@@ -2527,7 +2527,8 @@ class BiogMainRepository {
                     continue; // 對面空白／哨兵 → 無內容、可安全覆寫
                 }
                 if (is_array($baseline)) {
-                    // 關係碼：對面碼仍是「正向舊碼的合法反向」(pair1/pair2) → 同步、非分歧；否則為真分歧。
+                    // 碼欄：對面碼 ∈ baseline 集 → 非分歧；否則真分歧。assoc baseline 為 validReverseAssocSet；
+                    // kin 經 #86（語義 b）已於 syncKinMirrorOnUpdate 把 baseline 覆寫為 [本次欲寫入反向碼]（preserve 模式則移除碼欄不判）。
                     $valid = array_map(static fn ($v) => (string) (int) $v, $baseline);
                     $isConflict = !in_array((string) (int) $existing, $valid, true);
                 } else {
@@ -2741,7 +2742,20 @@ class BiogMainRepository {
             $updateQuery = DB::table('KIN_DATA')->where($pairWhere);
             $mirroredRows = (clone $updateQuery)->get();
             if ($detectConflict) {
-                $this->detectMirrorConflicts('KIN_DATA', $mirroredRows, $conflictBaselines, $dataMirror, $auditLog);
+                // #86（語義 b）：碼欄衝突基準＝本次「實際欲寫入對面的反向碼」（$dataMirror['c_kin_code']），
+                // 在此單點權威覆寫呼叫端傳入的碼欄基準（create 的 createKinMirrorBaselines / 核准的 buildApprovalMirrorBaselines）。
+                // 理由：定位器（kinReverseLocatorCodes 聯集）命中的列其碼必為合法反向，但若對面碼 ≠ 我方欲寫入碼（如對面為更
+                // 具體的排行碼 77、我方寫通用 76），update 會把它覆寫成我方碼而丟失原碼 → 應提示讓使用者確認；對面碼 == 我方
+                // 欲寫入碼（含使用者手選同碼）→ 冪等通過、不誤擋。內容欄基準（c_notes/c_source/c_pages）維持呼叫端所傳不變。
+                $kinBaselines = $conflictBaselines;
+                if (isset($dataMirror['c_kin_code'])) {
+                    $kinBaselines['c_kin_code'] = [(int) $dataMirror['c_kin_code']];
+                } else {
+                    // preserve 模式（純內容編輯：未送 c_kinship_pair、正向碼未變 → KinshipMutationHandler unset c_kin_code）：
+                    // 本次根本不改寫對面反向碼 → 不應對碼欄判衝突（否則對面既有合法手選碼如 74 ∉ 呼叫端窄基準會被誤擋）。
+                    unset($kinBaselines['c_kin_code']);
+                }
+                $this->detectMirrorConflicts('KIN_DATA', $mirroredRows, $kinBaselines, $dataMirror, $auditLog);
             }
             $updateQuery->update($dataMirror);
             foreach ($mirroredRows as $mirroredRow) {

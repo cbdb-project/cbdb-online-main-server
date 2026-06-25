@@ -271,6 +271,68 @@ class ApiV2MutateKinshipTest extends TestCase {
         $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73]);
     }
 
+    #[Test]
+    public function testDirectKinshipUpdateHandPickedSameReverseCodeNoFalseConflict(): void {
+        // #86（語義 b）：對面以使用者手選的合法替代反向碼 74 編碼、內容與正向舊值一致（in-sync）；本次手選「同碼 74」改備註。
+        // (b) 碼欄基準＝我方欲寫入碼 74 → 對面 74 == 我方 74 → 不誤判碼衝突，非 force 即通過。
+        // 修正前（碼欄基準＝validReverseKinSet(72)={73}）會把對面 74 誤判碼衝突而擋下（誤擋合法手選同碼）。
+        $this->actingAs($this->makeUser(email: 'kin-upd-b-samecode@example.com'));
+        $this->seedKinship(['c_kin_code' => 72, 'c_notes' => '原備註', 'c_autogen_notes' => 'auto-b']);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 74,
+            'c_source' => 10, 'c_notes' => '原備註', 'c_autogen_notes' => 'auto-b', // 內容與正向舊值一致＝in-sync
+        ]);
+
+        $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'changes' => ['c_notes' => '改後', 'c_kinship_pair' => 74],
+        ]))->assertOk();
+
+        // 鏡像同步為新備註、碼維持 74（無誤擋、無覆寫成 73）。
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 74, 'c_notes' => '改後']);
+    }
+
+    #[Test]
+    public function testDirectKinshipUpdateWritingDifferentReverseCodeFlagsConflict(): void {
+        // #86（語義 b 的保護面）：對面為合法排行碼 74、內容 in-sync；本次手選寫入「不同」反向碼 73 →
+        // (b) 偵測「對面碼 74 ≠ 我方欲寫入碼 73」→ 409，避免靜默把對面 74 覆寫成 73（丟失排行資訊）；force 才覆寫。
+        $this->actingAs($this->makeUser(email: 'kin-upd-b-diffcode@example.com'));
+        $this->seedKinship(['c_kin_code' => 72, 'c_notes' => '原備註', 'c_autogen_notes' => 'auto-d']);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 74,
+            'c_source' => 10, 'c_notes' => '原備註', 'c_autogen_notes' => 'auto-d',
+        ]);
+
+        $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'changes' => ['c_notes' => '改後', 'c_kinship_pair' => 73],
+        ]))->assertStatus(409);
+
+        // 回滾：對面碼維持 74、未被覆寫成 73。
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 74]);
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73]);
+    }
+
+    #[Test]
+    public function testDirectKinshipUpdatePreserveModeWithHandPickedReverseNoFalseConflict(): void {
+        // #86（語義 b，preserve 路徑）：對面以手選合法替代反向碼 74 編碼、內容 in-sync；本次「純內容編輯」未送
+        // c_kinship_pair、正向碼未變 → handler unset c_kin_code（保留對面碼）→ 不應對碼欄判衝突。
+        // 修正前（preserve 退回窄基準 validReverseKinSet(72)={73}）會把對面 74 誤判碼衝突而擋下（非 force）。
+        $this->actingAs($this->makeUser(email: 'kin-upd-b-preserve@example.com'));
+        $this->seedKinship(['c_kin_code' => 72, 'c_notes' => '原備註', 'c_autogen_notes' => 'auto-pb']);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 74,
+            'c_source' => 10, 'c_notes' => '原備註', 'c_autogen_notes' => 'auto-pb', // in-sync
+        ]);
+
+        // 純改備註、未送 c_kinship_pair、非 force → 不應因對面碼 74∉{73} 被誤擋。
+        $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'changes' => ['c_notes' => '改後'],
+        ]))->assertOk();
+
+        // 鏡像備註同步、碼維持 74（未被誤擋、未被洗成 73）。
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 74, 'c_notes' => '改後']);
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73]);
+    }
+
     // ── #66 雙向鏡像衝突偵測 ──────────────────────────────────
 
     #[Test]

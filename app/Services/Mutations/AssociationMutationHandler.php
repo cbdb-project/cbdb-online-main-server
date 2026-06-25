@@ -54,24 +54,13 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
         return $baselines;
     }
 
-    /** ASSOC_CODES：某社會關係碼的合法反向集（c_assoc_pair / c_assoc_pair2）。空/0 或無反向 → 空陣列（該欄不納入碼分歧檢測）。 */
+    /** §8：合法反向碼集收斂於 RelationshipMirrorService（單一真相來源）。 */
     private function assocValidReverses($code): array {
-        if ($code === null || (int) $code === 0) {
-            return [];
-        }
-        $row = DB::table('ASSOC_CODES')->where('c_assoc_code', $code)->first();
-
-        return array_values(array_filter([$row->c_assoc_pair ?? null, $row->c_assoc_pair2 ?? null], static fn ($v) => $v !== null && (int) $v !== 0));
+        return app(\App\Services\RelationshipMirrorService::class)->validReverseAssocSet($code);
     }
 
-    /** KINSHIP_CODES：某親屬碼的合法反向集（c_kin_pair1 / c_kin_pair2）。空/0 或無反向 → 空陣列。 */
     private function kinValidReverses($code): array {
-        if ($code === null || (int) $code === 0) {
-            return [];
-        }
-        $row = DB::table('KINSHIP_CODES')->where('c_kincode', $code)->first();
-
-        return array_values(array_filter([$row->c_kin_pair1 ?? null, $row->c_kin_pair2 ?? null], static fn ($v) => $v !== null && (int) $v !== 0));
+        return app(\App\Services\RelationshipMirrorService::class)->validReverseKinSet($code);
     }
 
     public function __construct(

@@ -167,17 +167,9 @@ class AssociationCreateHandler extends AbstractPersonSubresourceCreateHandler {
         return $baselines;
     }
 
-    /** ASSOC_CODES：正向社會關係碼的合法反向集（c_assoc_pair / c_assoc_pair2）。空/0/無反向 → 空陣列（該欄不納入碼分歧）。 */
+    /** §8：合法反向碼集收斂於 RelationshipMirrorService（單一真相來源）。 */
     private function validAssocReverses($code): array {
-        if ($code === null || (int) $code === 0) {
-            return [];
-        }
-        $row = DB::table('ASSOC_CODES')->where('c_assoc_code', $code)->first();
-        if (!$row) {
-            return [];
-        }
-
-        return array_values(array_filter([$row->c_assoc_pair ?? null, $row->c_assoc_pair2 ?? null], static fn ($v) => $v !== null && (int) $v !== 0));
+        return app(\App\Services\RelationshipMirrorService::class)->validReverseAssocSet($code);
     }
 
     /**

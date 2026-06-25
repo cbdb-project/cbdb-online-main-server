@@ -141,17 +141,9 @@ class KinshipCreateHandler extends AbstractPersonSubresourceCreateHandler {
         return $baselines;
     }
 
-    /** KINSHIP_CODES：正向親屬碼的合法反向集（c_kin_pair1 / c_kin_pair2）。空/0/無反向 → 空陣列（該欄不納入碼分歧）。 */
+    /** §8：合法反向碼集收斂於 RelationshipMirrorService（單一真相來源）。 */
     private function validKinReverses($code): array {
-        if ($code === null || (int) $code === 0) {
-            return [];
-        }
-        $row = DB::table('KINSHIP_CODES')->where('c_kincode', $code)->first();
-        if (!$row) {
-            return [];
-        }
-
-        return array_values(array_filter([$row->c_kin_pair1 ?? null, $row->c_kin_pair2 ?? null], static fn ($v) => $v !== null && (int) $v !== 0));
+        return app(\App\Services\RelationshipMirrorService::class)->validReverseKinSet($code);
     }
 
     /** proposal 模式把配對碼（送的或權威值）存入 __proposal_aux（核准時 applyKinshipProposal 套用）。 */

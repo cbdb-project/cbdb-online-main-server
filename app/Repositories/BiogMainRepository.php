@@ -2693,7 +2693,7 @@ class BiogMainRepository {
      * $allowBackfill=true 時（v2 永遠雙向同步），找不到反向列且鏡像碼有效則補建——修正 legacy 單邊缺鏡像；
      * legacy 呼叫一律傳 false＝行為不變。回傳精確配對命中數（legacy 以此填 err）。
      */
-    public function syncKinMirrorOnUpdate(array $dataMirror, int $cPersonid, $oldKinId, $oldAutogenNotes, $oldKinCode, $operation = null, ?AuditLogService $auditLog = null, bool $allowBackfill = false, bool $detectConflict = false, array $conflictBaselines = []): int {
+    public function syncKinMirrorOnUpdate(array $dataMirror, int $cPersonid, $oldKinId, $oldAutogenNotes, $oldKinCode, $operation = null, ?AuditLogService $auditLog = null, bool $allowBackfill = false, bool $detectConflict = false, array $conflictBaselines = [], bool $reverseCodeAuthoritative = false): int {
         $auditLog = $auditLog ?? new AuditLogService();
         $operationId = $operation ? (string) $operation->id : null;
 
@@ -2750,7 +2750,18 @@ class BiogMainRepository {
                 // 77、我方寫通用 76），update 會覆寫丟失原碼 → 應提示確認；對面碼 == 欲寫入碼（含手選同碼）→ 冪等通過、不誤擋。
                 // 內容欄基準（c_notes/c_source/c_pages）維持呼叫端所傳不變。
                 $kinBaselines = $conflictBaselines;
-                if (isset($dataMirror['c_kin_code'])) {
+                if ($reverseCodeAuthoritative) {
+                    // #88 pair-only：使用者顯式設定反向配對碼（authoritative）——對面持有的「舊」反向碼正被遷移到新碼，
+                    // 非分歧；沿用呼叫端傳入的寬碼基準（validReverseKinSet，含舊反向碼）→ 對面舊碼 ∈ 即不誤擋、僅擋∉合法集的漂移碼。
+                    // 不套用下方 (b) 的 [欲寫入碼] 窄覆寫（否則改反向碼必撞「對面舊碼≠新碼」誤判衝突，逼使用者 force）。
+                    // 另把「欲寫入新碼」併入碼基準：使「對面現值已等於目標新碼」（冪等重送/先前已修好）不被誤判衝突（review MINOR）。
+                    if (isset($dataMirror['c_kin_code']) && isset($kinBaselines['c_kin_code']) && is_array($kinBaselines['c_kin_code'])) {
+                        $kinBaselines['c_kin_code'] = array_values(array_unique(array_merge(
+                            [(int) $dataMirror['c_kin_code']],
+                            array_map('intval', $kinBaselines['c_kin_code'])
+                        )));
+                    }
+                } elseif (isset($dataMirror['c_kin_code'])) {
                     $writtenReverse = (int) $dataMirror['c_kin_code'];
                     if (in_array($writtenReverse, $legitReverses, true)) {
                         // 未改正向碼（欲寫入反向碼仍屬舊正向碼的反向集）：嚴格＝[欲寫入碼]（保護：對面為「別的」合法反向碼→提示）。

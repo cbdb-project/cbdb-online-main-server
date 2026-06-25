@@ -333,6 +333,29 @@ class ApiV2MutateKinshipTest extends TestCase {
         $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73]);
     }
 
+    #[Test]
+    public function testDirectKinshipUpdatePairOnlyChangesReverseCode(): void {
+        // #88：只送互逆配對碼（c_kinship_pair）、無任何正向欄變更 → 不再回 422「changes 不可為空」，
+        // 而是經 handlePairOnlyMirrorSync 把既有反向鏡像 c_kin_code 由 73 改為手選的 74（正向碼維持 72）。
+        $this->actingAs($this->makeUser(email: 'kin-pair-only@example.com'));
+        $this->seedKinship(['c_kin_code' => 72, 'c_notes' => '原備註', 'c_autogen_notes' => 'auto-po']);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73,
+            'c_source' => 10, 'c_notes' => '原備註', 'c_autogen_notes' => 'auto-po',
+        ]);
+
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'kinship', 'person_id' => 1000, 'mode' => 'direct', 'operation' => 'update',
+            'target' => ['pk' => ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 72]],
+            'changes' => ['c_kinship_pair' => 74], // 只送反向配對碼，無正向欄
+        ])->assertOk();
+
+        // 反向鏡像碼由 73 改為 74；正向 (1000,2000,72) 不變。
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 74]);
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73]);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 72]);
+    }
+
     // ── #66 雙向鏡像衝突偵測 ──────────────────────────────────
 
     #[Test]

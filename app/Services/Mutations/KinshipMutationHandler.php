@@ -72,6 +72,7 @@ class KinshipMutationHandler extends AbstractPersonSubresourceMutationHandler {
      */
     public function handle(string $resource, string $mode, string $operation, int $personId, array $targetPk, array $changes, array $meta = []): JsonResponse {
         // 先讀 client 可選的反向碼覆寫，再剝除（c_kinship_pair 非 KIN_DATA 欄）。
+        $pairSent = array_key_exists('c_kinship_pair', $changes); // #88：是否顯式送了反向配對碼。
         $clientReverse = $changes['c_kinship_pair'] ?? null;
         unset($changes['c_kinship_pair']);
 
@@ -106,11 +107,87 @@ class KinshipMutationHandler extends AbstractPersonSubresourceMutationHandler {
         $this->forceMirror = (bool) ($meta['force'] ?? false);
 
         try {
+            // #88：pair-only direct——只送互逆配對碼（c_kinship_pair）、無任何 KIN_DATA 欄變更（顯式修復/改寫反向碼）。
+            // 父類會以「changes 空」回 422 拒絕，故獨立處理（對齊 AssociationMutationHandler::handlePairOnlyMirrorSync）。
+            if ($mode === 'direct' && $pairSent && $changes === []) {
+                return $this->handlePairOnlyMirrorSync($personId, $targetPk);
+            }
+
             return parent::handle($resource, $mode, $operation, $personId, $targetPk, $changes, $meta);
         } finally {
             $this->pendingKin = null;
             $this->forceMirror = false;
         }
+    }
+
+    /**
+     * #88 pair-only：只改互逆配對碼、無正向欄變更時，於獨立交易內同步既有反向鏡像列的 c_kin_code（不經父類 handleDirect，
+     * 因其要求至少一個正向欄變更）。對齊 AssociationMutationHandler::handlePairOnlyMirrorSync。reverseCodeAuthoritative=true：
+     * 使用者顯式設定反向碼為權威，對面舊反向碼正被遷移，不以 (b) 窄碼基準誤判衝突；仍偵測對面碼漂移出合法集（真分歧）。
+     */
+    private function handlePairOnlyMirrorSync(int $personId, array $targetPk): JsonResponse {
+        if ($authError = $this->authorizeDirect()) {
+            return $authError;
+        }
+        $original = $this->findKinRow($targetPk);
+        if (!$original) {
+            return $this->errorResponse('KIN_DATA 記錄不存在', 404);
+        }
+        if ((string) ($original->c_personid ?? '') !== (string) $personId) {
+            return $this->errorResponse('person_id 與目標記錄不一致', 422, ['person_id' => ['mismatch']]);
+        }
+
+        $kin = $this->pendingKin ?? [];
+        $dataMirror = (array) $original;
+        unset($dataMirror['c_created_by'], $dataMirror['c_created_date']);
+        $dataMirror['c_modified_by'] = Auth::user()->name ?? '';
+        $dataMirror['c_modified_date'] = Carbon::now();
+        $dataMirror['c_kin_code'] = CompositePrimaryKey::emptyToSentinel($kin['mirrorCode'] ?? null);
+        $dataMirror['c_personid'] = $original->c_kin_id; // 反向列主體＝對方
+        unset($dataMirror['c_kin_id']);                  // 反向列客體 c_kin_id 維持本人（sync backfill 補回）
+
+        try {
+            DB::transaction(function () use ($dataMirror, $personId, $targetPk, $original) {
+                app(BiogMainRepository::class)->syncKinMirrorOnUpdate(
+                    $dataMirror,
+                    $personId,
+                    $targetPk['c_kin_id'] ?? null,
+                    $original->c_autogen_notes ?? null,
+                    $targetPk['c_kin_code'] ?? null,
+                    null,
+                    $this->auditLogService,
+                    true,                 // allowBackfill：顯式維護雙向→缺鏡像即補建
+                    !$this->forceMirror,  // #66：非 force 時偵測對面（碼漂移）真分歧
+                    $this->conflictBaselines([], (array) $original),
+                    true                  // #88：reverseCodeAuthoritative——沿用寬碼基準，不誤擋對面舊反向碼
+                );
+            });
+        } catch (MirrorConflictException $e) {
+            return $this->errorResponse($e->getMessage(), 409, [
+                'mirror_conflict' => ['table' => $e->mirrorTable, 'pk' => $e->mirrorPk, 'fields' => $e->conflicts],
+            ]);
+        } catch (MirrorSuspectedException $e) {
+            return $this->errorResponse($e->getMessage(), 409, [
+                'mirror_suspected' => [
+                    'table' => $e->mirrorTable,
+                    'candidates' => $e->candidates,
+                    'authoritative_code' => $e->authoritativeCode,
+                    'count' => $e->count(),
+                ],
+            ]);
+        } catch (MirrorIntegrityException $e) {
+            return $this->errorResponse($e->getMessage(), 422, ['mirror_integrity' => ['fail_closed']]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            return $this->errorResponse('鏡像列已存在或主鍵衝突', 409, ['mirror' => ['conflict']]);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'resource' => $this->resourceName(),
+            'mode' => 'direct',
+            'operation' => 'update',
+            'result' => ['pk' => $targetPk, 'updated_fields' => ['c_kinship_pair']],
+        ]);
     }
 
     /**

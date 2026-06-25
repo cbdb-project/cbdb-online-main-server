@@ -126,7 +126,12 @@ export default function AssocEditor({
     // #80（§5-B）：對面多筆對應時，direct 存檔須二次確認（先停下提示，再次點擊才一併同步）。偵測結果變動即重置。
     const multiAckRef = useRef(false);
 
-    const dirty = useMemo(() => JSON.stringify(fields) !== savedSnapshot, [fields, savedSnapshot]);
+    // #88：三組互逆配對碼（社會關係/親屬/關聯親屬）皆為獨立 state、不在 fields。只改任一須仍視為 dirty（啟用存檔），
+    // 否則存檔鈕停用、改動存不進去。後端 handlePairOnlyMirrorSync 承接「僅配對碼變更」。
+    const dirty = useMemo(
+        () => JSON.stringify(fields) !== savedSnapshot || (mode === 'edit' && (pairTouched || kinPairTouched || assocKinPairTouched)),
+        [fields, savedSnapshot, mode, pairTouched, kinPairTouched, assocKinPairTouched],
+    );
 
     // #79：偵測對面缺邊/多條（僅 edit；依「已存檔」列定位；存檔後重抓）。
     const savedRow = useMemo<Fields>(() => { try { return JSON.parse(savedSnapshot) as Fields; } catch { return base; } }, [savedSnapshot]);
@@ -376,6 +381,7 @@ export default function AssocEditor({
             if (auditRow) { for (const k of ['c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date']) { if (auditRow[k] != null) auditPatch[k] = String(auditRow[k]); } }
             if (Object.keys(auditPatch).length > 0) setFields((prev) => ({ ...prev, ...auditPatch }));
             setSavedSnapshot(JSON.stringify({ ...fields, ...auditPatch }));
+            setPairTouched(false); setKinPairTouched(false); setAssocKinPairTouched(false); // #88：存檔成功後重置三組配對 touched。
             if (mode === 'create') { window.location.assign(indexUrl); } else if (sm === 'direct') {
                 // 改鍵後以實際送出的 PK 變更覆寫 originalPk（不可用 fields 重建，避免清空 Number('')=0 失準）。
                 const nextPk = { ...originalPk.current };

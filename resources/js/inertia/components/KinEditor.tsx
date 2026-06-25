@@ -85,7 +85,9 @@ export default function KinEditor({
     // #80（§5-B）：對面多筆對應時，direct 存檔須二次確認（先停下提示，再次點擊才一併同步）。偵測結果變動即重置。
     const multiAckRef = useRef(false);
 
-    const dirty = useMemo(() => JSON.stringify(fields) !== savedSnapshot, [fields, savedSnapshot]);
+    // #88：互逆配對碼（reversePair）是獨立 state、不在 fields 內。只改它時須仍視為 dirty（啟用存檔），
+    // 否則存檔鈕停用、改動存不進去（使用者回報「設反向為弟、存檔卻沒成功」）。後端有 pair-only 同步路徑承接。
+    const dirty = useMemo(() => JSON.stringify(fields) !== savedSnapshot || (mode === 'edit' && pairTouched), [fields, savedSnapshot, mode, pairTouched]);
 
     // #79：偵測對面缺邊/多條（僅 edit 模式、依「已存檔」的列定位；存檔後 savedSnapshot 變→重抓）。
     const savedRow = useMemo<Fields>(() => { try { return JSON.parse(savedSnapshot) as Fields; } catch { return base; } }, [savedSnapshot]);
@@ -183,6 +185,16 @@ export default function KinEditor({
             if (reversePair && pairTouched) changes.c_kinship_pair = reversePair;
             if (Object.keys(changes).length === 0) { setSaving(false); setError(tr('no_change', '沒有變更')); return; }
         }
+        // #88：pair-only 修復（僅互逆配對碼變更、無任何正向欄）屬「直接修復鏡像」維護動作，後端僅 direct 支援；
+        // 以 proposal 送出會被父類「changes 不可為空」擋成 422，故前端先攔截並引導改用「直接保存」（對齊 AssocEditor）。
+        if (mode === 'edit' && sm === 'proposal') {
+            const realChanges = Object.keys(changes).filter((k) => k !== 'c_kinship_pair');
+            if (realChanges.length === 0) {
+                setSaving(false);
+                setError(tr('pair_only_proposal_hint', '互逆配對碼修復請使用「直接保存」；提交建議請至少修改一個關係欄位。'));
+                return;
+            }
+        }
         try {
             // #66：meta 可帶 comment（proposal）與 force（衝突警告中選「強制覆寫」時）。
             const meta: Record<string, unknown> = {};
@@ -211,6 +223,7 @@ export default function KinEditor({
             if (auditRow) { for (const k of ['c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date']) { if (auditRow[k] != null) auditPatch[k] = String(auditRow[k]); } }
             if (Object.keys(auditPatch).length > 0) setFields((prev) => ({ ...prev, ...auditPatch }));
             setSavedSnapshot(JSON.stringify({ ...fields, ...auditPatch }));
+            setPairTouched(false); // #88：存檔成功後重置，避免反向配對碼改動持續被視為 dirty。
             if (mode === 'create') { window.location.assign(indexUrl); } else if (sm === 'direct') {
                 // 改鍵後以實際送出的 PK 變更覆寫 originalPk（不可用 fields 重建，避免 Number('')=0 失準）。
                 const nextPk = { ...originalPk.current };

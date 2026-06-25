@@ -66,8 +66,8 @@ class AddressMutationHandler extends AbstractPersonSubresourceMutationHandler {
         // -999 → 0 轉換
         $data = $this->normalizeSentinelValues($data, ['c_addr_id', 'c_source']);
 
-        // 對齊 legacy emptyToSentinel：地名／出處為碼表 FK（0=Unknown），清空時正規化為 '0'，
-        // 不可寫成 NULL（real schema 多為 NOT NULL default 0）。
+        // 對齊 legacy emptyToSentinel：地名／出處為碼表 FK（legacy 哨兵 0=Unknown），清空時正規化為 '0'，
+        // 不可寫成 NULL（real DDL 雖 nullable，但 legacy 資料流空碼一律落 0）。
         foreach (['c_addr_id', 'c_source'] as $f) {
             if (array_key_exists($f, $data) && ($data[$f] === null || $data[$f] === '')) {
                 $data[$f] = '0';

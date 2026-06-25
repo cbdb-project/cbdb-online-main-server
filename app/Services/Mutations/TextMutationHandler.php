@@ -48,8 +48,8 @@ class TextMutationHandler extends AbstractPersonSubresourceMutationHandler {
     protected function preprocessUpdateData(array $data): array {
         $data = $this->normalizeSentinelValues($data, ['c_textid', 'c_source']);
 
-        // 對齊 legacy emptyToSentinel：著述／出處為碼表 FK（0=Unknown），清空時正規化為 '0'，
-        // 不可寫成 NULL（real schema c_textid/c_source NOT NULL default 0）。
+        // 對齊 legacy emptyToSentinel：著述／出處為碼表 FK（legacy 哨兵 0=Unknown），清空時正規化為 '0'，
+        // 不可寫成 NULL（real DDL 雖 nullable，但 legacy 資料流空碼一律落 0）。
         foreach (['c_textid', 'c_source'] as $f) {
             if (array_key_exists($f, $data) && ($data[$f] === null || $data[$f] === '')) {
                 $data[$f] = '0';

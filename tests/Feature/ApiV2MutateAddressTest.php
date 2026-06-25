@@ -273,7 +273,7 @@ class ApiV2MutateAddressTest extends TestCase {
     #[Test]
     public function testDirectAddressUpdateClearingSourceNormalizesToSentinelZero(): void {
         // 回歸（人物編輯重做）：清空出處（c_source）時前端送 null，後端須對齊 legacy emptyToSentinel
-        // 正規化為 0（Unknown），不可寫成 NULL（real schema c_source NOT NULL default 0）。
+        // 正規化為 0（Unknown），不可寫成 NULL（legacy 哨兵 0=Unknown，空碼一律落 0；real DDL 雖 nullable）。
         $user = $this->makeUser(email: 'addr-clearsource@example.com');
         $this->actingAs($user);
         $this->seedAddress(['c_source' => 10]);

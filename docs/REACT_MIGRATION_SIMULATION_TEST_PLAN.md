@@ -130,6 +130,13 @@
 3. **幂等性以程式/命令驗證，不可靠目視**：對新版同一輸入**重送**，以查詢腳本/命令確認**不產生重複列、欄位不漂移**（例如 `SELECT count(*)` 與欄位 diff 由臨時程式輸出判定），人工只讀程式產出的判定結果，不靠肉眼比 UI。
 4. **安全**：全程合成資料（高位保留主鍵 + E2E 標記）、`finally` 清理（含連動 `operations` 列），**絕不碰真實 CBDB 資料**；以真實 `operations.resource_data` 為**輸入樣本**時只讀取、不修改原列。
 
+> **✅ M 維度已完成（2026-06-25）**：13 個人物編輯器皆有 `*WriteEquivalenceLegacyVsV2`（legacy 真實輸入重放 + 程式驗幂等，`#[Group('legacy-parity')]`）。本 session 由此維度逼出並修復：
+> - assoc/kinship 互逆鏡像曾寫哨兵 0（未详）而非權威反向配對碼（#51/#56）；
+> - 任官 update 未同步 `POSTING_DATA.c_modified_*`（#69）；
+> - **sentinel 完全幂等**：碼/FK 欄 `null/''/-999/缺鍵` 落庫須一律為哨兵 0、永不寫 null/''——UPDATE 路徑（9 handler）與 CREATE 路徑（#71，含缺鍵補 0、possession 缺鍵 undefined-index）皆已修，13 編輯器各 ≥10 案例 `*SentinelFullyIdempotent`；
+> - #66 雙向鏡像內容衝突偵測 + #70 鏡像「疑似匹配」（嚴格落空+對面碼漂移→警告/強制收斂）UPDATE 與 CREATE 兩路徑（#72）皆完成。
+> 全量 phpunit 1918 綠（8667 assertions）。legacy 下線時依 `#[Group('legacy-parity')]` 一鍵清理耦合 legacy 的等價測試（#68）。
+
 ### 目標表選定（流程 A–E）
 - 選一張**結構單純、主鍵明確、可安全插入合成列**的 codes 表（候選由實作前以 `CompositePrimaryKey::SCHEMAS` 與欄位數最少者中挑選並記錄於報告）。
 - 合成列主鍵採高位保留值（如 code 欄 `9999xxx`），名稱欄含 `E2E-TEST-<runtag>`，確保不與真實資料碰撞、清理可精準定位。

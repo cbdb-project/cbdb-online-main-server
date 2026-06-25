@@ -218,7 +218,7 @@ class ApiV2MutateTextTest extends TestCase {
     #[Test]
     public function testDirectTextUpdateClearingSourceNormalizesToSentinelZero(): void {
         // 回歸（人物編輯重做）：清空出處（c_source）時 React 編輯器送 null，後端須對齊 legacy
-        // emptyToSentinel 正規化為 0（Unknown），不可寫成 NULL（real schema c_source NOT NULL default 0）。
+        // emptyToSentinel 正規化為 0（Unknown），不可寫成 NULL（legacy 哨兵 0=Unknown，空碼一律落 0；real DDL 雖 nullable）。
         $user = $this->makeUser(email: 'text-clearsource@example.com');
         $this->actingAs($user);
         $this->seedText(['c_source' => 10]);

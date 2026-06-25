@@ -190,6 +190,24 @@ class ApiV2DeleteKinshipTest extends TestCase {
     }
 
     #[Test]
+    public function testDirectKinshipDeleteRemovesReciprocalMirrorDespiteAutogenMismatch(): void {
+        // #87：刪除定位也不再認 autogen。正向與反向 autogen 不對稱時，仍須刪除同段合法反向列，不能漏刪成孤兒。
+        $user = $this->makeUser(email: 'delete-kin-mirror-autogen@example.com');
+        $this->actingAs($user);
+        $this->seedKin(['c_kin_code' => 75, 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 76,
+            'c_source' => 10, 'c_autogen_notes' => 'other',
+        ]);
+
+        $this->postJson('/api/v2/delete', $this->deletePayload())->assertOk();
+
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 200, 'c_kin_code' => 75]);
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 76]);
+        $this->assertSame(0, DB::table('KIN_DATA')->count());
+    }
+
+    #[Test]
     public function testDirectKinshipDeleteRemovesOrphanProneRankReverse(): void {
         // #81 §6：反向列以「排行碼」201 編碼（pair1=75 指回正向碼 75，但 ≠ 75 自身 pair1=76）。
         // 舊窄定位（只認 75 自身 pair1=76）會漏刪→孤兒；對齊 legitReverses 後應命中並刪除。

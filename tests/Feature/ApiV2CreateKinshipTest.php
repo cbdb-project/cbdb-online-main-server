@@ -536,6 +536,25 @@ class ApiV2CreateKinshipTest extends TestCase {
     }
 
     #[Test]
+    public function testKinshipCreateMirrorSuspectedDetectedDespiteAutogenMismatch(): void {
+        // #87（relaxed autogen 一致性）：對面漂移列 99 的 c_autogen_notes='AG'，但本次 create autogen='other'（不對稱）。
+        // relaxed 分支不再認 c_autogen_notes → 仍偵測到漂移疑似 → 409 整筆回滾，而非因 autogen 不符漏抓→backfill 補出重複鏡像。
+        $this->actingAs($this->makeUser(email: 'kin-c-suspect-autogen@example.com'));
+        $this->seedReverseKin(); // (300,1000,99) autogen='AG'
+
+        $res = $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_source' => 20, 'c_notes' => '甲之親', 'c_autogen_notes' => 'other'], // 與漂移列 autogen 不對稱
+        ]));
+
+        $res->assertStatus(409)->assertJson(['ok' => false]);
+        $this->assertSame('KIN_DATA', $res->json('errors.mirror_suspected.table'));
+        // 整筆回滾：正向未建、漂移 99 未動、不得補出第二條反向鏡像（81）。
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 300, 'c_kin_code' => 80]);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 300, 'c_kin_id' => 1000, 'c_kin_code' => 99]);
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 300, 'c_kin_id' => 1000, 'c_kin_code' => 81]);
+    }
+
+    #[Test]
     public function testKinshipCreateMirrorSuspectedForceCollapses(): void {
         // force=true → 就地收斂漂移列（99→權威反向碼 81、套用新內容），不補出重複鏡像；正向列建立。
         $this->actingAs($this->makeUser(email: 'kin-c-force@example.com'));

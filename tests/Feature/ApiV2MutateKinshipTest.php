@@ -813,6 +813,26 @@ class ApiV2MutateKinshipTest extends TestCase {
     }
 
     #[Test]
+    public function testKinUpdateSuspectedMirrorBlockedDespiteAutogenMismatch(): void {
+        // #87：對面僅有漂移列 99，但其 autogen 與正向舊值不對稱。relaxed 不再認 autogen，仍須視為同段疑似 →
+        // 409 回滾，而非漏抓後讓 direct update 靜默成功/留下日後 backfill 重複鏡像。
+        $this->actingAs($this->makeUser(email: 'kin-suspected-autogen@example.com'));
+        $this->seedKinship(['c_kin_code' => 72, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 99, 'c_source' => 10, 'c_notes' => '漂移鏡像', 'c_autogen_notes' => 'other']);
+
+        $res = $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'changes' => ['c_notes' => '改後', 'c_kinship_pair' => 73],
+        ]))->assertStatus(409);
+        $res->assertJsonPath('errors.mirror_suspected.table', 'KIN_DATA');
+        $res->assertJsonPath('errors.mirror_suspected.count', 1);
+
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 72, 'c_notes' => '正向原備註']);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 99, 'c_notes' => '漂移鏡像']);
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73]);
+        $this->assertSame(2, DB::table('KIN_DATA')->count(), '整筆回滾，不得補出新鏡像');
+    }
+
+    #[Test]
     public function testKinUpdateSuspectedForceCollapsesInPlace(): void {
         // #70 強制（單條漂移）：按該漂移列完整 PK 就地收斂 99→權威反向碼 73 + 覆寫內容，不新建。
         $this->actingAs($this->makeUser(email: 'kin-suspected-force@example.com'));
@@ -868,24 +888,26 @@ class ApiV2MutateKinshipTest extends TestCase {
     }
 
     #[Test]
-    public function testKinUpdateForceCollapseTargetPkOccupiedReturns409NotSilentNoop(): void {
-        // #70（codex 揪出）：罕見髒資料——本段漂移列 99@auto-x，但目標權威碼 PK 已被他列 73@auto-y 佔用（不同 autogen，
-        // 未被 pairWhere 計入）。force 收斂 99→73 會撞 KIN_DATA 主鍵 → QueryException → 409「主鍵衝突」（誠實告知無法自動解），
-        // 而非靜默 no-op 假成功。整筆回滾。
-        $this->actingAs($this->makeUser(email: 'kin-collide@example.com'));
+    public function testKinUpdateLegitReverseDifferentAutogenStrictMatchedNotTreatedAsOtherSegment(): void {
+        // #87（autogen 根因，取代舊「PK 佔用 409」案例）：對面有合法反向碼 73 的列，但其 c_autogen_notes='auto-y' 與正向
+        // 的 'auto-x' 不同。autogen 不再參與定位 → 73 列即本段合法反向（同對人 + 合法反向碼，PK 唯一），嚴格命中並同步更新；
+        // 另一條漂移列 99（碼∉合法反向集）不被嚴格命中、保持不動。修正前 autogen 不符會把 73 排除→落 relaxed 收斂 99→73 撞 PK。
+        $this->actingAs($this->makeUser(email: 'kin-autogen-diff@example.com'));
         $this->seedKinship(['c_kin_code' => 72, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'auto-x']);
         DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 99, 'c_source' => 10, 'c_notes' => '漂移', 'c_autogen_notes' => 'auto-x']);
-        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73, 'c_source' => 10, 'c_notes' => '他段73', 'c_autogen_notes' => 'auto-y']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73, 'c_source' => 10, 'c_notes' => '對面原備註', 'c_autogen_notes' => 'auto-y']);
 
+        // 純改備註、force（略過內容衝突閘，專驗定位）→ 嚴格命中合法反向 73（不論 autogen）並同步。
         $this->postJson('/api/v2/mutate', $this->kinshipPayload([
             'changes' => ['c_notes' => '改後'],
             'meta' => ['force' => true],
-        ]))->assertStatus(409);
+        ]))->assertOk();
 
-        // 整筆回滾：正向未改、漂移 99 未動、他段 73@auto-y 未動。
-        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 72, 'c_notes' => '正向原備註']);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 72, 'c_notes' => '改後']);
+        // 合法反向 73（autogen 不同）被視為本段反向 → 內容同步為「改後」。
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73, 'c_notes' => '改後']);
+        // 漂移列 99（碼∉合法反向集）非嚴格命中 → 不動。
         $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 99, 'c_notes' => '漂移']);
-        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73, 'c_notes' => '他段73']);
         $this->assertSame(3, DB::table('KIN_DATA')->count());
     }
 

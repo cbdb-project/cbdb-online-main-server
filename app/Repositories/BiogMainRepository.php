@@ -2710,10 +2710,13 @@ class BiogMainRepository {
         // 編碼的合法反向列 → 落 relaxed 被誤判他段、偵測誤報缺邊、sync 漏定位補重複。偵測 locateOppositeEdges 用同一聯集。
         $legitReverses = app(\App\Services\RelationshipMirrorService::class)->kinReverseLocatorCodes($oldKinCode);
 
-        $pairWhere = function ($query) use ($cPersonid, $oldKinId, $oldAutogenNotes, $legitReverses) {
+        // #87（autogen 根因）：嚴格定位**不**納入 c_autogen_notes。它是描述性註記、鏡像兩側天生不對稱（自動生成側帶
+        // 「Auto-generated from PersonID=…」字串、原始手填側為 NULL），舊版精確比對 autogen 會讓「自動生成側 vs NULL 原始側」
+        // 嚴格落空 → 偵測誤報缺邊、且 sync 漏定位（存檔時對面反向列不被同步、或補出重複）。反向關係身分由
+        // (c_kin_id=本人, c_personid=對方, c_kin_code ∈ 反向碼集) 唯一決定；與偵測 locateOppositeEdges 同套（皆不認 autogen）。
+        $pairWhere = function ($query) use ($cPersonid, $oldKinId, $legitReverses) {
             $query->where('c_kin_id', $cPersonid)
                 ->where('c_personid', $oldKinId)
-                ->where('c_autogen_notes', $oldAutogenNotes)
                 ->whereIn('c_kin_code', $legitReverses ?: [-99999]); // 空集 → 不命中（落 relaxed）
         };
 
@@ -2742,14 +2745,21 @@ class BiogMainRepository {
             $updateQuery = DB::table('KIN_DATA')->where($pairWhere);
             $mirroredRows = (clone $updateQuery)->get();
             if ($detectConflict) {
-                // #86（語義 b）：碼欄衝突基準＝本次「實際欲寫入對面的反向碼」（$dataMirror['c_kin_code']），
-                // 在此單點權威覆寫呼叫端傳入的碼欄基準（create 的 createKinMirrorBaselines / 核准的 buildApprovalMirrorBaselines）。
-                // 理由：定位器（kinReverseLocatorCodes 聯集）命中的列其碼必為合法反向，但若對面碼 ≠ 我方欲寫入碼（如對面為更
-                // 具體的排行碼 77、我方寫通用 76），update 會把它覆寫成我方碼而丟失原碼 → 應提示讓使用者確認；對面碼 == 我方
-                // 欲寫入碼（含使用者手選同碼）→ 冪等通過、不誤擋。內容欄基準（c_notes/c_source/c_pages）維持呼叫端所傳不變。
+                // #86（語義 b）：碼欄衝突基準＝本次「實際欲寫入對面的反向碼」（$dataMirror['c_kin_code']），於此單點權威覆寫
+                // 呼叫端傳入的碼欄基準。理由：定位器命中列其碼必為合法反向，但若對面碼 ≠ 我方欲寫入碼（如對面為更具體的排行碼
+                // 77、我方寫通用 76），update 會覆寫丟失原碼 → 應提示確認；對面碼 == 欲寫入碼（含手選同碼）→ 冪等通過、不誤擋。
+                // 內容欄基準（c_notes/c_source/c_pages）維持呼叫端所傳不變。
                 $kinBaselines = $conflictBaselines;
                 if (isset($dataMirror['c_kin_code'])) {
-                    $kinBaselines['c_kin_code'] = [(int) $dataMirror['c_kin_code']];
+                    $writtenReverse = (int) $dataMirror['c_kin_code'];
+                    if (in_array($writtenReverse, $legitReverses, true)) {
+                        // 未改正向碼（欲寫入反向碼仍屬舊正向碼的反向集）：嚴格＝[欲寫入碼]（保護：對面為「別的」合法反向碼→提示）。
+                        $kinBaselines['c_kin_code'] = [$writtenReverse];
+                    } else {
+                        // 正向碼改碼(recode)：欲寫入的是「新正向碼」的反向碼，對面持有的是「舊正向碼」的合法反向碼（$legitReverses）、
+                        // 正被遷移到新碼——非分歧，不應誤擋。故基準併入舊反向集，容許遷移既有鏡像（仍擋真正∉兩者的漂移/他段碼）。
+                        $kinBaselines['c_kin_code'] = array_values(array_unique(array_merge([$writtenReverse], $legitReverses)));
+                    }
                 } else {
                     // preserve 模式（純內容編輯：未送 c_kinship_pair、正向碼未變 → KinshipMutationHandler unset c_kin_code）：
                     // 本次根本不改寫對面反向碼 → 不應對碼欄判衝突（否則對面既有合法手選碼如 74 ∉ 呼叫端窄基準會被誤擋）。
@@ -2767,12 +2777,13 @@ class BiogMainRepository {
             return $sumCount;
         }
 
-        // sumCount === 0（本段合法反向集無命中）：#70 放寬探測「相同對方/本人/舊備註、不限親屬碼」的疑似列。
+        // sumCount === 0（本段合法反向集無命中）：#70 放寬探測「相同對方/本人、不限親屬碼」的疑似列。
         // 僅作 UI 疑似提示／強制收斂之用，不入冪等／確定匹配（確定性同步只認上方精確配對）。
+        // #87：與 strict/偵測一致，relaxed 亦**不**認 c_autogen_notes（鏡像兩側天生不對稱、非身分；當前程式已不生成 autogen）。
+        // 否則「漂移碼 + autogen 不對稱」時 relaxed 漏抓疑似 → create 補出重複、direct update 靜默漏同步、本該 409 變成功。
         $relaxed = DB::table('KIN_DATA')->where([
             ['c_kin_id', '=', $cPersonid],
             ['c_personid', '=', $oldKinId],
-            ['c_autogen_notes', '=', $oldAutogenNotes],
         ]);
         $suspects = (clone $relaxed)->get();
 
@@ -2841,8 +2852,9 @@ class BiogMainRepository {
     /**
      * 同步親屬（KIN_DATA）反向鏡像列（delete 場景）。legacy kinshipDeleteById 與 v2 KinshipDeleteHandler 共用。
      * $row 為被刪除的「正向列」（陣列）。以 kinReverseLocatorCodes（指向正向碼 ∪ 正向碼自身配對的聯集，#87；與
-     * update/偵測 locateOppositeEdges 同源）定位反向列（c_kin_id=正向 c_personid、c_personid=正向 c_kin_id、備註相符、
-     * c_kin_code ∈ kinReverseLocatorCodes(正向碼)），涵蓋排行子/非對稱配對等多碼，修正舊窄定位漏刪→孤兒。
+     * update/偵測 locateOppositeEdges 同源）定位反向列（c_kin_id=正向 c_personid、c_personid=正向 c_kin_id、
+     * c_kin_code ∈ kinReverseLocatorCodes(正向碼)；#87 起不認 c_autogen_notes，鏡像兩側天生不對稱非身分），
+     * 涵蓋排行子/非對稱配對等多碼，修正舊窄定位漏刪→孤兒。
      * 命中 0 → 不刪（合法單邊）；命中 1 → 精確刪該列；命中 >1 且未帶 $force → 拋 MirrorDeleteMultipleException
      * （整筆交易回滾，回 409 供使用者確認）；>1 且 $force → 一併精確刪除全部候選。正向列本身由呼叫端負責刪除。
      */

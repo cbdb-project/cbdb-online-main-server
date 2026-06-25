@@ -187,25 +187,23 @@ class RelationshipMirrorServiceTest extends TestCase {
         // 多條（再加碼 77 → 問題 B）。
         DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 77, 'c_notes' => 'r2', 'c_autogen_notes' => 'a']);
         $this->assertCount(2, $this->svc->locateOppositeEdges('kinship', $locator));
-        // autogen_notes 不符 → 不命中（定位器條件）。
-        $miss = array_merge($locator, ['autogen_notes' => 'other']);
-        $this->assertCount(0, $this->svc->locateOppositeEdges('kinship', $miss));
+        // #87：autogen_notes 不參與定位（非身分）。改送不同 autogen 仍命中相同兩列。
+        $this->assertCount(2, $this->svc->locateOppositeEdges('kinship', array_merge($locator, ['autogen_notes' => 'other'])));
+        // 換對方人物（非身分維度改變）→ 不命中。
+        $this->assertCount(0, $this->svc->locateOppositeEdges('kinship', array_merge($locator, ['opposite_id' => 9999])));
     }
 
     #[Test]
-    public function testLocateOppositeEdgesKinAutogenNullEmptyEquivalent(): void {
-        // 回歸（review SERIOUS）：對面鏡像 c_autogen_notes 為 NULL（常見），前端送 ''（控制器把 NULL 補水成 ''）→
-        // 須仍命中（NULL/'' 視為「無自動備註」同義），不可誤報缺邊。反之非空也須能命中既有 ''/NULL 不混淆。
+    public function testLocateOppositeEdgesKinAutogenAsymmetricStillMatches(): void {
+        // #87（autogen 根因回歸，64↔240 重現）：自動生成的鏡像側 c_autogen_notes 帶「Auto-generated from …」字串、
+        // 原始手填側為 NULL，兩側天生不對稱。autogen 不再參與定位 → 即使正向側帶非空 autogen、對面反向列為 NULL，
+        // 仍須命中（不誤報缺邊）。
         DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 76, 'c_autogen_notes' => null]);
-        // 送 '' → 命中 NULL 列。
-        $this->assertCount(1, $this->svc->locateOppositeEdges('kinship', ['person_id' => 1000, 'opposite_id' => 2000, 'autogen_notes' => '', 'forward_code' => 75]));
-        // 送 null → 同樣命中。
+        // 正向側送非空 autogen（模擬自動生成側）→ 仍命中對面 NULL 列。
+        $this->assertCount(1, $this->svc->locateOppositeEdges('kinship', ['person_id' => 1000, 'opposite_id' => 2000, 'autogen_notes' => 'Auto-generated from PersonID = 2000, KinCode = 76.', 'forward_code' => 75]));
+        // 送 null / '' 亦命中（與上一致，autogen 完全不影響）。
         $this->assertCount(1, $this->svc->locateOppositeEdges('kinship', ['person_id' => 1000, 'opposite_id' => 2000, 'autogen_notes' => null, 'forward_code' => 75]));
-        // 另一列 autogen='' 亦屬空 → 送 '' 命中兩列。
-        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 77, 'c_autogen_notes' => '']);
-        $this->assertCount(2, $this->svc->locateOppositeEdges('kinship', ['person_id' => 1000, 'opposite_id' => 2000, 'autogen_notes' => '', 'forward_code' => 75]));
-        // 送非空 'x' → 不命中空值列。
-        $this->assertCount(0, $this->svc->locateOppositeEdges('kinship', ['person_id' => 1000, 'opposite_id' => 2000, 'autogen_notes' => 'x', 'forward_code' => 75]));
+        $this->assertCount(1, $this->svc->locateOppositeEdges('kinship', ['person_id' => 1000, 'opposite_id' => 2000, 'autogen_notes' => '', 'forward_code' => 75]));
     }
 
     #[Test]

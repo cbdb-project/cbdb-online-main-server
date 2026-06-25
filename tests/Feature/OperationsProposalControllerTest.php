@@ -1025,6 +1025,28 @@ class OperationsProposalControllerTest extends TestCase {
         $this->assertSame('提案改後', DB::table('KIN_DATA')->where(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 101])->value('c_notes'));
     }
 
+    #[Test]
+    public function testApproveKinUpdateProposalUsesLegitReverseDespiteAutogenMismatch(): void {
+        // #87：proposal approve 的 strict 定位也不認 autogen。對面合法反向碼 101 的 autogen 與正向不對稱時，
+        // 仍須命中並同步；不可誤落 relaxed，把漂移列收斂/撞 PK 或維持 pending。
+        DB::table('KIN_DATA')->insert(['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100, 'c_source' => 10, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 99, 'c_source' => 10, 'c_notes' => '漂移鏡像', 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 101, 'c_source' => 10, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'other']);
+
+        $this->actingAs($this->makeAdmin());
+        $operation = $this->makeKinUpdateProposal(['c_source' => 10, 'c_notes' => '提案改後']);
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])->assertRedirect();
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status'] ?? null, '合法反向列不因 autogen 不對稱而卡 pending');
+        $this->assertSame('提案改後', DB::table('KIN_DATA')->where(['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100])->value('c_notes'));
+        $this->assertSame('提案改後', DB::table('KIN_DATA')->where(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 101])->value('c_notes'));
+        $this->assertSame('漂移鏡像', DB::table('KIN_DATA')->where(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 99])->value('c_notes'));
+        $this->assertSame(3, DB::table('KIN_DATA')->count());
+    }
+
     /** 建一筆親屬 UPDATE 提案 operation（正向 (1000,2000,100)→新內容；c_kinship_pair=101；c_personid=1000）。 */
     private function makeKinUpdateProposal(array $newContent): Operation {
         $fwdPk = ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100];

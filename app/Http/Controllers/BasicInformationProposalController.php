@@ -564,13 +564,20 @@ class BasicInformationProposalController extends Controller {
             return false;
         }
 
-        $currentPair = DB::table('KIN_DATA')
-            ->where('c_personid', $originalRow['c_kin_id'] ?? null)
-            ->where('c_kin_id', $originalRow['c_personid'] ?? null)
-            ->where('c_autogen_notes', $originalRow['c_autogen_notes'] ?? null)
-            ->value('c_kin_code');
+        // #87：kin 鏡像的身分不含 c_autogen_notes；proposal 的「是否改了 pair」判斷需與 direct/proposal approve
+        // 共用同一套反向定位語義，避免因 autogen 不對稱把既有同段鏡像誤判成缺邊/已變更。
+        $currentPairs = app(\App\Services\RelationshipMirrorService::class)
+            ->locateOppositeEdges('kinship', [
+                'person_id' => $originalRow['c_personid'] ?? null,
+                'opposite_id' => $originalRow['c_kin_id'] ?? null,
+                'autogen_notes' => $originalRow['c_autogen_notes'] ?? null,
+                'forward_code' => $originalRow['c_kin_code'] ?? null,
+            ])
+            ->pluck('c_kin_code')
+            ->map(static fn ($code) => (int) $code)
+            ->all();
 
-        return (int) ($auxiliaryPayload['c_kinship_pair'] ?? 0) !== (int) ($currentPair ?? 0);
+        return !in_array((int) ($auxiliaryPayload['c_kinship_pair'] ?? 0), $currentPairs, true);
     }
 
     protected function hasAssocPairChanges(array $originalRow, array $auxiliaryPayload): bool {

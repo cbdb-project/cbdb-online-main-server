@@ -117,8 +117,8 @@ class RelationshipMirrorService {
     /**
      * 定位「對面互逆鏡像列」（與 syncKin/AssocMirrorOnUpdate 的嚴格定位器同套條件）。供 §4/§5 缺邊/多條偵測共用。
      *
-     * - kinship  $locator：['person_id'(本人), 'opposite_id'(對方), 'autogen_notes', 'forward_code'(正向親屬碼)]
-     *   → KIN_DATA where c_kin_id=本人, c_personid=對方, c_autogen_notes=備註, c_kin_code ∈ kinReverseLocatorCodes(正向碼)（#87 聯集）。
+     * - kinship  $locator：['person_id'(本人), 'opposite_id'(對方), 'forward_code'(正向親屬碼)]（autogen_notes 已不納入定位，#87）
+     *   → KIN_DATA where c_kin_id=本人, c_personid=對方, c_kin_code ∈ kinReverseLocatorCodes(正向碼)（#87 聯集）。autogen 為非身分描述性註記、兩側天生不對稱，不參與定位。
      * - association $locator：['person_id', 'opposite_id', 'text_title', 'first_year', 'forward_code']
      *   → ASSOC_DATA where c_assoc_id=本人, c_personid=對方, c_text_title=書名, c_assoc_first_year=首年, c_assoc_code ∈ validReverseAssocSet(正向碼)。
      *
@@ -136,23 +136,16 @@ class RelationshipMirrorService {
         if ($type === 'kinship') {
             // #87：用聯集定位碼集（指向我 ∪ 我指向），涵蓋非對稱配對，避免漏命中合法反向列誤報缺邊。
             $reverseCodes = $this->kinReverseLocatorCodes($locator['forward_code'] ?? null);
-            $autogen = $locator['autogen_notes'] ?? null;
-            $q = DB::table('KIN_DATA')
+
+            // #87（autogen 根因）：c_autogen_notes 不納入定位條件。它是描述性註記、在鏡像兩側天生不對稱——系統自動生成的
+            // 鏡像側帶「Auto-generated from PersonID=…」字串，原始手填側為 NULL，兩者永遠不相等。舊版以 autogen 精確比對
+            // 會把「自動生成側 vs NULL 原始側」誤判為不同關係 → 命中 0 → 誤報缺邊（如 64↔240）。反向關係的身分由
+            // (c_kin_id=本人, c_personid=對方, c_kin_code ∈ 反向碼集) 唯一決定，autogen 非身分，故移除。
+            return DB::table('KIN_DATA')
                 ->where('c_kin_id', $locator['person_id'])
                 ->where('c_personid', $locator['opposite_id'])
-                ->whereIn('c_kin_code', $reverseCodes ?: [-99999]);
-            // c_autogen_notes 的 NULL 與 '' 同為「無自動備註」：前端編輯載入時控制器把 DB NULL 補水成 ''（送 ''），
-            // 但既有反向鏡像列的 c_autogen_notes 多為 NULL，精確 `= ''` 比對會漏命中 → 誤報「缺邊」。故空值（null/''）
-            // 一律以 (IS NULL OR = '') 比對；非空才精確比對。
-            if ($autogen === null || $autogen === '') {
-                $q->where(function ($w) {
-                    $w->whereNull('c_autogen_notes')->orWhere('c_autogen_notes', '');
-                });
-            } else {
-                $q->where('c_autogen_notes', $autogen);
-            }
-
-            return $q->get();
+                ->whereIn('c_kin_code', $reverseCodes ?: [-99999])
+                ->get();
         }
 
         $reverseCodes = $this->validReverseAssocSet($locator['forward_code'] ?? null);

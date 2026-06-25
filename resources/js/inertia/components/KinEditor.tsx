@@ -5,6 +5,7 @@ import { getCsrfToken } from './PersonBrowser/shared/csrf';
 import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
 import MirrorConflictNotice, { MirrorConflict } from './PersonEditorShared/MirrorConflictNotice';
 import MirrorSuspectedNotice, { MirrorSuspected } from './PersonEditorShared/MirrorSuspectedNotice';
+import MirrorDeleteMultipleNotice, { MirrorDeleteMultiple } from './PersonEditorShared/MirrorDeleteMultipleNotice';
 import OppositeEdgeNotice from './PersonEditorShared/OppositeEdgeNotice';
 import { useOppositeEdgeDetection } from './PersonEditorShared/useOppositeEdgeDetection';
 
@@ -70,6 +71,7 @@ export default function KinEditor({
     const [comment, setComment] = useState('');
     const [conflict, setConflict] = useState<MirrorConflict | null>(null); // #66 對面鏡像衝突
     const [suspected, setSuspected] = useState<MirrorSuspected | null>(null); // #70 對面疑似漂移鏡像
+    const [deleteMulti, setDeleteMulti] = useState<MirrorDeleteMultiple | null>(null); // #81 §6 刪除命中對面多筆反向列
     // 互逆配對碼（反向關係碼）：候選由 /api/select/search/kinpair 依正向碼取得（對齊 legacy）。
     // 預設選第一個候選（同 legacy）；反向關係常有歧義（父→子/女、第幾子…）故容許手選。
     type PairOpt = { code: string; label: string };
@@ -220,18 +222,28 @@ export default function KinEditor({
         } finally { setSaving(false); }
     };
 
-    const doDelete = async () => {
-        if (!deleteEndpoint || !window.confirm(tr('delete_confirm', '確定刪除此親屬關係？'))) return;
+    // force=true 為「對面多筆反向列」確認後重送（帶 meta.force，後端一併刪除全部候選）。
+    const doDelete = async (force = false) => {
+        if (!deleteEndpoint) return;
+        if (!force && !window.confirm(tr('delete_confirm', '確定刪除此親屬關係？'))) return;
         setDeleting(true); setError(null);
         try {
+            const body: Record<string, unknown> = { resource: 'kinship', person_id: personId, mode: 'direct', operation: 'delete', target: { pk: originalPk.current } };
+            if (force) body.meta = { force: true };
             const res = await fetch(deleteEndpoint, {
                 method: 'POST',
                 headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
-                body: JSON.stringify({ resource: 'kinship', person_id: personId, mode: 'direct', operation: 'delete', target: { pk: originalPk.current } }),
+                body: JSON.stringify(body),
             });
             const json = await res.json().catch(() => ({}));
-            if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
+            if (!res.ok || !json?.ok) {
+                // #81 §6：對面命中多筆反向列 → 列出候選供確認，再帶 meta.force 重送。
+                const dm = json?.errors?.mirror_delete_multiple;
+                if (res.status === 409 && dm) { setDeleting(false); setDeleteMulti(dm as MirrorDeleteMultiple); return; }
+                throw new Error(json?.message || `HTTP ${res.status}`);
+            }
+            setDeleteMulti(null);
             setSavedSnapshot(JSON.stringify(fields));
             window.location.assign(indexUrl);
         } catch (e) {
@@ -322,6 +334,17 @@ export default function KinEditor({
                     onForce={() => void save('direct', true)}
                     onDismiss={() => setSuspected(null)}
                     forcing={saving}
+                    tr={tr}
+                />
+            ) : null}
+
+            {deleteMulti ? (
+                <MirrorDeleteMultipleNotice
+                    info={deleteMulti}
+                    urlFor={(row) => `/app/basicinformation/${row.c_personid}/kinship/edit-v2?${new URLSearchParams({ c_personid: String(row.c_personid), c_kin_id: String(row.c_kin_id), c_kin_code: String(row.c_kin_code) }).toString()}`}
+                    onConfirm={() => void doDelete(true)}
+                    onDismiss={() => setDeleteMulti(null)}
+                    deleting={deleting}
                     tr={tr}
                 />
             ) : null}

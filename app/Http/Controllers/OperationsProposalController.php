@@ -86,7 +86,9 @@ class OperationsProposalController extends Controller {
                         app(\App\Repositories\BiogMainRepository::class)->syncAssocMirrorOnDelete($appliedRow, $finalOperation);
                     }
                     if ($opType === Operation::TYPE_PROPOSAL_DELETE && $table === 'KIN_DATA') {
-                        app(\App\Repositories\BiogMainRepository::class)->syncKinMirrorOnDelete($appliedRow, $finalOperation);
+                        // 核准為非互動路徑，沿用「刪除全部對應反向列」語義（$force=true）：取得 #81 §6 廣集孤兒修正，
+                        // 不在此拋多筆確認閘（是否於核准路徑加偵測閘由 #82 統一評估）。
+                        app(\App\Repositories\BiogMainRepository::class)->syncKinMirrorOnDelete($appliedRow, $finalOperation, null, true);
                     }
                 }
                 $this->updateProposalStatus(

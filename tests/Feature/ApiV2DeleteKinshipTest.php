@@ -190,6 +190,67 @@ class ApiV2DeleteKinshipTest extends TestCase {
     }
 
     #[Test]
+    public function testDirectKinshipDeleteRemovesOrphanProneRankReverse(): void {
+        // #81 §6：反向列以「排行碼」201 編碼（pair1=75 指回正向碼 75，但 ≠ 75 自身 pair1=76）。
+        // 舊窄定位（只認 75 自身 pair1=76）會漏刪→孤兒；對齊 legitReverses 後應命中並刪除。
+        DB::table('KINSHIP_CODES')->insert(['c_kincode' => 201, 'c_kin_pair1' => 75, 'c_kin_pair2' => null]);
+        $user = $this->makeUser(email: 'delete-kin-orphan@example.com');
+        $this->actingAs($user);
+        $this->seedKin(['c_kin_code' => 75, 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 201,
+            'c_source' => 10, 'c_autogen_notes' => 'auto-x',
+        ]);
+
+        $this->postJson('/api/v2/delete', $this->deletePayload())->assertOk();
+
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 200, 'c_kin_code' => 75]);
+        // 排行碼反向列亦連帶刪除（修孤兒）。
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 201]);
+        $this->assertSame(0, DB::table('KIN_DATA')->count());
+    }
+
+    #[Test]
+    public function testDirectKinshipDeleteMultipleReverseBlocksWith409(): void {
+        // #81 §6：對面命中多筆合法反向列（76 與排行碼 201 並存）→ 未確認應 409、整筆回滾（正向亦不刪）。
+        DB::table('KINSHIP_CODES')->insert(['c_kincode' => 201, 'c_kin_pair1' => 75, 'c_kin_pair2' => null]);
+        $user = $this->makeUser(email: 'delete-kin-multi@example.com');
+        $this->actingAs($user);
+        $this->seedKin(['c_kin_code' => 75, 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert([
+            ['c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 76, 'c_source' => 10, 'c_autogen_notes' => 'auto-x'],
+            ['c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 201, 'c_source' => 11, 'c_autogen_notes' => 'auto-x'],
+        ]);
+
+        $resp = $this->postJson('/api/v2/delete', $this->deletePayload());
+        $resp->assertStatus(409)->assertJson(['ok' => false]);
+        $this->assertSame('KIN_DATA', $resp->json('errors.mirror_delete_multiple.table'));
+        $this->assertSame(2, $resp->json('errors.mirror_delete_multiple.count'));
+        $this->assertCount(2, $resp->json('errors.mirror_delete_multiple.candidates'));
+
+        // 回滾：正向與兩筆反向皆原樣保留。
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 200, 'c_kin_code' => 75]);
+        $this->assertSame(3, DB::table('KIN_DATA')->count());
+    }
+
+    #[Test]
+    public function testDirectKinshipDeleteMultipleReverseForceDeletesAll(): void {
+        // #81 §6：使用者確認後帶 meta.force → 一併刪除正向與全部對面反向列。
+        DB::table('KINSHIP_CODES')->insert(['c_kincode' => 201, 'c_kin_pair1' => 75, 'c_kin_pair2' => null]);
+        $user = $this->makeUser(email: 'delete-kin-force@example.com');
+        $this->actingAs($user);
+        $this->seedKin(['c_kin_code' => 75, 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert([
+            ['c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 76, 'c_source' => 10, 'c_autogen_notes' => 'auto-x'],
+            ['c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 201, 'c_source' => 11, 'c_autogen_notes' => 'auto-x'],
+        ]);
+
+        $this->postJson('/api/v2/delete', $this->deletePayload(['meta' => ['force' => true]]))->assertOk();
+
+        $this->assertSame(0, DB::table('KIN_DATA')->count());
+    }
+
+    #[Test]
     public function testDirectKinshipDeleteFailsClosedWhenCodeMissingFromCodeTable(): void {
         // 正向碼缺於 KINSHIP_CODES（資料完整性破壞）：刪除須 fail-closed 回滾整筆，
         // 不可正向已刪而反向鏡像孤兒（codex MAJOR 修正）。

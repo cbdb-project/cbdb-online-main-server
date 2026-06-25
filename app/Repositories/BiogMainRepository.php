@@ -1556,7 +1556,9 @@ class BiogMainRepository {
             ])->delete();
 
             // 反向鏡像刪除抽出為共用方法（legacy 與 v2 KinshipDeleteHandler 共用）。
-            $this->syncKinMirrorOnDelete((array) $row, $operation, $auditLog);
+            // legacy 路徑無互動確認，沿用「刪除全部對應反向列」語義（$force=true）：取得 #81 §6 廣集定位的孤兒修正，
+            // 但不啟用多筆確認閘（避免在非互動的 legacy 刪除拋 MirrorDeleteMultipleException 中斷）。
+            $this->syncKinMirrorOnDelete((array) $row, $operation, $auditLog, true);
         });
     }
 
@@ -2774,75 +2776,56 @@ class BiogMainRepository {
 
     /**
      * 同步親屬（KIN_DATA）反向鏡像列（delete 場景）。legacy kinshipDeleteById 與 v2 KinshipDeleteHandler 共用。
-     * $row 為被刪除的「正向列」（陣列）。依 legacy：先以配對碼定位反向列 row2（c_kin_id=正向 c_personid、
-     * c_personid=正向 c_kin_id、備註相符、c_kin_code ∈ 正向碼配對），再依 row2 的 c_source/c_autogen_notes
-     * （及 c_modified_date 有值時加入）刪除並補 audit。正向列本身由呼叫端（base handler / legacy）負責刪除。
+     * $row 為被刪除的「正向列」（陣列）。#81 §6：以 legitReverses（指向正向碼的合法反向碼集，與 update/偵測
+     * locateOppositeEdges 同套）定位反向列（c_kin_id=正向 c_personid、c_personid=正向 c_kin_id、備註相符、
+     * c_kin_code ∈ legitReverseKinCodes(正向碼)），涵蓋排行子等多碼，修正舊窄定位漏刪具體排行碼反向列→孤兒。
+     * 命中 0 → 不刪（合法單邊）；命中 1 → 精確刪該列；命中 >1 且未帶 $force → 拋 MirrorDeleteMultipleException
+     * （整筆交易回滾，回 409 供使用者確認）；>1 且 $force → 一併精確刪除全部候選。正向列本身由呼叫端負責刪除。
      */
-    public function syncKinMirrorOnDelete(array $row, $operation = null, ?AuditLogService $auditLog = null): void {
+    public function syncKinMirrorOnDelete(array $row, $operation = null, ?AuditLogService $auditLog = null, bool $force = false): void {
         $auditLog = $auditLog ?? new AuditLogService();
         $operationId = $operation ? (string) $operation->id : null;
 
         // 正向碼缺於 KINSHIP_CODES＝資料完整性已破壞：fail-closed 中止（拋例外回滾整筆交易，
         // 與 legacy 解參考 null 致命錯誤同為原子失敗），避免正向已刪而反向鏡像孤兒（codex MAJOR 修正）。
-        // 注意：這與「反向列 row2 不存在」（合法的單邊資料）不同——後者下方仍正常 return 不刪。
-        $kinCodePair = KinshipCode::find($row['c_kin_code'] ?? null);
-        if (!$kinCodePair) {
+        // 注意：這與「反向列不存在」（合法的單邊資料）不同——後者下方仍正常 return 不刪。
+        if (!KinshipCode::find($row['c_kin_code'] ?? null)) {
             throw new \RuntimeException('找不到親屬關係碼的配對資訊（KINSHIP_CODES 缺碼），為避免反向鏡像孤兒已中止刪除。');
         }
-        $pair1 = $kinCodePair->c_kin_pair1;
-        $pair2 = $kinCodePair->c_kin_pair2 ?? null;
-        $autogen = $row['c_autogen_notes'] ?? null;
 
-        $row2Query = DB::table('KIN_DATA')->where(function ($q) use ($row, $autogen, $pair1) {
-            $q->where('c_kin_id', $row['c_personid'])
-                ->where('c_personid', $row['c_kin_id'])
-                ->where('c_autogen_notes', $autogen)
-                ->where('c_kin_code', $pair1);
-        });
-        if (!empty($pair2)) {
-            $row2Query->orWhere(function ($q) use ($row, $autogen, $pair2) {
-                $q->where('c_kin_id', $row['c_personid'])
-                    ->where('c_personid', $row['c_kin_id'])
-                    ->where('c_autogen_notes', $autogen)
-                    ->where('c_kin_code', $pair2);
-            });
-        }
-        $row2 = $row2Query->first();
-        if ($row2 === null) {
-            return;
+        // #81 §6：反向鏡像定位對齊 legitReverses（「指向正向碼」的合法反向碼集，與 update / 偵測 locateOppositeEdges
+        // 同套定位器），涵蓋排行子等多碼，修正舊窄定位（只認正向碼自身 c_kin_pair1/2）漏刪具體排行碼反向列→孤兒。
+        $mirror = app(\App\Services\RelationshipMirrorService::class);
+        $candidates = $mirror->locateOppositeEdges('kinship', [
+            'person_id' => $row['c_personid'] ?? null,
+            'opposite_id' => $row['c_kin_id'] ?? null,
+            'autogen_notes' => $row['c_autogen_notes'] ?? null,
+            'forward_code' => $row['c_kin_code'] ?? 0,
+        ]);
+
+        if ($candidates->isEmpty()) {
+            return; // 對面無對應反向列（合法的單邊資料），不刪。
         }
 
-        $hasModDate = !is_null($row2->c_modified_date);
-        $deleteWhere = function ($query) use ($row2, $pair1, $pair2, $hasModDate) {
-            $query->where(function ($q) use ($row2, $pair1, $hasModDate) {
-                $q->where('c_kin_id', $row2->c_kin_id)
-                    ->where('c_personid', $row2->c_personid)
-                    ->where('c_source', $row2->c_source)
-                    ->where('c_autogen_notes', $row2->c_autogen_notes)
-                    ->where('c_kin_code', $pair1);
-                if ($hasModDate) {
-                    $q->where('c_modified_date', $row2->c_modified_date);
-                }
-            });
-            if (!empty($pair2)) {
-                $query->orWhere(function ($q) use ($row2, $pair2, $hasModDate) {
-                    $q->where('c_kin_id', $row2->c_kin_id)
-                        ->where('c_personid', $row2->c_personid)
-                        ->where('c_source', $row2->c_source)
-                        ->where('c_autogen_notes', $row2->c_autogen_notes)
-                        ->where('c_kin_code', $pair2);
-                    if ($hasModDate) {
-                        $q->where('c_modified_date', $row2->c_modified_date);
-                    }
-                });
+        // 安全單筆：對面命中多筆且未確認 → 偵測即停（拋例外 → handleDirect 交易回滾，正向列亦不刪），
+        // 回 409 + 候選明細供使用者裁決；確認後帶 $force 重送才一併刪除全部候選。單筆則直接精確刪除。
+        if ($candidates->count() > 1 && !$force) {
+            throw new \App\Services\Mutations\MirrorDeleteMultipleException('KIN_DATA', $mirror->formatRecords('kinship', $candidates));
+        }
+
+        foreach ($candidates as $mirroredRow) {
+            // 逐列以完整識別欄精確刪除（c_modified_date 有值時加入），不誤刪他列。
+            $deleteQuery = DB::table('KIN_DATA')
+                ->where('c_personid', $mirroredRow->c_personid)
+                ->where('c_kin_id', $mirroredRow->c_kin_id)
+                ->where('c_kin_code', $mirroredRow->c_kin_code)
+                ->where('c_source', $mirroredRow->c_source)
+                ->where('c_autogen_notes', $mirroredRow->c_autogen_notes);
+            if (!is_null($mirroredRow->c_modified_date ?? null)) {
+                $deleteQuery->where('c_modified_date', $mirroredRow->c_modified_date);
             }
-        };
+            $deleteQuery->delete();
 
-        $deleteQuery = DB::table('KIN_DATA')->where($deleteWhere);
-        $mirroredRows = (clone $deleteQuery)->get();
-        $deleteQuery->delete();
-
-        foreach ($mirroredRows as $mirroredRow) {
             $mirroredRowData = $auditLog->normalizeRow($mirroredRow);
             $auditLog->write('KIN_DATA', 'DELETE', $auditLog->buildRowPkFromData('KIN_DATA', $mirroredRowData), $mirroredRowData, null, 'user', (string) Auth::id(), $operationId);
         }

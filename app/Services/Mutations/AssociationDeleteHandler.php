@@ -45,8 +45,12 @@ class AssociationDeleteHandler extends AbstractPersonSubresourceDeleteHandler {
         ];
     }
 
-    /** direct 刪除成功後，於同交易內同步刪除反向鏡像列（重用 BiogMainRepository::syncAssocMirrorOnDelete）。 */
-    protected function afterDirectDelete(int $personId, array $targetPk, array $originalArray, ?Operation $operation): void {
+    /**
+     * direct 刪除成功後，於同交易內同步刪除反向鏡像列（重用 BiogMainRepository::syncAssocMirrorOnDelete）。
+     * assoc 反向定位以自身配對碼 + 完整親屬維度精確匹配，且回退層唯一才刪、多筆即跳過（既有安全行為），
+     * 不適用 #81 §6 的 legitReverses 廣集多筆裁決，故 $force 在此不使用。
+     */
+    protected function afterDirectDelete(int $personId, array $targetPk, array $originalArray, ?Operation $operation, bool $force = false): void {
         app(BiogMainRepository::class)->syncAssocMirrorOnDelete($originalArray, $operation, $this->auditLogService);
     }
 }

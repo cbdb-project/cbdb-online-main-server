@@ -26,6 +26,8 @@ use Illuminate\Support\Str;
 abstract class AbstractPersonSubresourceDeleteHandler extends AbstractMutationHandler {
     protected OperationRepository $operationRepository;
     protected AuditLogService $auditLogService;
+    /** #81 §6：使用者已確認一併刪除多筆對面反向列（meta.force）；於 handle() 設定，afterDirectDelete 讀取。 */
+    protected bool $forceMirrorDelete = false;
 
     public function __construct(
         OperationRepository $operationRepository,
@@ -120,6 +122,9 @@ abstract class AbstractPersonSubresourceDeleteHandler extends AbstractMutationHa
         }
 
         $comment = is_string($meta['comment'] ?? null) ? trim($meta['comment']) : '';
+        // #81 §6：使用者已在「對面多筆反向列」確認後重送（meta.force）→ 一併刪除全部候選；否則多筆即停回 409。
+        // 以實例屬性傳遞，避免更動 handleDirect 簽名（部分子類覆寫之）破壞相容性。
+        $this->forceMirrorDelete = !empty($meta['force']);
         $originalArray = $this->auditLogService->normalizeRow($original);
 
         // 6. 分派到 direct / proposal
@@ -159,11 +164,12 @@ abstract class AbstractPersonSubresourceDeleteHandler extends AbstractMutationHa
 
     protected function handleDirect(int $personId, array $targetPk, array $originalArray, string $comment): JsonResponse {
         $operationId = (string) Str::ulid();
+        $force = $this->forceMirrorDelete;
         /** @var Operation|null $operation */
         $operation = null;
 
         try {
-            DB::transaction(function () use ($personId, $targetPk, $originalArray, $comment, $operationId, &$operation) {
+            DB::transaction(function () use ($personId, $targetPk, $originalArray, $comment, $operationId, $force, &$operation) {
                 // 刪除資料表記錄
                 $this->performDelete($targetPk);
 
@@ -198,8 +204,17 @@ abstract class AbstractPersonSubresourceDeleteHandler extends AbstractMutationHa
                 );
 
                 // 子類在同一交易內的後續處理（例如社會關係刪除互逆鏡像列），保證原子性
-                $this->afterDirectDelete($personId, $targetPk, $originalArray, $operation);
+                $this->afterDirectDelete($personId, $targetPk, $originalArray, $operation, $force);
             });
+        } catch (MirrorDeleteMultipleException $e) {
+            // #81 §6：對面命中多筆反向列、未確認 → 整筆回滾（正向列亦未刪），回 409 + 候選明細供前端列出並確認。
+            return $this->errorResponse($e->getMessage(), 409, [
+                'mirror_delete_multiple' => [
+                    'table' => $e->mirrorTable,
+                    'candidates' => $e->candidates,
+                    'count' => $e->count(),
+                ],
+            ]);
         } catch (\Illuminate\Database\QueryException $e) {
             throw $e;
         }
@@ -271,8 +286,9 @@ abstract class AbstractPersonSubresourceDeleteHandler extends AbstractMutationHa
     /**
      * direct 刪除成功後、仍在同一交易內的後續處理鉤子（預設無動作）。
      * 子類可覆寫以在原子交易內刪除互逆鏡像列（例如 AssociationDeleteHandler 刪 ASSOC_DATA 反向關係）。
+     * $force：使用者已確認一併刪除多筆對面反向列（#81 §6）；多數子類不需用到。
      */
-    protected function afterDirectDelete(int $personId, array $targetPk, array $originalArray, ?Operation $operation): void {
+    protected function afterDirectDelete(int $personId, array $targetPk, array $originalArray, ?Operation $operation, bool $force = false): void {
     }
 
     /** 查詢原始記錄 */

@@ -10,6 +10,7 @@ import { stableKey } from '../shared/stableKey';
 import { getCsrfToken } from '../shared/csrf';
 import { buildEditV2CreateUrl, buildEditV2EditUrl } from '../shared/legacyEditUrl';
 import SubresourceTable from '../../PersonEditorShared/SubresourceTable';
+import MirrorDeleteMultipleNotice, { MirrorDeleteMultiple } from '../../PersonEditorShared/MirrorDeleteMultipleNotice';
 import { APP_THEME } from '../../../theme';
 import { useTranslation } from '../../../hooks/useTranslation';
 import { Button } from '../../ui/Button';
@@ -71,6 +72,17 @@ export default function KinshipTab({
     const [deleteTarget, setDeleteTarget] = useState<KinshipItem | null>(null);
     const [deleting, setDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
+    const [deleteMulti, setDeleteMulti] = useState<MirrorDeleteMultiple | null>(null); // #81 §6 刪除命中對面多筆反向列
+    // 409 當下「快照」要刪的列；force 重送一律用此快照，避免 notice 顯示期間 deleteTarget 被列表其他刪除按鈕覆寫而誤刪他列。
+    const [multiTarget, setMultiTarget] = useState<KinshipItem | null>(null);
+    const resetDeleteFlow = () => {
+        setDeleteMulti(null);
+        setMultiTarget(null);
+        setDeleteTarget(null);
+    };
+    const deleteFlowOpen = deleteTarget != null || deleteMulti != null || multiTarget != null;
+    // biogmains 翻譯 + fallback（對齊編輯器 tr 形態）：查無鍵時用 fallback。
+    const tr = (k: string, fb: string): string => { const v = tb(k); return v && v !== k ? v : fb; };
 
     // 新編輯器在 flag=new 且（可直接編輯 或 可提案）且必要端點齊全時啟用。
     // #34：新增/編輯導向獨立 edit-v2 編輯器頁（非 person-browser 內聯 modal）；刪除仍於列表內聯確認。
@@ -89,13 +101,23 @@ export default function KinshipTab({
         if (url) router.visit(url);
     };
 
-    const handleDelete = async () => {
-        if (!deleteTarget || !personId) {
+    // force=true 為「對面多筆反向列」確認後重送（帶 meta.force，後端一併刪除全部候選）。
+    // force 時用 409 快照 multiTarget（非可能已漂移的 deleteTarget）以鎖定刪除對象。
+    const handleDelete = async (force = false) => {
+        const target = force ? multiTarget : deleteTarget;
+        if (!target || !personId) {
             return;
         }
         setDeleting(true);
         setDeleteError(null);
         try {
+            const body: Record<string, unknown> = {
+                resource: 'kinship',
+                person_id: personId,
+                mode: proposalMode ? 'proposal' : 'direct',
+                target: { pk: target.pk },
+            };
+            if (force) body.meta = { force: true };
             const response = await fetch(deleteEndpoint, {
                 method: 'POST',
                 headers: {
@@ -105,19 +127,23 @@ export default function KinshipTab({
                     'X-Requested-With': 'XMLHttpRequest',
                 },
                 credentials: 'same-origin',
-                body: JSON.stringify({
-                    resource: 'kinship',
-                    person_id: personId,
-                    mode: proposalMode ? 'proposal' : 'direct',
-                    target: { pk: deleteTarget.pk },
-                }),
+                body: JSON.stringify(body),
             });
             const json = await response.json().catch(() => ({}));
             if (!response.ok || !json?.ok) {
+                // #81 §6：對面命中多筆反向列 → 快照當前目標、收起確認框、列出候選供確認，再帶 meta.force 重送。
+                const dm = json?.errors?.mirror_delete_multiple;
+                if (response.status === 409 && dm) {
+                    setDeleting(false);
+                    setDeleteTarget(null);
+                    setMultiTarget(target);
+                    setDeleteMulti(dm as MirrorDeleteMultiple);
+                    return;
+                }
                 setDeleteError(json?.message || `${t('delete_failed')}（HTTP ${response.status}）`);
                 return;
             }
-            setDeleteTarget(null);
+            resetDeleteFlow();
             onRefresh?.();
         } catch (err) {
             setDeleteError(err instanceof Error ? err.message : t('delete_failed'));
@@ -151,7 +177,7 @@ export default function KinshipTab({
                 actions={(canEdit || canPropose) ? (item) => (useReactEditor ? (
                     <span style={actionCellStyle}>
                         <Button size="sm" variant="outline" onClick={() => openEdit(item)}>{t('edit_btn')}</Button>
-                        <Button size="sm" variant="destructive" onClick={() => { setDeleteError(null); setDeleteTarget(item); }}>{t('delete_btn')}</Button>
+                        <Button size="sm" variant="destructive" disabled={deleting || deleteFlowOpen} onClick={() => { setDeleteError(null); setDeleteTarget(item); }}>{t('delete_btn')}</Button>
                     </span>
                 ) : (
                     <span style={actionCellStyle}>
@@ -165,9 +191,9 @@ export default function KinshipTab({
             {useReactEditor ? (
                 <>
                     <ConfirmDialog
-                        open={deleteTarget != null}
+                        open={deleteTarget != null && deleteMulti == null}
                         onOpenChange={(o) => {
-                            if (!o) setDeleteTarget(null);
+                            if (!o) resetDeleteFlow();
                         }}
                         title={proposalMode ? t('proposal_delete_btn') : t('kinship_delete_title')}
                         description={deleteError ?? (proposalMode ? `${t('proposal_delete_prefix')}\n${t('kinship_delete_confirm')}` : t('kinship_delete_confirm'))}
@@ -177,6 +203,16 @@ export default function KinshipTab({
                         loading={deleting}
                         onConfirm={() => void handleDelete()}
                     />
+                    {deleteMulti ? (
+                        <MirrorDeleteMultipleNotice
+                            info={deleteMulti}
+                            urlFor={(row) => `/app/basicinformation/${row.c_personid}/kinship/edit-v2?${new URLSearchParams({ c_personid: String(row.c_personid), c_kin_id: String(row.c_kin_id), c_kin_code: String(row.c_kin_code) }).toString()}`}
+                            onConfirm={() => void handleDelete(true)}
+                            onDismiss={resetDeleteFlow}
+                            deleting={deleting}
+                            tr={tr}
+                        />
+                    ) : null}
                 </>
             ) : null}
         </div>

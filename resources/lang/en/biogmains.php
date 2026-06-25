@@ -66,6 +66,7 @@ return [
     // Action-button live feedback (Q3).
     'saving' => 'Saving…',
     'deleting' => 'Deleting…',
+    'cancel' => 'Cancel',
     // basic_info dynasty required.
     'required_field' => 'Required',
     'dynasty_required' => 'Dynasty is required — please select a dynasty first.',
@@ -191,6 +192,9 @@ return [
     'mirror_suspected_goto' => 'Go check (new tab)',
     'mirror_suspected_authoritative' => 'Force-collapse target reverse code',
     'mirror_suspected_force' => 'Force-collapse',
+    'mirror_delete_multiple_title' => 'The other side has multiple corresponding reverse relationship rows',
+    'mirror_delete_multiple_desc' => 'Deleting this relationship will also delete the following reverse rows on the other side ({n} total). Please confirm these rows belong to this relationship before confirming deletion; reviewing them on the other person\'s page first is recommended.',
+    'mirror_delete_multiple_confirm' => 'Confirm delete all',
     'subresource_not_found_title' => 'Record not found',
     'subresource_not_found_desc' => 'This record does not exist (it may have been deleted, or the primary key does not match). The other-side record may have changed.',
     'subresource_not_found_back' => 'Back to list',

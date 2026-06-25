@@ -66,6 +66,7 @@ return [
     // 動作按鈕即時回饋（Q3）。
     'saving' => '儲存中…',
     'deleting' => '刪除中…',
+    'cancel' => '取消',
     // basic_info 朝代必填。
     'required_field' => '必填',
     'dynasty_required' => '朝代為必填欄位，請先選擇朝代',
@@ -191,6 +192,9 @@ return [
     'mirror_suspected_goto' => '前往核對（另開分頁）',
     'mirror_suspected_authoritative' => '強制收斂目標反向碼',
     'mirror_suspected_force' => '強制收斂',
+    'mirror_delete_multiple_title' => '對面有多筆對應的反向關係列',
+    'mirror_delete_multiple_desc' => '刪除此關係將一併刪除對面下列反向關係列（共 {n} 筆）。請先確認這些列確屬本段關係，再確認刪除；建議先前往對面人物逐一核對。',
+    'mirror_delete_multiple_confirm' => '確認一併刪除全部',
     'subresource_not_found_title' => '找不到這筆記錄',
     'subresource_not_found_desc' => '這筆記錄不存在（可能已被刪除，或主鍵不符）。可能是對面記錄已變更。',
     'subresource_not_found_back' => '返回列表',

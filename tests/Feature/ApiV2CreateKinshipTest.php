@@ -472,6 +472,131 @@ class ApiV2CreateKinshipTest extends TestCase {
         }
     }
 
+    // ── #70 鏡像疑似匹配（CREATE 路徑）─────────────────────────────
+    // create 與 update 共用 syncKinMirrorOnUpdate 的 Option 2 安全判別：建立反向鏡像前，若對面已有「碼漂移
+    // （∉ 合法 KINSHIP_CODE）」的疑似同關係列 → 非 force 時拋 409 errors.mirror_suspected（整筆回滾、正向也不建），
+    // force 時就地收斂該漂移列為權威反向碼（不補出重複鏡像）；碼∈合法 code 的他段關係**絕不覆寫**。
+
+    /** 在對面（300→1000）預埋一條反向鏡像列；預設碼 99（漂移垃圾值，∉ KINSHIP_CODES）。 */
+    protected function seedReverseKin(array $overrides = []): void {
+        DB::table('KIN_DATA')->insert(array_replace([
+            'c_personid' => 300, 'c_kin_id' => 1000, 'c_kin_code' => 99,
+            'c_source' => 5, 'c_pages' => '舊', 'c_notes' => '舊鏡像', 'c_autogen_notes' => 'AG',
+        ], $overrides));
+    }
+
+    #[Test]
+    public function testKinshipCreateMirrorSuspectedDetectedAborts(): void {
+        // 對面已有碼漂移（99）疑似列、嚴格反向集 {81,82} 落空 → 非 force 建立時偵測疑似 → 409 + 整筆回滾。
+        $this->actingAs($this->makeUser(email: 'kin-c-suspect@example.com'));
+        $this->seedReverseKin(); // (300,1000,99) autogen=AG
+
+        $res = $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_source' => 20, 'c_notes' => '甲之親', 'c_autogen_notes' => 'AG'],
+        ]));
+
+        $res->assertStatus(409)->assertJson(['ok' => false]);
+        $this->assertSame('KIN_DATA', $res->json('errors.mirror_suspected.table'));
+        $this->assertSame(81, $res->json('errors.mirror_suspected.authoritative_code'));
+        $this->assertSame(1, $res->json('errors.mirror_suspected.count'));
+        // 整筆回滾：正向列不得建立；漂移列維持原碼 99 不被觸碰。
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 300, 'c_kin_code' => 80]);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 300, 'c_kin_id' => 1000, 'c_kin_code' => 99]);
+        // 不得補出第二條反向鏡像（81）。
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 300, 'c_kin_id' => 1000, 'c_kin_code' => 81]);
+    }
+
+    #[Test]
+    public function testKinshipCreateMirrorSuspectedForceCollapses(): void {
+        // force=true → 就地收斂漂移列（99→權威反向碼 81、套用新內容），不補出重複鏡像；正向列建立。
+        $this->actingAs($this->makeUser(email: 'kin-c-force@example.com'));
+        $this->seedReverseKin();
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_source' => 20, 'c_notes' => '甲之親', 'c_autogen_notes' => 'AG'],
+            'meta' => ['force' => true],
+        ]))->assertOk()->assertJson(['ok' => true]);
+
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 300, 'c_kin_code' => 80]);
+        // 漂移列被收斂：99 消失、81 出現（內容更新為新鏡像 c_source=20）。
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 300, 'c_kin_id' => 1000, 'c_kin_code' => 99]);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 300, 'c_kin_id' => 1000, 'c_kin_code' => 81, 'c_source' => 20]);
+        // 對面 (300→1000) 只剩一條反向列（無重複）。
+        $this->assertSame(1, DB::table('KIN_DATA')->where(['c_personid' => 300, 'c_kin_id' => 1000])->count());
+    }
+
+    #[Test]
+    public function testKinshipCreateValidCodeOtherReverseNotClobbered(): void {
+        // Option 2 安全：對面預埋的是合法碼（75，∉ 嚴格反向集 {81,82}）的「他段關係」→ 視為合法、絕不覆寫，
+        // 本段鏡像照常 backfill（81）；非 force 也不誤判為疑似。
+        $this->actingAs($this->makeUser(email: 'kin-c-valid@example.com'));
+        $this->seedReverseKin(['c_kin_code' => 75]); // (300,1000,75) 合法碼、他段關係
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_source' => 20, 'c_notes' => '甲之親', 'c_autogen_notes' => 'AG'],
+        ]))->assertOk()->assertJson(['ok' => true]);
+
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 300, 'c_kin_code' => 80]);
+        // 他段合法關係 75 不被觸碰。
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 300, 'c_kin_id' => 1000, 'c_kin_code' => 75, 'c_source' => 5]);
+        // 本段反向鏡像 81 照常補建。
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 300, 'c_kin_id' => 1000, 'c_kin_code' => 81, 'c_source' => 20]);
+    }
+
+    #[Test]
+    public function testKinshipCreateNoExistingReverseBackfillsNormally(): void {
+        // 對面無任何相符列 → 正常 backfill 寫反向鏡像（委派 sync 後 create 預設行為不變）。
+        $this->actingAs($this->makeUser(email: 'kin-c-backfill@example.com'));
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_source' => 20, 'c_notes' => '甲之親', 'c_autogen_notes' => 'AG'],
+        ]))->assertOk()->assertJson(['ok' => true]);
+
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 300, 'c_kin_code' => 80]);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 300, 'c_kin_id' => 1000, 'c_kin_code' => 81]);
+    }
+
+    #[Test]
+    public function testKinshipCreateStrictReverseDifferingContentConflicts(): void {
+        // 非對稱安全（#66 套用 create）：對面已有「權威反向碼 81 嚴格命中」但內容不同（c_source=5≠欲寫 20）的既有列
+        // → 非 force 拋 MirrorConflictException→409，整筆回滾（正向不建、既有列不被靜默覆寫）；force 才覆寫。
+        $this->actingAs($this->makeUser(email: 'kin-c-strict-conf@example.com'));
+        $this->seedReverseKin(['c_kin_code' => 81, 'c_source' => 5]); // (300,1000,81) 既有、不同內容、autogen=AG
+
+        $res = $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_source' => 20, 'c_notes' => '甲之親', 'c_autogen_notes' => 'AG'],
+        ]));
+        $res->assertStatus(409)->assertJson(['ok' => false]);
+        $this->assertSame('KIN_DATA', $res->json('errors.mirror_conflict.table'));
+        // 回滾：正向未建、既有反向列內容（c_source=5）未被觸碰。
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 300, 'c_kin_code' => 80]);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 300, 'c_kin_id' => 1000, 'c_kin_code' => 81, 'c_source' => 5]);
+
+        // force=true → 覆寫既有反向列為新內容（c_source 5→20），正向建立，對面仍只一條（無重複）。
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_source' => 20, 'c_notes' => '甲之親', 'c_autogen_notes' => 'AG'],
+            'meta' => ['force' => true],
+        ]))->assertOk()->assertJson(['ok' => true]);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 300, 'c_kin_code' => 80]);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 300, 'c_kin_id' => 1000, 'c_kin_code' => 81, 'c_source' => 20]);
+        $this->assertSame(1, DB::table('KIN_DATA')->where(['c_personid' => 300, 'c_kin_id' => 1000])->count());
+    }
+
+    #[Test]
+    public function testKinshipCreateStrictReverseIdenticalContentIdempotent(): void {
+        // 對面既有嚴格命中列「內容相同」→ 不視為分歧（同內容鏡像可冪等通過），正常建立、對面仍一條（無重複/無 409）。
+        $this->actingAs($this->makeUser(email: 'kin-c-strict-idem@example.com'));
+        // 與下方 create 的鏡像內容一致：c_source=20、c_notes=甲之親、c_pages=null（createPayload 未送）。
+        $this->seedReverseKin(['c_kin_code' => 81, 'c_source' => 20, 'c_notes' => '甲之親', 'c_pages' => null]);
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_source' => 20, 'c_notes' => '甲之親', 'c_autogen_notes' => 'AG'],
+        ]))->assertOk()->assertJson(['ok' => true]);
+
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 300, 'c_kin_code' => 80]);
+        $this->assertSame(1, DB::table('KIN_DATA')->where(['c_personid' => 300, 'c_kin_id' => 1000])->count());
+    }
+
     #[Test]
     public function testKinshipV2CreateIdempotentResendNoDuplicate(): void {
         // #56（幂等）：v2 create 同 PK 重送鎖死 409 + errors['target.pk']=['conflict']，KIN_DATA 行數不變。

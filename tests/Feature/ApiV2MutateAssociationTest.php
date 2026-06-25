@@ -993,9 +993,9 @@ class ApiV2MutateAssociationTest extends TestCase {
     }
 
     #[Test]
-    public function testAssocUpdateSuspectedForceMultiBackfillsAndLeavesStrays(): void {
-        // #70 強制（多條疑似）：不臆造覆寫哪條 → backfill 一條權威反向列 2；兩條漂移列留待人工去對面刪。
-        // backfill 前提（嚴格落空 + 無嚴格匹配）結構上成立：兩漂移碼皆 ∉ {2}，故 code-2 必不存在、insert 不撞主鍵。
+    public function testAssocUpdateSuspectedForceMultiCollapsesFirstLeavesStrays(): void {
+        // #70 強制（多條疑似）：就地收斂「第一條」漂移列為權威反向碼 2 + 覆寫內容，其餘漂移列留待人工去對面刪，
+        // **不**再 backfill 補新列（對齊 kin；修掉舊「多條→落 backfill→殘留多條垃圾、總列數膨脹」codex MINOR）。
         $this->actingAs($this->makeUser(email: 'assoc-suspected-forceN@example.com'));
         $this->seedAssociation(['c_notes' => '正向原備註']);
         $this->seedMirror(['c_assoc_code' => 99, 'c_notes' => '漂移A']);
@@ -1006,10 +1006,11 @@ class ApiV2MutateAssociationTest extends TestCase {
             'meta' => ['force' => true],
         ]))->assertOk();
 
+        // 恰一條漂移列被收斂為權威碼 2 + 新內容；總列數 = 3（正向 + 收斂列 + 1 殘留漂移），非 4（無 backfill 新列）。
         $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000, 'c_notes' => '改後']);
-        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 99, 'c_assoc_id' => 1000]);
-        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 88, 'c_assoc_id' => 1000]);
-        $this->assertSame(4, DB::table('ASSOC_DATA')->count(), '正向 + 兩漂移列 + 新建權威列');
+        $this->assertSame(1, DB::table('ASSOC_DATA')->where(['c_personid' => 2000, 'c_assoc_id' => 1000, 'c_assoc_code' => 2])->count());
+        $this->assertSame(1, DB::table('ASSOC_DATA')->whereIn('c_assoc_code', [99, 88])->where(['c_personid' => 2000, 'c_assoc_id' => 1000])->count(), '應僅殘留一條未收斂漂移列');
+        $this->assertSame(3, DB::table('ASSOC_DATA')->count(), '正向 + 收斂後鏡像 + 1 殘留漂移列（無 backfill 第四列）');
     }
 
     #[Test]

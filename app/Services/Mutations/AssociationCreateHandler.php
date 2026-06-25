@@ -3,6 +3,7 @@
 namespace App\Services\Mutations;
 
 use App\Models\Operation;
+use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
 use App\Support\CompositePrimaryKey;
@@ -16,6 +17,9 @@ class AssociationCreateHandler extends AbstractPersonSubresourceCreateHandler {
      * 皆非 ASSOC_DATA 欄；於 handle() 抽出、afterDirectInsert()/proposalAuxiliaryPayload() 取用、finally 清除。
      */
     private ?array $pendingPairs = null;
+
+    /** #70：本次是否強制收斂對面疑似漂移鏡像（meta.force）；handle() 設定、finally 清除。預設 false＝偵測疑似。 */
+    private bool $forceMirror = false;
 
     public function __construct(
         OperationRepository $operationRepository,
@@ -45,10 +49,14 @@ class AssociationCreateHandler extends AbstractPersonSubresourceCreateHandler {
         ];
         unset($changes['c_assocship_pair'], $changes['c_kinship_pair'], $changes['c_assoc_kinship_pair']);
 
+        // #70：force 旗標——使用者在前端疑似警告中選「強制收斂」時帶 meta.force=true，跳過鏡像疑似偵測直接就地收斂。
+        $this->forceMirror = (bool) ($meta['force'] ?? false);
+
         try {
             return parent::handle($resource, $mode, $operation, $personId, $targetPk, $changes, $meta);
         } finally {
             $this->pendingPairs = null;
+            $this->forceMirror = false;
         }
     }
 
@@ -74,13 +82,23 @@ class AssociationCreateHandler extends AbstractPersonSubresourceCreateHandler {
 
     /**
      * 寫互逆鏡像列（對齊 legacy BiogMainRepository::assocStoreById）：反向關係碼、對方為主體、原人為客體，
-     * kin/assoc_kin 用對應配對碼、雙方 id 皆為原人。無條件寫入＝永遠雙向同步（create 無 legacy 的選擇性跳過問題）。
+     * kin/assoc_kin 用對應配對碼、雙方 id 皆為原人。
+     *
+     * #70：不再裸 insert，改委派已嚴格 gate 的 syncAssocMirrorOnUpdate（allowBackfill=true＝對面無對應反向列時補建
+     * ＝create 預設行為；detectConflict=!force＝對面已有「碼漂移」疑似列時拋 MirrorSuspectedException→409，
+     * 由前端跳對面 + 強制收斂）。如此 create 與 update 共用同一份 Option 2 安全判別（碼∈合法 code 的列視為他段
+     * 合法關係絕不覆寫；僅就地收斂純漂移垃圾列），避免靜默補出對面重複鏡像列。
+     *
+     * 反向關係碼為哨兵 0（正向碼無權威反向配對的極端情形）時，無有效反向可定位／偵測 → 退回 legacy 無條件
+     * insert，保持 parity（legacy assocStoreById 亦無條件寫 code-0 鏡像）。
      */
     protected function afterDirectInsert(int $personId, array $actualPk, array $rowData, array $insertedArray, ?Operation $operation): void {
         $pairs = $this->pendingPairs ?? [];
+        $reverseAssocCode = CompositePrimaryKey::emptyToSentinel($pairs['assoc'] ?? null);
+
         $mirror = $insertedArray;
         unset($mirror['__operation_id'], $mirror['__note']);
-        $mirror['c_assoc_code'] = CompositePrimaryKey::emptyToSentinel($pairs['assoc'] ?? null);
+        $mirror['c_assoc_code'] = $reverseAssocCode;
         $mirror['c_personid'] = $insertedArray['c_assoc_id'];
         $mirror['c_assoc_id'] = $personId;
         $mirror['c_kin_code'] = CompositePrimaryKey::emptyToSentinel($pairs['kin'] ?? null);
@@ -88,29 +106,78 @@ class AssociationCreateHandler extends AbstractPersonSubresourceCreateHandler {
         $mirror['c_kin_id'] = $personId;
         $mirror['c_assoc_kin_id'] = $personId;
 
-        DB::table('ASSOC_DATA')->insert($mirror);
+        // 反向碼為哨兵 0：無有效反向可定位／偵測疑似 → 退回 legacy 無條件 insert（parity）。
+        if ((int) $reverseAssocCode === 0) {
+            DB::table('ASSOC_DATA')->insert($mirror);
+            $this->auditLogService->write(
+                'ASSOC_DATA',
+                'INSERT',
+                $this->auditLogService->buildRowPkFromData('ASSOC_DATA', $mirror),
+                null,
+                $mirror,
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
 
-        $mirrorPk = [
-            'c_personid' => $mirror['c_personid'],
-            'c_assoc_code' => $mirror['c_assoc_code'],
-            'c_assoc_id' => $mirror['c_assoc_id'],
-            'c_kin_code' => $mirror['c_kin_code'],
-            'c_kin_id' => $mirror['c_kin_id'],
-            'c_assoc_kin_code' => $mirror['c_assoc_kin_code'],
-            'c_assoc_kin_id' => $mirror['c_assoc_kin_id'],
-            'c_text_title' => $mirror['c_text_title'] ?? '',
-            'c_assoc_first_year' => $mirror['c_assoc_first_year'] ?? '-9999',
-        ];
-        $this->auditLogService->write(
-            'ASSOC_DATA',
-            'INSERT',
-            $mirrorPk,
-            null,
+            return;
+        }
+
+        // 反向碼有效：委派已 gate 的鏡像同步（含 #70 疑似偵測 + Option 2 安全 + #66 衝突偵測）。
+        // 定位參數對齊 update 場景：c_assoc_id=本人、c_personid=對方、書名/首年相符、c_assoc_code=反向碼。
+        app(BiogMainRepository::class)->syncAssocMirrorOnUpdate(
             $mirror,
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
+            $personId,                                          // c_assoc_id（本人）
+            (int) $insertedArray['c_assoc_id'],                 // c_personid（對方）
+            $insertedArray['c_text_title'] ?? '',
+            $insertedArray['c_assoc_first_year'] ?? '-9999',
+            $reverseAssocCode,                                  // 反向碼（locator c_assoc_code）
+            null,
+            $operation,
+            $this->auditLogService,
+            true,                                               // allowBackfill：對面無對應列即補建（create 預設）
+            !$this->forceMirror,                                // detectConflict：非 force 時偵測疑似/衝突
+            // #66：非對稱「對面已嚴格命中」時的真分歧基準（正向碼取 insertedArray 的 c_assoc_code）。
+            $this->createMirrorBaselines($mirror, $insertedArray['c_assoc_code'] ?? null)
         );
+    }
+
+    /**
+     * #66（create 路徑的真分歧基準）：create 正向列本無「編輯前舊值」，但若對面已存在「以權威反向碼嚴格命中」
+     * 的既有反向列（非對稱單邊資料：對面有、本側缺），嚴格命中分支會 update 覆寫該列——若不設基準（空集）就會
+     * **靜默洗掉對面既有內容**（與 legacy 既有不會靜默覆寫不一致、亦違反 #66 資料安全模型）。
+     *
+     * 故以「本次欲寫入的鏡像內容」為基準：對面既有內容欄 == 欲寫入 → 視為等價、不分歧（重建同內容鏡像可冪等通過）；
+     * != → 真分歧 → 拋 MirrorConflictException → 409，前端彈警告 + 跳對面 + 強制覆寫（meta.force）。碼欄基準＝正向碼
+     * 的合法反向集（對面碼∈集即合法反向、不誤報）。
+     */
+    private function createMirrorBaselines(array $mirror, $forwardAssocCode): array {
+        $contentFields = ['c_notes', 'c_source', 'c_pages', 'c_assoc_first_year', 'c_assoc_last_year'];
+        $baselines = [];
+        foreach ($contentFields as $f) {
+            if (array_key_exists($f, $mirror)) {
+                $baselines[$f] = $mirror[$f];
+            }
+        }
+        // 碼欄合法反向集（正向社會關係碼→ASSOC_CODES.c_assoc_pair/pair2）：對面碼∈集即合法反向、不誤報為分歧。
+        if ($vr = $this->validAssocReverses($forwardAssocCode)) {
+            $baselines['c_assoc_code'] = $vr;
+        }
+
+        return $baselines;
+    }
+
+    /** ASSOC_CODES：正向社會關係碼的合法反向集（c_assoc_pair / c_assoc_pair2）。空/0/無反向 → 空陣列（該欄不納入碼分歧）。 */
+    private function validAssocReverses($code): array {
+        if ($code === null || (int) $code === 0) {
+            return [];
+        }
+        $row = DB::table('ASSOC_CODES')->where('c_assoc_code', $code)->first();
+        if (!$row) {
+            return [];
+        }
+
+        return array_values(array_filter([$row->c_assoc_pair ?? null, $row->c_assoc_pair2 ?? null], static fn ($v) => $v !== null && (int) $v !== 0));
     }
 
     /**

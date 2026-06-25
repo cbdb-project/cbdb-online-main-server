@@ -211,6 +211,32 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
             }
 
             throw $e;
+        } catch (MirrorConflictException $e) {
+            // #66：建立反向鏡像時，對面對應列已有不同內容 → 整筆交易已回滾（含正向列），回 409 + 衝突明細 + 對面鏡像 PK，
+            // 供前端彈警告 + 可點連結跳對面 edit-v2 + 提供「強制覆寫」(meta.force) 重送。
+            return $this->errorResponse($e->getMessage(), 409, [
+                'mirror_conflict' => [
+                    'table' => $e->mirrorTable,
+                    'pk' => $e->mirrorPk,
+                    'fields' => $e->conflicts,
+                ],
+            ]);
+        } catch (MirrorIntegrityException $e) {
+            // #70：鏡像同步資料完整性 fail-closed（無權威反向碼可收斂）→ 整筆已回滾，回結構化 422，
+            // 而非裸 RuntimeException 漏成 500。防禦性：現行 create 在反向碼為哨兵 0 時就走無條件 insert、不進 sync，
+            // 故 sync 內「缺權威反向碼」分支於 create 不可達；保留此 catch 以防 sync 日後演進拋出，不致漏成 500。
+            return $this->errorResponse($e->getMessage(), 422, ['mirror_integrity' => ['fail_closed']]);
+        } catch (MirrorSuspectedException $e) {
+            // #70（create 路徑）：建立反向鏡像時，對面已有疑似同一關係的漂移列（碼∉合法反向集，非嚴格命中）→ 整筆已回滾，
+            // 回 409 + 疑似列 PK 清單 + 權威反向碼，供前端彈「對面有 N 條疑似」警告 + 跳對面連結 + 強制收斂（meta.force）。
+            return $this->errorResponse($e->getMessage(), 409, [
+                'mirror_suspected' => [
+                    'table' => $e->mirrorTable,
+                    'candidates' => $e->candidates,
+                    'authoritative_code' => $e->authoritativeCode,
+                    'count' => $e->count(),
+                ],
+            ]);
         }
 
         return response()->json([

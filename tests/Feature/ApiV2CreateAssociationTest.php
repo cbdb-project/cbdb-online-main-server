@@ -710,4 +710,153 @@ class ApiV2CreateAssociationTest extends TestCase {
         $this->assertSame($opsAfterFirst, DB::table('operations')->count(), '重送被拒不得新增 operations 列');
         $this->assertSame($auditAfterFirst, DB::table('audit_log')->count(), '重送被拒不得新增 audit_log 列');
     }
+
+    // ── #70 鏡像疑似匹配（CREATE 路徑）─────────────────────────────
+    // create 與 update 共用 syncAssocMirrorOnUpdate 的 Option 2 安全判別：建立反向鏡像前，若對面已有「碼漂移
+    // （∉ 合法 ASSOC_CODE）」的疑似同關係列 → 非 force 時拋 409 errors.mirror_suspected（整筆回滾、正向也不建），
+    // force 時就地收斂該漂移列為權威反向碼（不補出重複鏡像）；碼∈合法 code 的他段關係**絕不覆寫**。
+
+    /** 在對面（2000→1000）預埋一條反向鏡像列；預設碼 99（漂移垃圾值，∉ ASSOC_CODES）。書名/首年對齊正向以入放寬探測。 */
+    protected function seedReverseAssoc(array $overrides = []): void {
+        DB::table('ASSOC_DATA')->insert(array_replace($this->pk([
+            'c_personid' => 2000, 'c_assoc_code' => 99, 'c_assoc_id' => 1000,
+            'c_text_title' => '史記', 'c_assoc_first_year' => 1080,
+        ]), [
+            'c_source' => 5, 'c_pages' => '舊', 'c_notes' => '舊鏡像',
+        ], $overrides));
+    }
+
+    #[Test]
+    public function testAssocCreateMirrorSuspectedDetectedAborts(): void {
+        // 對面已有碼漂移（99）疑似列、嚴格反向集 {101} 落空 → 非 force 建立時偵測疑似 → 409 + 整筆回滾。
+        $this->actingAs($this->makeUser(email: 'assoc-c-suspect@example.com'));
+        $this->seedReverseAssoc(); // (2000,99,1000) 史記/1080
+
+        $res = $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_source' => 20, 'c_notes' => '甲對乙'],
+        ]));
+
+        $res->assertStatus(409)->assertJson(['ok' => false]);
+        $this->assertSame('ASSOC_DATA', $res->json('errors.mirror_suspected.table'));
+        $this->assertSame(101, $res->json('errors.mirror_suspected.authoritative_code'));
+        $this->assertSame(1, $res->json('errors.mirror_suspected.count'));
+        // 整筆回滾：正向列不得建立；漂移列維持原碼 99 不被觸碰。
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000]);
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 99, 'c_assoc_id' => 1000]);
+        // 不得補出第二條反向鏡像（101）。
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000]);
+    }
+
+    #[Test]
+    public function testAssocCreateMirrorSuspectedForceCollapses(): void {
+        // force=true → 就地收斂漂移列（99→權威反向碼 101、套用新內容），不補出重複鏡像；正向列建立。
+        $this->actingAs($this->makeUser(email: 'assoc-c-force@example.com'));
+        $this->seedReverseAssoc();
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_source' => 20, 'c_notes' => '甲對乙'],
+            'meta' => ['force' => true],
+        ]))->assertOk()->assertJson(['ok' => true]);
+
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000]);
+        // 漂移列被收斂：99 消失、101 出現（內容更新為新鏡像 c_source=20）。
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 99, 'c_assoc_id' => 1000]);
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000, 'c_source' => 20]);
+        // 收斂列整列套用新鏡像內容（非僅改碼）：c_kin_id / c_assoc_kin_id 皆=本人 1000（原預埋為 0）。
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000, 'c_kin_id' => 1000, 'c_assoc_kin_id' => 1000]);
+        // 對面 (2000→1000) 只剩一條反向列（無重複）。
+        $this->assertSame(1, DB::table('ASSOC_DATA')->where(['c_personid' => 2000, 'c_assoc_id' => 1000])->count());
+    }
+
+    #[Test]
+    public function testAssocCreateStrictReverseDifferingContentConflicts(): void {
+        // 非對稱安全（#66 套用 create）：對面已有「權威反向碼 101 嚴格命中」但內容不同（c_source=5≠欲寫 20）的既有列
+        // → 非 force 拋 MirrorConflictException→409，整筆回滾（正向不建、既有列不被靜默覆寫）；force 才覆寫。
+        $this->actingAs($this->makeUser(email: 'assoc-c-strict-conf@example.com'));
+        $this->seedReverseAssoc(['c_assoc_code' => 101, 'c_source' => 5]); // (2000,101,1000) 既有、不同內容
+
+        $res = $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_source' => 20, 'c_notes' => '甲對乙'],
+        ]));
+        $res->assertStatus(409)->assertJson(['ok' => false]);
+        $this->assertSame('ASSOC_DATA', $res->json('errors.mirror_conflict.table'));
+        // 回滾：正向未建、既有反向列內容（c_source=5）未被觸碰。
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000]);
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000, 'c_source' => 5]);
+
+        // force=true → 覆寫既有反向列為新內容（c_source 5→20），正向建立，對面仍只一條（無重複）。
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_source' => 20, 'c_notes' => '甲對乙'],
+            'meta' => ['force' => true],
+        ]))->assertOk()->assertJson(['ok' => true]);
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000]);
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000, 'c_source' => 20]);
+        $this->assertSame(1, DB::table('ASSOC_DATA')->where(['c_personid' => 2000, 'c_assoc_id' => 1000])->count());
+    }
+
+    #[Test]
+    public function testAssocCreateStrictReverseIdenticalContentIdempotent(): void {
+        // 對面既有嚴格命中列「內容相同」→ 不視為分歧（同內容鏡像可冪等通過），正常建立、對面仍一條（無重複/無 409）。
+        $this->actingAs($this->makeUser(email: 'assoc-c-strict-idem@example.com'));
+        // 與下方 create 的鏡像內容一致：c_source=20、c_notes=甲對乙、c_pages=null（createPayload 未送）。
+        $this->seedReverseAssoc(['c_assoc_code' => 101, 'c_source' => 20, 'c_notes' => '甲對乙', 'c_pages' => null]);
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_source' => 20, 'c_notes' => '甲對乙'],
+        ]))->assertOk()->assertJson(['ok' => true]);
+
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000]);
+        $this->assertSame(1, DB::table('ASSOC_DATA')->where(['c_personid' => 2000, 'c_assoc_id' => 1000])->count());
+    }
+
+    #[Test]
+    public function testAssocCreateMultiDriftForceCollapsesFirstNoExtraInsert(): void {
+        // 多條漂移 + force：就地收斂「第一條」漂移列為權威反向碼 101，其餘漂移列保留（待人工刪），
+        // **不**再 backfill 補新列（修掉舊「多條→落 backfill→殘留多條垃圾」）。對面列數維持 2（收斂 1 + 殘留 1），非 3。
+        $this->actingAs($this->makeUser(email: 'assoc-c-multidrift@example.com'));
+        // 兩條漂移（碼 99 / 98，皆∉ ASSOC_CODES），以 c_kin_code 區分 PK。
+        $this->seedReverseAssoc(['c_assoc_code' => 99, 'c_kin_code' => 0, 'c_source' => 5]);
+        $this->seedReverseAssoc(['c_assoc_code' => 98, 'c_kin_code' => 7, 'c_source' => 6]);
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_source' => 20, 'c_notes' => '甲對乙'],
+            'meta' => ['force' => true],
+        ]))->assertOk()->assertJson(['ok' => true]);
+
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000]);
+        // 恰一條被收斂為 101；對面總列數 = 2（無第三條 backfill）。
+        $this->assertSame(1, DB::table('ASSOC_DATA')->where(['c_personid' => 2000, 'c_assoc_id' => 1000, 'c_assoc_code' => 101])->count());
+        $this->assertSame(2, DB::table('ASSOC_DATA')->where(['c_personid' => 2000, 'c_assoc_id' => 1000])->count());
+    }
+
+    #[Test]
+    public function testAssocCreateValidCodeOtherReverseNotClobbered(): void {
+        // Option 2 安全：對面預埋的是合法碼（300，∉ 嚴格反向集 {101}）的「他段關係」→ 視為合法、絕不覆寫，
+        // 本段鏡像照常 backfill（101）；非 force 也不誤判為疑似。
+        $this->actingAs($this->makeUser(email: 'assoc-c-valid@example.com'));
+        $this->seedReverseAssoc(['c_assoc_code' => 300]); // (2000,300,1000) 合法碼、他段關係
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_source' => 20, 'c_notes' => '甲對乙'],
+        ]))->assertOk()->assertJson(['ok' => true]);
+
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000]);
+        // 他段合法關係 300 不被觸碰。
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 300, 'c_assoc_id' => 1000, 'c_source' => 5]);
+        // 本段反向鏡像 101 照常補建。
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000, 'c_source' => 20]);
+    }
+
+    #[Test]
+    public function testAssocCreateNoExistingReverseBackfillsNormally(): void {
+        // 對面無任何相符列 → 正常 backfill 寫反向鏡像（委派 sync 後 create 預設行為不變）。
+        $this->actingAs($this->makeUser(email: 'assoc-c-backfill@example.com'));
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_source' => 20, 'c_notes' => '甲對乙'],
+        ]))->assertOk()->assertJson(['ok' => true]);
+
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000]);
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000]);
+    }
 }

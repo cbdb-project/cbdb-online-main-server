@@ -2481,32 +2481,31 @@ class BiogMainRepository {
                             (int) $mirrorCode
                         );
                     }
-                    // 強制：單條漂移→就地收斂（碼為垃圾值、確定非合法他段關係，安全）；以「該列完整 PK」精確定位，
-                    // 不可用放寬 query 更新（會誤改同位置的他段合法關係）。多條漂移→不臆造，落到下方 backfill。
-                    if ($drifted->count() === 1) {
-                        $only = $drifted->first();
-                        $updateSet = Arr::except($dataMirror, ['c_created_by', 'c_created_date']);
-                        $pkWhere = [];
-                        foreach (CompositePrimaryKey::SCHEMAS['ASSOC_DATA'] as $col) {
-                            $pkWhere[] = [$col, '=', $only->$col];
-                        }
-                        DB::table('ASSOC_DATA')->where($pkWhere)->update($updateSet);
-                        $oldData = $auditLog->normalizeRow($only);
-                        $newData = array_merge($oldData, $updateSet);
-                        $auditLog->write(
-                            'ASSOC_DATA',
-                            'UPDATE',
-                            $auditLog->buildRowPkFromData('ASSOC_DATA', $newData),
-                            $oldData,
-                            $newData,
-                            'user',
-                            (string) Auth::id(),
-                            $operationId
-                        );
-
-                        return;
+                    // 強制：就地收斂「第一條」漂移列為權威反向鏡像（碼為垃圾值、確定非合法他段關係，安全）；以「該列
+                    // 完整 PK」精確定位，不可用放寬 query 更新（會誤改同位置的他段合法關係）。多條漂移時其餘留待人工去
+                    // 對面刪——對齊 kin 的「至少收斂第一條」（修掉舊「多條→落 backfill 補新列、舊漂移全保留＝對面殘留
+                    // 多條垃圾鏡像、force 名義成功實際沒清」的不一致；codex MINOR）。
+                    $only = $drifted->first();
+                    $updateSet = Arr::except($dataMirror, ['c_created_by', 'c_created_date']);
+                    $pkWhere = [];
+                    foreach (CompositePrimaryKey::SCHEMAS['ASSOC_DATA'] as $col) {
+                        $pkWhere[] = [$col, '=', $only->$col];
                     }
-                    // 多條漂移 → 落到 backfill（下方）。
+                    DB::table('ASSOC_DATA')->where($pkWhere)->update($updateSet);
+                    $oldData = $auditLog->normalizeRow($only);
+                    $newData = array_merge($oldData, $updateSet);
+                    $auditLog->write(
+                        'ASSOC_DATA',
+                        'UPDATE',
+                        $auditLog->buildRowPkFromData('ASSOC_DATA', $newData),
+                        $oldData,
+                        $newData,
+                        'user',
+                        (string) Auth::id(),
+                        $operationId
+                    );
+
+                    return;
                 }
                 // 無漂移疑似（命中的都是合法他段關係或無）→ 落到 backfill 補本段鏡像，不動他段。
             }

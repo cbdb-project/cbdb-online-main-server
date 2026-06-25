@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
+use App\Services\RelationshipMirrorService;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,16 +14,20 @@ use Illuminate\Validation\ValidationException;
 
 class UnidirectionalRelationshipRepairController extends Controller {
     /**
-     * 默認的 c_assoc_first_year 值，用於 ASSOC_DATA 記錄
+     * 默認的 c_assoc_first_year 值，用於 ASSOC_DATA 記錄。
+     *
+     * @deprecated §8 後改用 RelationshipMirrorService::DEFAULT_ASSOC_FIRST_YEAR（本常數已無內部引用，保留供向後相容）。
      */
     public const DEFAULT_ASSOC_FIRST_YEAR = -9999;
 
     protected OperationRepository $operationRepository;
     protected ToolsRepository $toolsRepository;
+    protected RelationshipMirrorService $mirrorService;
 
-    public function __construct(OperationRepository $operationRepository, ToolsRepository $toolsRepository) {
+    public function __construct(OperationRepository $operationRepository, ToolsRepository $toolsRepository, RelationshipMirrorService $mirrorService) {
         $this->operationRepository = $operationRepository;
         $this->toolsRepository = $toolsRepository;
+        $this->mirrorService = $mirrorService;
         $this->middleware('auth');
         $this->middleware(function ($request, $next) {
             if (!Auth::user() || !Auth::user()->canRunBatchImport()) {
@@ -203,47 +208,18 @@ class UnidirectionalRelationshipRepairController extends Controller {
      * 獲取關係類型的配置
      */
     protected function getRepairConfig(string $type): array {
-        return $type === 'kinship' ? [
-            'table' => 'KIN_DATA',
-            'related_id_field' => 'c_kin_id',
-            'relation_code_field' => 'c_kin_code',
-            'relation_name' => '親屬關係',
-        ] : [
-            'table' => 'ASSOC_DATA',
-            'related_id_field' => 'c_assoc_id',
-            'relation_code_field' => 'c_assoc_code',
-            'relation_name' => '社會關係',
-        ];
+        // §8：定位/設定真相來源收斂於 RelationshipMirrorService。
+        return $this->mirrorService->repairConfig($type);
     }
 
     /**
      * 處理多條記錄錯誤
      */
     protected function multipleRecordsError(string $type, $records, int $count) {
-        $config = $this->getRepairConfig($type);
-        $mapper = $type === 'kinship'
-            ? fn ($r) => [
-                'c_personid' => $r->c_personid,
-                'c_kin_id' => $r->c_kin_id,
-                'c_kin_code' => $r->c_kin_code,
-                'c_source' => $r->c_source,
-                'c_created_by' => $r->c_created_by ?? null,
-                'c_created_date' => $r->c_created_date ?? null,
-            ]
-            : fn ($r) => [
-                'c_personid' => $r->c_personid,
-                'c_assoc_id' => $r->c_assoc_id,
-                'c_assoc_code' => $r->c_assoc_code,
-                'c_text_title' => $r->c_text_title,
-                'c_source' => $r->c_source,
-                'c_created_by' => $r->c_created_by ?? null,
-                'c_created_date' => $r->c_created_date ?? null,
-            ];
-
         return response()->json([
             'success' => false,
             'message' => "檢索到多條記錄（{$count} 條），請檢查輸入參數是否正確。",
-            'records' => $records->map($mapper)->toArray(),
+            'records' => $this->mirrorService->formatRecords($type, $records),
         ], 400);
     }
 
@@ -263,89 +239,14 @@ class UnidirectionalRelationshipRepairController extends Controller {
      * 檢查反向關係是否已存在
      */
     protected function reverseRelationExists(string $type, $relation, array $params): bool {
-        $config = $this->getRepairConfig($type);
-
-        if ($type === 'kinship') {
-            return DB::table('KIN_DATA')
-                ->where('c_personid', $params['related_id'])
-                ->where('c_kin_id', $params['person_id'])
-                ->where('c_kin_code', $params['new_relation_code'])
-                ->exists();
-        } else {
-            $relationFirstYear = $relation->c_assoc_first_year ?? self::DEFAULT_ASSOC_FIRST_YEAR;
-
-            return DB::table('ASSOC_DATA')
-                ->where('c_personid', $params['related_id'])
-                ->where('c_assoc_id', $params['person_id'])
-                ->where('c_assoc_code', $params['new_relation_code'])
-                ->where('c_kin_code', $relation->c_kin_code)
-                ->where('c_kin_id', $relation->c_kin_id)
-                ->where('c_assoc_kin_code', $relation->c_assoc_kin_code)
-                ->where('c_assoc_kin_id', $relation->c_assoc_kin_id)
-                ->where('c_text_title', $relation->c_text_title)
-                ->where('c_assoc_first_year', $relationFirstYear)
-                ->where('c_assoc_count', $relation->c_assoc_count ?? 1)
-                ->where('c_sequence', $relation->c_sequence ?? 0)
-                ->exists();
-        }
+        return $this->mirrorService->reverseRelationExists($type, $relation, $params);
     }
 
     /**
      * 構建反向關係記錄
      */
     protected function buildReverseRelation(string $type, $relation, array $params): array {
-        if ($type === 'kinship') {
-            return [
-                'c_personid' => $params['related_id'],
-                'c_kin_id' => $params['person_id'],
-                'c_kin_code' => $params['new_relation_code'],
-                'c_source' => $relation->c_source ?? null,
-                'c_pages' => $relation->c_pages ?? null,
-                'c_notes' => $relation->c_notes ?? null,
-                'c_autogen_notes' => $relation->c_autogen_notes ?? null,
-            ];
-        } else {
-            return [
-                'c_personid' => $params['related_id'],
-                'c_assoc_id' => $params['person_id'],
-                'c_assoc_code' => $params['new_relation_code'],
-                'c_kin_code' => $relation->c_kin_code,
-                'c_kin_id' => $relation->c_kin_id,
-                'c_assoc_kin_code' => $relation->c_assoc_kin_code,
-                'c_assoc_kin_id' => $relation->c_assoc_kin_id,
-                'c_text_title' => $relation->c_text_title,
-                'c_tertiary_personid' => $relation->c_tertiary_personid ?? null,
-                'c_tertiary_type_notes' => $relation->c_tertiary_type_notes ?? null,
-                'c_assoc_count' => $relation->c_assoc_count ?? 1,
-                'c_sequence' => $relation->c_sequence ?? 0,
-                'c_assoc_first_year' => $relation->c_assoc_first_year ?? self::DEFAULT_ASSOC_FIRST_YEAR,
-                'c_assoc_last_year' => $relation->c_assoc_last_year ?? null,
-                'c_assoc_fy_nh_code' => $relation->c_assoc_fy_nh_code ?? null,
-                'c_assoc_fy_nh_year' => $relation->c_assoc_fy_nh_year ?? null,
-                'c_assoc_fy_range' => $relation->c_assoc_fy_range ?? null,
-                'c_assoc_ly_nh_code' => $relation->c_assoc_ly_nh_code ?? null,
-                'c_assoc_ly_nh_year' => $relation->c_assoc_ly_nh_year ?? null,
-                'c_assoc_ly_range' => $relation->c_assoc_ly_range ?? null,
-                'c_assoc_fy_intercalary' => $relation->c_assoc_fy_intercalary ?? null,
-                'c_assoc_fy_month' => $relation->c_assoc_fy_month ?? null,
-                'c_assoc_fy_day' => $relation->c_assoc_fy_day ?? null,
-                'c_assoc_fy_day_gz' => $relation->c_assoc_fy_day_gz ?? null,
-                'c_assoc_ly_intercalary' => $relation->c_assoc_ly_intercalary ?? null,
-                'c_assoc_ly_month' => $relation->c_assoc_ly_month ?? null,
-                'c_assoc_ly_day' => $relation->c_assoc_ly_day ?? null,
-                'c_assoc_ly_day_gz' => $relation->c_assoc_ly_day_gz ?? null,
-                'c_addr_id' => $relation->c_addr_id ?? null,
-                'c_inst_code' => $relation->c_inst_code ?? 0,
-                'c_inst_name_code' => $relation->c_inst_name_code ?? 0,
-                'c_litgenre_code' => $relation->c_litgenre_code ?? null,
-                'c_occasion_code' => $relation->c_occasion_code ?? null,
-                'c_topic_code' => $relation->c_topic_code ?? null,
-                'c_assoc_claimer_id' => $relation->c_assoc_claimer_id ?? null,
-                'c_source' => $relation->c_source ?? null,
-                'c_pages' => $relation->c_pages ?? null,
-                'c_notes' => $relation->c_notes ?? null,
-            ];
-        }
+        return $this->mirrorService->buildReverseRelation($type, $relation, $params);
     }
 
     /**

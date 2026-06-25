@@ -7,6 +7,8 @@ import AiCodeLookupPanel, { AiCandidate } from './PersonEditorShared/AiCodeLooku
 import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
 import MirrorConflictNotice, { MirrorConflict } from './PersonEditorShared/MirrorConflictNotice';
 import MirrorSuspectedNotice, { MirrorSuspected } from './PersonEditorShared/MirrorSuspectedNotice';
+import OppositeEdgeNotice from './PersonEditorShared/OppositeEdgeNotice';
+import { useOppositeEdgeDetection } from './PersonEditorShared/useOppositeEdgeDetection';
 
 /**
  * 社會關係（associations / ASSOC_DATA）編輯器（對齊 legacy biogmains/assoc/_form.blade.php，非 person-browser）。
@@ -123,6 +125,24 @@ export default function AssocEditor({
     useEffect(() => () => { if (msgTimer.current) window.clearTimeout(msgTimer.current); }, []);
 
     const dirty = useMemo(() => JSON.stringify(fields) !== savedSnapshot, [fields, savedSnapshot]);
+
+    // #79：偵測對面缺邊/多條（僅 edit；依「已存檔」列定位；存檔後重抓）。
+    const savedRow = useMemo<Fields>(() => { try { return JSON.parse(savedSnapshot) as Fields; } catch { return base; } }, [savedSnapshot]);
+    const { result: oppositeEdge } = useOppositeEdgeDetection({
+        // 僅「可直接寫入」者偵測（後端亦 detection:false 把關；前端先過濾省一次請求）。
+        enabled: mode === 'edit' && canEdit,
+        resource: 'associations',
+        personId,
+        forward: {
+            opposite_id: savedRow.c_assoc_id ?? '0',
+            forward_code: savedRow.c_assoc_code ?? '0',
+            text_title: savedRow.c_text_title ?? TEXT_PK_SENTINEL,
+            first_year: savedRow.c_assoc_first_year ?? YEAR_PK_SENTINEL,
+        },
+        reloadKey: savedSnapshot,
+    });
+    const reverseCodeLabel = useMemo(() => pairCandidates.find((o) => o.code === reversePair)?.label, [pairCandidates, reversePair]);
+
     const set = (k: string, v: string) => setFields((p) => ({ ...p, [k]: v }));
     const setLabel = (k: string, v: string) => setLabels((p) => ({ ...p, [k]: v }));
     const editable = canEdit || canPropose;
@@ -419,6 +439,7 @@ export default function AssocEditor({
             <h3 style={titleStyle}>{mode === 'create' ? tr('assoc_create', '新增社會關係') : tr('assoc_edit', '編輯社會關係')} — {personLabel}</h3>
             {message ? <div style={okStyle}>{message}</div> : null}
             {error ? <div style={errStyle}>{error}</div> : null}
+            <OppositeEdgeNotice result={oppositeEdge} reverseCodeLabel={reverseCodeLabel} tr={tr} />
 
             {aiEnabled && aiSuggestEndpoint && editable ? (
                 <AiCodeLookupPanel

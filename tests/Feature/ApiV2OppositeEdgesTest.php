@@ -120,6 +120,15 @@ class ApiV2OppositeEdgesTest extends TestCase {
     }
 
     #[Test]
+    public function testKinMirrorWithNullAutogenNotMissing(): void {
+        // 回歸（review SERIOUS）：對面鏡像 c_autogen_notes 為 NULL，前端送 ''（控制器補水）→ 應 'single' 非 'missing'。
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 76, 'c_autogen_notes' => null]);
+        $this->actingAs($this->makeUser());
+        $this->postJson('/api/v2/relationship/opposite-edges', $this->kinPayload(['autogen_notes' => '']))
+            ->assertOk()->assertJson(['count' => 1, 'status' => 'single']);
+    }
+
+    #[Test]
     public function testKinMultipleEdges(): void {
         DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 76, 'c_autogen_notes' => 'a']);
         DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 77, 'c_autogen_notes' => 'a']);

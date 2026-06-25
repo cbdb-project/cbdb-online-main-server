@@ -108,13 +108,23 @@ class RelationshipMirrorService {
     public function locateOppositeEdges(string $type, array $locator) {
         if ($type === 'kinship') {
             $reverseCodes = $this->legitReverseKinCodes($locator['forward_code'] ?? null);
-
-            return DB::table('KIN_DATA')
+            $autogen = $locator['autogen_notes'] ?? null;
+            $q = DB::table('KIN_DATA')
                 ->where('c_kin_id', $locator['person_id'])
                 ->where('c_personid', $locator['opposite_id'])
-                ->where('c_autogen_notes', $locator['autogen_notes'] ?? null)
-                ->whereIn('c_kin_code', $reverseCodes ?: [-99999])
-                ->get();
+                ->whereIn('c_kin_code', $reverseCodes ?: [-99999]);
+            // c_autogen_notes 的 NULL 與 '' 同為「無自動備註」：前端編輯載入時控制器把 DB NULL 補水成 ''（送 ''），
+            // 但既有反向鏡像列的 c_autogen_notes 多為 NULL，精確 `= ''` 比對會漏命中 → 誤報「缺邊」。故空值（null/''）
+            // 一律以 (IS NULL OR = '') 比對；非空才精確比對。
+            if ($autogen === null || $autogen === '') {
+                $q->where(function ($w) {
+                    $w->whereNull('c_autogen_notes')->orWhere('c_autogen_notes', '');
+                });
+            } else {
+                $q->where('c_autogen_notes', $autogen);
+            }
+
+            return $q->get();
         }
 
         $reverseCodes = $this->validReverseAssocSet($locator['forward_code'] ?? null);

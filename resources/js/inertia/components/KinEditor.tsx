@@ -5,6 +5,8 @@ import { getCsrfToken } from './PersonBrowser/shared/csrf';
 import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
 import MirrorConflictNotice, { MirrorConflict } from './PersonEditorShared/MirrorConflictNotice';
 import MirrorSuspectedNotice, { MirrorSuspected } from './PersonEditorShared/MirrorSuspectedNotice';
+import OppositeEdgeNotice from './PersonEditorShared/OppositeEdgeNotice';
+import { useOppositeEdgeDetection } from './PersonEditorShared/useOppositeEdgeDetection';
 
 /**
  * 親屬關係（kinship / KIN_DATA）編輯器（對齊 legacy biogmains/kinship/_form.blade.php，非 person-browser）。
@@ -80,6 +82,19 @@ export default function KinEditor({
     useEffect(() => () => { if (msgTimer.current) window.clearTimeout(msgTimer.current); }, []);
 
     const dirty = useMemo(() => JSON.stringify(fields) !== savedSnapshot, [fields, savedSnapshot]);
+
+    // #79：偵測對面缺邊/多條（僅 edit 模式、依「已存檔」的列定位；存檔後 savedSnapshot 變→重抓）。
+    const savedRow = useMemo<Fields>(() => { try { return JSON.parse(savedSnapshot) as Fields; } catch { return base; } }, [savedSnapshot]);
+    const { result: oppositeEdge } = useOppositeEdgeDetection({
+        // 僅「可直接寫入」者偵測（後端亦 detection:false 把關，前端先過濾省一次請求；對齊提示只對直接寫入者有意義）。
+        enabled: mode === 'edit' && canEdit,
+        resource: 'kinship',
+        personId,
+        forward: { opposite_id: savedRow.c_kin_id ?? '0', forward_code: savedRow.c_kin_code ?? '0', autogen_notes: savedRow.c_autogen_notes ?? null },
+        reloadKey: savedSnapshot,
+    });
+    const reverseCodeLabel = useMemo(() => pairCandidates.find((o) => o.code === reversePair)?.label, [pairCandidates, reversePair]);
+
     const set = (k: string, v: string) => setFields((p) => ({ ...p, [k]: v }));
     const setLabel = (k: string, v: string) => setLabels((p) => ({ ...p, [k]: v }));
     const editable = canEdit || canPropose;
@@ -225,6 +240,7 @@ export default function KinEditor({
             <h3 style={titleStyle}>{mode === 'create' ? tr('kinship_create', '新增親屬關係') : tr('kinship_edit', '編輯親屬關係')} — {personLabel}</h3>
             {message ? <div style={okStyle}>{message}</div> : null}
             {error ? <div style={errStyle}>{error}</div> : null}
+            <OppositeEdgeNotice result={oppositeEdge} reverseCodeLabel={reverseCodeLabel} tr={tr} />
 
             {searchRow('c_kin_code', `${tr('kinship_relation', '親屬關係')} (c_kin_code)`, '/api/select/search/kincode')}
             {searchRow('c_kin_id', `${tr('relative_name', '親屬姓名')} (c_kin_id)`, '/api/select/search/biog')}

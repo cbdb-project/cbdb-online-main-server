@@ -173,6 +173,22 @@ class RelationshipMirrorServiceTest extends TestCase {
     }
 
     #[Test]
+    public function testLocateOppositeEdgesKinAutogenNullEmptyEquivalent(): void {
+        // 回歸（review SERIOUS）：對面鏡像 c_autogen_notes 為 NULL（常見），前端送 ''（控制器把 NULL 補水成 ''）→
+        // 須仍命中（NULL/'' 視為「無自動備註」同義），不可誤報缺邊。反之非空也須能命中既有 ''/NULL 不混淆。
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 76, 'c_autogen_notes' => null]);
+        // 送 '' → 命中 NULL 列。
+        $this->assertCount(1, $this->svc->locateOppositeEdges('kinship', ['person_id' => 1000, 'opposite_id' => 2000, 'autogen_notes' => '', 'forward_code' => 75]));
+        // 送 null → 同樣命中。
+        $this->assertCount(1, $this->svc->locateOppositeEdges('kinship', ['person_id' => 1000, 'opposite_id' => 2000, 'autogen_notes' => null, 'forward_code' => 75]));
+        // 另一列 autogen='' 亦屬空 → 送 '' 命中兩列。
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 77, 'c_autogen_notes' => '']);
+        $this->assertCount(2, $this->svc->locateOppositeEdges('kinship', ['person_id' => 1000, 'opposite_id' => 2000, 'autogen_notes' => '', 'forward_code' => 75]));
+        // 送非空 'x' → 不命中空值列。
+        $this->assertCount(0, $this->svc->locateOppositeEdges('kinship', ['person_id' => 1000, 'opposite_id' => 2000, 'autogen_notes' => 'x', 'forward_code' => 75]));
+    }
+
+    #[Test]
     public function testLocateOppositeEdgesAssociation(): void {
         $locator = ['person_id' => 1000, 'opposite_id' => 2000, 'text_title' => '史記', 'first_year' => 1080, 'forward_code' => 100];
         $this->assertCount(0, $this->svc->locateOppositeEdges('association', $locator));

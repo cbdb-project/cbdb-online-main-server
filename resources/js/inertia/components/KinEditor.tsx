@@ -4,6 +4,7 @@ import TextpersonPair from './PersonEditorShared/TextpersonPair';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
 import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
 import MirrorConflictNotice, { MirrorConflict } from './PersonEditorShared/MirrorConflictNotice';
+import MirrorSuspectedNotice, { MirrorSuspected } from './PersonEditorShared/MirrorSuspectedNotice';
 
 /**
  * 親屬關係（kinship / KIN_DATA）編輯器（對齊 legacy biogmains/kinship/_form.blade.php，非 person-browser）。
@@ -66,6 +67,7 @@ export default function KinEditor({
     const [sourceHighlight, setSourceHighlight] = useState(false);
     const [comment, setComment] = useState('');
     const [conflict, setConflict] = useState<MirrorConflict | null>(null); // #66 對面鏡像衝突
+    const [suspected, setSuspected] = useState<MirrorSuspected | null>(null); // #70 對面疑似漂移鏡像
     // 互逆配對碼（反向關係碼）：候選由 /api/select/search/kinpair 依正向碼取得（對齊 legacy）。
     // 預設選第一個候選（同 legacy）；反向關係常有歧義（父→子/女、第幾子…）故容許手選。
     type PairOpt = { code: string; label: string };
@@ -121,7 +123,7 @@ export default function KinEditor({
     };
 
     const save = async (sm: 'direct' | 'proposal', force = false) => {
-        setSaving(true); setError(null); setMessage(null); setConflict(null);
+        setSaving(true); setError(null); setMessage(null); setConflict(null); setSuspected(null);
         // PK 段空值正規化為哨兵 '0'。
         const pkVal = (k: string): number | string => {
             if (k === 'c_personid') return personId;
@@ -169,6 +171,9 @@ export default function KinEditor({
                 // #66：對面鏡像衝突 → 顯示警告 + 連結 + 強制覆寫，不丟一般錯誤。
                 const mc = json?.errors?.mirror_conflict;
                 if (res.status === 409 && mc) { setSaving(false); setConflict(mc as MirrorConflict); return; }
+                // #70：對面疑似漂移鏡像 → 顯示疑似警告 + 逐一連結 + 強制收斂。
+                const ms = json?.errors?.mirror_suspected;
+                if (res.status === 409 && ms) { setSaving(false); setSuspected(ms as MirrorSuspected); return; }
                 throw new Error(json?.message || `HTTP ${res.status}`);
             }
             flashSaved(sm === 'proposal' ? tr('proposal_submitted', '已提交建議') : tr('save_success', '已儲存'));
@@ -278,6 +283,17 @@ export default function KinEditor({
                     mirrorUrl={`/app/basicinformation/${conflict.pk.c_personid}/kinship/edit-v2?${new URLSearchParams(Object.fromEntries(Object.entries(conflict.pk).map(([k, v]) => [k, String(v)]))).toString()}`}
                     onForce={() => void save('direct', true)}
                     onDismiss={() => setConflict(null)}
+                    forcing={saving}
+                    tr={tr}
+                />
+            ) : null}
+
+            {suspected ? (
+                <MirrorSuspectedNotice
+                    suspected={suspected}
+                    urlFor={(pk) => `/app/basicinformation/${pk.c_personid}/kinship/edit-v2?${new URLSearchParams(Object.fromEntries(Object.entries(pk).map(([k, v]) => [k, String(v)]))).toString()}`}
+                    onForce={() => void save('direct', true)}
+                    onDismiss={() => setSuspected(null)}
                     forcing={saving}
                     tr={tr}
                 />

@@ -6,6 +6,7 @@ import { getCsrfToken } from './PersonBrowser/shared/csrf';
 import AiCodeLookupPanel, { AiCandidate } from './PersonEditorShared/AiCodeLookupPanel';
 import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
 import MirrorConflictNotice, { MirrorConflict } from './PersonEditorShared/MirrorConflictNotice';
+import MirrorSuspectedNotice, { MirrorSuspected } from './PersonEditorShared/MirrorSuspectedNotice';
 
 /**
  * 社會關係（associations / ASSOC_DATA）編輯器（對齊 legacy biogmains/assoc/_form.blade.php，非 person-browser）。
@@ -101,6 +102,7 @@ export default function AssocEditor({
     const [assocHighlight, setAssocHighlight] = useState(false);
     const [comment, setComment] = useState('');
     const [conflict, setConflict] = useState<MirrorConflict | null>(null); // #66 對面鏡像衝突
+    const [suspected, setSuspected] = useState<MirrorSuspected | null>(null); // #70 對面疑似漂移鏡像
     // 互逆配對碼（反向社會關係碼）：候選由 /api/select/search/assocpair 依正向碼取得（對齊 legacy / KinEditor）。
     // create 預設選第一個候選；反向有歧義（一碼可能有 c_assoc_pair / c_assoc_pair2 兩個合法反向）故容許手選。
     type PairOpt = { code: string; label: string };
@@ -259,7 +261,7 @@ export default function AssocEditor({
     };
 
     const save = async (sm: 'direct' | 'proposal', force = false) => {
-        setSaving(true); setError(null); setMessage(null); setConflict(null);
+        setSaving(true); setError(null); setMessage(null); setConflict(null); setSuspected(null);
         // PK 段空值正規化：c_text_title→'[n/a]'、c_assoc_first_year→'-9999'、其餘 code 段→'0'。
         const pkVal = (k: string): number | string => {
             if (k === 'c_personid') return personId;
@@ -331,6 +333,9 @@ export default function AssocEditor({
                 // #66：對面鏡像衝突 → 顯示警告 + 連結 + 強制覆寫，不丟一般錯誤。
                 const mc = json?.errors?.mirror_conflict;
                 if (res.status === 409 && mc) { setSaving(false); setConflict(mc as MirrorConflict); return; }
+                // #70：對面疑似漂移鏡像 → 顯示疑似警告 + 逐一連結 + 強制收斂。
+                const ms = json?.errors?.mirror_suspected;
+                if (res.status === 409 && ms) { setSaving(false); setSuspected(ms as MirrorSuspected); return; }
                 throw new Error(json?.message || `HTTP ${res.status}`);
             }
             flashSaved(sm === 'proposal' ? tr('proposal_submitted', '已提交建議') : tr('save_success', '已儲存'));
@@ -524,6 +529,17 @@ export default function AssocEditor({
                     mirrorUrl={`/app/basicinformation/${conflict.pk.c_personid}/assoc/edit-v2?${new URLSearchParams(Object.fromEntries(Object.entries(conflict.pk).map(([k, v]) => [k, String(v)]))).toString()}`}
                     onForce={() => void save('direct', true)}
                     onDismiss={() => setConflict(null)}
+                    forcing={saving}
+                    tr={tr}
+                />
+            ) : null}
+
+            {suspected ? (
+                <MirrorSuspectedNotice
+                    suspected={suspected}
+                    urlFor={(pk) => `/app/basicinformation/${pk.c_personid}/assoc/edit-v2?${new URLSearchParams(Object.fromEntries(Object.entries(pk).map(([k, v]) => [k, String(v)]))).toString()}`}
+                    onForce={() => void save('direct', true)}
+                    onDismiss={() => setSuspected(null)}
                     forcing={saving}
                     tr={tr}
                 />

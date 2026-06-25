@@ -1144,6 +1144,21 @@ class BasicInformationController extends Controller {
      * Inertia + React 版：社會關係（assoc）編輯器（對齊 legacy assoc/_form，非 person-browser）。
      * 9 段複合主鍵以 query 帶入編輯。pair codes 由後端自動權威補齊，編輯器不送。
      */
+    /**
+     * #70：子資源「記錄不存在」優雅降級。取代 edit-v2 在對應列不存在時硬 abort(404)——
+     * 渲染共用 SubresourceNotFound 頁（明確訊息 + 返回人物詳情中樞對應分頁連結）。
+     * 典型情境：從鏡像「疑似匹配」提示跳對面，但該列已被刪除或主鍵不符。
+     * **保留 404 狀態碼**（語義正確、不影響監控/快取/狀態判斷），僅把錯誤頁換成自訂 Inertia 頁。
+     * 不傳資源中文名（避免 en locale 混中文）；訊息為通用「記錄不存在」，由前端 i18n 呈現。
+     */
+    private function renderSubresourceNotFound(Request $request, int $personId, string $personLabel, string $tab) {
+        return Inertia::render('BasicInformation/SubresourceNotFound', [
+            'person_label' => $personLabel,
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => $tab], false),
+            'person_banner' => $this->personBannerProps($personId, $tab),
+        ])->toResponse($request)->setStatusCode(404);
+    }
+
     public function appAssocEditV2(Request $request, $id) {
         $personId = $this->normalizePersonId($id);
         [, $personLabel] = $this->buildPersonViewProps($personId);
@@ -1171,7 +1186,9 @@ class BasicInformationController extends Controller {
                 ->where('c_assoc_first_year', (int) $request->input('c_assoc_first_year'))
                 ->first();
             if (!$row) {
-                abort(404);
+                // #70 優雅降級：對面記錄不存在（可能已刪除或主鍵不符，如從鏡像疑似提示跳對面）→ 不硬報 404，
+                // 渲染「記錄不存在」態 + 返回中樞連結，取代舊版點 edit 直接報錯的痛點。
+                return $this->renderSubresourceNotFound($request, $personId, $personLabel, 'associations');
             }
             foreach ((array) $row as $k => $v) {
                 $initialFields[$k] = $v === null ? '' : (string) $v;
@@ -1285,7 +1302,9 @@ class BasicInformationController extends Controller {
                 ->where('c_kin_code', (int) $request->input('c_kin_code'))
                 ->first();
             if (!$row) {
-                abort(404);
+                // #70 優雅降級：對面記錄不存在（可能已刪除或主鍵不符，如從鏡像疑似提示跳對面）→ 不硬報 404，
+                // 渲染「記錄不存在」態 + 返回中樞連結，取代舊版點 edit 直接報錯的痛點。
+                return $this->renderSubresourceNotFound($request, $personId, $personLabel, 'kinship');
             }
             foreach ((array) $row as $k => $v) {
                 $initialFields[$k] = $v === null ? '' : (string) $v;

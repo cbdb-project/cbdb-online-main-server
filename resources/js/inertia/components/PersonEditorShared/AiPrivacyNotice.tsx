@@ -6,14 +6,39 @@ import { useTranslation } from '../../hooks/useTranslation';
  * 由所有 AI 面板（AiCodeLookupPanel：assoc/statuses；PostingAiAutofill：offices）共用，
  * 確保告知內容與樣式單一來源、不再各自實作而分歧（曾發生 assoc 整段缺失）。
  */
+// #84：收合狀態以 localStorage 跨頁/跨 session 記憶。使用者一旦收起，之後任何顯示此須知的頁面預設即收起；
+// 首次（未設定）仍預設展開，確保同意須知對未讀者可見（§0.2 parity）。無 localStorage（隱私模式）時靜默回退展開。
+const NOTICE_COLLAPSED_KEY = 'cbdb:ai-privacy-notice:collapsed';
+
+function readCollapsed(): boolean {
+    try {
+        if (typeof window === 'undefined') {
+            return false; // SSR 安全（目前 Inertia SSR 關閉，仍前瞻性防護）
+        }
+        return window.localStorage.getItem(NOTICE_COLLAPSED_KEY) === '1';
+    } catch {
+        return false;
+    }
+}
+
 export default function AiPrivacyNotice({ aiModel }: { aiModel?: string }) {
     const t = useTranslation('biogmains');
-    // 預設展開：legacy 永遠顯示完整數據收集/第三方服務同意須知，新版若預設收合等於把同意聲明藏在點擊後，
-    // 屬 §0.2 parity 退化（且使用者多次強調此須知須可見）。故預設展開、仍可收合。
-    const [show, setShow] = useState(true);
+    // 預設展開（首次/未設定）；曾收起過則讀 localStorage 回收合狀態。仍可隨時切換，切換即寫回 localStorage。
+    const [show, setShow] = useState<boolean>(() => !readCollapsed());
+    const toggle = () => {
+        setShow((v) => {
+            const next = !v;
+            try {
+                window.localStorage.setItem(NOTICE_COLLAPSED_KEY, next ? '0' : '1');
+            } catch {
+                /* localStorage 不可用（隱私模式等）：僅本次有效，不持久化 */
+            }
+            return next;
+        });
+    };
     return (
         <div style={wrapStyle}>
-            <button type="button" style={toggleStyle} onClick={() => setShow((v) => !v)} aria-expanded={show}>
+            <button type="button" style={toggleStyle} onClick={toggle} aria-expanded={show}>
                 <i className="fas fa-circle-info" aria-hidden="true" style={{ marginRight: 4 }} />
                 {t('ai_notice_title')}
                 <i className={`fas fa-chevron-${show ? 'up' : 'down'}`} aria-hidden="true" style={{ marginLeft: 6, fontSize: '0.7rem' }} />

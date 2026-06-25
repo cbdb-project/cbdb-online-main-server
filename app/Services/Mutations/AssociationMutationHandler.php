@@ -255,6 +255,16 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
             return $this->errorResponse($e->getMessage(), 409, [
                 'mirror_conflict' => ['table' => $e->mirrorTable, 'pk' => $e->mirrorPk, 'fields' => $e->conflicts],
             ]);
+        } catch (MirrorSuspectedException $e) {
+            // #70（同 S2）：pair-only 路徑同樣須自行把「疑似漂移鏡像」轉 409，否則逃逸成 500。
+            return $this->errorResponse($e->getMessage(), 409, [
+                'mirror_suspected' => [
+                    'table' => $e->mirrorTable,
+                    'candidates' => $e->candidates,
+                    'authoritative_code' => $e->authoritativeCode,
+                    'count' => $e->count(),
+                ],
+            ]);
         } catch (\Illuminate\Database\QueryException $e) {
             return $this->errorResponse('鏡像列已存在或主鍵衝突', 409, ['mirror' => ['conflict']]);
         }

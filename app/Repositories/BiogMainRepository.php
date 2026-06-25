@@ -2455,6 +2455,62 @@ class BiogMainRepository {
                 return;
             }
 
+            // #70 放寬探測：嚴格定位（含碼∈合法反向集）落空時，再以「相同對方/本人/書名/首年、不限關係碼」查疑似列。
+            // 僅作 UI 疑似提示／強制收斂之用，不入冪等／確定匹配規則（確定性同步永遠只認上方嚴格定位）。
+            $relaxed = DB::table('ASSOC_DATA')->where([
+                ['c_assoc_id', '=', $cPersonid],
+                ['c_personid', '=', $oldAssocId],
+                ['c_text_title', '=', $oldTextTitle],
+                ['c_assoc_first_year', '=', $oldFirstYear],
+            ]);
+            $suspects = (clone $relaxed)->get();
+
+            // Option 2 安全判別：ASSOC_DATA 為 9 鍵 PK，同對方+同書+同首年下可合法存在「另一段不同社會關係」（僅 c_assoc_code 等不同）。
+            // 故放寬命中的列**只有碼不是任何合法 ASSOC_CODE（純漂移垃圾值，如 99）**時，才可能是本段關係的漂移鏡像、可警告／就地收斂；
+            // 碼是合法 code 的列極可能是另一段合法關係的鏡像，**絕不可覆寫**（會靜默吞掉他段關係）→ 視為非本段疑似、不阻擋本段 backfill。
+            if ($suspects->isNotEmpty()) {
+                $validCodes = DB::table('ASSOC_CODES')->pluck('c_assoc_code')->map(static fn ($c) => (int) $c)->all();
+                $drifted = $suspects->filter(static fn ($r) => !in_array((int) $r->c_assoc_code, $validCodes, true))->values();
+
+                if ($drifted->isNotEmpty()) {
+                    if ($detectConflict) {
+                        // 非強制：偵測到漂移疑似列 → 不自動同步、不 backfill → 拋疑似中止 → 整筆回滾 → 409 + 跳對面 + 強制收斂。
+                        throw new \App\Services\Mutations\MirrorSuspectedException(
+                            'ASSOC_DATA',
+                            $drifted->map(fn ($r) => $auditLog->buildRowPkFromData('ASSOC_DATA', $auditLog->normalizeRow($r)))->all(),
+                            (int) $mirrorCode
+                        );
+                    }
+                    // 強制：單條漂移→就地收斂（碼為垃圾值、確定非合法他段關係，安全）；以「該列完整 PK」精確定位，
+                    // 不可用放寬 query 更新（會誤改同位置的他段合法關係）。多條漂移→不臆造，落到下方 backfill。
+                    if ($drifted->count() === 1) {
+                        $only = $drifted->first();
+                        $updateSet = Arr::except($dataMirror, ['c_created_by', 'c_created_date']);
+                        $pkWhere = [];
+                        foreach (CompositePrimaryKey::SCHEMAS['ASSOC_DATA'] as $col) {
+                            $pkWhere[] = [$col, '=', $only->$col];
+                        }
+                        DB::table('ASSOC_DATA')->where($pkWhere)->update($updateSet);
+                        $oldData = $auditLog->normalizeRow($only);
+                        $newData = array_merge($oldData, $updateSet);
+                        $auditLog->write(
+                            'ASSOC_DATA',
+                            'UPDATE',
+                            $auditLog->buildRowPkFromData('ASSOC_DATA', $newData),
+                            $oldData,
+                            $newData,
+                            'user',
+                            (string) Auth::id(),
+                            $operationId
+                        );
+
+                        return;
+                    }
+                    // 多條漂移 → 落到 backfill（下方）。
+                }
+                // 無漂移疑似（命中的都是合法他段關係或無）→ 落到 backfill 補本段鏡像，不動他段。
+            }
+
             $insert = $dataMirror;
             if (empty($insert['c_created_by'])) {
                 $insert['c_created_by'] = Auth::user()->name ?? '';

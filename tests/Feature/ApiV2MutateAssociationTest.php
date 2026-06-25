@@ -169,6 +169,9 @@ class ApiV2MutateAssociationTest extends TestCase {
         DB::table('ASSOC_CODES')->insert([
             ['c_assoc_code' => 1, 'c_assoc_pair' => 2, 'c_assoc_pair2' => null],
             ['c_assoc_code' => 2, 'c_assoc_pair' => 1, 'c_assoc_pair2' => null],
+            // 5↔6：代表「同對方+同書+同首年」的另一段合法社會關係（#70 Option 2：碼∈合法 code 的疑似列不可覆寫）。
+            ['c_assoc_code' => 5, 'c_assoc_pair' => 6, 'c_assoc_pair2' => null],
+            ['c_assoc_code' => 6, 'c_assoc_pair' => 5, 'c_assoc_pair2' => null],
         ]);
     }
 
@@ -947,6 +950,169 @@ class ApiV2MutateAssociationTest extends TestCase {
         $this->assertSame($legacyMir, $v2Mir, '反向鏡像 legacy vs v2 同步結果不等價');
         $this->assertSame('改後', $v2Mir['c_notes'], '鏡像 notes 應同步為改後');
         $this->assertSame(20, (int) $v2Mir['c_source'], '鏡像 c_source 應同步為 20');
+    }
+
+    // ── #70 鏡像「疑似匹配」（嚴格落空 + 對面有碼漂移的疑似列）──────────────
+
+    #[Test]
+    public function testAssocUpdateSuspectedMirrorBlockedAndRolledBack(): void {
+        // #70：對面鏡像碼漂移出合法反向集（99 ∉ {2}）→ 嚴格定位落空。非強制下放寬查到疑似 → 不自動同步、不 backfill，
+        // 拋疑似中止 → 409 + mirror_suspected 明細；整筆回滾：正向未改、漂移列未動、未補出重複 code-2 鏡像。
+        $this->actingAs($this->makeUser(email: 'assoc-suspected@example.com'));
+        $this->seedAssociation(['c_notes' => '正向原備註']);
+        $this->seedMirror(['c_assoc_code' => 99, 'c_notes' => '對面漂移備註']);
+
+        $res = $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_notes' => '改後', 'c_assocship_pair' => 2],
+        ]))->assertStatus(409);
+        $res->assertJsonPath('errors.mirror_suspected.table', 'ASSOC_DATA');
+        $res->assertJsonPath('errors.mirror_suspected.count', 1);
+        $res->assertJsonPath('errors.mirror_suspected.authoritative_code', 2);
+
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000, 'c_notes' => '正向原備註']);
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 99, 'c_assoc_id' => 1000, 'c_notes' => '對面漂移備註']);
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000]);
+        $this->assertSame(2, DB::table('ASSOC_DATA')->count(), '不得補出重複鏡像（仍只有正向 + 漂移列）');
+    }
+
+    #[Test]
+    public function testAssocUpdateSuspectedForceCollapsesInPlace(): void {
+        // #70 強制（單條疑似）：就地把漂移列碼 99 收斂為權威反向碼 2 + 覆寫內容，不新建第三條。
+        $this->actingAs($this->makeUser(email: 'assoc-suspected-force1@example.com'));
+        $this->seedAssociation(['c_notes' => '正向原備註']);
+        $this->seedMirror(['c_assoc_code' => 99, 'c_notes' => '對面漂移備註']);
+
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_notes' => '改後', 'c_assocship_pair' => 2],
+            'meta' => ['force' => true],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000, 'c_notes' => '改後']);
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 99, 'c_assoc_id' => 1000]);
+        $this->assertSame(2, DB::table('ASSOC_DATA')->count(), '就地收斂：正向 + 收斂後鏡像，無重複');
+    }
+
+    #[Test]
+    public function testAssocUpdateSuspectedForceMultiBackfillsAndLeavesStrays(): void {
+        // #70 強制（多條疑似）：不臆造覆寫哪條 → backfill 一條權威反向列 2；兩條漂移列留待人工去對面刪。
+        // backfill 前提（嚴格落空 + 無嚴格匹配）結構上成立：兩漂移碼皆 ∉ {2}，故 code-2 必不存在、insert 不撞主鍵。
+        $this->actingAs($this->makeUser(email: 'assoc-suspected-forceN@example.com'));
+        $this->seedAssociation(['c_notes' => '正向原備註']);
+        $this->seedMirror(['c_assoc_code' => 99, 'c_notes' => '漂移A']);
+        $this->seedMirror(['c_assoc_code' => 88, 'c_notes' => '漂移B']);
+
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_notes' => '改後', 'c_assocship_pair' => 2],
+            'meta' => ['force' => true],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000, 'c_notes' => '改後']);
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 99, 'c_assoc_id' => 1000]);
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 88, 'c_assoc_id' => 1000]);
+        $this->assertSame(4, DB::table('ASSOC_DATA')->count(), '正向 + 兩漂移列 + 新建權威列');
+    }
+
+    #[Test]
+    public function testAssocUpdateNoMirrorStillBackfillsWhenNoSuspect(): void {
+        // #70 邊界：嚴格落空且放寬「也查無」（對面完全無此關係）→ 維持現狀 backfill，不誤報疑似、不 409。
+        $this->actingAs($this->makeUser(email: 'assoc-no-suspect@example.com'));
+        $this->seedAssociation(['c_notes' => '正向原備註']); // 僅正向，無任何反向列
+
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_notes' => '改後', 'c_assocship_pair' => 2],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000, 'c_notes' => '改後']);
+        $this->assertSame(2, DB::table('ASSOC_DATA')->count(), '靜默 backfill：正向 + 新建鏡像');
+    }
+
+    #[Test]
+    public function testAssocUpdateValidCodeSuspectNotClobberedBackfillsOwn(): void {
+        // #70 Option 2 防資料損壞：同對方+同書+同首年存在「另一段合法關係」的鏡像（碼 6 ∈ ASSOC_CODES）。
+        // 編輯本段（正向碼 1、本段鏡像缺）→ 放寬命中碼 6，但 6 是合法 code → 判為他段關係、非本段漂移 →
+        // 不誤報疑似、不覆寫他段，改 backfill 本段鏡像（碼 2）；他段鏡像（碼 6）原封不動。
+        $this->actingAs($this->makeUser(email: 'assoc-validcode-suspect@example.com'));
+        $this->seedAssociation(['c_notes' => '本段正向']);
+        $this->seedMirror(['c_assoc_code' => 6, 'c_notes' => '他段關係鏡像']);
+
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_notes' => '改後', 'c_assocship_pair' => 2],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000, 'c_notes' => '改後']);
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 6, 'c_assoc_id' => 1000, 'c_notes' => '他段關係鏡像']);
+        $this->assertSame(3, DB::table('ASSOC_DATA')->count(), '本段鏡像補上 + 他段鏡像保留（不吞）');
+    }
+
+    #[Test]
+    public function testAssocUpdateValidCodeSuspectForceDoesNotClobberOther(): void {
+        // #70 Option 2 防資料損壞（強制）：即便強制，也絕不就地覆寫「合法碼的他段關係」→ backfill 本段鏡像、他段不動。
+        $this->actingAs($this->makeUser(email: 'assoc-validcode-force@example.com'));
+        $this->seedAssociation(['c_notes' => '本段正向']);
+        $this->seedMirror(['c_assoc_code' => 6, 'c_notes' => '他段關係鏡像']);
+
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_notes' => '改後', 'c_assocship_pair' => 2],
+            'meta' => ['force' => true],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000, 'c_notes' => '改後']);
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 6, 'c_assoc_id' => 1000, 'c_notes' => '他段關係鏡像']);
+        $this->assertSame(3, DB::table('ASSOC_DATA')->count(), '強制亦不動他段合法關係');
+    }
+
+    #[Test]
+    public function testAssocUpdateMixedDriftAndValidCodeForceCollapsesOnlyDrift(): void {
+        // #70 Option 2 混合場景（強制）：對面同時有「漂移列(碼 99 ∉ codes)」與「他段合法關係(碼 6 ∈ codes)」。
+        // 強制單條漂移 → 只就地收斂 99→2 + 覆寫內容；他段合法列 6 原封不動。鎖死判別：只動漂移、不碰他段。
+        $this->actingAs($this->makeUser(email: 'assoc-mixed-force@example.com'));
+        $this->seedAssociation(['c_notes' => '本段正向']);
+        $this->seedMirror(['c_assoc_code' => 99, 'c_notes' => '漂移鏡像']);
+        $this->seedMirror(['c_assoc_code' => 6, 'c_notes' => '他段關係鏡像']);
+
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_notes' => '改後', 'c_assocship_pair' => 2],
+            'meta' => ['force' => true],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000, 'c_notes' => '改後']);
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 99, 'c_assoc_id' => 1000]);
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 6, 'c_assoc_id' => 1000, 'c_notes' => '他段關係鏡像']);
+        $this->assertSame(3, DB::table('ASSOC_DATA')->count(), '只收斂漂移列（99→2），他段(6)保留');
+    }
+
+    #[Test]
+    public function testAssocPairOnlySuspectedMirrorReturns409NotEscapeTo500(): void {
+        // #70（codex 揪出）：pair-only 修鏡像路徑自帶交易、不經 handleDirect，須自行把 MirrorSuspectedException 轉 409。
+        // 只送 c_assocship_pair（無內容欄變更）、對面有漂移疑似列(99)、非 force → 應回 409 mirror_suspected，不可逃逸成 500。
+        $this->actingAs($this->makeUser(email: 'assoc-paironly-suspected@example.com'));
+        $this->seedAssociation(['c_notes' => '本段正向']);
+        $this->seedMirror(['c_assoc_code' => 99, 'c_notes' => '漂移鏡像']);
+
+        $res = $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_assocship_pair' => 2], // 僅送配對碼，無 c_notes 等內容欄
+        ]))->assertStatus(409);
+        $res->assertJsonPath('errors.mirror_suspected.table', 'ASSOC_DATA');
+        $res->assertJsonPath('errors.mirror_suspected.count', 1);
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 99, 'c_assoc_id' => 1000]);
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000]);
+    }
+
+    #[Test]
+    public function testAssocPairOnlySuspectedForceCollapses(): void {
+        // #70：pair-only + 強制 → 漂移列就地收斂 99→2（pair-only 路徑亦不誤吞他段，與一般 update 一致）。
+        $this->actingAs($this->makeUser(email: 'assoc-paironly-force@example.com'));
+        $this->seedAssociation(['c_notes' => '本段正向']);
+        $this->seedMirror(['c_assoc_code' => 99, 'c_notes' => '漂移鏡像']);
+
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_assocship_pair' => 2],
+            'meta' => ['force' => true],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000]);
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 99, 'c_assoc_id' => 1000]);
+        $this->assertSame(2, DB::table('ASSOC_DATA')->count());
     }
 
     #[Test]

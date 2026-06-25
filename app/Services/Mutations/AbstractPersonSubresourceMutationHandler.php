@@ -265,6 +265,17 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
                     'fields' => $e->conflicts,
                 ],
             ]);
+        } catch (MirrorSuspectedException $e) {
+            // #70：嚴格定位（碼∈合法反向集）落空、但放寬查到對面有疑似同一關係的列（碼已漂移）→ 整筆已回滾，
+            // 回 409 + 疑似列 PK 清單 + 權威反向碼，供前端彈「對面無匹配反向碼／N 條疑似」警告 + 跳對面連結 + 強制收斂。
+            return $this->errorResponse($e->getMessage(), 409, [
+                'mirror_suspected' => [
+                    'table' => $e->mirrorTable,
+                    'candidates' => $e->candidates,
+                    'authoritative_code' => $e->authoritativeCode,
+                    'count' => $e->count(),
+                ],
+            ]);
         }
 
         return response()->json([

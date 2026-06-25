@@ -1449,7 +1449,7 @@ class BiogMainRepository {
         return $ori_data;
     }
 
-    public function kinshipStoreById(Request $request, $id) {
+    public function kinshipStoreById(Request $request, $id, bool $detectConflict = false) {
         $auditLog = new AuditLogService();
         $data = $request->all();
         $kin_pair = $data['c_kinship_pair'];
@@ -1462,7 +1462,7 @@ class BiogMainRepository {
 
         $ori_Data = $data;
 
-        DB::transaction(function () use ($id, $data, $kin_pair, $auditLog, &$ori_Data) {
+        DB::transaction(function () use ($id, $data, $kin_pair, $auditLog, $detectConflict, &$ori_Data) {
             DB::table('KIN_DATA')->insert($data);
             $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
                 'c_personid' => $data['c_personid'],
@@ -1485,25 +1485,47 @@ class BiogMainRepository {
                 $operationId
             );
 
-            $data_mirror = $data;
-            $data_mirror['c_kin_code'] = $kin_pair;
-            $data_mirror['c_personid'] = $data['c_kin_id'];
-            $data_mirror['c_kin_id'] = $id;
-            DB::table('KIN_DATA')->insert($data_mirror);
-            $auditLog->write(
-                'KIN_DATA',
-                'INSERT',
-                [
-                    'c_personid' => $data_mirror['c_personid'],
-                    'c_kin_id' => $data_mirror['c_kin_id'],
-                    'c_kin_code' => $data_mirror['c_kin_code'],
-                ],
-                null,
-                $data_mirror,
-                'user',
-                (string) Auth::id(),
-                $operationId
-            );
+            // #82：提案核准（$detectConflict=true）且反向碼非哨兵 0 時，反向鏡像改走已 gate 的 syncKinMirrorOnUpdate
+            // （含 #66 衝突 + #72 疑似偵測 + allowBackfill），與 v2 direct create 行為一致——對面分歧/碼漂移→拋例外
+            // 中止核准（approve() 友善 flash + 整筆回滾），不再盲插重複/衝突鏡像。legacy direct（false）維持原盲插 parity。
+            if ($detectConflict && (int) $kin_pair !== 0) {
+                $dataMirror = $data;
+                unset($dataMirror['c_kin_id']);
+                $dataMirror['c_kin_code'] = $kin_pair;
+                $dataMirror['c_personid'] = $data['c_kin_id'];
+                $this->syncKinMirrorOnUpdate(
+                    $dataMirror,
+                    (int) $id,
+                    (int) $data['c_kin_id'],
+                    $data['c_autogen_notes'] ?? null,
+                    $data['c_kin_code'],
+                    $operation,
+                    $auditLog,
+                    true,   // allowBackfill：對面無對應列即補建
+                    true,   // detectConflict：偵測對面衝突/疑似
+                    $this->createKinMirrorBaselines($dataMirror, $data['c_kin_code'])
+                );
+            } else {
+                $data_mirror = $data;
+                $data_mirror['c_kin_code'] = $kin_pair;
+                $data_mirror['c_personid'] = $data['c_kin_id'];
+                $data_mirror['c_kin_id'] = $id;
+                DB::table('KIN_DATA')->insert($data_mirror);
+                $auditLog->write(
+                    'KIN_DATA',
+                    'INSERT',
+                    [
+                        'c_personid' => $data_mirror['c_personid'],
+                        'c_kin_id' => $data_mirror['c_kin_id'],
+                        'c_kin_code' => $data_mirror['c_kin_code'],
+                    ],
+                    null,
+                    $data_mirror,
+                    'user',
+                    (string) Auth::id(),
+                    $operationId
+                );
+            }
         });
 
         return $ori_Data;
@@ -2423,6 +2445,41 @@ class BiogMainRepository {
     }
 
     /**
+     * #82：核准 CREATE 反向鏡像的真分歧基準（對齊 v2 KinshipCreateHandler::createMirrorBaselines）。
+     * 以「本次欲寫入鏡像內容」為基準：對面同內容→冪等通過、不同→真分歧→MirrorConflictException；碼欄＝正向碼合法反向集。
+     */
+    private function createKinMirrorBaselines(array $dataMirror, $forwardKinCode): array {
+        $baselines = [];
+        foreach (['c_notes', 'c_source', 'c_pages'] as $f) {
+            if (array_key_exists($f, $dataMirror)) {
+                $baselines[$f] = $dataMirror[$f];
+            }
+        }
+        if ($vr = $this->validKinReverseSet($forwardKinCode)) {
+            $baselines['c_kin_code'] = $vr;
+        }
+
+        return $baselines;
+    }
+
+    /**
+     * #82：核准 CREATE 反向鏡像的真分歧基準（對齊 v2 AssociationCreateHandler::createMirrorBaselines）。
+     */
+    private function createAssocMirrorBaselines(array $mirror, $forwardAssocCode): array {
+        $baselines = [];
+        foreach (['c_notes', 'c_source', 'c_pages', 'c_assoc_first_year', 'c_assoc_last_year'] as $f) {
+            if (array_key_exists($f, $mirror)) {
+                $baselines[$f] = $mirror[$f];
+            }
+        }
+        if ($vr = $this->validAssocReverseSet($forwardAssocCode)) {
+            $baselines['c_assoc_code'] = $vr;
+        }
+
+        return $baselines;
+    }
+
+    /**
      * 定位並同步 ASSOC_DATA 反向（互逆）鏡像列。供 legacy assocPerformUpdate 與 v2 AssociationMutationHandler 共用。
      *
      * 行為對齊 legacy assocPerformUpdate 的鏡像區塊：用「對方擁有(c_personid=oldAssocId)、指回原人(c_assoc_id=cPersonid)、
@@ -2831,7 +2888,7 @@ class BiogMainRepository {
         }
     }
 
-    public function assocStoreById(Request $request, $id) {
+    public function assocStoreById(Request $request, $id, bool $detectConflict = false) {
         $auditLog = new AuditLogService();
         $data = $request->all();
         $data = $this->formatSelect($data);
@@ -2849,7 +2906,7 @@ class BiogMainRepository {
 
         $ori_Data = $data;
 
-        DB::transaction(function () use ($id, $data, $assoc_pair, $kin_pair, $assoc_kin_pair, &$ori_Data, $auditLog) {
+        DB::transaction(function () use ($id, $data, $assoc_pair, $kin_pair, $assoc_kin_pair, $detectConflict, &$ori_Data, $auditLog) {
             DB::table('ASSOC_DATA')->insert($data);
             // 修正：operation record ID 包含第 9 個欄位 c_assoc_first_year
             $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'ASSOC_DATA', CompositePrimaryKey::buildStoredResourceId([
@@ -2895,27 +2952,47 @@ class BiogMainRepository {
             $data_mirror['c_kin_id'] = $id;
             $data_mirror['c_assoc_kin_id'] = $id;
 
-            DB::table('ASSOC_DATA')->insert($data_mirror);
-            $auditLog->write(
-                'ASSOC_DATA',
-                'INSERT',
-                [
-                    'c_personid' => $data_mirror['c_personid'],
-                    'c_assoc_code' => $data_mirror['c_assoc_code'],
-                    'c_assoc_id' => $data_mirror['c_assoc_id'],
-                    'c_kin_code' => $data_mirror['c_kin_code'],
-                    'c_kin_id' => $data_mirror['c_kin_id'],
-                    'c_assoc_kin_code' => $data_mirror['c_assoc_kin_code'],
-                    'c_assoc_kin_id' => $data_mirror['c_assoc_kin_id'],
-                    'c_text_title' => $data_mirror['c_text_title'] ?? '',
-                    'c_assoc_first_year' => $data_mirror['c_assoc_first_year'] ?? '-9999',
-                ],
-                null,
-                $data_mirror,
-                'user',
-                (string) Auth::id(),
-                $operationId
-            );
+            // #82：提案核准（$detectConflict=true）且反向社會關係碼非哨兵 0 時，反向鏡像改走已 gate 的
+            // syncAssocMirrorOnUpdate（含 #66 衝突 + #72 疑似偵測 + allowBackfill），與 v2 direct create 一致——
+            // 對面分歧/碼漂移→拋例外中止核准（approve() 友善 flash + 回滾）。legacy direct（false）維持原盲插 parity。
+            if ($detectConflict && (int) $assoc_pair !== 0) {
+                $this->syncAssocMirrorOnUpdate(
+                    $data_mirror,
+                    (int) $id,
+                    (int) $data['c_assoc_id'],
+                    $data['c_text_title'] ?? '',
+                    $data['c_assoc_first_year'] ?? '-9999',
+                    $assoc_pair,
+                    null,
+                    $operation,
+                    $auditLog,
+                    true,   // allowBackfill
+                    true,   // detectConflict
+                    $this->createAssocMirrorBaselines($data_mirror, $data['c_assoc_code'])
+                );
+            } else {
+                DB::table('ASSOC_DATA')->insert($data_mirror);
+                $auditLog->write(
+                    'ASSOC_DATA',
+                    'INSERT',
+                    [
+                        'c_personid' => $data_mirror['c_personid'],
+                        'c_assoc_code' => $data_mirror['c_assoc_code'],
+                        'c_assoc_id' => $data_mirror['c_assoc_id'],
+                        'c_kin_code' => $data_mirror['c_kin_code'],
+                        'c_kin_id' => $data_mirror['c_kin_id'],
+                        'c_assoc_kin_code' => $data_mirror['c_assoc_kin_code'],
+                        'c_assoc_kin_id' => $data_mirror['c_assoc_kin_id'],
+                        'c_text_title' => $data_mirror['c_text_title'] ?? '',
+                        'c_assoc_first_year' => $data_mirror['c_assoc_first_year'] ?? '-9999',
+                    ],
+                    null,
+                    $data_mirror,
+                    'user',
+                    (string) Auth::id(),
+                    $operationId
+                );
+            }
         });
 
         return $ori_Data;

@@ -294,7 +294,8 @@ class OperationsProposalController extends Controller {
         $request = Request::create('/', 'POST', $requestPayload);
 
         if ((int) $operation->op_type === Operation::TYPE_PROPOSAL_CREATE) {
-            return $this->biogMainRepository->kinshipStoreById($request, $personId);
+            // #82：核准 CREATE 啟用鏡像衝突/疑似偵測（對齊 v2 direct create）——對面分歧/碼漂移則拋例外中止核准，不盲插衝突鏡像。
+            return $this->biogMainRepository->kinshipStoreById($request, $personId, true);
         }
 
         if (empty($original)) {
@@ -332,7 +333,8 @@ class OperationsProposalController extends Controller {
         $request = Request::create('/', 'POST', array_merge($data, $auxiliaryPayload));
 
         if ((int) $operation->op_type === Operation::TYPE_PROPOSAL_CREATE) {
-            $result = $this->biogMainRepository->assocStoreById($request, $personId);
+            // #82：核准 CREATE 啟用鏡像衝突/疑似偵測（對齊 v2 direct create）。
+            $result = $this->biogMainRepository->assocStoreById($request, $personId, true);
 
             return $this->fetchAppliedRow('ASSOC_DATA', [
                 'c_personid' => $result['c_personid'] ?? $personId,

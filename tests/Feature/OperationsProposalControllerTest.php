@@ -862,6 +862,100 @@ class OperationsProposalControllerTest extends TestCase {
     }
 
     #[Test]
+    public function testApproveAssocCreateProposalBlockedWhenOppositeDiverged(): void {
+        // #82（D1）：核准 CREATE 時，對面已存在「以權威反向碼(101)嚴格命中」但內容分歧的反向列 → 偵測衝突 → 中止核准、
+        // 整筆回滾（正向未插入、對面不被覆寫）。修正前 legacy assocStoreById 盲插會靜默補出衝突/重複鏡像。
+        DB::table('ASSOC_DATA')->insert([
+            'c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000,
+            'c_kin_code' => 0, 'c_kin_id' => 0, 'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0,
+            'c_text_title' => '史記', 'c_assoc_first_year' => 1080,
+            'c_source' => 10, 'c_notes' => '對面既有不同內容',
+        ]);
+
+        $this->actingAs($this->makeAdmin());
+        $operation = $this->makeAssocCreateProposal('提案內容');
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])->assertRedirect();
+
+        $operation->refresh();
+        $this->assertSame('pending', (json_decode($operation->resource_data, true)['__review_status'] ?? null), '對面分歧應中止核准');
+        $this->assertNull(DB::table('ASSOC_DATA')->where(['c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000])->first(), '回滾：正向未插入');
+        $this->assertSame('對面既有不同內容', DB::table('ASSOC_DATA')->where(['c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000])->value('c_notes'));
+        $this->assertSame(1, DB::table('ASSOC_DATA')->count(), '回滾：不得補出衝突/重複鏡像');
+    }
+
+    #[Test]
+    public function testApproveAssocCreateProposalBackfillsWhenNoOpposite(): void {
+        // #82（D1 對照，不誤擋）：對面無任何反向列 → 核准 CREATE 照常插入正向 + 補建反向鏡像（碼 101），雙向同步。
+        $this->actingAs($this->makeAdmin());
+        $operation = $this->makeAssocCreateProposal('提案內容');
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])->assertRedirect();
+
+        $operation->refresh();
+        $this->assertSame('approved', (json_decode($operation->resource_data, true)['__review_status'] ?? null), '無對面應照常核准');
+        $this->assertSame('提案內容', DB::table('ASSOC_DATA')->where(['c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000])->value('c_notes'));
+        $this->assertSame('提案內容', DB::table('ASSOC_DATA')->where(['c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000])->value('c_notes'), '反向鏡像補建');
+        $this->assertSame(2, DB::table('ASSOC_DATA')->count());
+    }
+
+    /** 建一筆社會關係 CREATE 提案（正向 (1000,100,2000,...,史記,1080)；c_assocship_pair=101；c_personid=1000）。 */
+    private function makeAssocCreateProposal(string $notes): Operation {
+        $resourceData = [
+            'c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000,
+            'c_kin_code' => 0, 'c_kin_id' => 0, 'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0,
+            'c_text_title' => '史記', 'c_assoc_first_year' => 1080,
+            'c_source' => 10, 'c_notes' => $notes,
+            'c_assocship_pair' => 101, 'c_kinship_pair' => 0, 'c_assoc_kinship_pair' => 0,
+            '__key_columns' => ['c_personid', 'c_assoc_code', 'c_assoc_id', 'c_kin_code', 'c_kin_id', 'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => ['action' => 'create', 'submitted_by' => 'tester'],
+        ];
+        $op = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource' => 'ASSOC_DATA',
+            'resource_id' => '1000-100-2000-0-0-0-0-史記-1080',
+            'resource_data' => $resourceData,
+        ]);
+        $op->c_personid = 1000;
+        $op->save();
+
+        return $op;
+    }
+
+    #[Test]
+    public function testApproveKinCreateProposalBlockedWhenOppositeDiverged(): void {
+        // #82（D1，kin）：核准 CREATE 時對面已存在嚴格命中(碼101)但內容分歧的反向列 → 偵測衝突 → 中止核准、回滾、不盲插。
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 101, 'c_source' => 10, 'c_notes' => '對面既有不同內容', 'c_autogen_notes' => 'auto-x']);
+
+        $this->actingAs($this->makeAdmin());
+        $resourceData = [
+            'c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100,
+            'c_source' => 10, 'c_notes' => '提案內容', 'c_autogen_notes' => 'auto-x',
+            'c_kinship_pair' => 101,
+            '__key_columns' => ['c_personid', 'c_kin_id', 'c_kin_code'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => ['action' => 'create', 'submitted_by' => 'tester'],
+        ];
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource' => 'KIN_DATA',
+            'resource_id' => '1000-2000-100',
+            'resource_data' => $resourceData,
+        ]);
+        $operation->c_personid = 1000;
+        $operation->save();
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])->assertRedirect();
+
+        $operation->refresh();
+        $this->assertSame('pending', (json_decode($operation->resource_data, true)['__review_status'] ?? null), 'kin 對面分歧應中止核准');
+        $this->assertNull(DB::table('KIN_DATA')->where(['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100])->first(), '回滾：正向未插入');
+        $this->assertSame('對面既有不同內容', DB::table('KIN_DATA')->where(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 101])->value('c_notes'));
+        $this->assertSame(1, DB::table('KIN_DATA')->count(), '回滾：不得補出衝突/重複鏡像');
+    }
+
+    #[Test]
     public function testApproveKinUpdateProposalBlockedWhenMirrorContentDiverged(): void {
         // #77（kin）：親屬 UPDATE 提案核准時，對面鏡像被獨立改過 → 偵測衝突 → 中止核准、回滾、不覆寫。
         DB::table('KIN_DATA')->insert(['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100, 'c_source' => 10, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'auto-x']);

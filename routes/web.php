@@ -39,6 +39,8 @@ Route::middleware(['auth.optional'])->post('api/v2/mutate', 'Api\\MutationContro
 Route::middleware(['auth.optional'])->post('api/v2/create', 'Api\\MutationController@create')->name('api.v2.create.web');
 Route::middleware(['auth.optional'])->post('api/v2/delete', 'Api\\MutationController@delete')->name('api.v2.delete.web');
 Route::middleware(['auth.optional'])->match(['get', 'post'], 'api/v2/get', 'Api\\MutationController@get')->name('api.v2.get.web');
+// #79：社會關係／親屬「對面互逆鏡像」現況偵測（缺邊/多條），供編輯器行內提示用。
+Route::middleware(['auth.optional'])->post('api/v2/relationship/opposite-edges', 'Api\\MutationController@oppositeEdges')->name('api.v2.relationship.opposite-edges.web');
 Route::get('view', 'ViewTableController@index')->middleware('auth')->name('view.index');
 Route::get('view/{key}', 'ViewTableController@show')->middleware('auth')->name('view.show');
 

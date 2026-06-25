@@ -265,6 +265,10 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
                     'fields' => $e->conflicts,
                 ],
             ]);
+        } catch (MirrorIntegrityException $e) {
+            // #70：鏡像同步資料完整性 fail-closed（缺配對碼／無權威反向碼可收斂）→ 整筆已回滾，回結構化 422，
+            // 而非裸 RuntimeException 漏成 500。
+            return $this->errorResponse($e->getMessage(), 422, ['mirror_integrity' => ['fail_closed']]);
         } catch (MirrorSuspectedException $e) {
             // #70：嚴格定位（碼∈合法反向集）落空、但放寬查到對面有疑似同一關係的列（碼已漂移）→ 整筆已回滾，
             // 回 409 + 疑似列 PK 清單 + 權威反向碼，供前端彈「對面無匹配反向碼／N 條疑似」警告 + 跳對面連結 + 強制收斂。

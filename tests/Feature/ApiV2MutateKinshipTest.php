@@ -729,6 +729,180 @@ class ApiV2MutateKinshipTest extends TestCase {
         }
     }
 
+    // ── #70 鏡像「疑似匹配」（精確配對落空 + 對面有碼漂移的疑似列）──────────────
+
+    #[Test]
+    public function testKinUpdateSuspectedMirrorBlockedAndRolledBack(): void {
+        // #70：對面鏡像碼漂移出合法配對（99 ∉ KINSHIP_CODES）→ 精確配對落空。非強制下放寬查到漂移疑似 →
+        // 拋疑似中止 → 409 mirror_suspected；整筆回滾：正向未改、漂移列未動。
+        $this->actingAs($this->makeUser(email: 'kin-suspected@example.com'));
+        $this->seedKinship(['c_kin_code' => 72, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 99, 'c_source' => 10, 'c_notes' => '漂移鏡像', 'c_autogen_notes' => 'auto-x']);
+
+        $res = $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'changes' => ['c_notes' => '改後', 'c_kinship_pair' => 73],
+        ]))->assertStatus(409);
+        $res->assertJsonPath('errors.mirror_suspected.table', 'KIN_DATA');
+        $res->assertJsonPath('errors.mirror_suspected.count', 1);
+
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 72, 'c_notes' => '正向原備註']);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 99, 'c_notes' => '漂移鏡像']);
+        $this->assertSame(2, DB::table('KIN_DATA')->count(), '不得補出重複鏡像');
+    }
+
+    #[Test]
+    public function testKinUpdateSuspectedForceCollapsesInPlace(): void {
+        // #70 強制（單條漂移）：按該漂移列完整 PK 就地收斂 99→權威反向碼 73 + 覆寫內容，不新建。
+        $this->actingAs($this->makeUser(email: 'kin-suspected-force@example.com'));
+        $this->seedKinship(['c_kin_code' => 72, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 99, 'c_source' => 10, 'c_notes' => '漂移鏡像', 'c_autogen_notes' => 'auto-x']);
+
+        $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'changes' => ['c_notes' => '改後', 'c_kinship_pair' => 73],
+            'meta' => ['force' => true],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73, 'c_notes' => '改後']);
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 99]);
+        $this->assertSame(2, DB::table('KIN_DATA')->count(), '就地收斂，無重複');
+    }
+
+    #[Test]
+    public function testKinUpdateSuspectedForcePreserveCollapsesCode(): void {
+        // #70（codex 揪出）：純內容編輯（不送 c_kinship_pair → preserveMirrorCode → dataMirror 不含 c_kin_code）+ force。
+        // 漂移列 99 強制收斂時，**仍須把碼修為權威反向碼 73**（c_kin_pair1 of 72），而非只改備註留 99 仍 drift。
+        $this->actingAs($this->makeUser(email: 'kin-preserve-force@example.com'));
+        $this->seedKinship(['c_kin_code' => 72, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'auto-pf']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 99, 'c_source' => 10, 'c_notes' => '漂移鏡像', 'c_autogen_notes' => 'auto-pf']);
+
+        $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'changes' => ['c_notes' => '改後'], // 不送 c_kinship_pair
+            'meta' => ['force' => true],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73, 'c_notes' => '改後']);
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 99]);
+        $this->assertSame(2, DB::table('KIN_DATA')->count());
+    }
+
+    #[Test]
+    public function testKinUpdateMultiDriftForceCollapsesOneLeavesRest(): void {
+        // #70（codex 揪出）：多條漂移列(99+88) + force。kin allowBackfill=false 不能 backfill，故收斂「其中一條」為權威碼 73
+        // （修出一條正確鏡像），另一條漂移留待人工刪——而非舊邏輯「落 backfill no-op→force 名義成功實際沒修」。
+        $this->actingAs($this->makeUser(email: 'kin-multidrift-force@example.com'));
+        $this->seedKinship(['c_kin_code' => 72, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'auto-md']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 99, 'c_source' => 10, 'c_notes' => '漂移A', 'c_autogen_notes' => 'auto-md']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 88, 'c_source' => 10, 'c_notes' => '漂移B', 'c_autogen_notes' => 'auto-md']);
+
+        $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'changes' => ['c_notes' => '改後'],
+            'meta' => ['force' => true],
+        ]))->assertOk();
+
+        // 修出一條權威反向列 73；正向 + 73 + 一條殘留漂移 = 3。
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73]);
+        $this->assertSame(1, DB::table('KIN_DATA')->where(['c_personid' => 2000, 'c_kin_id' => 1000])->whereIn('c_kin_code', [99, 88])->count(), '只收斂一條，另一條漂移留人工');
+        $this->assertSame(3, DB::table('KIN_DATA')->count());
+    }
+
+    #[Test]
+    public function testKinUpdateForceCollapseTargetPkOccupiedReturns409NotSilentNoop(): void {
+        // #70（codex 揪出）：罕見髒資料——本段漂移列 99@auto-x，但目標權威碼 PK 已被他列 73@auto-y 佔用（不同 autogen，
+        // 未被 pairWhere 計入）。force 收斂 99→73 會撞 KIN_DATA 主鍵 → QueryException → 409「主鍵衝突」（誠實告知無法自動解），
+        // 而非靜默 no-op 假成功。整筆回滾。
+        $this->actingAs($this->makeUser(email: 'kin-collide@example.com'));
+        $this->seedKinship(['c_kin_code' => 72, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 99, 'c_source' => 10, 'c_notes' => '漂移', 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73, 'c_source' => 10, 'c_notes' => '他段73', 'c_autogen_notes' => 'auto-y']);
+
+        $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'changes' => ['c_notes' => '改後'],
+            'meta' => ['force' => true],
+        ]))->assertStatus(409);
+
+        // 整筆回滾：正向未改、漂移 99 未動、他段 73@auto-y 未動。
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 72, 'c_notes' => '正向原備註']);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 99, 'c_notes' => '漂移']);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73, 'c_notes' => '他段73']);
+        $this->assertSame(3, DB::table('KIN_DATA')->count());
+    }
+
+    #[Test]
+    public function testKinUpdateDriftButNoAuthoritativeReverseFailsClosed(): void {
+        // #70（codex 揪出 fail-closed 缺口）：正向碼 80 無任何反向配對（c_kin_pair1=null，無碼指向它）+ 對面有漂移列。
+        // force 收斂時推不出權威反向碼（authoritative=0）→ 不可靜默跳過假成功，須 fail-closed 拋例外回滾。
+        DB::table('KINSHIP_CODES')->insert(['c_kincode' => 80, 'c_kin_pair1' => null, 'c_kin_pair2' => null]);
+        $this->actingAs($this->makeUser(email: 'kin-nopair@example.com'));
+        $this->seedKinship(['c_kin_code' => 80, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'auto-np']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 99, 'c_source' => 10, 'c_notes' => '漂移', 'c_autogen_notes' => 'auto-np']);
+
+        $res = $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'target' => ['pk' => ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 80]],
+            'changes' => ['c_notes' => '改後'],
+            'meta' => ['force' => true],
+        ]))->assertStatus(422); // fail-closed → 結構化 422（非裸 RuntimeException 漏成 500）
+        $res->assertJsonPath('errors.mirror_integrity', ['fail_closed']);
+
+        // 整筆回滾：正向未改、漂移未動。
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 80, 'c_notes' => '正向原備註']);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 99, 'c_notes' => '漂移']);
+    }
+
+    #[Test]
+    public function testKinUpdateValidCodeSuspectNotClobbered(): void {
+        // #70 Option 2 防資料損壞：對面有「另一段合法親屬關係」鏡像（碼 75 ∈ KINSHIP_CODES，共用 c_autogen_notes）。
+        // 編輯本段（正向碼 72、本段鏡像缺）→ 放寬命中碼 75，但 75 是合法 code → 判他段、非本段漂移 → 不誤報、不覆寫他段。
+        $this->actingAs($this->makeUser(email: 'kin-validcode@example.com'));
+        $this->seedKinship(['c_kin_code' => 72, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 75, 'c_source' => 10, 'c_notes' => '他段關係鏡像', 'c_autogen_notes' => 'auto-x']);
+
+        $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'changes' => ['c_notes' => '改後', 'c_kinship_pair' => 73],
+        ]))->assertOk(); // 不誤報疑似 409
+
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 75, 'c_notes' => '他段關係鏡像']);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 72, 'c_notes' => '改後']);
+    }
+
+    #[Test]
+    public function testKinUpdateMixedDriftAndValidCodeForceCollapsesOnlyDrift(): void {
+        // #70 Option 2 混合（強制）：對面同時有漂移列(99 ∉ codes) 與他段合法關係(75 ∈ codes)。
+        // 強制單條漂移 → 只收斂 99→73；他段合法列 75 原封不動。
+        $this->actingAs($this->makeUser(email: 'kin-mixed-force@example.com'));
+        $this->seedKinship(['c_kin_code' => 72, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 99, 'c_source' => 10, 'c_notes' => '漂移鏡像', 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 75, 'c_source' => 10, 'c_notes' => '他段關係鏡像', 'c_autogen_notes' => 'auto-x']);
+
+        $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'changes' => ['c_notes' => '改後', 'c_kinship_pair' => 73],
+            'meta' => ['force' => true],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73, 'c_notes' => '改後']);
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 99]);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 75, 'c_notes' => '他段關係鏡像']);
+    }
+
+    #[Test]
+    public function testKinUpdateBothLegitReverseRowsStillSynced(): void {
+        // #70（review S1 修復）：對面同時有兩個「本段合法反向碼」鏡像（73 權威預設 + 74 手選替代，皆 ∈ legitReverses(72)）。
+        // 拓寬定位器後 sumCount=2，須走精確路徑「全部同步」——不可因 sumCount≠1 落 relaxed 把合法反向碼誤判他段而漏同步。
+        $this->actingAs($this->makeUser(email: 'kin-both-legit@example.com'));
+        $this->seedKinship(['c_kin_code' => 72, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'auto-b']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73, 'c_source' => 10, 'c_notes' => '舊備註', 'c_autogen_notes' => 'auto-b']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 74, 'c_source' => 10, 'c_notes' => '舊備註', 'c_autogen_notes' => 'auto-b']);
+
+        // 僅改備註、未送配對碼（preserveMirrorCode）→ 兩列碼保留、備註同步。force 略過 #66 內容衝突閘。
+        $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'changes' => ['c_notes' => '改後'],
+            'meta' => ['force' => true],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 73, 'c_notes' => '改後']);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 74, 'c_notes' => '改後']);
+        $this->assertSame(3, DB::table('KIN_DATA')->count(), '正向 + 兩本段反向列；皆同步、無新增/孤兒');
+    }
+
     #[Test]
     public function testKinshipUpdateAcceptsAlias(): void {
         $user = $this->makeUser(email: 'kin-alias@example.com');

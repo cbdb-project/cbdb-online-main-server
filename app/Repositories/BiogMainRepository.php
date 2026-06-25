@@ -1357,7 +1357,7 @@ class BiogMainRepository {
         return ['row' => $row, 'text_str' => $text_str, 'kin_str' => $kin_str, 'biog_str' => $biog_str, 'kinpair_str' => $kinpair_str, 'k_p_code' => $k_p_code];
     }
 
-    public function kinshipUpdateById(Request $request, $id, $id_) {
+    public function kinshipUpdateById(Request $request, $id, $id_, bool $detectConflict = false) {
         $auditLog = new AuditLogService();
         $id_ = str_replace("--", "-minus", $id_);
         $temp_l = explode("-", $id_);
@@ -1389,7 +1389,7 @@ class BiogMainRepository {
         $ori_data = $data;
         $sumCount = 0;
 
-        DB::transaction(function () use (&$ori_data, &$sumCount, $id, $id_, $temp_l, $row, $data, $kin_pair, $kin_id, $c_autogen_notes, $old_kin_id, $old_kin_code, $auditLog) {
+        DB::transaction(function () use (&$ori_data, &$sumCount, $id, $id_, $temp_l, $row, $data, $kin_pair, $kin_id, $c_autogen_notes, $old_kin_id, $old_kin_code, $auditLog, $detectConflict) {
             DB::table('KIN_DATA')->where([
                 ['c_personid', '=', $temp_l[0]],
                 ['c_kin_id', '=', $temp_l[1]],
@@ -1434,7 +1434,13 @@ class BiogMainRepository {
                 $old_kin_code,
                 $operation,
                 $auditLog,
-                false
+                // kin 維持 allowBackfill=false：syncKinMirrorOnUpdate 的 #70 疑似偵測**不受 allowBackfill 閘控**（與 assoc
+                // 不同，無 early-return），故 detectConflict=true 下對面碼漂移仍會拋 MirrorSuspectedException 中止核准；
+                // 對面無鏡像時 sumCount=0 → applyKinshipProposal 既有 guard 拋「更新失敗」中止（亦 fail-safe）。
+                // 不可改 true：backfill 雖補列但 sumCount 仍 0 → guard 仍拋 → 反把 backfill 回滾（測試實證）。
+                false,            // allowBackfill
+                $detectConflict,  // detectConflict
+                $detectConflict ? $this->buildApprovalMirrorBaselines('KIN_DATA', $row) : []
             );
         });
 
@@ -2163,7 +2169,7 @@ class BiogMainRepository {
         return $this->assocPerformUpdate($request, $whereConditions, $row, $c_personid);
     }
 
-    public function assocUpdateById(Request $request, $id, $c_personid) {
+    public function assocUpdateById(Request $request, $id, $c_personid, bool $detectConflict = false) {
         $auditLog = new AuditLogService();
         //20200709聯合主鍵保留字弱點防禦函式
         // 複合主鍵格式: c_personid-c_assoc_code-c_assoc_id-c_kin_code-c_kin_id-c_assoc_kin_code-c_assoc_kin_id-c_text_title-c_assoc_first_year
@@ -2256,7 +2262,7 @@ class BiogMainRepository {
             ['c_assoc_first_year', '=', $c_assoc_first_year],
         ];
 
-        return $this->assocPerformUpdate($request, $whereConditions, $row, $c_personid);
+        return $this->assocPerformUpdate($request, $whereConditions, $row, $c_personid, $detectConflict);
     }
 
     /**
@@ -2268,7 +2274,7 @@ class BiogMainRepository {
      * @param int|string $c_personid 人物 ID
      * @return array 更新後的資料
      */
-    private function assocPerformUpdate(Request $request, array $whereConditions, $row, $c_personid) {
+    private function assocPerformUpdate(Request $request, array $whereConditions, $row, $c_personid, bool $detectConflict = false) {
         $auditLog = new AuditLogService();
 
         $data = $request->all();
@@ -2291,7 +2297,7 @@ class BiogMainRepository {
 
         $ori_data = $data;
 
-        DB::transaction(function () use (&$ori_data, $c_personid, $whereConditions, $row, $data, $kin_pair, $assoc_kin_pair, $assoc_pair, $assoc_id, $old_assoc_id, $old_c_text_title, $old_c_assoc_first_year, $old_c_assocship_pair1, $old_c_assocship_pair2, $auditLog) {
+        DB::transaction(function () use (&$ori_data, $c_personid, $whereConditions, $row, $data, $kin_pair, $assoc_kin_pair, $assoc_pair, $assoc_id, $old_assoc_id, $old_c_text_title, $old_c_assoc_first_year, $old_c_assocship_pair1, $old_c_assocship_pair2, $auditLog, $detectConflict) {
             DB::table('ASSOC_DATA')->where($whereConditions)->update($data);
 
             // 修正：operation record ID 包含第 9 個欄位 c_assoc_first_year
@@ -2349,11 +2355,86 @@ class BiogMainRepository {
                 $old_c_assocship_pair1,
                 $old_c_assocship_pair2,
                 $operation,
-                $auditLog
+                $auditLog,
+                // #77：核准（detectConflict=true）視為「比照 v2 direct 的權威雙向套用」→ allowBackfill 亦 true：
+                // (a) 嚴格命中+內容分歧 → #66 衝突中止；(b) 嚴格落空+對面碼漂移 → #70 疑似中止（allowBackfill=false 會在
+                // 偵測前 early-return 而漏掉，造成「核准成功但鏡像沒同步」的 false-green，codex SERIOUS）；(c) 對面無鏡像
+                // → 補建（雙向同步）。legacy direct（detectConflict=false）維持 allowBackfill=false＝行為不變。
+                $detectConflict,  // allowBackfill
+                $detectConflict,  // detectConflict
+                $detectConflict ? $this->buildApprovalMirrorBaselines('ASSOC_DATA', $row) : []
             );
         });
 
         return $ori_data;
+    }
+
+    /**
+     * #77：以「正向編輯前的列」($row) 建提案核准用的鏡像衝突基準。
+     * 內容欄基準＝舊值（對面≠舊值＝被獨立改過＝真分歧）；碼欄基準＝舊碼的合法反向集（對面碼∉集＝被改成無關碼＝分歧）。
+     *
+     * 與 v2 *MutationHandler::conflictBaselines 的差異（刻意）：v2 只對「本次有變更」的內容欄建基準，因 v2 鏡像同步
+     * 只寫變更欄（$dataMirror=changed-only）；但 legacy assocPerformUpdate/kinshipUpdateById 的 $data_mirror=**整列**，
+     * 核准時會把整列鏡像欄覆寫成提案值——故須對**全部**內容欄建基準（任一欄被對面獨立改過都會被覆寫，理應擋下）。
+     * 此「全欄」基準對 full-row 覆寫語義是正確的、且核准為高風險不可逆操作，從嚴合理。僅供 detectConflict=true（提案核准）
+     * 使用；legacy direct 寫入不傳（行為不變）。
+     */
+    private function buildApprovalMirrorBaselines(string $table, $row): array {
+        $row = (array) $row;
+        $baselines = [];
+        if ($table === 'ASSOC_DATA') {
+            foreach (['c_notes', 'c_source', 'c_pages', 'c_assoc_first_year', 'c_assoc_last_year'] as $f) {
+                if (array_key_exists($f, $row)) {
+                    $baselines[$f] = $row[$f];
+                }
+            }
+            if ($vr = $this->validAssocReverseSet($row['c_assoc_code'] ?? null)) {
+                $baselines['c_assoc_code'] = $vr;
+            }
+            if ($vr = $this->validKinReverseSet($row['c_kin_code'] ?? null)) {
+                $baselines['c_kin_code'] = $vr;
+            }
+            if ($vr = $this->validKinReverseSet($row['c_assoc_kin_code'] ?? null)) {
+                $baselines['c_assoc_kin_code'] = $vr;
+            }
+        } elseif ($table === 'KIN_DATA') {
+            foreach (['c_notes', 'c_source', 'c_pages'] as $f) {
+                if (array_key_exists($f, $row)) {
+                    $baselines[$f] = $row[$f];
+                }
+            }
+            if ($vr = $this->validKinReverseSet($row['c_kin_code'] ?? null)) {
+                $baselines['c_kin_code'] = $vr;
+            }
+        }
+
+        return $baselines;
+    }
+
+    /** ASSOC_CODES：某社會關係碼的合法反向集（c_assoc_pair / c_assoc_pair2）。空/0/無反向 → 空陣列。 */
+    private function validAssocReverseSet($code): array {
+        if ($code === null || (int) $code === 0) {
+            return [];
+        }
+        $r = DB::table('ASSOC_CODES')->where('c_assoc_code', $code)->first();
+        if (!$r) {
+            return [];
+        }
+
+        return array_values(array_filter([$r->c_assoc_pair ?? null, $r->c_assoc_pair2 ?? null], static fn ($v) => $v !== null && (int) $v !== 0));
+    }
+
+    /** KINSHIP_CODES：某親屬碼的合法反向集（c_kin_pair1 / c_kin_pair2）。空/0/無反向 → 空陣列。 */
+    private function validKinReverseSet($code): array {
+        if ($code === null || (int) $code === 0) {
+            return [];
+        }
+        $r = DB::table('KINSHIP_CODES')->where('c_kincode', $code)->first();
+        if (!$r) {
+            return [];
+        }
+
+        return array_values(array_filter([$r->c_kin_pair1 ?? null, $r->c_kin_pair2 ?? null], static fn ($v) => $v !== null && (int) $v !== 0));
     }
 
     /**

@@ -109,6 +109,30 @@ class OperationsProposalController extends Controller {
             flash('審核失敗：'.$detail, 'error');
 
             return redirect()->back();
+        } catch (\App\Services\Mutations\MirrorConflictException|\App\Services\Mutations\MirrorSuspectedException|\App\Services\Mutations\MirrorIntegrityException $e) {
+            // #77：核准社會關係／親屬更新提案時，偵測到對面互逆鏡像列已被獨立改動（內容分歧／關係碼漂移）或資料完整性問題。
+            // 整筆交易已回滾、提案未核准——避免靜默覆寫對方資料。回友善中文提示（不外洩底層 SQL），引導審核者先至對面確認。
+            Log::warning('提案核准中止：對面鏡像分歧/疑似', [
+                'operation_id' => $operation->id,
+                'table' => $table,
+                'exception' => get_class($e),
+            ]);
+            flash('審核未通過：偵測到對應的反向關係列已被獨立修改（內容或關係碼不一致）。為避免覆寫對方資料，已中止此次核准——請先至對應人物頁確認/修正反向關係後再核准。', 'error');
+
+            return redirect()->back();
+        } catch (\Illuminate\Database\QueryException $e) {
+            // #77：DB 層錯誤（如核准 create 提案時對面已存在等價鏡像導致主鍵衝突）→ 整筆已回滾。
+            // 回友善中文提示，**不外洩原始 SQL／錯誤字串**給審核者（完整訊息只進 log）。
+            Log::error('提案核准失敗（資料庫錯誤）', [
+                'operation_id' => $operation->id,
+                'table' => $table,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile().':'.$e->getLine(),
+            ]);
+            flash('審核失敗：資料庫操作發生衝突或錯誤（可能對應記錄已存在或已被變更），本次未核准。請重新整理後確認資料狀態，或聯絡管理員。', 'error');
+
+            return redirect()->back();
         } catch (\Throwable $e) {
             Log::error('提案核准失敗', [
                 'operation_id' => $operation->id,
@@ -278,7 +302,8 @@ class OperationsProposalController extends Controller {
         $result = $this->biogMainRepository->kinshipUpdateById(
             $request,
             $personId,
-            $this->buildLegacyKinshipId($original)
+            $this->buildLegacyKinshipId($original),
+            true // #77：核准時啟用鏡像衝突/疑似偵測——對面鏡像已分歧/碼漂移則拋例外中止核准（不靜默覆寫）
         );
 
         $mirrorStatus = (int) ($result['err'] ?? 1);
@@ -327,7 +352,8 @@ class OperationsProposalController extends Controller {
         $result = $this->biogMainRepository->assocUpdateById(
             $request,
             $this->buildLegacyAssocId($original),
-            $personId
+            $personId,
+            true // #77：核准時啟用鏡像衝突/疑似偵測——對面鏡像已分歧/碼漂移則拋例外中止核准（不靜默覆寫）
         );
 
         if ($result === []) {

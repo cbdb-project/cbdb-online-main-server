@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
+import { redirectAfterSubresourceCreate } from './PersonEditorShared/afterCreate';
 import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import TextpersonPair from './PersonEditorShared/TextpersonPair';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
@@ -123,7 +124,7 @@ export default function TextEditor({
             if (auditRow) { for (const k of ['c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date']) { if (auditRow[k] != null) auditPatch[k] = String(auditRow[k]); } }
             if (Object.keys(auditPatch).length > 0) setFields((prev) => ({ ...prev, ...auditPatch }));
             setSavedSnapshot(JSON.stringify({ ...fields, ...auditPatch }));
-            if (isCreate) { window.location.assign(indexUrl); }
+            if (isCreate) { redirectAfterSubresourceCreate(indexUrl, json, sm === 'direct'); }
             // 直接儲存若改了主鍵（著述／角色），列已改鍵；以「實際送出的 PK 變更」覆寫 originalPk，
             // 後續操作才指向新列。注意：不可用 fields 重建（清空欄位 Number('')=0 會讓 client 與 DB 失準），
             // 只套用 changes 內真正送出的 PK 欄位（清空未送出者保留原值）。

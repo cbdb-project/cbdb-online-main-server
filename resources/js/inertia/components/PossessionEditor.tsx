@@ -4,6 +4,7 @@ import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import TextpersonPair from './PersonEditorShared/TextpersonPair';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
 import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
+import { redirectAfterSubresourceCreate } from './PersonEditorShared/afterCreate';
 import {
     gridCardStyle, gGrid, gInputStyle, gReadonlyStyle, gOkStyle, gErrStyle,
     gSubmitRow, gBtnGroupRight, gPrimaryBtn, gInfoBtn, gDangerBtn, gCancelBtn,
@@ -159,7 +160,7 @@ export default function PossessionEditor({
             if (Object.keys(auditPatch).length > 0) setFields((prev) => ({ ...prev, ...auditPatch }));
             setSavedSnapshot(JSON.stringify({ ...fields, ...auditPatch }));
             initialAddrIds.current = addrItems.map((it) => String(it.id));
-            if (mode === 'create') { window.location.assign(indexUrl); }
+            if (mode === 'create') { redirectAfterSubresourceCreate(indexUrl, json, sm === 'direct'); }
         } catch (e) {
             setError(e instanceof Error ? e.message : tr('save_failed', '儲存失敗'));
         } finally { setSaving(false); }

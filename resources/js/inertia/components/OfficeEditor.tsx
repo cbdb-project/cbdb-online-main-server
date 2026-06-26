@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
+import { redirectAfterSubresourceCreate } from './PersonEditorShared/afterCreate';
 import EraTimeField, { EraTimeFieldValues } from './EraTimeField';
 import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import TextpersonPair from './PersonEditorShared/TextpersonPair';
@@ -256,7 +257,7 @@ export default function OfficeEditor({
             if (auditRow) { for (const k of ['c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date']) { if (auditRow[k] != null) auditPatch[k] = String(auditRow[k]); } }
             if (Object.keys(auditPatch).length > 0) setFields((prev) => ({ ...prev, ...auditPatch }));
             setSavedSnapshot(JSON.stringify({ f: { ...fields, ...auditPatch }, a: addr }));
-            if (creating) { window.location.assign(indexUrl); } else if (sm === 'direct') {
+            if (creating) { redirectAfterSubresourceCreate(indexUrl, json, sm === 'direct'); } else if (sm === 'direct') {
                 // c_office_id 可改 → 重同步 originalPk（c_posting_id 不變）。
                 originalPk.current = { c_office_id: Number(fields.c_office_id ?? 0) || 0, c_posting_id: originalPk.current.c_posting_id };
             }

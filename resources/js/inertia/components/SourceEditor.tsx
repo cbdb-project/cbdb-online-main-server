@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
+import { redirectAfterSubresourceCreate } from './PersonEditorShared/afterCreate';
 import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
 import {
@@ -164,7 +165,7 @@ export default function SourceEditor({
             const mergedPatch: Fields = { ...auditPatch, ...pkPatch };
             if (Object.keys(mergedPatch).length > 0) setFields((prev) => ({ ...prev, ...mergedPatch }));
             setSavedSnapshot(JSON.stringify({ ...fields, ...mergedPatch }));
-            if (mode === 'create') { window.location.assign(indexUrl); }
+            if (mode === 'create') { redirectAfterSubresourceCreate(indexUrl, json, sm === 'direct'); }
         } catch (e) {
             setError(e instanceof Error ? e.message : tr('save_failed', '儲存失敗'));
         } finally { setSaving(false); }

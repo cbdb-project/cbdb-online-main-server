@@ -4,6 +4,7 @@ import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import TextpersonPair from './PersonEditorShared/TextpersonPair';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
 import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
+import { redirectAfterSubresourceCreate } from './PersonEditorShared/afterCreate';
 import {
     gridCardStyle, gGrid, gInputStyle, gReadonlyStyle, gOkStyle, gErrStyle,
     gSubmitRow, gBtnGroupRight, gPrimaryBtn, gInfoBtn, gDangerBtn, gCancelBtn,
@@ -177,7 +178,7 @@ export default function EventEditor({
             if (Object.keys(auditPatch).length > 0) setFields((prev) => ({ ...prev, ...auditPatch }));
             setSavedSnapshot(JSON.stringify({ ...fields, ...auditPatch }));
             initialAddrIds.current = addrItems.map((a) => String(a.id));
-            if (mode === 'create') { window.location.assign(indexUrl); }
+            if (mode === 'create') { redirectAfterSubresourceCreate(indexUrl, json, sm === 'direct'); }
             else if (sm === 'direct') {
                 const nextPk = { ...originalPk.current };
                 for (const k of EDITABLE_PK) { if (Object.prototype.hasOwnProperty.call(changes, k)) nextPk[k] = Number(changes[k]); }

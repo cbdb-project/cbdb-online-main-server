@@ -3,6 +3,7 @@ import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import TextpersonPair from './PersonEditorShared/TextpersonPair';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
 import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
+import { redirectAfterSubresourceCreate } from './PersonEditorShared/afterCreate';
 import MirrorConflictNotice, { MirrorConflict } from './PersonEditorShared/MirrorConflictNotice';
 import MirrorSuspectedNotice, { MirrorSuspected } from './PersonEditorShared/MirrorSuspectedNotice';
 import MirrorDeleteMultipleNotice, { MirrorDeleteMultiple } from './PersonEditorShared/MirrorDeleteMultipleNotice';
@@ -238,7 +239,7 @@ export default function KinEditor({
             if (Object.keys(auditPatch).length > 0) setFields((prev) => ({ ...prev, ...auditPatch }));
             setSavedSnapshot(JSON.stringify({ ...fields, ...auditPatch }));
             setPairTouched(false); // #88：存檔成功後重置，避免反向配對碼改動持續被視為 dirty。
-            if (mode === 'create') { window.location.assign(indexUrl); } else if (sm === 'direct') {
+            if (mode === 'create') { redirectAfterSubresourceCreate(indexUrl, json, sm === 'direct'); } else if (sm === 'direct') {
                 // 改鍵後以實際送出的 PK 變更覆寫 originalPk（不可用 fields 重建，避免 Number('')=0 失準）。
                 const nextPk = { ...originalPk.current };
                 for (const k of EDITABLE_PK) { if (Object.prototype.hasOwnProperty.call(changes, k)) nextPk[k] = Number(changes[k]); }

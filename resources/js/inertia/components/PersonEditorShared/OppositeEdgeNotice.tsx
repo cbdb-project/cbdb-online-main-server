@@ -41,7 +41,7 @@ export default function OppositeEdgeNotice({ result, reverseCodeLabel, tr }: {
         const codeKey = result.resource === 'kinship' ? 'c_kin_code' : 'c_assoc_code';
         const fmt = (e: Record<string, string | number | null>): string => {
             const parts = [`${tr('opposite_edge_code_label', '碼')} ${e[codeKey] ?? ''}`];
-            if (e.c_text_title) parts.push(`${tr('text_title_field', '出處標題')} ${e.c_text_title}`);
+            if (e.c_text_title) parts.push(`${tr('text_title_field', '作品標題')} ${e.c_text_title}`);
             parts.push(`${tr('source_field', '出處')} ${e.c_source ?? 0}`);
             if (e.c_created_by) parts.push(`${tr('audit_created', '建檔')} ${e.c_created_by}`);
             return parts.join(' · ');

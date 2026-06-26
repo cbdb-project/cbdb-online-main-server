@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from '../hooks/useTranslation';
 import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import {
     gregorianToReignCandidates,
@@ -55,13 +56,20 @@ export default function EraTimeField({
     showRange = false,
     showLunar = false,
     showNotes = false,
-    nhLabel = '年號',
-    rangeLabel = '時限',
-    intercalaryLabel = '閏月',
-    dayGzLabel = '日(干支)',
-    notesLabel = '備註',
+    nhLabel,
+    rangeLabel,
+    intercalaryLabel,
+    dayGzLabel,
+    notesLabel,
     disabled = false,
 }: Props) {
+    const t = useTranslation('biogmains');
+    // 預設標籤改於 render 時取 t()，使英文 locale 正確；caller 傳入則優先採用。
+    const resolvedNhLabel = nhLabel ?? t('era_nh_label');
+    const resolvedRangeLabel = rangeLabel ?? t('era_range_label');
+    const resolvedIntercalaryLabel = intercalaryLabel ?? t('era_intercalary_label');
+    const resolvedDayGzLabel = dayGzLabel ?? t('era_day_gz_label');
+    const resolvedNotesLabel = notesLabel ?? t('era_notes_label');
     const [eraOptions, setEraOptions] = useState<EraResult[] | null>(null);
     const [busy, setBusy] = useState(false);
 
@@ -83,18 +91,18 @@ export default function EraTimeField({
                 // 對齊 legacy app.js fillEraFields：精確匹配失敗時 fallback 只是「同名年號中最近一筆」，
                 // 非已證實正確（同名跨朝代/cn-era 與 DB c_str 不一致時可能錯）。須先 confirm 再採用，
                 // 不可靜默填入，否則有錯填年號 ID 的風險。
-                const ok = window.confirm(
-                    `年號「${era.reign_title}」的資料庫記錄與 cn-era 數據存在差異。\n\n` +
-                    `cn-era：${era.reign_title} 第 ${era.year} 年（西元 ${year}）\n` +
-                    `資料庫：${fb.dbInfo}\n\n` +
-                    `是否使用資料庫中的記錄？（取消＝放棄轉換，請手動選擇）`,
-                );
+                const ok = window.confirm(t('era_mismatch_confirm', {
+                    title: era.reign_title,
+                    eraYear: String(era.year),
+                    year: String(year),
+                    dbInfo: fb.dbInfo,
+                }));
                 if (!ok) {
                     return;
                 }
                 id = fb.id;
             } else {
-                window.alert(`找到年號「${era.reign_title}」，但資料庫中無對應記錄，請手動選擇。`);
+                window.alert(t('era_db_missing', { title: era.reign_title }));
                 return;
             }
         }
@@ -105,7 +113,7 @@ export default function EraTimeField({
     const handleToReign = async () => {
         const year = parseInt(values.year, 10);
         if (Number.isNaN(year) || year === 0) {
-            window.alert('請先輸入有效的西元年份');
+            window.alert(t('era_need_valid_ce'));
             return;
         }
         setBusy(true);
@@ -113,7 +121,7 @@ export default function EraTimeField({
             // 取「全部」候選（不過濾朝代），再自行依朝代過濾，以便偵測朝代不匹配並警告（對齊 app.js）。
             const all = gregorianToReignCandidates(year, null);
             if (!all.length) {
-                window.alert(`無法找到西元 ${year} 年對應的年號`);
+                window.alert(t('era_no_match_for_ce', { year: String(year) }));
                 return;
             }
             const dc = dynastyCode ?? null;
@@ -123,9 +131,9 @@ export default function EraTimeField({
                 const only = all[0];
                 // 單一結果且與所選朝代不符 → 只 confirm（不另發朝代無對應 alert，對齊 app.js:529-549）。
                 if (dc && dc > 0 && only.dynasty !== dc) {
-                    const ok = window.confirm(
-                        `所選朝代與查詢結果不符。\n\n查詢結果：${only.dynasty_name} ${only.reign_title} ${only.year_num}\n\n是否使用此結果？`,
-                    );
+                    const ok = window.confirm(t('era_dynasty_mismatch_single', {
+                        result: `${only.dynasty_name} ${only.reign_title} ${only.year_num}`,
+                    }));
                     if (!ok) {
                         return;
                     }
@@ -138,7 +146,7 @@ export default function EraTimeField({
             if (dc && dc > 0) {
                 const filtered = all.filter((r) => r.dynasty === dc);
                 if (filtered.length === 0) {
-                    window.alert(`所選朝代在西元 ${year} 年沒有對應的年號。\n請檢查朝代選擇是否正確，或從以下全部候選中選擇。`);
+                    window.alert(t('era_dynasty_no_match_for_ce', { year: String(year) }));
                     candidates = all;
                 } else {
                     candidates = filtered;
@@ -157,12 +165,12 @@ export default function EraTimeField({
     // 年號 → 西元
     const handleToAd = async () => {
         if (!values.nhCode) {
-            window.alert('請先選擇年號');
+            window.alert(t('era_need_nh'));
             return;
         }
         const nhYear = parseInt(values.nhYear, 10);
         if (Number.isNaN(nhYear) || nhYear <= 0) {
-            window.alert('請輸入有效的年號年數');
+            window.alert(t('era_need_valid_nh_year'));
             return;
         }
         setBusy(true);
@@ -171,7 +179,7 @@ export default function EraTimeField({
             if (res.success && res.year != null) {
                 onChange({ year: String(res.year) });
             } else {
-                window.alert(res.message || '轉換失敗');
+                window.alert(res.message || t('era_convert_failed'));
             }
         } finally {
             setBusy(false);
@@ -186,16 +194,16 @@ export default function EraTimeField({
                 disabled={disabled}
                 onChange={(e) => onChange({ year: e.target.value })}
                 style={{ ...inputStyle, width: '12ch' }}
-                aria-label="西元年份"
+                aria-label={t('era_ce_year')}
             />
             {!disabled && (
                 <div style={btnGroupStyle}>
-                    <button type="button" style={convBtnStyle} disabled={busy} onClick={() => void handleToReign()} title="西元 → 年號（由西元年換算年號）" aria-label="由西元換算年號">→</button>
-                    <button type="button" style={convBtnStyle} disabled={busy} onClick={() => void handleToAd()} title="年號 → 西元（由年號換算西元年）" aria-label="由年號換算西元">←</button>
+                    <button type="button" style={convBtnStyle} disabled={busy} onClick={() => void handleToReign()} title={t('era_convert_to_nh')} aria-label={t('era_convert_to_nh')}>→</button>
+                    <button type="button" style={convBtnStyle} disabled={busy} onClick={() => void handleToAd()} title={t('era_convert_to_ce')} aria-label={t('era_convert_to_ce')}>←</button>
                 </div>
             )}
             <div style={fieldGroupStyle}>
-                <label style={labelStyle}>{nhLabel}</label>
+                <label style={labelStyle}>{resolvedNhLabel}</label>
                 <div style={{ minWidth: '16ch', flex: '1 1 16ch' }}>
                     <CodeAutocomplete
                         mode="list"
@@ -214,13 +222,13 @@ export default function EraTimeField({
                     disabled={disabled}
                     onChange={(e) => onChange({ nhYear: e.target.value })}
                     style={{ ...inputStyle, width: '8ch' }}
-                    aria-label="年號年"
+                    aria-label={t('era_nh_year')}
                 />
-                <span style={unitStyle}>年</span>
+                <span style={unitStyle}>{t('era_unit_year')}</span>
             </div>
             {showRange && (
                 <div style={fieldGroupStyle}>
-                    <label style={labelStyle}>{rangeLabel}</label>
+                    <label style={labelStyle}>{resolvedRangeLabel}</label>
                     <div style={{ minWidth: '14ch', flex: '1 1 14ch' }}>
                         <CodeAutocomplete
                             mode="list"
@@ -244,21 +252,21 @@ export default function EraTimeField({
                             disabled={disabled}
                             onChange={(e) => onChange({ intercalary: e.target.checked ? '1' : '0' })}
                         />
-                        {intercalaryLabel}
+                        {resolvedIntercalaryLabel}
                     </label>
                     <input type="number" min={1} max={12} value={values.month ?? ''} disabled={disabled}
                         onChange={(e) => onChange({ month: e.target.value })}
                         style={{ ...inputStyle, width: '7ch', ...(monthInvalid ? invalidStyle : {}) }}
-                        aria-invalid={monthInvalid} title={monthInvalid ? '請輸入 1-12 或留空' : undefined} aria-label="月" />
-                    <span style={unitStyle}>月</span>
+                        aria-invalid={monthInvalid} title={monthInvalid ? t('era_month_hint') : undefined} aria-label={t('era_unit_month')} />
+                    <span style={unitStyle}>{t('era_unit_month')}</span>
                     <span style={{ ...rangeHintStyle, ...(monthInvalid ? invalidHintStyle : {}) }}>(1-12)</span>
                     <input type="number" min={1} max={30} value={values.day ?? ''} disabled={disabled}
                         onChange={(e) => onChange({ day: e.target.value })}
                         style={{ ...inputStyle, width: '7ch', ...(dayInvalid ? invalidStyle : {}) }}
-                        aria-invalid={dayInvalid} title={dayInvalid ? '請輸入 1-30 或留空' : undefined} aria-label="日" />
-                    <span style={unitStyle}>日</span>
+                        aria-invalid={dayInvalid} title={dayInvalid ? t('era_day_hint') : undefined} aria-label={t('era_unit_day')} />
+                    <span style={unitStyle}>{t('era_unit_day')}</span>
                     <span style={{ ...rangeHintStyle, ...(dayInvalid ? invalidHintStyle : {}) }}>(1-30)</span>
-                    <label style={labelStyle}>{dayGzLabel}</label>
+                    <label style={labelStyle}>{resolvedDayGzLabel}</label>
                     <div style={{ minWidth: '12ch', flex: '1 1 12ch' }}>
                         <CodeAutocomplete
                             mode="list"
@@ -275,7 +283,7 @@ export default function EraTimeField({
             )}
             {showNotes && (
                 <div style={{ ...fieldGroupStyle, width: '100%' }}>
-                    <label style={labelStyle}>{notesLabel}</label>
+                    <label style={labelStyle}>{resolvedNotesLabel}</label>
                     <input type="text" value={values.notes ?? ''} disabled={disabled}
                         onChange={(e) => onChange({ notes: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
                 </div>
@@ -284,7 +292,7 @@ export default function EraTimeField({
             {eraOptions && (
                 <div style={dialogBackdrop} onClick={() => setEraOptions(null)}>
                     <div style={dialogBox} onClick={(e) => e.stopPropagation()}>
-                        <div style={dialogTitle}>找到多個符合年號，請選擇：</div>
+                        <div style={dialogTitle}>{t('era_multiple_nh')}</div>
                         {eraOptions.map((opt) => (
                             <button
                                 key={`${opt.dynasty ?? ''}-${opt.reign_title}-${opt.year}`}
@@ -295,7 +303,7 @@ export default function EraTimeField({
                                 <strong>{opt.dynasty_name}</strong> {opt.reign_title} {opt.year_num}
                             </button>
                         ))}
-                        <button type="button" style={dialogCancel} onClick={() => setEraOptions(null)}>取消</button>
+                        <button type="button" style={dialogCancel} onClick={() => setEraOptions(null)}>{t('cancel')}</button>
                     </div>
                 </div>
             )}

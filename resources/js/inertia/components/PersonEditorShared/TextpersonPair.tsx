@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from '../../hooks/useTranslation';
 
 /**
  * 「典籍出處候選」聯動（textperson_pair）—— 對齊 legacy 各子資源 _form 底部的同款控件。
@@ -22,7 +23,9 @@ interface Props {
     disabled?: boolean;
 }
 
-export default function TextpersonPair({ personId, label = '候選出處', hint, onPick, disabled = false }: Props) {
+export default function TextpersonPair({ personId, label, hint, onPick, disabled = false }: Props) {
+    const t = useTranslation('biogmains');
+    const resolvedLabel = label ?? t('candidate_source_title');
     const [options, setOptions] = useState<TextpersonOption[]>([]);
     const [value, setValue] = useState('');
     const [busy, setBusy] = useState(false);
@@ -68,7 +71,7 @@ export default function TextpersonPair({ personId, label = '候選出處', hint,
 
     return (
         <div style={rowStyle}>
-            <label style={labelStyle}>{label}</label>
+            <label style={labelStyle}>{resolvedLabel}</label>
             <div style={fieldStyle}>
                 <select
                     value={value}
@@ -76,7 +79,7 @@ export default function TextpersonPair({ personId, label = '候選出處', hint,
                     onChange={(e) => void handleChange(e.target.value)}
                     style={selectStyle}
                 >
-                    <option value="">{hint ?? '選擇後自動回填出處與頁碼'}</option>
+                    <option value="">{hint ?? t('textperson_pick_hint')}</option>
                     {options.map((o) => (
                         <option key={o.value} value={o.value}>{o.text}</option>
                     ))}

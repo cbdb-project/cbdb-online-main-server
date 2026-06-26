@@ -21,6 +21,7 @@ interface PageProps extends SharedProps {
     mutate_endpoint: string;
     delete_endpoint: string;
     index_url: string;
+    breadcrumbs: Array<{ label: string; url?: string }>;
     person_banner: PersonBannerData;
     ai_enabled: boolean;
     ai_model: string;
@@ -42,7 +43,7 @@ export default function AssocEditV2() {
     };
 
     return (
-        <DashboardLayout title={p.person_label} headerAlign="center">
+        <DashboardLayout title={p.person_label} headerAlign="center" breadcrumbs={p.breadcrumbs}>
             <PersonBanner data={p.person_banner} />
             <AssocEditor
                 personId={p.person_id}

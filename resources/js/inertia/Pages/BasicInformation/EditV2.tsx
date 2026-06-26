@@ -21,6 +21,7 @@ interface PageProps extends SharedProps {
     delete_endpoint: string;
     pinyin_endpoint: string;
     index_url: string;
+    breadcrumbs: Array<{ label: string; url?: string }>;
     person_banner: PersonBannerData;
     duplicate_collateral_url: string;
     saveas_url: string;
@@ -45,7 +46,7 @@ export default function EditV2() {
     }
 
     return (
-        <DashboardLayout title={p.person_label} headerAlign="center">
+        <DashboardLayout title={p.person_label} headerAlign="center" breadcrumbs={p.breadcrumbs}>
             <PersonBanner data={p.person_banner} />
             <BasicInfoEditor
                 personId={p.personId}

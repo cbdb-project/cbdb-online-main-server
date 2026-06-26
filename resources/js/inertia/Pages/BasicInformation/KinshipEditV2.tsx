@@ -20,6 +20,7 @@ interface PageProps extends SharedProps {
     mutate_endpoint: string;
     delete_endpoint: string;
     index_url: string;
+    breadcrumbs: Array<{ label: string; url?: string }>;
     person_banner: PersonBannerData;
 }
 
@@ -38,7 +39,7 @@ export default function KinshipEditV2() {
     };
 
     return (
-        <DashboardLayout title={p.person_label} headerAlign="center">
+        <DashboardLayout title={p.person_label} headerAlign="center" breadcrumbs={p.breadcrumbs}>
             <PersonBanner data={p.person_banner} />
             <KinEditor
                 personId={p.person_id}

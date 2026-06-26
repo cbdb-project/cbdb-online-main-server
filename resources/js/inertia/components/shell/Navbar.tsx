@@ -4,18 +4,21 @@ import type { SharedProps } from '../../types/page';
 import { useTranslation } from '../../hooks/useTranslation';
 import { hasUnsavedChanges } from '../../hooks/useDirtyGuard';
 import { cn } from '../../lib/utils';
+import { type Crumb } from './Breadcrumbs';
 
 interface NavbarProps {
     onToggleSidebar: () => void;
     isDark: boolean;
     onToggleDark: () => void;
+    /** 麵包屑：渲染於頂部導覽列「首頁」之後（同一行），對齊 legacy header-v3 的頂端麵包屑。 */
+    breadcrumbs?: Crumb[];
 }
 
 /**
  * 頂部導覽列：pushmenu 切換、首頁、深色模式、語言切換、使用者下拉/登入註冊。
  * 對齊舊 header-v3.blade.php 的功能與行為（含語言切換的未存變更確認）。
  */
-export default function Navbar({ onToggleSidebar, isDark, onToggleDark }: NavbarProps) {
+export default function Navbar({ onToggleSidebar, isDark, onToggleDark, breadcrumbs }: NavbarProps) {
     const { auth, locale, locale_url, shell } = usePage<SharedProps>().props;
     const tNav = useTranslation('nav');
     const tCommon = useTranslation('common');
@@ -54,6 +57,25 @@ export default function Navbar({ onToggleSidebar, isDark, onToggleDark }: Navbar
             <a href={shell.home_url} className="hidden px-2 text-sm hover:text-primary sm:inline">
                 {tCommon('home')}
             </a>
+
+            {/* 頂端麵包屑：併入「首頁」同一行（#113），最後一項為 active 不可點。 */}
+            {breadcrumbs && breadcrumbs.length > 0 && (
+                <ol className="hidden min-w-0 items-center gap-1 overflow-hidden text-sm text-muted-foreground md:flex">
+                    {breadcrumbs.map((crumb, i) => {
+                        const isLast = i === breadcrumbs.length - 1;
+                        return (
+                            <li key={i} className="flex min-w-0 items-center gap-1">
+                                <span className="opacity-50">/</span>
+                                {isLast || !crumb.url ? (
+                                    <span className="truncate font-medium text-foreground">{crumb.label}</span>
+                                ) : (
+                                    <a href={crumb.url} className="truncate hover:text-primary">{crumb.label}</a>
+                                )}
+                            </li>
+                        );
+                    })}
+                </ol>
+            )}
 
             <div className="ml-auto flex items-center gap-1">
                 <button

@@ -307,7 +307,7 @@ export default function OfficeEditor({
 
             <div style={gGrid}>
                 {/* 官名 + 地名 同行（#101 使用者建議排版） */}
-                {gridCell(tr('office_name_field', '官名'), { code: 'c_office_id', required: isCreate },
+                {gridCell(tr('office_name_field', '官名'), { code: 'c_office_id', required: true },
                     <CodeAutocomplete mode="search" endpoint="/api/select/search/office"
                         value={fields.c_office_id ?? '0'} initialLabel={labels.c_office_id ?? ''} disabled={!editable}
                         extraQuery={dynastyCode != null ? { c_dy: String(dynastyCode) } : undefined}

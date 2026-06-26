@@ -293,8 +293,8 @@ export default function KinEditor({
             <OppositeEdgeNotice result={oppositeEdge} reverseCodeLabel={reverseCodeLabel} tr={tr} />
 
             <div style={gGrid}>
-                {searchRow('c_kin_code', tr('kinship_relation', '親屬關係'), 'c_kin_code', '/api/select/search/kincode', false, '0', mode === 'create')}
-                {searchRow('c_kin_id', tr('relative_name', '親屬姓名'), 'c_kin_id', '/api/select/search/biog', false, '0', mode === 'create')}
+                {searchRow('c_kin_code', tr('kinship_relation', '親屬關係'), 'c_kin_code', '/api/select/search/kincode', false, '0', true)}
+                {searchRow('c_kin_id', tr('relative_name', '親屬姓名'), 'c_kin_id', '/api/select/search/biog', false, '0', true)}
 
                 {/* 互逆配對碼：依正向碼取候選，預設第一個（同 legacy），反向關係有歧義（父→子/女、第幾子…）故可手選。 */}
                 {gridCell(tr('reverse_pair_label', '互逆配對碼'), { code: 'c_kinship_pair', full: true }, <>

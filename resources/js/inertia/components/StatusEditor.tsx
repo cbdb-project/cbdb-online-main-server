@@ -241,7 +241,7 @@ export default function StatusEditor({
             ) : null}
 
             <div style={gGrid}>
-                {gridCell(tr('status', '社會區分'), { code: 'c_status_code', required: mode === 'create' },
+                {gridCell(tr('status', '社會區分'), { code: 'c_status_code', required: true },
                     <div style={statusHighlight ? { background: '#FFFFBB', borderRadius: 6 } : undefined}>
                         <CodeAutocomplete mode="search" endpoint="/api/select/search/status"
                             value={fields.c_status_code ?? '0'} initialLabel={labels.c_status_code ?? ''} disabled={!editable}

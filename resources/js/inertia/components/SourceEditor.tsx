@@ -180,7 +180,7 @@ export default function SourceEditor({
             ) : null}
 
             <div style={gGrid}>
-                {gridCell(tr('source_field', '出處'), { code: 'c_source', required: mode === 'create', hint: mode === 'edit' ? tr('source_pk_immutable_hint', '出處與頁碼為主鍵，不可修改；如需更改請刪除後重新新增。') : undefined },
+                {gridCell(tr('source_field', '出處'), { code: 'c_source', required: true, hint: mode === 'edit' ? tr('source_pk_immutable_hint', '出處與頁碼為主鍵，不可修改；如需更改請刪除後重新新增。') : undefined },
                     mode === 'edit' ? (
                         <input type="text" value={labels.c_textid ?? (fields.c_textid ?? '')} readOnly disabled
                             style={{ ...gInputStyle, ...gReadonlyStyle }} />

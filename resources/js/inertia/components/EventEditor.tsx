@@ -127,6 +127,12 @@ export default function EventEditor({
         if (mode === 'create' && (!fields.c_event_code || fields.c_event_code === '0')) {
             setSaving(false); setError(tr('please_select_event', '請選擇事件名')); return;
         }
+        // 編輯模式：可改主鍵（序號/事件名）不可被清空（清空會靜默正規化為 0）。僅擋空、允許既有 0。
+        if (mode === 'edit') {
+            for (const k of EDITABLE_PK) {
+                if (!(fields[k] ?? '').trim()) { setSaving(false); setError(tr('pk_field_required', '主鍵欄位不可為空')); return; }
+            }
+        }
         const pkVal = (k: string) => (k === 'c_personid' ? String(personId) : (fields[k]?.trim() ? fields[k] : '0'));
         let changes: Record<string, string | null>;
         let target: Record<string, number>;
@@ -214,7 +220,7 @@ export default function EventEditor({
             <div style={gGrid}>
                 {textRow('c_sequence', tr('sequence', '序號'), 'c_sequence')}
 
-                {gridCell(tr('event_name', '事件名'), { code: 'c_event_code', required: mode === 'create' },
+                {gridCell(tr('event_name', '事件名'), { code: 'c_event_code', required: true },
                     <CodeAutocomplete mode="search" endpoint="/api/select/search/event"
                         value={fields.c_event_code ?? '0'} initialLabel={labels.c_event_code ?? ''} disabled={!editable}
                         onChange={(v, l) => { set('c_event_code', v); setLabel('c_event_code', l); }} />)}

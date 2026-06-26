@@ -84,6 +84,8 @@ return [
     'please_select_assoc' => '請選擇社會關係',
     'please_select_assoc_person' => '請選擇關聯人物',
     'please_select_place' => '請選擇地名',
+    'please_select_role' => '請選擇著述角色',
+    'please_select_addr_type' => '請選擇地址類別',
     'pk_field_required' => '主鍵欄位不可為空',
     // basic_info 網格重設計：派生/指數唯讀子區塊標題與派生全名標籤。
     'derived_auto_tag' => '自動生成（唯讀，由上方姓名合併）',

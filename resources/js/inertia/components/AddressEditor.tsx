@@ -54,7 +54,7 @@ export default function AddressEditor({
     canEdit, canPropose, createEndpoint, mutateEndpoint, deleteEndpoint, indexUrl, t,
 }: Props) {
     const tr = (k: string, fb: string) => { const v = t ? t(k) : k; return v && v !== k ? v : fb; };
-    const base: Fields = { c_personid: String(personId), c_sequence: '0', c_addr_type: '0', c_addr_id: '', c_natal: '', c_source: '0', ...initialFields };
+    const base: Fields = { c_personid: String(personId), c_sequence: '0', c_addr_type: '', c_addr_id: '', c_natal: '', c_source: '0', ...initialFields };
     const [fields, setFields] = useState<Fields>(base);
     const [labels, setLabels] = useState<Fields>(initialLabels);
     const [savedSnapshot, setSavedSnapshot] = useState(JSON.stringify(base));
@@ -106,6 +106,10 @@ export default function AddressEditor({
         // 地名 c_addr_id 為主碼，必填（拒絕 0/未詳）：僅新增時擋；編輯既有列不卡。
         if (mode === 'create' && (!fields.c_addr_id || fields.c_addr_id === '0')) {
             setSaving(false); setError(tr('please_select_place', '請選擇地名')); return;
+        }
+        // 地址類別 c_addr_type 為主碼，必填（拒絕 0/未詳）：僅新增時擋（#104）。
+        if (mode === 'create' && (!fields.c_addr_type || fields.c_addr_type === '0')) {
+            setSaving(false); setError(tr('please_select_addr_type', '請選擇地址類別')); return;
         }
         // 編輯模式：可改主鍵欄位不可被清空（清空 + skip-changes 會造成 client/DB PK 失準）。
         // 僅擋「空字串」，0=未詳 等既有值仍允許（對齊 StatusEditor）。
@@ -198,12 +202,12 @@ export default function AddressEditor({
             {error ? <div style={gErrStyle}>{error}</div> : null}
 
             <div style={gGrid}>
-                {gridCell(tr('address_type', '地址類型'), { code: 'c_addr_type' },
+                {gridCell(tr('address_type', '地址類型'), { code: 'c_addr_type', required: true },
                     <CodeAutocomplete mode="list" model="biogaddr" idKey="c_addr_type" labelKeys={['c_addr_desc_chn', 'c_addr_desc']}
                         value={fields.c_addr_type ?? '0'} initialLabel={labels.c_addr_type ?? ''} disabled={!editable}
                         onChange={(v, l) => { set('c_addr_type', v); setLabel('c_addr_type', l); }} />)}
 
-                {gridCell(tr('place_name', '地名'), { code: 'c_addr_id', required: mode === 'create', hint: otherBelongs ? `${tr('other_upper_info', '其他上層資訊')}: ${otherBelongs}` : undefined },
+                {gridCell(tr('place_name', '地名'), { code: 'c_addr_id', required: true, hint: otherBelongs ? `${tr('other_upper_info', '其他上層資訊')}: ${otherBelongs}` : undefined },
                     <CodeAutocomplete mode="search" endpoint="/api/select/search/addr"
                         extraQuery={{ dy_start: dynastyStart ?? '', dy_end: dynastyEnd ?? '' }}
                         value={fields.c_addr_id ?? '0'} initialLabel={labels.c_addr_id ?? ''} disabled={!editable}

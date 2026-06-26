@@ -483,8 +483,8 @@ export default function AssocEditor({
             {/* 核心社會關係：社會關係碼 | 關聯人物 + 關係次數（重要）+ 次序（不重要、後置）+ 互逆配對碼。 */}
             <GridSection title={tr('assoc_core_section', '社會關係')}>
                 <div style={gGrid}>
-                    {searchRow('c_assoc_code', tr('assoc_field', '社會關係'), 'c_assoc_code', '/api/select/search/assoccode', assocHighlight, '0', mode === 'create')}
-                    {searchRow('c_assoc_id', tr('assoc_person', '關聯人物'), 'c_assoc_id', '/api/select/search/biog', false, '0', mode === 'create')}
+                    {searchRow('c_assoc_code', tr('assoc_field', '社會關係'), 'c_assoc_code', '/api/select/search/assoccode', assocHighlight, '0', true)}
+                    {searchRow('c_assoc_id', tr('assoc_person', '關聯人物'), 'c_assoc_id', '/api/select/search/biog', false, '0', true)}
                     {/* 關係次數（書信計次）：重要、非出處，移入核心區，置於社會關係/關聯人物之後。 */}
                     {textRow('c_assoc_count', tr('assoc_count_field', '數量'), 'c_assoc_count', false, tr('assoc_count_hint', '此欄位僅適用於書信：當無法以標題及日期區分多次信件時，則僅建「一筆」社會關係，並將信件總數填於此欄。請填阿拉伯數字'))}
                     {/* 次序不重要，下移至核心欄之後（去強調）。 */}

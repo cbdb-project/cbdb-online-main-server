@@ -120,6 +120,12 @@ export default function SocialInstEditor({
         if (mode === 'create' && (!fields.c_inst_code || fields.c_inst_code === '0')) {
             setSaving(false); setError(tr('please_select_socialinst', '請選擇社交機構')); return;
         }
+        // 編輯模式：可改主鍵不可被清空（清空會靜默正規化為 0）。僅擋空、允許既有 0。
+        if (mode === 'edit') {
+            for (const k of EDITABLE_PK) {
+                if (!(fields[k] ?? '').trim()) { setSaving(false); setError(tr('pk_field_required', '主鍵欄位不可為空')); return; }
+            }
+        }
         // PK 欄位 NOT NULL：空值正規化為 '0'（未詳），對齊 legacy。
         const pkVal = (k: string) => (k === 'c_personid' ? String(personId) : (fields[k]?.trim() ? fields[k] : '0'));
         let changes: Record<string, string | null>;
@@ -198,7 +204,7 @@ export default function SocialInstEditor({
             {error ? <div style={gErrStyle}>{error}</div> : null}
 
             <div style={gGrid}>
-                {gridCell(tr('socialinst_field', '社交機構'), { code: 'social_institution', required: mode === 'create' },
+                {gridCell(tr('socialinst_field', '社交機構'), { code: 'social_institution', required: true },
                     <CodeAutocomplete mode="search" endpoint="/api/select/search/socialinstcode"
                         value={instCombined} initialLabel={labels.c_inst_code ?? ''} disabled={!editable}
                         onChange={onPickInst} />)}

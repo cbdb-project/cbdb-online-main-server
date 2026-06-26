@@ -84,6 +84,8 @@ return [
     'please_select_assoc' => 'Please select an association',
     'please_select_assoc_person' => 'Please select an associated person',
     'please_select_place' => 'Please select a place',
+    'please_select_role' => 'Please select a text role',
+    'please_select_addr_type' => 'Please select an address type',
     'pk_field_required' => 'Primary key fields cannot be empty',
     // basic_info grid redesign: derived/index read-only sub-block titles and derived full-name labels.
     'derived_auto_tag' => 'Auto-generated (read-only, merged from the names above)',

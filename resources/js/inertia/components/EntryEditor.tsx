@@ -136,6 +136,14 @@ export default function EntryEditor({
         if (mode === 'create' && (!fields.c_entry_code || fields.c_entry_code === '0')) {
             setError(tr('please_select_entry', '請選擇入仕途徑')); return;
         }
+        // 編輯模式：可改主鍵不可被清空（清空會靜默正規化為 0 或 client/DB PK 失準）。僅擋空、允許既有 0。
+        // c_year（入仕年）可未詳（空→0 合法），故排除；其餘可改 PK 段皆擋空。
+        if (mode === 'edit') {
+            for (const k of EDITABLE_PK) {
+                if (k === 'c_year') continue;
+                if (!(fields[k] ?? '').trim()) { setError(tr('pk_field_required', '主鍵欄位不可為空')); return; }
+            }
+        }
         setSaving(true); setError(null); setMessage(null);
         // 主鍵 NOT NULL：空值正規化為 '0'（未詳），對齊 legacy。
         const pkVal = (k: string) => (k === 'c_personid' ? String(personId) : (fields[k]?.trim() ? fields[k] : '0'));
@@ -219,7 +227,7 @@ export default function EntryEditor({
             {error ? <div style={gErrStyle}>{error}</div> : null}
 
             <div style={gGrid}>
-                {gridCell(tr('entry_field', '入仕途徑'), { code: 'c_entry_code', required: mode === 'create' },
+                {gridCell(tr('entry_field', '入仕途徑'), { code: 'c_entry_code', required: true },
                     <CodeAutocomplete mode="search" endpoint="/api/select/search/entry"
                         value={fields.c_entry_code ?? '0'} initialLabel={labels.c_entry_code ?? ''} disabled={!editable}
                         onChange={(v, l) => { set('c_entry_code', v || '0'); setLabel('c_entry_code', l); }} />)}

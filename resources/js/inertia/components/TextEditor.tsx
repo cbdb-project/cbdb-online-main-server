@@ -44,7 +44,7 @@ export default function TextEditor({
 }: Props) {
     const tr = (k: string, fb: string) => { const v = t ? t(k) : k; return v && v !== k ? v : fb; };
     const isCreate = mode === 'create';
-    const base: Fields = { c_personid: String(personId), c_textid: '', c_role_id: '0', c_source: '0', ...initialFields };
+    const base: Fields = { c_personid: String(personId), c_textid: '', c_role_id: '', c_source: '0', ...initialFields };
     const [fields, setFields] = useState<Fields>(base);
     const [labels, setLabels] = useState<Fields>(initialLabels);
     const [savedSnapshot, setSavedSnapshot] = useState(JSON.stringify(base));
@@ -78,6 +78,16 @@ export default function TextEditor({
         // 對齊出處編輯器 c_textid 的 create-only 守衛）。
         if (isCreate && (!fields.c_textid || fields.c_textid === '0')) {
             setSaving(false); setError(tr('please_select_text', '請選擇著述')); return;
+        }
+        // 著述角色 c_role_id 為主碼，必填（拒絕 0/未詳）：僅新建時擋（#104）。
+        if (isCreate && (!fields.c_role_id || fields.c_role_id === '0')) {
+            setSaving(false); setError(tr('please_select_role', '請選擇著述角色')); return;
+        }
+        // 編輯模式：可改主鍵（著述/角色）不可被清空（c_role_id 清空原會被略過送出→client/DB PK 失準）。僅擋空、允許既有 0。
+        if (mode === 'edit') {
+            for (const k of EDITABLE_PK) {
+                if (!(fields[k] ?? '').trim()) { setSaving(false); setError(tr('pk_field_required', '主鍵欄位不可為空')); return; }
+            }
         }
         const pk = Object.fromEntries(PK.map((k) => [k, Number(fields[k] ?? 0)]));
         let changes: Record<string, string | null>;
@@ -157,12 +167,12 @@ export default function TextEditor({
             {error ? <div style={gErrStyle}>{error}</div> : null}
 
             <div style={gGrid}>
-                {gridCell(tr('text_code', '著述'), { code: 'c_textid', required: isCreate },
+                {gridCell(tr('text_code', '著述'), { code: 'c_textid', required: true },
                     <CodeAutocomplete mode="search" endpoint="/api/select/search/text"
                         value={fields.c_textid ?? '0'} initialLabel={labels.c_textid ?? ''} disabled={!editable}
                         onChange={(v, l) => { set('c_textid', v || '0'); setLabel('c_textid', l); }} />)}
 
-                {gridCell(tr('text_role', '角色'), { code: 'c_role_id' },
+                {gridCell(tr('text_role', '角色'), { code: 'c_role_id', required: true },
                     <CodeAutocomplete mode="list" model="role" idKey="c_role_id" labelKeys={['c_role_id', 'c_role_desc_chn', 'c_role_desc']}
                         value={fields.c_role_id ?? '0'} initialLabel={labels.c_role_id ?? ''} disabled={!editable}
                         onChange={(v, l) => { set('c_role_id', v); setLabel('c_role_id', l); }} />)}

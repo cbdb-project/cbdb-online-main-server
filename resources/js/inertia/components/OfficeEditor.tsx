@@ -306,23 +306,14 @@ export default function OfficeEditor({
             ) : null}
 
             <div style={gGrid}>
-                {mode === 'edit' ? gridCell('posting_id', {},
-                    <input type="text" value={fields.c_posting_id ?? ''} readOnly disabled style={{ ...gInputStyle, ...gReadonlyStyle }} />) : null}
-
-                {textRow('c_sequence', tr('sequence', '序號'), 'c_sequence', false, tr('sequence_same_note', '註：若有同時任命的官職，請手動填上相同的 sequence'))}
-
+                {/* 官名 + 地名 同行（#101 使用者建議排版） */}
                 {gridCell(tr('office_name_field', '官名'), { code: 'c_office_id', required: isCreate },
                     <CodeAutocomplete mode="search" endpoint="/api/select/search/office"
                         value={fields.c_office_id ?? '0'} initialLabel={labels.c_office_id ?? ''} disabled={!editable}
                         extraQuery={dynastyCode != null ? { c_dy: String(dynastyCode) } : undefined}
                         onChange={(v, l) => { set('c_office_id', v || '0'); setLabel('c_office_id', l); }} />)}
 
-                {gridCell(tr('socialinst_field', '社會機構'), { code: 'social_institution' },
-                    <CodeAutocomplete mode="search" endpoint="/api/select/search/socialinstcode"
-                        value={instValue} initialLabel={labels.c_inst_code ?? ''} disabled={!editable}
-                        onChange={onInstChange} />)}
-
-                {gridCell(tr('place_name', '地名'), { full: true }, <>
+                {gridCell(tr('place_name', '地名'), { code: 'c_addr' }, <>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: addr.length ? 6 : 0 }}>
                         {addr.map((it) => (
                             <span key={it.id} style={chipStyle}>{it.label} #{it.id}
@@ -339,12 +330,10 @@ export default function OfficeEditor({
                     ) : null}
                 </>)}
 
-                {gridCell(tr('source_field', '出處'), { code: 'c_source' },
-                    <CodeAutocomplete mode="search" endpoint="/api/select/search/text"
-                        value={fields.c_source ?? '0'} initialLabel={labels.c_source ?? ''} disabled={!editable}
-                        onChange={(v, l) => { set('c_source', v || '0'); setLabel('c_source', l); }} />)}
-
-                {textRow('c_pages', tr('pages_entries', '頁碼'), 'c_pages', sourceHighlight)}
+                {/* 次序 + posting_id 同行（#101）：次序非重點，去強調並下移 */}
+                {textRow('c_sequence', tr('sequence', '次序'), 'c_sequence', false, tr('sequence_same_note', '註：若有同時任命的官職，請手動填上相同的 sequence'))}
+                {mode === 'edit' ? gridCell('posting_id', {},
+                    <input type="text" value={fields.c_posting_id ?? ''} readOnly disabled style={{ ...gInputStyle, ...gReadonlyStyle }} />) : null}
 
                 {gridCell(tr('start_year', '起年'), { code: 'firstyear', full: true },
                     <EraTimeField values={buildEra(FY)} onChange={(p) => applyEra(FY, p)} dynastyCode={dynastyCode} showRange showLunar disabled={!editable} />)}
@@ -352,14 +341,28 @@ export default function OfficeEditor({
                 {gridCell(tr('end_year', '訖年'), { code: 'lastyear', full: true },
                     <EraTimeField values={buildEra(LY)} onChange={(p) => applyEra(LY, p)} dynastyCode={dynastyCode} showRange showLunar disabled={!editable} />)}
 
+                {/* 除授類別 / 是否赴任 / 職官類別（寬螢幕自動排成一列）（#101） */}
                 {listRow('c_appt_code', tr('appt_type', '任命類型'), 'c_appt_code', 'appttype', 'c_appt_code', ['c_appt_desc_chn', 'c_appt_desc'])}
                 {listRow('c_assume_office_code', tr('assume_office', '任官方式'), 'c_assume_office_code', 'assumeoffice', 'c_assume_office_code', ['c_assume_office_desc_chn', 'c_assume_office_desc'])}
                 {listRow('c_office_category_id', tr('office_category', '官職分類'), 'c_office_category_id', 'officecate', 'c_office_category_id', ['c_category_desc_chn', 'c_category_desc'])}
 
+                {gridCell(tr('socialinst_field', '社會機構'), { code: 'social_institution' },
+                    <CodeAutocomplete mode="search" endpoint="/api/select/search/socialinstcode"
+                        value={instValue} initialLabel={labels.c_inst_code ?? ''} disabled={!editable}
+                        onChange={onInstChange} />)}
+
+                {listRow('c_dy', tr('dynasty', '朝代'), 'dy', 'dynasty', 'c_dy', ['c_dynasty_chn', 'c_dynasty'])}
+
                 {gridCell(tr('notes_field', '備註'), { code: 'c_notes', full: true },
                     <textarea value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
 
-                {listRow('c_dy', tr('dynasty', '朝代'), 'dy', 'dynasty', 'c_dy', ['c_dynasty_chn', 'c_dynasty'])}
+                {/* 出處 / 頁碼（與下方「候選出處與頁數」對應）（#101） */}
+                {gridCell(tr('source_field', '出處'), { code: 'c_source' },
+                    <CodeAutocomplete mode="search" endpoint="/api/select/search/text"
+                        value={fields.c_source ?? '0'} initialLabel={labels.c_source ?? ''} disabled={!editable}
+                        onChange={(v, l) => { set('c_source', v || '0'); setLabel('c_source', l); }} />)}
+
+                {textRow('c_pages', tr('pages_entries', '頁碼'), 'c_pages', sourceHighlight)}
             </div>
 
             <TextpersonPair personId={personId} label={tr('candidate_source_title', '候選出處')} onPick={onPickTextperson} disabled={!editable} />

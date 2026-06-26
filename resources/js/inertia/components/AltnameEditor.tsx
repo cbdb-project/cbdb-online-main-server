@@ -173,14 +173,16 @@ export default function AltnameEditor({
             {error ? <div style={gErrStyle}>{error}</div> : null}
 
             <div style={gGrid}>
-                {textRow('c_sequence', tr('sequence', '序號'), 'c_sequence', 'number', false, mode === 'create')}
+                {/* 別名(中)+拼音 同行（#100）：兩個半寬欄相鄰即同列 */}
                 {textRow('c_alt_name_chn', tr('altname_chn', '別名（中）'), 'c_alt_name_chn', 'text', false, true)}
                 {textRow('c_alt_name', tr('altname_pinyin_label', '別名（拼音）'), 'c_alt_name')}
 
+                {/* 類型+次序 同行（#100）：次序非重點，置於類型右側 */}
                 {gridCell(tr('altname_type', '類型'), { code: 'c_alt_name_type_code' },
                     <CodeAutocomplete mode="list" model="altcode" idKey="c_alt_name_type_code" labelKeys={['c_alt_name_type_code', 'c_alt_name_type_desc_chn', 'c_alt_name_type_desc']}
                         value={fields.c_alt_name_type_code ?? '0'} initialLabel={labels.c_alt_name_type_code ?? ''} disabled={!editable}
                         onChange={(v, l) => { set('c_alt_name_type_code', v); setLabel('c_alt_name_type_code', l); }} />)}
+                {textRow('c_sequence', tr('sequence', '次序'), 'c_sequence', 'number', false, mode === 'create')}
 
                 {gridCell(tr('source_field', '出處'), { code: 'c_source' },
                     <CodeAutocomplete mode="search" endpoint="/api/select/search/text"

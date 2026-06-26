@@ -219,14 +219,15 @@ export default function EntryEditor({
             {error ? <div style={gErrStyle}>{error}</div> : null}
 
             <div style={gGrid}>
-                {gridCell(tr('migration_sequence', '序號'), { code: 'c_sequence', required: mode === 'create' },
-                    <input type="number" value={fields.c_sequence ?? ''} disabled={!editable} required maxLength={4}
-                        onChange={(e) => set('c_sequence', e.target.value)} style={{ ...gInputStyle, ...(!editable ? gReadonlyStyle : {}) }} />)}
-
                 {gridCell(tr('entry_field', '入仕途徑'), { code: 'c_entry_code', required: mode === 'create' },
                     <CodeAutocomplete mode="search" endpoint="/api/select/search/entry"
                         value={fields.c_entry_code ?? '0'} initialLabel={labels.c_entry_code ?? ''} disabled={!editable}
                         onChange={(v, l) => { set('c_entry_code', v || '0'); setLabel('c_entry_code', l); }} />)}
+
+                {/* 次序非重點，置於入仕途徑右側（#102）；label 用「次序」而非地址用語「遷徙次序」 */}
+                {gridCell(tr('sequence', '次序'), { code: 'c_sequence', required: mode === 'create' },
+                    <input type="number" value={fields.c_sequence ?? ''} disabled={!editable} required maxLength={4}
+                        onChange={(e) => set('c_sequence', e.target.value)} style={{ ...gInputStyle, ...(!editable ? gReadonlyStyle : {}) }} />)}
 
                 {gridCell(tr('entry_year_field', '入仕年'), { code: 'c_year', full: true },
                     <EraTimeField values={buildEra(EY)} onChange={(p) => applyEra(EY, p)} dynastyCode={dynastyCode} showRange disabled={!editable} />)}

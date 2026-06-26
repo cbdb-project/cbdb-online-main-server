@@ -241,15 +241,16 @@ export default function StatusEditor({
             ) : null}
 
             <div style={gGrid}>
-                {gridCell(tr('sequence', '序號'), { code: 'c_sequence', required: true },
-                    <input type="number" value={fields.c_sequence ?? ''} disabled={!editable} required maxLength={4}
-                        onChange={(e) => set('c_sequence', e.target.value)} style={{ ...gInputStyle, ...(!editable ? gReadonlyStyle : {}) }} />)}
-
                 {gridCell(tr('status', '社會區分'), { code: 'c_status_code', required: mode === 'create' },
                     <div style={statusHighlight ? { background: '#FFFFBB', borderRadius: 6 } : undefined}>
                         <CodeAutocomplete mode="search" endpoint="/api/select/search/status"
                             value={fields.c_status_code ?? '0'} initialLabel={labels.c_status_code ?? ''} disabled={!editable}
                             onChange={(v, l) => { set('c_status_code', v || '0'); setLabel('c_status_code', l); }} /></div>)}
+
+                {/* 次序非重點，置於社會區分右側（#103） */}
+                {gridCell(tr('sequence', '次序'), { code: 'c_sequence', required: true },
+                    <input type="number" value={fields.c_sequence ?? ''} disabled={!editable} required maxLength={4}
+                        onChange={(e) => set('c_sequence', e.target.value)} style={{ ...gInputStyle, ...(!editable ? gReadonlyStyle : {}) }} />)}
 
                 {textRow('c_supplement', tr('supplement_text', '補充說明'), 'c_supplement', false, tr('supplement_placeholder', ''))}
 

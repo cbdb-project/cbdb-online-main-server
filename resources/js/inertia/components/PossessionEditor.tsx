@@ -166,7 +166,7 @@ export default function PossessionEditor({
     };
 
     const doDelete = async () => {
-        if (!deleteEndpoint || !window.confirm(tr('delete_confirm', '確定刪除此財產記錄？'))) return;
+        if (!deleteEndpoint || !window.confirm(tr('possession_delete_confirm', '確定刪除此財產記錄？'))) return;
         setDeleting(true); setError(null);
         try {
             const res = await fetch(deleteEndpoint, {

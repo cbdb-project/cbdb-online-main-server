@@ -150,7 +150,7 @@ export default function SourceEditor({
     };
 
     const doDelete = async () => {
-        if (!deleteEndpoint || !window.confirm(tr('delete_confirm', '確定刪除此出處記錄？'))) return;
+        if (!deleteEndpoint || !window.confirm(tr('source_delete_confirm', '確定刪除此出處記錄？'))) return;
         setDeleting(true); setError(null);
         try {
             const res = await fetch(deleteEndpoint, {

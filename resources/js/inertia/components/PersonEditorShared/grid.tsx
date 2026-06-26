@@ -27,7 +27,7 @@ export const gAuditWrapStyle: React.CSSProperties = { marginTop: 16, paddingTop:
 // 動作列：主要動作靠左、危險/另存靠右。
 export const gSubmitRow: React.CSSProperties = { display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap', alignItems: 'center' };
 export const gBtnGroupRight: React.CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 'auto' };
-const actionBtnBase: React.CSSProperties = { padding: '8px 14px', borderRadius: 6, fontWeight: 700, cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid transparent' };
+const actionBtnBase: React.CSSProperties = { padding: '8px 16px', borderRadius: 6, fontSize: '0.95rem', fontWeight: 700, cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid transparent' };
 export const gPrimaryBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid #255f93', background: '#255f93', color: '#fff' };
 export const gInfoBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid #0891b2', background: '#0891b2', color: '#fff' };
 export const gDangerBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid #dc3545', background: '#dc3545', color: '#fff' };

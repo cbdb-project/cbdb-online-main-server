@@ -189,7 +189,7 @@ export default function EventEditor({
     };
 
     const doDelete = async () => {
-        if (!deleteEndpoint || !window.confirm(tr('delete_confirm', '確定刪除此事件？'))) return;
+        if (!deleteEndpoint || !window.confirm(tr('event_delete_confirm', '確定刪除此事件？'))) return;
         setDeleting(true); setError(null);
         try {
             const res = await fetch(deleteEndpoint, {

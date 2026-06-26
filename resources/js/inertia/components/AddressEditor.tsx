@@ -167,7 +167,7 @@ export default function AddressEditor({
     };
 
     const doDelete = async () => {
-        if (!deleteEndpoint || !window.confirm(tr('delete_confirm', '確定刪除此地址？'))) return;
+        if (!deleteEndpoint || !window.confirm(tr('address_delete_confirm', '確定刪除此地址？'))) return;
         setDeleting(true); setError(null);
         try {
             const res = await fetch(deleteEndpoint, {

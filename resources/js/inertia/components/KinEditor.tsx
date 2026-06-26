@@ -252,7 +252,7 @@ export default function KinEditor({
     // force=true 為「對面多筆反向列」確認後重送（帶 meta.force，後端一併刪除全部候選）。
     const doDelete = async (force = false) => {
         if (!deleteEndpoint) return;
-        if (!force && !window.confirm(tr('delete_confirm', '確定刪除此親屬關係？'))) return;
+        if (!force && !window.confirm(tr('kinship_delete_confirm', '確定刪除此親屬關係？'))) return;
         setDeleting(true); setError(null);
         try {
             const body: Record<string, unknown> = { resource: 'kinship', person_id: personId, mode: 'direct', operation: 'delete', target: { pk: originalPk.current } };

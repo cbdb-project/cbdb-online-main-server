@@ -266,7 +266,7 @@ export default function OfficeEditor({
     };
 
     const doDelete = async () => {
-        if (!deleteEndpoint || !window.confirm(tr('delete_confirm', '確定刪除此任官記錄？'))) return;
+        if (!deleteEndpoint || !window.confirm(tr('posting_delete_confirm', '確定刪除此任官記錄？'))) return;
         setDeleting(true); setError(null);
         try {
             const res = await fetch(deleteEndpoint, {
@@ -313,21 +313,23 @@ export default function OfficeEditor({
                         extraQuery={dynastyCode != null ? { c_dy: String(dynastyCode) } : undefined}
                         onChange={(v, l) => { set('c_office_id', v || '0'); setLabel('c_office_id', l); }} />)}
 
+                {/* 地名：搜尋框置頂（與官名輸入框對齊），已選地名以 chips 列於下方（#110 對齊修正） */}
                 {gridCell(tr('place_name', '地名'), { code: 'c_addr' }, <>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: addr.length ? 6 : 0 }}>
-                        {addr.map((it) => (
-                            <span key={it.id} style={chipStyle}>{it.label} #{it.id}
-                                {editable ? <button type="button" onClick={() => removeAddr(it.id)} style={chipRemoveBtn} aria-label={`${tr('remove', '移除')} ${it.id}`}>×</button> : null}
-                            </span>
-                        ))}
-                        {addr.length === 0 ? <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{tr('no_place', '（未設定地名）')}</span> : null}
-                    </div>
                     {editable ? (
                         <CodeAutocomplete key={addrKey} mode="search" endpoint="/api/select/search/addr"
                             value="" initialLabel="" placeholder={tr('add_place', '搜尋並新增地名…')}
                             extraQuery={dynastyCode != null ? { dy_start: String(dynastyCode), dy_end: String(dynastyCode) } : undefined}
                             onChange={addAddr} />
                     ) : null}
+                    {addr.length ? (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: editable ? 6 : 0 }}>
+                            {addr.map((it) => (
+                                <span key={it.id} style={chipStyle}>{it.label} #{it.id}
+                                    {editable ? <button type="button" onClick={() => removeAddr(it.id)} style={chipRemoveBtn} aria-label={`${tr('remove', '移除')} ${it.id}`}>×</button> : null}
+                                </span>
+                            ))}
+                        </div>
+                    ) : (!editable ? <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{tr('no_place', '（未設定地名）')}</span> : null)}
                 </>)}
 
                 {/* 次序 + posting_id 同行（#101）：次序非重點，去強調並下移 */}

@@ -138,7 +138,7 @@ export default function TextEditor({
     };
 
     const doDelete = async () => {
-        if (!deleteEndpoint || !window.confirm(tr('delete_confirm', '確定刪除此著述？'))) return;
+        if (!deleteEndpoint || !window.confirm(tr('text_delete_confirm', '確定刪除此著述？'))) return;
         setDeleting(true); setError(null);
         try {
             const res = await fetch(deleteEndpoint, {

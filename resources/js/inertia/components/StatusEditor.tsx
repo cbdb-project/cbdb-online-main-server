@@ -198,7 +198,7 @@ export default function StatusEditor({
     };
 
     const doDelete = async () => {
-        if (!deleteEndpoint || !window.confirm(tr('delete_confirm', '確定刪除此社會區分記錄？'))) return;
+        if (!deleteEndpoint || !window.confirm(tr('status_delete_confirm', '確定刪除此社會區分記錄？'))) return;
         setDeleting(true); setError(null);
         try {
             const res = await fetch(deleteEndpoint, {

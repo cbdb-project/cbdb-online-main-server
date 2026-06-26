@@ -408,7 +408,7 @@ export default function AssocEditor({
     };
 
     const doDelete = async () => {
-        if (!deleteEndpoint || !window.confirm(tr('delete_confirm', '確定刪除此社會關係？'))) return;
+        if (!deleteEndpoint || !window.confirm(tr('assoc_delete_confirm', '確定刪除此社會關係？'))) return;
         setDeleting(true); setError(null);
         try {
             const res = await fetch(deleteEndpoint, {

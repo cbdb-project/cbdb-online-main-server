@@ -144,7 +144,7 @@ export default function AltnameEditor({
     };
 
     const doDelete = async () => {
-        if (!deleteEndpoint || !window.confirm(tr('delete_confirm', '確定刪除此別名？'))) return;
+        if (!deleteEndpoint || !window.confirm(tr('altname_delete_confirm', '確定刪除此別名？'))) return;
         setDeleting(true); setError(null);
         try {
             const res = await fetch(deleteEndpoint, {

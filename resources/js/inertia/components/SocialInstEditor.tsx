@@ -179,7 +179,7 @@ export default function SocialInstEditor({
     };
 
     const doDelete = async () => {
-        if (!deleteEndpoint || !window.confirm(tr('delete_confirm', '確定刪除此社會機構記錄？'))) return;
+        if (!deleteEndpoint || !window.confirm(tr('social_institution_delete_confirm', '確定刪除此社會機構記錄？'))) return;
         setDeleting(true); setError(null);
         try {
             const res = await fetch(deleteEndpoint, {

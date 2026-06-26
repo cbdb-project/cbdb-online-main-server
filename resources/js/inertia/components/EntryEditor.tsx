@@ -198,7 +198,7 @@ export default function EntryEditor({
     };
 
     const doDelete = async () => {
-        if (!deleteEndpoint || !window.confirm(tr('delete_confirm', '確定刪除此入仕記錄？'))) return;
+        if (!deleteEndpoint || !window.confirm(tr('entry_delete_confirm', '確定刪除此入仕記錄？'))) return;
         setDeleting(true); setError(null);
         try {
             const res = await fetch(deleteEndpoint, {

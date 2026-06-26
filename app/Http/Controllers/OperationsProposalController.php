@@ -77,8 +77,19 @@ class OperationsProposalController extends Controller {
                 );
 
                 if (!$usedDirectWorkflow) {
-                    $this->logFinalOperation($operation, $appliedRow, $original, $opType);
+                    $finalOperation = $this->logFinalOperation($operation, $appliedRow, $original, $opType);
                     $this->writeAuditLogForApproval($operation, $appliedRow, $original, $opType);
+
+                    // 社會關係／親屬刪除核准：在 final delete operation 建立後同步刪除反向鏡像列，
+                    // 使鏡像 audit 掛同一 operation id（與 direct delete 一致，避免單向孤兒且審計鏈完整）。
+                    if ($opType === Operation::TYPE_PROPOSAL_DELETE && $table === 'ASSOC_DATA') {
+                        app(\App\Repositories\BiogMainRepository::class)->syncAssocMirrorOnDelete($appliedRow, $finalOperation);
+                    }
+                    if ($opType === Operation::TYPE_PROPOSAL_DELETE && $table === 'KIN_DATA') {
+                        // 核准為非互動路徑，沿用「刪除全部對應反向列」語義（$force=true）：取得 #81 §6 廣集孤兒修正，
+                        // 不在此拋多筆確認閘（是否於核准路徑加偵測閘由 #82 統一評估）。
+                        app(\App\Repositories\BiogMainRepository::class)->syncKinMirrorOnDelete($appliedRow, $finalOperation, null, true);
+                    }
                 }
                 $this->updateProposalStatus(
                     $operation,
@@ -98,6 +109,41 @@ class OperationsProposalController extends Controller {
                 'errors' => $messages,
             ]);
             flash('審核失敗：'.$detail, 'error');
+
+            return redirect()->back();
+        } catch (\App\Services\Mutations\MirrorConflictException|\App\Services\Mutations\MirrorSuspectedException $e) {
+            // #77：核准社會關係／親屬更新提案時，偵測到對面互逆鏡像列已被獨立改動（內容分歧／關係碼漂移）或資料完整性問題。
+            // 整筆交易已回滾、提案未核准——避免靜默覆寫對方資料。回友善中文提示（不外洩底層 SQL），引導審核者先至對面確認。
+            Log::warning('提案核准中止：對面鏡像分歧/疑似', [
+                'operation_id' => $operation->id,
+                'table' => $table,
+                'exception' => get_class($e),
+            ]);
+            flash('審核未通過：偵測到對應的反向關係列已被獨立修改（內容或關係碼不一致）。為避免覆寫對方資料，已中止此次核准——請先至對應人物頁確認/修正反向關係後再核准。', 'error');
+
+            return redirect()->back();
+        } catch (\App\Services\Mutations\MirrorIntegrityException $e) {
+            // fail-closed：鏡像同步所需的配對碼/權威反向碼缺失，若繼續核准會造成單邊刪除或假成功。
+            Log::warning('提案核准中止：鏡像資料完整性 fail-closed', [
+                'operation_id' => $operation->id,
+                'table' => $table,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+            ]);
+            flash('審核未通過：對應的反向關係資料完整性異常，為避免產生單邊刪除或不一致鏡像，已中止此次核准。請先檢查關係碼與對應人物資料後再重試。', 'error');
+
+            return redirect()->back();
+        } catch (\Illuminate\Database\QueryException $e) {
+            // #77：DB 層錯誤（如核准 create 提案時對面已存在等價鏡像導致主鍵衝突）→ 整筆已回滾。
+            // 回友善中文提示，**不外洩原始 SQL／錯誤字串**給審核者（完整訊息只進 log）。
+            Log::error('提案核准失敗（資料庫錯誤）', [
+                'operation_id' => $operation->id,
+                'table' => $table,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile().':'.$e->getLine(),
+            ]);
+            flash('審核失敗：資料庫操作發生衝突或錯誤（可能對應記錄已存在或已被變更），本次未核准。請重新整理後確認資料狀態，或聯絡管理員。', 'error');
 
             return redirect()->back();
         } catch (\Throwable $e) {
@@ -135,7 +181,7 @@ class OperationsProposalController extends Controller {
         }
 
         $opType = (int) $operation->op_type;
-        if (!in_array($opType, [Operation::TYPE_PROPOSAL_CREATE, Operation::TYPE_PROPOSAL_UPDATE], true)) {
+        if (!in_array($opType, [Operation::TYPE_PROPOSAL_CREATE, Operation::TYPE_PROPOSAL_UPDATE, Operation::TYPE_PROPOSAL_DELETE], true)) {
             abort(404);
         }
     }
@@ -213,6 +259,10 @@ class OperationsProposalController extends Controller {
         array $original,
         array $auxiliaryPayload
     ): array {
+        if ((int) $operation->op_type === Operation::TYPE_PROPOSAL_DELETE) {
+            return [$this->applyDeleteProposal($table, $keyColumns, $original), false];
+        }
+
         if ($table === 'KIN_DATA') {
             return [$this->applyKinshipProposal($operation, $data, $original, $auxiliaryPayload), true];
         }
@@ -223,6 +273,14 @@ class OperationsProposalController extends Controller {
 
         if ($table === 'POSTED_TO_OFFICE_DATA') {
             return [$this->applyOfficeProposal($operation, $data, $original, $auxiliaryPayload), true];
+        }
+
+        if ($table === 'POSSESSION_DATA' && (int) $operation->op_type === Operation::TYPE_PROPOSAL_CREATE) {
+            return [$this->applyPossessionCreateProposal($operation, $data, $auxiliaryPayload), true];
+        }
+
+        if ($table === 'POSSESSION_DATA' && (int) $operation->op_type === Operation::TYPE_PROPOSAL_UPDATE) {
+            return [$this->applyPossessionUpdateProposal($operation, $data, $original, $auxiliaryPayload), true];
         }
 
         if ($table === 'EVENTS_DATA') {
@@ -247,7 +305,8 @@ class OperationsProposalController extends Controller {
         $request = Request::create('/', 'POST', $requestPayload);
 
         if ((int) $operation->op_type === Operation::TYPE_PROPOSAL_CREATE) {
-            return $this->biogMainRepository->kinshipStoreById($request, $personId);
+            // #82：核准 CREATE 啟用鏡像衝突/疑似偵測（對齊 v2 direct create）——對面分歧/碼漂移則拋例外中止核准，不盲插衝突鏡像。
+            return $this->biogMainRepository->kinshipStoreById($request, $personId, true);
         }
 
         if (empty($original)) {
@@ -257,7 +316,8 @@ class OperationsProposalController extends Controller {
         $result = $this->biogMainRepository->kinshipUpdateById(
             $request,
             $personId,
-            $this->buildLegacyKinshipId($original)
+            $this->buildLegacyKinshipId($original),
+            true // #77：核准時啟用鏡像衝突/疑似偵測——對面鏡像已分歧/碼漂移則拋例外中止核准（不靜默覆寫）
         );
 
         $mirrorStatus = (int) ($result['err'] ?? 1);
@@ -284,7 +344,8 @@ class OperationsProposalController extends Controller {
         $request = Request::create('/', 'POST', array_merge($data, $auxiliaryPayload));
 
         if ((int) $operation->op_type === Operation::TYPE_PROPOSAL_CREATE) {
-            $result = $this->biogMainRepository->assocStoreById($request, $personId);
+            // #82：核准 CREATE 啟用鏡像衝突/疑似偵測（對齊 v2 direct create）。
+            $result = $this->biogMainRepository->assocStoreById($request, $personId, true);
 
             return $this->fetchAppliedRow('ASSOC_DATA', [
                 'c_personid' => $result['c_personid'] ?? $personId,
@@ -306,7 +367,8 @@ class OperationsProposalController extends Controller {
         $result = $this->biogMainRepository->assocUpdateById(
             $request,
             $this->buildLegacyAssocId($original),
-            $personId
+            $personId,
+            true // #77：核准時啟用鏡像衝突/疑似偵測——對面鏡像已分歧/碼漂移則拋例外中止核准（不靜默覆寫）
         );
 
         if ($result === []) {
@@ -377,6 +439,60 @@ class OperationsProposalController extends Controller {
         $row = $this->fetchAppliedRow('POSTED_TO_OFFICE_DATA', $pk);
         if ($row === null) {
             throw new \RuntimeException('官名提案套用後讀取資料失敗。');
+        }
+
+        return $row;
+    }
+
+    /**
+     * 財產新增提案核准：委派 possessionStoreById 配發 c_possession_record_id（交易內 max+1），
+     * 連帶寫主表 POSSESSION_DATA + 副表 POSSESSION_ADDR + operation + audit_log。
+     * 地址陣列存於 __proposal_aux['c_addr_id']；usedDirectWorkflow=true 由委派端自行寫 operation/audit，
+     * approve() 不再重複寫，避免 operation/audit 重複（比照 applyOfficeProposal）。
+     */
+    protected function applyPossessionCreateProposal(
+        Operation $operation,
+        array $data,
+        array $auxiliaryPayload
+    ): array {
+        $personId = (int) ($operation->c_personid ?? $data['c_personid'] ?? 0);
+
+        $addr = $auxiliaryPayload['c_addr_id'] ?? [];
+        if (!is_array($addr)) {
+            $addr = [$addr];
+        }
+
+        $request = Request::create('/', 'POST', array_merge($data, ['c_addr_id' => array_values($addr)]));
+
+        $newId = $this->biogMainRepository->possessionStoreById($request, $personId);
+
+        $row = $this->fetchAppliedRow('POSSESSION_DATA', ['c_possession_record_id' => $newId]);
+        if ($row === null) {
+            throw new \RuntimeException('財產提案套用後讀取資料失敗。');
+        }
+
+        return $row;
+    }
+
+    /**
+     * 套用財產更新提案：連帶同步 POSSESSION_ADDR（修補先前 update 提案走泛型單表套用、漏掉地址副表的缺口）。
+     * aux 帶 c_addr_id（陣列）時 possessionUpdateById 同步副表；未帶則保留既有地址（is_array 守衛）。
+     */
+    protected function applyPossessionUpdateProposal(
+        Operation $operation,
+        array $data,
+        array $original,
+        array $auxiliaryPayload
+    ): array {
+        $personId = (int) ($operation->c_personid ?? $data['c_personid'] ?? $original['c_personid'] ?? 0);
+        $recordId = (int) ($data['c_possession_record_id'] ?? $original['c_possession_record_id'] ?? 0);
+
+        $request = Request::create('/', 'POST', array_merge($data, $auxiliaryPayload));
+        $this->biogMainRepository->possessionUpdateById($request, $personId, $recordId);
+
+        $row = $this->fetchAppliedRow('POSSESSION_DATA', ['c_possession_record_id' => $recordId]);
+        if ($row === null) {
+            throw new \RuntimeException('財產提案套用後讀取資料失敗。');
         }
 
         return $row;
@@ -565,6 +681,17 @@ class OperationsProposalController extends Controller {
         }
 
         $updatePayload = $this->buildUpdatePayload($data, $keyColumns, $original);
+
+        // 改鍵碰撞偵測（#117，對齊 direct 路徑）：updatePayload 含任一主鍵欄即為改鍵；若變更後的新主鍵
+        // 已被另一列佔用，擋下並回明確錯誤，避免 UPDATE 撞 DB 複合主鍵約束冒成未處理的 500。
+        $reKeyedColumns = array_intersect($keyColumns, array_keys($updatePayload));
+        if (!empty($reKeyedColumns)) {
+            $newKeyRow = $this->resolveReadbackKeyRow($keyColumns, $original, $updatePayload);
+            if (DB::table($table)->where($this->buildKeyConditions($keyColumns, $newKeyRow))->exists()) {
+                throw new \RuntimeException('變更後的主鍵與現有記錄重複，無法核准此改鍵提案。');
+            }
+        }
+
         if (!empty($updatePayload)) {
             DB::table($table)->where($conditions)->update($updatePayload);
         }
@@ -582,6 +709,110 @@ class OperationsProposalController extends Controller {
         }
 
         return $this->convertRowToArray($row);
+    }
+
+    /**
+     * 套用刪除提案：以 __key_columns + original 的 PK 值定位目標列並刪除。
+     * offices(POSTED_TO_OFFICE_DATA)/possession(POSSESSION_DATA) 連帶刪除副表。
+     * 回傳被刪除前的原始列（供 logFinalOperation/audit 使用）；目標列不存在則回傳空陣列。
+     */
+    protected function applyDeleteProposal(string $table, array $keyColumns, array $original): array {
+        if (empty($original)) {
+            throw new \RuntimeException('缺少原始資料，無法刪除。');
+        }
+        if (empty($keyColumns)) {
+            throw new \RuntimeException('提案缺少主鍵資訊，無法刪除。');
+        }
+
+        $conditions = $this->buildKeyConditions($keyColumns, $original);
+
+        $row = DB::table($table)->where($conditions)->first();
+        if (!$row) {
+            // 目標列已不存在：視為冪等成功，回傳原始資料以利稽核紀錄
+            return $original;
+        }
+
+        $deletedRow = $this->convertRowToArray($row);
+
+        // 連帶刪除副表
+        if ($table === 'POSTED_TO_OFFICE_DATA') {
+            $this->deleteOfficeAuxiliaryTables($deletedRow);
+        } elseif ($table === 'POSSESSION_DATA') {
+            $this->deletePossessionAuxiliaryTables($deletedRow);
+        }
+
+        DB::table($table)->where($conditions)->delete();
+
+        // 注意：社會關係反向鏡像刪除移至 approve() 於 logFinalOperation 之後執行，
+        // 以便鏡像 audit 掛 final delete operation id（見 approve()）。
+
+        if ($table === 'ALTNAME_DATA') {
+            $this->indexAltnameAfterDelete($deletedRow);
+        }
+
+        return $deletedRow;
+    }
+
+    /**
+     * POSTED_TO_OFFICE_DATA 核准刪除時連帶刪除 POSTED_TO_ADDR_DATA 與 POSTING_DATA。
+     */
+    protected function deleteOfficeAuxiliaryTables(array $row): void {
+        $officeId = $row['c_office_id'] ?? null;
+        $postingId = $row['c_posting_id'] ?? null;
+        $personId = $row['c_personid'] ?? null;
+
+        if ($officeId === null || $postingId === null) {
+            return;
+        }
+
+        if (Schema::hasTable('POSTED_TO_ADDR_DATA')) {
+            $addrQuery = DB::table('POSTED_TO_ADDR_DATA')
+                ->where('c_office_id', $officeId)
+                ->where('c_posting_id', $postingId);
+            if ($personId !== null) {
+                $addrQuery->where('c_personid', $personId);
+            }
+            $addrQuery->delete();
+        }
+
+        if (Schema::hasTable('POSTING_DATA')) {
+            DB::table('POSTING_DATA')->where('c_posting_id', $postingId)->delete();
+        }
+    }
+
+    /**
+     * POSSESSION_DATA 核准刪除時連帶刪除 POSSESSION_ADDR。
+     */
+    protected function deletePossessionAuxiliaryTables(array $row): void {
+        $recordId = $row['c_possession_record_id'] ?? null;
+        if ($recordId === null) {
+            return;
+        }
+
+        if (Schema::hasTable('POSSESSION_ADDR')) {
+            DB::table('POSSESSION_ADDR')->where('c_possession_record_id', $recordId)->delete();
+        }
+    }
+
+    /**
+     * ALTNAME_DATA 核准刪除後移除全文索引。
+     */
+    protected function indexAltnameAfterDelete(array $row): void {
+        if (!Schema::hasTable('CBDB__NAME_FTS')) {
+            return;
+        }
+
+        $name = $row['c_alt_name_chn'] ?? null;
+        $personId = $row['c_personid'] ?? null;
+        if (empty($name) || $personId === null) {
+            return;
+        }
+
+        $this->nameSearchIndexService->removeAltname(
+            $personId,
+            $row['c_alt_name_type_code'] ?? null,
+            $name
+        );
     }
 
     protected function buildUpdatePayload(array $data, array $keyColumns, array $original): array {
@@ -748,30 +979,64 @@ class OperationsProposalController extends Controller {
             return;
         }
 
+        if ($proposalType === Operation::TYPE_PROPOSAL_DELETE) {
+            $operation = 'DELETE';
+            $oldData = $original ?: $appliedRow;
+            $newData = null;
+        } elseif ($proposalType === Operation::TYPE_PROPOSAL_CREATE) {
+            $operation = 'INSERT';
+            $oldData = null;
+            $newData = $appliedRow;
+        } else {
+            $operation = 'UPDATE';
+            $oldData = $original;
+            $newData = $appliedRow;
+        }
+
         (new AuditLogService())->write(
             $proposal->resource,
-            $proposalType === Operation::TYPE_PROPOSAL_CREATE ? 'INSERT' : 'UPDATE',
+            $operation,
             $rowPk,
-            $proposalType === Operation::TYPE_PROPOSAL_CREATE ? null : $original,
-            $appliedRow,
+            $oldData,
+            $newData,
             'user',
             (string) Auth::id(),
             (string) $proposal->id
         );
     }
 
-    protected function logFinalOperation(Operation $proposal, array $appliedRow, array $original, int $proposalType): void {
+    protected function logFinalOperation(Operation $proposal, array $appliedRow, array $original, int $proposalType): ?Operation {
         $proposalData = json_decode($proposal->resource_data, true) ?? [];
         $keyColumns = $proposalData['__key_columns'] ?? [];
-        $resourceId = $this->buildCompositeId($keyColumns, $appliedRow);
-        $type = $proposalType === Operation::TYPE_PROPOSAL_CREATE
-            ? Operation::TYPE_CREATE
-            : Operation::TYPE_UPDATE;
+
+        if ($proposalType === Operation::TYPE_PROPOSAL_DELETE) {
+            $type = Operation::TYPE_DELETE;
+        } elseif ($proposalType === Operation::TYPE_PROPOSAL_CREATE) {
+            $type = Operation::TYPE_CREATE;
+        } else {
+            $type = Operation::TYPE_UPDATE;
+        }
+
+        // delete 後 appliedRow 為被刪列（= original），以原始 PK 建立 resource_id
+        $resourceIdRow = $type === Operation::TYPE_DELETE ? $original : $appliedRow;
+        $resourceId = $this->buildCompositeId($keyColumns, $resourceIdRow);
 
         // 對於 BiogMain 相關提案，使用實際的 c_personid；對於 Codes 提案使用 0
         $personId = $proposal->c_personid ?? 0;
 
-        $this->operationRepository->store(
+        if ($type === Operation::TYPE_DELETE) {
+            return $this->operationRepository->store(
+                Auth::id(),
+                $personId,
+                Operation::TYPE_DELETE,
+                $proposal->resource,
+                $resourceId,
+                $original,
+                $original
+            );
+        }
+
+        return $this->operationRepository->store(
             Auth::id(),
             $personId,
             $type,

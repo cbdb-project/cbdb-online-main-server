@@ -112,14 +112,21 @@ class ApiV2CreateAddressTest extends TestCase {
             $table->text('c_notes')->nullable();
             $table->integer('c_source')->default(0);
             $table->string('c_pages', 255)->nullable();
+            $table->integer('c_natal')->nullable();
             $table->integer('c_fy_nh_code')->nullable();
             $table->integer('c_fy_nh_year')->nullable();
             $table->integer('c_fy_range')->nullable();
             $table->integer('c_fy_intercalary')->default(0);
+            $table->integer('c_fy_month')->nullable();
+            $table->integer('c_fy_day')->nullable();
+            $table->integer('c_fy_day_gz')->nullable();
             $table->integer('c_ly_nh_code')->nullable();
             $table->integer('c_ly_nh_year')->nullable();
             $table->integer('c_ly_range')->nullable();
             $table->integer('c_ly_intercalary')->default(0);
+            $table->integer('c_ly_month')->nullable();
+            $table->integer('c_ly_day')->nullable();
+            $table->integer('c_ly_day_gz')->nullable();
             $table->string('c_created_by', 255)->nullable();
             $table->string('c_created_date', 255)->nullable();
             $table->string('c_modified_by', 255)->nullable();
@@ -175,6 +182,33 @@ class ApiV2CreateAddressTest extends TestCase {
         return array_replace_recursive($payload, $overrides);
     }
 
+    #[Test]
+    public function testAddressCreateCodeFieldSentinelFullyIdempotent(): void {
+        // #71（確認 parity）：address create 既以 inline null/'' fix + normalizeSentinelValues 達成 c_source 完全幂等——
+        // null/''/'-999'/-999/'0'/0 落庫皆 0、永不寫 null/''；合法非 0 保留。每案用不同 c_sequence 取獨立 PK。≥10 案例。
+        $this->actingAs($this->makeUser(email: 'addr-create-sentinel@example.com'));
+        $T = 'BIOG_ADDR_DATA';
+        foreach ([null, '', '-999', -999, '0', 0] as $i => $sent) {
+            $seq = 10 + $i;
+            $this->postJson('/api/v2/create', $this->createPayload([
+                'target' => ['pk' => ['c_sequence' => $seq]],
+                'changes' => ['c_source' => $sent],
+            ]))->assertOk()->assertJson(['ok' => true]);
+            $stored = DB::table($T)->where(['c_personid' => 1000, 'c_addr_id' => 200, 'c_addr_type' => 2, 'c_sequence' => $seq])->value('c_source');
+            $this->assertNotNull($stored, 'c_source 送 '.var_export($sent, true).' 不得為 null');
+            $this->assertSame('0', (string) $stored, 'c_source 送 '.var_export($sent, true).' 應規範化為 0');
+        }
+        foreach ([5, 7, 999, 42] as $i => $sent) {
+            $seq = 20 + $i;
+            $this->postJson('/api/v2/create', $this->createPayload([
+                'target' => ['pk' => ['c_sequence' => $seq]],
+                'changes' => ['c_source' => $sent],
+            ]))->assertOk();
+            $stored = DB::table($T)->where(['c_personid' => 1000, 'c_addr_id' => 200, 'c_addr_type' => 2, 'c_sequence' => $seq])->value('c_source');
+            $this->assertSame($sent, (int) $stored, '合法非 0 值不得被誤清：'.$sent);
+        }
+    }
+
     // ── Direct Create Tests ─────────────────────────────────
 
     #[Test]
@@ -203,6 +237,46 @@ class ApiV2CreateAddressTest extends TestCase {
             'c_sequence' => 1,
             'c_firstyear' => 1060,
             'c_source' => 20,
+        ]);
+    }
+
+    #[Test]
+    public function testDirectAddressCreatePersistsLunarFields(): void {
+        // 回歸（人物編輯重做）：新增地址時 EraTimeField showLunar 的農曆月/日/干支須在 create allowlist 內。
+        $user = $this->makeUser(email: 'create-addr-lunar@example.com');
+        $this->actingAs($user);
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => [
+                'c_firstyear' => 1060, 'c_source' => 20,
+                'c_fy_month' => 3, 'c_fy_day' => 15, 'c_fy_day_gz' => 12,
+                'c_ly_month' => 8, 'c_ly_day' => 20, 'c_ly_day_gz' => 30,
+            ],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('BIOG_ADDR_DATA', [
+            'c_personid' => 1000, 'c_addr_id' => 200, 'c_addr_type' => 2, 'c_sequence' => 1,
+            'c_fy_month' => 3, 'c_fy_day' => 15, 'c_fy_day_gz' => 12,
+            'c_ly_month' => 8, 'c_ly_day' => 20, 'c_ly_day_gz' => 30,
+        ]);
+    }
+
+    #[Test]
+    public function testDirectAddressCreatePersistsNatal(): void {
+        // 回歸（Task 27）：補欄 c_natal（是否本貫）在 create 路徑須真的寫入 BIOG_ADDR_DATA。
+        $user = $this->makeUser(email: 'create-addr-natal@example.com');
+        $this->actingAs($user);
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => ['c_firstyear' => 1060, 'c_source' => 20, 'c_natal' => 1],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('BIOG_ADDR_DATA', [
+            'c_personid' => 1000,
+            'c_addr_id' => 200,
+            'c_addr_type' => 2,
+            'c_sequence' => 1,
+            'c_natal' => 1,
         ]);
     }
 

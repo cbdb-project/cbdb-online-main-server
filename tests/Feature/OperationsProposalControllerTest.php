@@ -49,6 +49,22 @@ class OperationsProposalControllerTest extends TestCase {
             $table->timestamps();
         });
 
+        Schema::dropIfExists('audit_log');
+        Schema::create('audit_log', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->dateTime('occurred_at');
+            $table->dateTime('created_at');
+            $table->string('table_name', 64);
+            $table->string('operation', 16);
+            $table->string('actor_type', 32);
+            $table->string('actor_id', 128);
+            $table->string('operation_id', 64);
+            $table->text('row_pk');
+            $table->string('row_pk_text', 512)->nullable();
+            $table->longText('old_data')->nullable();
+            $table->longText('new_data')->nullable();
+        });
+
         Schema::dropIfExists('TEST_CODES');
         Schema::create('TEST_CODES', function (Blueprint $table) {
             $table->string('code_id');
@@ -76,6 +92,28 @@ class OperationsProposalControllerTest extends TestCase {
             $table->dateTime('c_modified_date')->nullable();
         });
 
+        Schema::dropIfExists('POSTED_TO_OFFICE_DATA');
+        Schema::create('POSTED_TO_OFFICE_DATA', function (Blueprint $table) {
+            $table->integer('c_personid');
+            $table->integer('c_office_id');
+            $table->integer('c_posting_id');
+            $table->text('c_notes')->nullable();
+        });
+
+        Schema::dropIfExists('POSTED_TO_ADDR_DATA');
+        Schema::create('POSTED_TO_ADDR_DATA', function (Blueprint $table) {
+            $table->integer('c_personid');
+            $table->integer('c_posting_id');
+            $table->integer('c_office_id');
+            $table->integer('c_addr_id')->default(0);
+        });
+
+        Schema::dropIfExists('POSTING_DATA');
+        Schema::create('POSTING_DATA', function (Blueprint $table) {
+            $table->integer('c_posting_id')->primary();
+            $table->integer('c_personid')->default(0);
+        });
+
         Schema::dropIfExists('ENTRY_DATA');
         Schema::create('ENTRY_DATA', function (Blueprint $table) {
             $table->integer('c_personid');
@@ -93,13 +131,82 @@ class OperationsProposalControllerTest extends TestCase {
             $table->string('c_modified_by')->nullable();
             $table->dateTime('c_modified_date')->nullable();
         });
+
+        Schema::dropIfExists('ASSOC_DATA');
+        Schema::create('ASSOC_DATA', function (Blueprint $table) {
+            $table->integer('c_personid');
+            $table->integer('c_assoc_code')->default(0);
+            $table->integer('c_assoc_id')->default(0);
+            $table->integer('c_kin_code')->default(0);
+            $table->integer('c_kin_id')->default(0);
+            $table->integer('c_assoc_kin_code')->default(0);
+            $table->integer('c_assoc_kin_id')->default(0);
+            $table->string('c_text_title', 255)->default('');
+            $table->integer('c_assoc_first_year')->default(-9999);
+            $table->integer('c_source')->default(0);
+            $table->text('c_notes')->nullable();
+            $table->string('c_created_by')->nullable();
+            $table->dateTime('c_created_date')->nullable();
+            $table->string('c_modified_by')->nullable();
+            $table->dateTime('c_modified_date')->nullable();
+            $table->primary([
+                'c_personid', 'c_assoc_code', 'c_assoc_id', 'c_kin_code', 'c_kin_id',
+                'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year',
+            ]);
+        });
+
+        Schema::dropIfExists('ASSOC_CODES');
+        Schema::create('ASSOC_CODES', function (Blueprint $table) {
+            $table->integer('c_assoc_code')->primary();
+            $table->integer('c_assoc_pair')->nullable();
+            $table->integer('c_assoc_pair2')->nullable();
+        });
+        DB::table('ASSOC_CODES')->insert([
+            ['c_assoc_code' => 100, 'c_assoc_pair' => 101, 'c_assoc_pair2' => null],
+            ['c_assoc_code' => 101, 'c_assoc_pair' => 100, 'c_assoc_pair2' => null],
+        ]);
+
+        Schema::dropIfExists('KIN_DATA');
+        Schema::create('KIN_DATA', function (Blueprint $table) {
+            $table->integer('c_personid');
+            $table->integer('c_kin_id')->default(0);
+            $table->integer('c_kin_code')->default(0);
+            $table->integer('c_source')->default(0);
+            $table->string('c_pages', 255)->nullable();
+            $table->text('c_notes')->nullable();
+            $table->text('c_autogen_notes')->nullable();
+            $table->string('c_created_by')->nullable();
+            $table->dateTime('c_created_date')->nullable();
+            $table->string('c_modified_by')->nullable();
+            $table->dateTime('c_modified_date')->nullable();
+            $table->primary(['c_personid', 'c_kin_id', 'c_kin_code']);
+        });
+
+        Schema::dropIfExists('KINSHIP_CODES');
+        Schema::create('KINSHIP_CODES', function (Blueprint $table) {
+            $table->integer('c_kincode')->primary();
+            $table->integer('c_kin_pair1')->nullable();
+            $table->integer('c_kin_pair2')->nullable();
+        });
+        DB::table('KINSHIP_CODES')->insert([
+            ['c_kincode' => 100, 'c_kin_pair1' => 101, 'c_kin_pair2' => null],
+            ['c_kincode' => 101, 'c_kin_pair1' => 100, 'c_kin_pair2' => null],
+        ]);
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('KINSHIP_CODES');
+        Schema::dropIfExists('KIN_DATA');
+        Schema::dropIfExists('ASSOC_CODES');
+        Schema::dropIfExists('ASSOC_DATA');
+        Schema::dropIfExists('POSTING_DATA');
+        Schema::dropIfExists('POSTED_TO_ADDR_DATA');
+        Schema::dropIfExists('POSTED_TO_OFFICE_DATA');
         Schema::dropIfExists('ENTRY_DATA');
         Schema::dropIfExists('BIOG_SOURCE_DATA');
         Schema::dropIfExists('TEST_SINGLE');
         Schema::dropIfExists('TEST_CODES');
+        Schema::dropIfExists('audit_log');
         Schema::dropIfExists('operations');
         Schema::dropIfExists('users');
         parent::tearDown();
@@ -427,6 +534,42 @@ class OperationsProposalControllerTest extends TestCase {
     }
 
     #[Test]
+    public function testApproveUpdateProposalReKeyCollisionRejected(): void {
+        // #117：提案核准改鍵時，若變更後新主鍵已被另一列佔用 → 明確擋下（不覆寫他列、不冒未處理 500），提案維持待審。
+        DB::table('BIOG_SOURCE_DATA')->insert([
+            ['c_personid' => 200, 'c_textid' => 500, 'c_pages' => '12-15', 'c_notes' => 'orig'],
+            ['c_personid' => 200, 'c_textid' => 700, 'c_pages' => '88', 'c_notes' => 'occupier'],
+        ]);
+
+        $this->actingAs($this->makeAdmin());
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+            'resource' => 'BIOG_SOURCE_DATA',
+            'resource_id' => 'c_personid=200&c_textid=500&c_pages=12-15',
+            'resource_data' => [
+                'c_personid' => 200, 'c_textid' => 700, 'c_pages' => '88', 'c_notes' => 'orig',
+                '__key_columns' => ['c_personid', 'c_textid', 'c_pages'],
+                '__review_status' => 'pending',
+            ],
+            'resource_original' => ['c_personid' => 200, 'c_textid' => 500, 'c_pages' => '12-15', 'c_notes' => 'orig'],
+        ]);
+
+        $response = $this->post(route('operations.proposals.approve', $operation), [
+            'review_comment' => '改鍵到已佔用主鍵',
+        ]);
+        $response->assertRedirect(); // 乾淨擋下，非 500
+
+        // 兩列皆原樣保留（未覆寫、未刪除）。
+        $this->assertDatabaseHas('BIOG_SOURCE_DATA', ['c_personid' => 200, 'c_textid' => 500, 'c_pages' => '12-15', 'c_notes' => 'orig']);
+        $this->assertDatabaseHas('BIOG_SOURCE_DATA', ['c_personid' => 200, 'c_textid' => 700, 'c_pages' => '88', 'c_notes' => 'occupier']);
+        // 提案未核准（維持待審）。
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertNotSame('approved', $payload['__review_status'] ?? null);
+    }
+
+    #[Test]
     public function testApproveUpdateProposalReadbackUsesUnchangedOriginalKeyRepresentation(): void {
         DB::table('TEST_CODES')->insert([
             'code_id' => 'UP',
@@ -503,5 +646,663 @@ class OperationsProposalControllerTest extends TestCase {
         $payload = json_decode($operation->resource_data, true);
         $this->assertSame('rejected', $payload['__review_status']);
         $this->assertSame('Not acceptable', $payload['__review_comment']);
+    }
+
+    #[Test]
+    public function testApproveDeleteProposalRemovesRow(): void {
+        DB::table('TEST_CODES')->insert([
+            'code_id' => 'DL',
+            'code_sub' => '01',
+            'description' => 'Delete me',
+        ]);
+
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $original = [
+            'code_id' => 'DL',
+            'code_sub' => '01',
+            'description' => 'Delete me',
+        ];
+
+        $resourceData = array_merge($original, [
+            '__key_columns' => ['code_id', 'code_sub'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => ['action' => 'delete', 'submitted_by' => 'tester'],
+        ]);
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_DELETE,
+            'resource_id' => 'DL_._01',
+            'resource_data' => $resourceData,
+            'resource_original' => $original,
+        ]);
+
+        $response = $this->post(route('operations.proposals.approve', $operation), [
+            'review_comment' => '同意刪除',
+        ]);
+        $response->assertRedirect();
+
+        // 目標列確實被刪
+        $this->assertDatabaseMissing('TEST_CODES', ['code_id' => 'DL', 'code_sub' => '01']);
+
+        // __review_status=approved
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status']);
+        $this->assertSame('同意刪除', $payload['__review_comment']);
+
+        // 寫入 TYPE_DELETE final operation
+        $this->assertDatabaseHas('operations', [
+            'resource' => 'TEST_CODES',
+            'op_type' => Operation::TYPE_DELETE,
+        ]);
+
+        // audit DELETE 寫入：old=original, new=null
+        $audit = DB::table('audit_log')->where('table_name', 'TEST_CODES')->where('operation', 'DELETE')->first();
+        $this->assertNotNull($audit);
+        $this->assertNotNull($audit->old_data);
+        $this->assertNull($audit->new_data);
+    }
+
+    #[Test]
+    public function testApproveDeleteAssocProposalRemovesReciprocalMirror(): void {
+        // SEVERE 修復：核准社會關係刪除提案時，反向鏡像列須同步刪除（避免留下單向孤兒）。
+        $assocPk = [
+            'c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000,
+            'c_kin_code' => 0, 'c_kin_id' => 0, 'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0,
+            'c_text_title' => '史記', 'c_assoc_first_year' => 1080,
+        ];
+        DB::table('ASSOC_DATA')->insert(array_merge($assocPk, ['c_source' => 10]));
+        // 反向鏡像（對方 2000 擁有、反向碼 101、對稱 0,0 → 策略 1 可定位）。
+        DB::table('ASSOC_DATA')->insert(array_merge($assocPk, [
+            'c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000, 'c_source' => 10,
+        ]));
+
+        $this->actingAs($this->makeAdmin());
+
+        $resourceData = array_merge($assocPk, [
+            '__key_columns' => array_keys($assocPk),
+            '__review_status' => 'pending',
+            '__proposal_meta' => ['action' => 'delete', 'submitted_by' => 'tester'],
+        ]);
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_DELETE,
+            'resource' => 'ASSOC_DATA',
+            'resource_id' => '1000-100-2000-0-0-0-0-史記-1080',
+            'resource_data' => $resourceData,
+            'resource_original' => $assocPk,
+        ]);
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '同意刪除'])
+            ->assertRedirect();
+
+        // 正向已刪。
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000]);
+        // 反向鏡像同步刪除（雙向，修復前會殘留）。
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000]);
+
+        // 審計鏈完整：反向鏡像 DELETE audit 掛 final delete operation id（與正向一致，非 null）。
+        $finalOp = DB::table('operations')->where('resource', 'ASSOC_DATA')
+            ->where('op_type', Operation::TYPE_DELETE)->latest('id')->first();
+        $this->assertNotNull($finalOp);
+        $mirrorAudit = DB::table('audit_log')->where('table_name', 'ASSOC_DATA')->where('operation', 'DELETE')
+            ->where('old_data', 'like', '%"c_personid":2000%')->first();
+        $this->assertNotNull($mirrorAudit);
+        $this->assertSame((string) $finalOp->id, (string) $mirrorAudit->operation_id);
+    }
+
+    // ── #77 提案核准接上 #66 鏡像衝突偵測（fail-safe：對面分歧 → 中止核准、不靜默覆寫）──────────────
+
+    /** 建一筆社會關係 UPDATE 提案 operation（正向新內容 + 互逆配對碼入 aux；原始列供定位）。 */
+    private function makeAssocUpdateProposal(array $forwardPk, array $newContent, array $original): Operation {
+        $resourceData = array_merge($forwardPk, $newContent, [
+            'c_assocship_pair' => 101, 'c_kinship_pair' => 0, 'c_assoc_kinship_pair' => 0,
+            '__key_columns' => array_keys($forwardPk),
+            '__review_status' => 'pending',
+            '__proposal_meta' => ['action' => 'update', 'submitted_by' => 'tester'],
+        ]);
+
+        $op = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+            'resource' => 'ASSOC_DATA',
+            'resource_id' => '1000-100-2000-0-0-0-0-史記-1080',
+            'resource_data' => $resourceData,
+            'resource_original' => array_merge($forwardPk, $original),
+        ]);
+        // proposalOperation 預設 c_personid=0；真實提案帶實際人物 id，核准時用於定位反向鏡像，須設為 1000。
+        $op->c_personid = 1000;
+        $op->save();
+
+        return $op;
+    }
+
+    #[Test]
+    public function testApproveAssocUpdateProposalBlockedWhenMirrorContentDiverged(): void {
+        // #77：提案待審期間對面互逆鏡像被獨立改過（c_notes 分歧）→ 核准時偵測衝突 → 整筆回滾、提案維持 pending，
+        // 正向不更新、對面鏡像不被靜默覆寫。修正前 detectConflict=false 會靜默覆寫對方資料。
+        $fwd = [
+            'c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000,
+            'c_kin_code' => 0, 'c_kin_id' => 0, 'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0,
+            'c_text_title' => '史記', 'c_assoc_first_year' => 1080,
+        ];
+        DB::table('ASSOC_DATA')->insert(array_merge($fwd, ['c_source' => 10, 'c_notes' => '正向原備註']));
+        // 對面鏡像（碼 101）被獨立改成不同內容。
+        DB::table('ASSOC_DATA')->insert(array_merge($fwd, [
+            'c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000,
+            'c_source' => 10, 'c_notes' => '對面被獨立改過',
+        ]));
+
+        $this->actingAs($this->makeAdmin());
+        $operation = $this->makeAssocUpdateProposal(
+            $fwd,
+            ['c_source' => 10, 'c_notes' => '提案改後'],
+            ['c_source' => 10, 'c_notes' => '正向原備註']
+        );
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])
+            ->assertRedirect();
+
+        // 提案維持 pending（未核准）。
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('pending', $payload['__review_status'] ?? null, '衝突應中止核准、維持 pending');
+        // 整筆回滾：正向 c_notes 未變、對面鏡像未被覆寫。
+        $this->assertSame('正向原備註', DB::table('ASSOC_DATA')->where(['c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000])->value('c_notes'));
+        $this->assertSame('對面被獨立改過', DB::table('ASSOC_DATA')->where(['c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000])->value('c_notes'));
+        // 友善錯誤提示（不外洩 SQL）。
+        $flash = session('flash_notification', collect())->toArray();
+        $this->assertStringContainsString('審核未通過', $flash[0]['message'] ?? '');
+    }
+
+    #[Test]
+    public function testApproveAssocUpdateProposalSucceedsWhenMirrorInSync(): void {
+        // #77 對照（不誤擋）：對面鏡像與正向舊值一致（仍同步）→ 核准照常通過，正向與鏡像一併更新。
+        $fwd = [
+            'c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000,
+            'c_kin_code' => 0, 'c_kin_id' => 0, 'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0,
+            'c_text_title' => '史記', 'c_assoc_first_year' => 1080,
+        ];
+        DB::table('ASSOC_DATA')->insert(array_merge($fwd, ['c_source' => 10, 'c_notes' => '正向原備註']));
+        DB::table('ASSOC_DATA')->insert(array_merge($fwd, [
+            'c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000,
+            'c_source' => 10, 'c_notes' => '正向原備註', // 與正向舊值一致＝仍同步
+        ]));
+
+        $this->actingAs($this->makeAdmin());
+        $operation = $this->makeAssocUpdateProposal(
+            $fwd,
+            ['c_source' => 10, 'c_notes' => '提案改後'],
+            ['c_source' => 10, 'c_notes' => '正向原備註']
+        );
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])
+            ->assertRedirect();
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status'] ?? null, '同步狀態下核准應通過');
+        $this->assertSame('提案改後', DB::table('ASSOC_DATA')->where(['c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000])->value('c_notes'));
+        // 鏡像一併同步為新內容。
+        $this->assertSame('提案改後', DB::table('ASSOC_DATA')->where(['c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000])->value('c_notes'));
+    }
+
+    #[Test]
+    public function testApproveAssocUpdateProposalBlockedWhenMirrorCodeDrifted(): void {
+        // #77（codex SERIOUS 補洞）：對面鏡像「關係碼漂移」成 ∉ ASSOC_CODES 的垃圾值（99）→ 嚴格定位落空。
+        // 核准（allowBackfill=true + detectConflict=true）放寬查到漂移疑似 → 拋 MirrorSuspectedException → 中止核准、回滾。
+        // 修正前 allowBackfill=false 會在偵測前 early-return → 核准「成功」但鏡像沒同步（false-green）。
+        $fwd = [
+            'c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000,
+            'c_kin_code' => 0, 'c_kin_id' => 0, 'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0,
+            'c_text_title' => '史記', 'c_assoc_first_year' => 1080,
+        ];
+        DB::table('ASSOC_DATA')->insert(array_merge($fwd, ['c_source' => 10, 'c_notes' => '正向原備註']));
+        // 對面鏡像碼漂移成 99（嚴格定位 {101} 落空、放寬可查到）。
+        DB::table('ASSOC_DATA')->insert(array_merge($fwd, [
+            'c_personid' => 2000, 'c_assoc_code' => 99, 'c_assoc_id' => 1000, 'c_source' => 10, 'c_notes' => '漂移鏡像',
+        ]));
+
+        $this->actingAs($this->makeAdmin());
+        $operation = $this->makeAssocUpdateProposal($fwd, ['c_source' => 10, 'c_notes' => '提案改後'], ['c_source' => 10, 'c_notes' => '正向原備註']);
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])->assertRedirect();
+
+        $operation->refresh();
+        $this->assertSame('pending', (json_decode($operation->resource_data, true)['__review_status'] ?? null), '漂移疑似應中止核准');
+        $this->assertSame('正向原備註', DB::table('ASSOC_DATA')->where(['c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000])->value('c_notes'));
+        $this->assertSame('漂移鏡像', DB::table('ASSOC_DATA')->where(['c_personid' => 2000, 'c_assoc_code' => 99, 'c_assoc_id' => 1000])->value('c_notes'));
+        $this->assertSame(2, DB::table('ASSOC_DATA')->count(), '回滾：不得補出第三條鏡像');
+    }
+
+    #[Test]
+    public function testApproveAssocUpdateProposalBackfillsMissingMirror(): void {
+        // #77：對面完全無反向鏡像（合法單邊）→ 核准（allowBackfill=true）補建鏡像＝雙向同步（對齊 v2 direct）。
+        $fwd = [
+            'c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000,
+            'c_kin_code' => 0, 'c_kin_id' => 0, 'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0,
+            'c_text_title' => '史記', 'c_assoc_first_year' => 1080,
+        ];
+        DB::table('ASSOC_DATA')->insert(array_merge($fwd, ['c_source' => 10, 'c_notes' => '正向原備註']));
+
+        $this->actingAs($this->makeAdmin());
+        $operation = $this->makeAssocUpdateProposal($fwd, ['c_source' => 10, 'c_notes' => '提案改後'], ['c_source' => 10, 'c_notes' => '正向原備註']);
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])->assertRedirect();
+
+        $operation->refresh();
+        $this->assertSame('approved', (json_decode($operation->resource_data, true)['__review_status'] ?? null));
+        $this->assertSame('提案改後', DB::table('ASSOC_DATA')->where(['c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000])->value('c_notes'));
+        // 反向鏡像補建（碼 101、對方為主體）。
+        $this->assertSame('提案改後', DB::table('ASSOC_DATA')->where(['c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000])->value('c_notes'));
+    }
+
+    #[Test]
+    public function testApproveAssocCreateProposalBlockedWhenOppositeDiverged(): void {
+        // #82（D1）：核准 CREATE 時，對面已存在「以權威反向碼(101)嚴格命中」但內容分歧的反向列 → 偵測衝突 → 中止核准、
+        // 整筆回滾（正向未插入、對面不被覆寫）。修正前 legacy assocStoreById 盲插會靜默補出衝突/重複鏡像。
+        DB::table('ASSOC_DATA')->insert([
+            'c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000,
+            'c_kin_code' => 0, 'c_kin_id' => 0, 'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0,
+            'c_text_title' => '史記', 'c_assoc_first_year' => 1080,
+            'c_source' => 10, 'c_notes' => '對面既有不同內容',
+        ]);
+
+        $this->actingAs($this->makeAdmin());
+        $operation = $this->makeAssocCreateProposal('提案內容');
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])->assertRedirect();
+
+        $operation->refresh();
+        $this->assertSame('pending', (json_decode($operation->resource_data, true)['__review_status'] ?? null), '對面分歧應中止核准');
+        $this->assertNull(DB::table('ASSOC_DATA')->where(['c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000])->first(), '回滾：正向未插入');
+        $this->assertSame('對面既有不同內容', DB::table('ASSOC_DATA')->where(['c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000])->value('c_notes'));
+        $this->assertSame(1, DB::table('ASSOC_DATA')->count(), '回滾：不得補出衝突/重複鏡像');
+    }
+
+    #[Test]
+    public function testApproveAssocCreateProposalBackfillsWhenNoOpposite(): void {
+        // #82（D1 對照，不誤擋）：對面無任何反向列 → 核准 CREATE 照常插入正向 + 補建反向鏡像（碼 101），雙向同步。
+        $this->actingAs($this->makeAdmin());
+        $operation = $this->makeAssocCreateProposal('提案內容');
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])->assertRedirect();
+
+        $operation->refresh();
+        $this->assertSame('approved', (json_decode($operation->resource_data, true)['__review_status'] ?? null), '無對面應照常核准');
+        $this->assertSame('提案內容', DB::table('ASSOC_DATA')->where(['c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000])->value('c_notes'));
+        $this->assertSame('提案內容', DB::table('ASSOC_DATA')->where(['c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000])->value('c_notes'), '反向鏡像補建');
+        $this->assertSame(2, DB::table('ASSOC_DATA')->count());
+    }
+
+    /** 建一筆社會關係 CREATE 提案（正向 (1000,100,2000,...,史記,1080)；c_assocship_pair=101；c_personid=1000）。 */
+    private function makeAssocCreateProposal(string $notes): Operation {
+        $resourceData = [
+            'c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000,
+            'c_kin_code' => 0, 'c_kin_id' => 0, 'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0,
+            'c_text_title' => '史記', 'c_assoc_first_year' => 1080,
+            'c_source' => 10, 'c_notes' => $notes,
+            'c_assocship_pair' => 101, 'c_kinship_pair' => 0, 'c_assoc_kinship_pair' => 0,
+            '__key_columns' => ['c_personid', 'c_assoc_code', 'c_assoc_id', 'c_kin_code', 'c_kin_id', 'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => ['action' => 'create', 'submitted_by' => 'tester'],
+        ];
+        $op = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource' => 'ASSOC_DATA',
+            'resource_id' => '1000-100-2000-0-0-0-0-史記-1080',
+            'resource_data' => $resourceData,
+        ]);
+        $op->c_personid = 1000;
+        $op->save();
+
+        return $op;
+    }
+
+    #[Test]
+    public function testApproveKinCreateProposalBlockedWhenOppositeDiverged(): void {
+        // #82（D1，kin）：核准 CREATE 時對面已存在嚴格命中(碼101)但內容分歧的反向列 → 偵測衝突 → 中止核准、回滾、不盲插。
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 101, 'c_source' => 10, 'c_notes' => '對面既有不同內容', 'c_autogen_notes' => 'auto-x']);
+
+        $this->actingAs($this->makeAdmin());
+        $resourceData = [
+            'c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100,
+            'c_source' => 10, 'c_notes' => '提案內容', 'c_autogen_notes' => 'auto-x',
+            'c_kinship_pair' => 101,
+            '__key_columns' => ['c_personid', 'c_kin_id', 'c_kin_code'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => ['action' => 'create', 'submitted_by' => 'tester'],
+        ];
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource' => 'KIN_DATA',
+            'resource_id' => '1000-2000-100',
+            'resource_data' => $resourceData,
+        ]);
+        $operation->c_personid = 1000;
+        $operation->save();
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])->assertRedirect();
+
+        $operation->refresh();
+        $this->assertSame('pending', (json_decode($operation->resource_data, true)['__review_status'] ?? null), 'kin 對面分歧應中止核准');
+        $this->assertNull(DB::table('KIN_DATA')->where(['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100])->first(), '回滾：正向未插入');
+        $this->assertSame('對面既有不同內容', DB::table('KIN_DATA')->where(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 101])->value('c_notes'));
+        $this->assertSame(1, DB::table('KIN_DATA')->count(), '回滾：不得補出衝突/重複鏡像');
+    }
+
+    #[Test]
+    public function testApproveKinUpdateProposalBlockedWhenMirrorContentDiverged(): void {
+        // #77（kin）：親屬 UPDATE 提案核准時，對面鏡像被獨立改過 → 偵測衝突 → 中止核准、回滾、不覆寫。
+        DB::table('KIN_DATA')->insert(['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100, 'c_source' => 10, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 101, 'c_source' => 10, 'c_notes' => '對面被獨立改過', 'c_autogen_notes' => 'auto-x']);
+
+        $this->actingAs($this->makeAdmin());
+        $fwdPk = ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100];
+        $resourceData = array_merge($fwdPk, [
+            'c_source' => 10, 'c_notes' => '提案改後', 'c_autogen_notes' => 'auto-x',
+            'c_kinship_pair' => 101,
+            '__key_columns' => ['c_personid', 'c_kin_id', 'c_kin_code'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => ['action' => 'update', 'submitted_by' => 'tester'],
+        ]);
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+            'resource' => 'KIN_DATA',
+            'resource_id' => '1000-2000-100',
+            'resource_data' => $resourceData,
+            'resource_original' => array_merge($fwdPk, ['c_source' => 10, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'auto-x']),
+        ]);
+        $operation->c_personid = 1000;
+        $operation->save();
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])
+            ->assertRedirect();
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('pending', $payload['__review_status'] ?? null, '衝突應中止核准、維持 pending');
+        $this->assertSame('正向原備註', DB::table('KIN_DATA')->where(['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100])->value('c_notes'));
+        $this->assertSame('對面被獨立改過', DB::table('KIN_DATA')->where(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 101])->value('c_notes'));
+    }
+
+    #[Test]
+    public function testApproveKinUpdateProposalSucceedsWhenMirrorInSync(): void {
+        // #77（kin 對照，不誤擋）：對面鏡像與正向舊值一致 → 核准照常通過，正向與鏡像一併更新。
+        DB::table('KIN_DATA')->insert(['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100, 'c_source' => 10, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 101, 'c_source' => 10, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'auto-x']);
+
+        $this->actingAs($this->makeAdmin());
+        $fwdPk = ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100];
+        $resourceData = array_merge($fwdPk, [
+            'c_source' => 10, 'c_notes' => '提案改後', 'c_autogen_notes' => 'auto-x',
+            'c_kinship_pair' => 101,
+            '__key_columns' => ['c_personid', 'c_kin_id', 'c_kin_code'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => ['action' => 'update', 'submitted_by' => 'tester'],
+        ]);
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+            'resource' => 'KIN_DATA',
+            'resource_id' => '1000-2000-100',
+            'resource_data' => $resourceData,
+            'resource_original' => array_merge($fwdPk, ['c_source' => 10, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'auto-x']),
+        ]);
+        $operation->c_personid = 1000;
+        $operation->save();
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])
+            ->assertRedirect();
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status'] ?? null, '同步狀態下核准應通過');
+        $this->assertSame('提案改後', DB::table('KIN_DATA')->where(['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100])->value('c_notes'));
+        $this->assertSame('提案改後', DB::table('KIN_DATA')->where(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 101])->value('c_notes'));
+    }
+
+    #[Test]
+    public function testApproveKinUpdateProposalUsesLegitReverseDespiteAutogenMismatch(): void {
+        // #87：proposal approve 的 strict 定位也不認 autogen。對面合法反向碼 101 的 autogen 與正向不對稱時，
+        // 仍須命中並同步；不可誤落 relaxed，把漂移列收斂/撞 PK 或維持 pending。
+        DB::table('KIN_DATA')->insert(['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100, 'c_source' => 10, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 99, 'c_source' => 10, 'c_notes' => '漂移鏡像', 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 101, 'c_source' => 10, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'other']);
+
+        $this->actingAs($this->makeAdmin());
+        $operation = $this->makeKinUpdateProposal(['c_source' => 10, 'c_notes' => '提案改後']);
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])->assertRedirect();
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status'] ?? null, '合法反向列不因 autogen 不對稱而卡 pending');
+        $this->assertSame('提案改後', DB::table('KIN_DATA')->where(['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100])->value('c_notes'));
+        $this->assertSame('提案改後', DB::table('KIN_DATA')->where(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 101])->value('c_notes'));
+        $this->assertSame('漂移鏡像', DB::table('KIN_DATA')->where(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 99])->value('c_notes'));
+        $this->assertSame(3, DB::table('KIN_DATA')->count());
+    }
+
+    /** 建一筆親屬 UPDATE 提案 operation（正向 (1000,2000,100)→新內容；c_kinship_pair=101；c_personid=1000）。 */
+    private function makeKinUpdateProposal(array $newContent): Operation {
+        $fwdPk = ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100];
+        $resourceData = array_merge($fwdPk, $newContent, [
+            'c_autogen_notes' => 'auto-x', 'c_kinship_pair' => 101,
+            '__key_columns' => ['c_personid', 'c_kin_id', 'c_kin_code'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => ['action' => 'update', 'submitted_by' => 'tester'],
+        ]);
+        $op = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+            'resource' => 'KIN_DATA',
+            'resource_id' => '1000-2000-100',
+            'resource_data' => $resourceData,
+            'resource_original' => array_merge($fwdPk, ['c_source' => 10, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'auto-x']),
+        ]);
+        $op->c_personid = 1000;
+        $op->save();
+
+        return $op;
+    }
+
+    #[Test]
+    public function testApproveKinUpdateProposalBlockedWhenMirrorCodeDrifted(): void {
+        // #77（kin，codex MINOR 補測）：對面親屬碼漂移成 ∉ KINSHIP_CODES 的 99 → 嚴格落空 + 放寬查到漂移疑似 →
+        // 核准（detectConflict=true，kin allowBackfill=false——其疑似偵測不受 allowBackfill 閘控）拋
+        // MirrorSuspectedException → 中止核准、回滾、不補第三條。
+        DB::table('KIN_DATA')->insert(['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100, 'c_source' => 10, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 99, 'c_source' => 10, 'c_notes' => '漂移鏡像', 'c_autogen_notes' => 'auto-x']);
+
+        $this->actingAs($this->makeAdmin());
+        $operation = $this->makeKinUpdateProposal(['c_source' => 10, 'c_notes' => '提案改後']);
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])->assertRedirect();
+
+        $operation->refresh();
+        $this->assertSame('pending', (json_decode($operation->resource_data, true)['__review_status'] ?? null), '漂移疑似應中止核准');
+        $this->assertSame('正向原備註', DB::table('KIN_DATA')->where(['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100])->value('c_notes'));
+        $this->assertSame('漂移鏡像', DB::table('KIN_DATA')->where(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 99])->value('c_notes'));
+        $this->assertSame(2, DB::table('KIN_DATA')->count(), '回滾：不得補出第三條鏡像');
+    }
+
+    #[Test]
+    public function testApproveKinUpdateProposalBlockedWhenMirrorMissing(): void {
+        // #77（kin，與 assoc 行為差異）：kin allowBackfill=false，對面無反向鏡像 → sumCount=0 → applyKinshipProposal
+        // 既有 guard 拋「對應的親屬資料更新失敗」→ 中止核准、回滾（不補建、不單邊更新）。亦屬 fail-safe（不靜默不一致）。
+        // 註：assoc 因 #70 偵測受 allowBackfill 閘控、改 true 後對「無鏡像」採補建；kin 則由 guard 擋下，兩者皆安全。
+        DB::table('KIN_DATA')->insert(['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100, 'c_source' => 10, 'c_notes' => '正向原備註', 'c_autogen_notes' => 'auto-x']);
+
+        $this->actingAs($this->makeAdmin());
+        $operation = $this->makeKinUpdateProposal(['c_source' => 10, 'c_notes' => '提案改後']);
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])->assertRedirect();
+
+        $operation->refresh();
+        $this->assertSame('pending', (json_decode($operation->resource_data, true)['__review_status'] ?? null), '無鏡像應中止核准');
+        // 回滾：正向未單邊更新、對面未補建。
+        $this->assertSame('正向原備註', DB::table('KIN_DATA')->where(['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100])->value('c_notes'));
+        $this->assertSame(1, DB::table('KIN_DATA')->count(), '不得補建鏡像（kin 由 guard 擋下）');
+    }
+
+    #[Test]
+    public function testApproveDeleteProposalRemovesOfficeAndAuxiliaryTables(): void {
+        DB::table('POSTED_TO_OFFICE_DATA')->insert([
+            'c_personid' => 1000,
+            'c_office_id' => 50,
+            'c_posting_id' => 7,
+            'c_notes' => 'office',
+        ]);
+        DB::table('POSTED_TO_ADDR_DATA')->insert([
+            ['c_personid' => 1000, 'c_posting_id' => 7, 'c_office_id' => 50, 'c_addr_id' => 130],
+            ['c_personid' => 1000, 'c_posting_id' => 7, 'c_office_id' => 50, 'c_addr_id' => 200],
+        ]);
+        DB::table('POSTING_DATA')->insert(['c_posting_id' => 7, 'c_personid' => 1000]);
+
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $original = [
+            'c_personid' => 1000,
+            'c_office_id' => 50,
+            'c_posting_id' => 7,
+            'c_notes' => 'office',
+        ];
+
+        $resourceData = array_merge($original, [
+            '__key_columns' => ['c_office_id', 'c_posting_id'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => ['action' => 'delete'],
+        ]);
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_DELETE,
+            'resource' => 'POSTED_TO_OFFICE_DATA',
+            'resource_id' => '50_._7',
+            'resource_data' => $resourceData,
+            'resource_original' => $original,
+        ]);
+        $operation->c_personid = 1000;
+        $operation->save();
+
+        $response = $this->post(route('operations.proposals.approve', $operation));
+        $response->assertRedirect();
+
+        // 主表與副表一併刪除
+        $this->assertDatabaseMissing('POSTED_TO_OFFICE_DATA', ['c_office_id' => 50, 'c_posting_id' => 7]);
+        $this->assertSame(0, DB::table('POSTED_TO_ADDR_DATA')->where('c_posting_id', 7)->count());
+        $this->assertSame(0, DB::table('POSTING_DATA')->where('c_posting_id', 7)->count());
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status']);
+
+        $this->assertDatabaseHas('operations', [
+            'resource' => 'POSTED_TO_OFFICE_DATA',
+            'op_type' => Operation::TYPE_DELETE,
+        ]);
+    }
+
+    #[Test]
+    public function testRejectDeleteProposalKeepsRow(): void {
+        DB::table('TEST_CODES')->insert([
+            'code_id' => 'RK',
+            'code_sub' => '02',
+            'description' => 'Keep me',
+        ]);
+
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $original = [
+            'code_id' => 'RK',
+            'code_sub' => '02',
+            'description' => 'Keep me',
+        ];
+
+        $resourceData = array_merge($original, [
+            '__key_columns' => ['code_id', 'code_sub'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => ['action' => 'delete'],
+        ]);
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_DELETE,
+            'resource_id' => 'RK_._02',
+            'resource_data' => $resourceData,
+            'resource_original' => $original,
+        ]);
+
+        $response = $this->post(route('operations.proposals.reject', $operation), [
+            'review_comment' => '不同意刪除',
+        ]);
+        $response->assertRedirect();
+
+        // 目標列保留
+        $this->assertDatabaseHas('TEST_CODES', ['code_id' => 'RK', 'code_sub' => '02', 'description' => 'Keep me']);
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('rejected', $payload['__review_status']);
+        $this->assertSame('不同意刪除', $payload['__review_comment']);
+
+        // 無 final DELETE operation、無 audit DELETE
+        $this->assertDatabaseMissing('operations', ['resource' => 'TEST_CODES', 'op_type' => Operation::TYPE_DELETE]);
+        $this->assertSame(0, DB::table('audit_log')->where('operation', 'DELETE')->count());
+    }
+
+    #[Test]
+    public function testApproveDeleteKinProposalFailsClosedWhenCodeMissingFromCodeTable(): void {
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 1000,
+            'c_kin_id' => 2000,
+            'c_kin_code' => 999,
+            'c_source' => 10,
+            'c_notes' => '正向待刪',
+            'c_autogen_notes' => 'auto-x',
+        ]);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 2000,
+            'c_kin_id' => 1000,
+            'c_kin_code' => 101,
+            'c_source' => 10,
+            'c_notes' => '對面鏡像',
+            'c_autogen_notes' => 'auto-x',
+        ]);
+
+        $this->actingAs($this->makeAdmin());
+
+        $original = [
+            'c_personid' => 1000,
+            'c_kin_id' => 2000,
+            'c_kin_code' => 999,
+            'c_source' => 10,
+            'c_notes' => '正向待刪',
+            'c_autogen_notes' => 'auto-x',
+        ];
+        $resourceData = array_merge($original, [
+            '__key_columns' => ['c_personid', 'c_kin_id', 'c_kin_code'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => ['action' => 'delete', 'submitted_by' => 'tester'],
+        ]);
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_DELETE,
+            'resource' => 'KIN_DATA',
+            'resource_id' => '1000-2000-999',
+            'resource_data' => $resourceData,
+            'resource_original' => $original,
+        ]);
+        $operation->c_personid = 1000;
+        $operation->save();
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])
+            ->assertRedirect();
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('pending', $payload['__review_status'] ?? null, 'fail-closed 應中止核准並維持 pending');
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 999]);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 101]);
+        $this->assertSame(2, DB::table('KIN_DATA')->count(), '回滾：正反向皆不得半刪');
+        $this->assertSame(0, DB::table('operations')->where('resource', 'KIN_DATA')->where('op_type', Operation::TYPE_DELETE)->count(), '不得寫入 final delete operation');
     }
 }

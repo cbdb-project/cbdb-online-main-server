@@ -57,6 +57,14 @@ class SourceMutationHandler extends AbstractMutationHandler {
             }
 
             $data = $this->biogSourceRepository->buildUpdatePayload($personId, $targetPk, $changes, $existing);
+
+            // 改鍵（c_textid/c_pages 變更）碰撞偵測：新主鍵已存在另一列時擋下，避免 UPDATE 覆寫他列。
+            if ($this->biogSourceRepository->isReKeyed($targetPk, $changes) && $this->biogSourceRepository->findByPk($data)) {
+                return $this->errorResponse('變更後的出處主鍵與現有記錄重複', 409, [
+                    'target.pk' => ['duplicate'],
+                ]);
+            }
+
             if (!$this->biogSourceRepository->hasMeaningfulUpdate($existing, $data)) {
                 return $this->errorResponse('未偵測到任何修改內容', 422, [
                     'changes' => ['no_effective_changes'],
@@ -84,9 +92,21 @@ class SourceMutationHandler extends AbstractMutationHandler {
             ]);
         }
 
-        $result = $operation === 'create'
-            ? $this->biogSourceRepository->createDirect($personId, $data)
-            : $this->biogSourceRepository->updateDirect($personId, $targetPk, $data, $existing);
+        try {
+            $result = $operation === 'create'
+                ? $this->biogSourceRepository->createDirect($personId, $data)
+                : $this->biogSourceRepository->updateDirect($personId, $targetPk, $data, $existing);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // 改鍵/新增競態：findByPk 預檢後另一請求搶占同主鍵 → DB 唯一鍵衝突，縱深防禦轉 409
+            // （與其他子資源 handler 一致），不冒成未捕捉的 500。
+            if ($this->isUniqueConstraintViolation($e)) {
+                return $this->errorResponse('變更後的出處主鍵與現有記錄重複', 409, [
+                    'target.pk' => ['duplicate'],
+                ]);
+            }
+
+            throw $e;
+        }
 
         return response()->json([
             'ok' => true,
@@ -100,5 +120,19 @@ class SourceMutationHandler extends AbstractMutationHandler {
                 'row' => $result['row'],
             ],
         ]);
+    }
+
+    /**
+     * 判斷 QueryException 是否為唯一性約束衝突（MySQL 1062 / SQLite 19 = SQLITE_CONSTRAINT）。
+     * 供改鍵競態縱深防禦轉 409 用（對齊 AbstractPersonSubresourceMutationHandler 同名判斷）。
+     */
+    private function isUniqueConstraintViolation(\Illuminate\Database\QueryException $e): bool {
+        $code = (int) ($e->errorInfo[1] ?? 0);
+        if (in_array($code, [1062, 19], true)) {
+            return true;
+        }
+        $msg = $e->getMessage();
+
+        return str_contains($msg, 'UNIQUE') || str_contains($msg, 'Duplicate entry');
     }
 }

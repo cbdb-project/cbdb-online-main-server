@@ -7,6 +7,8 @@
     "prod": "vite build"
   },
   "devDependencies": {
+    "@fortawesome/fontawesome-free": "^6.7.2",
+    "@tailwindcss/vite": "^4.3.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-vue": "^6.0.2",
@@ -20,6 +22,7 @@
     "resolve-url-loader": "^5.0.0",
     "sass": "^1.79.4",
     "sass-loader": "^12.1.0",
+    "tailwindcss": "^4.3.1",
     "typescript": "^6.0.2",
     "vite": "^8.0.16",
     "vue": "^3.0.0"
@@ -27,16 +30,24 @@
   "dependencies": {
     "@fontsource/noto-sans-tc": "^5.2.9",
     "@inertiajs/react": "^2.3.18",
+    "@radix-ui/react-dialog": "^1.1.17",
+    "@radix-ui/react-label": "^2.1.10",
+    "@tanstack/react-table": "^8.21.3",
     "@ttskch/select2-bootstrap4-theme": "^1.5.2",
     "@vitejs/plugin-react": "^6.0.2",
     "admin-lte": "^3.2.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "cn-era": "^0.4.1",
     "datatables.net": "^1.13.8",
     "datatables.net-bs4": "^2.3.5",
     "leaflet": "^1.9.4",
+    "lucide-react": "^1.21.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "sql-formatter": "^15.6.12"
+    "sql-formatter": "^15.6.12",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss-animate": "^1.0.7"
   },
   "engines": {
     "node": ">=22 <23",

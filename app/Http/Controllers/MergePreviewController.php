@@ -32,6 +32,34 @@ class MergePreviewController extends Controller {
             return redirect('/home');
         }
 
+        $data = $this->buildMergePreview($request);
+
+        return view('manage.merge-preview', array_merge($data, [
+            'page_title' => 'MergePreview',
+            'page_description' => '人物記錄合併預覽',
+            'page_url' => '/merge-preview',
+        ]));
+    }
+
+    public function appIndex(Request $request) {
+        if (!Auth::user()->isAdmin()) {
+            flash('該用戶沒有權限，請聯絡管理員。', 'error');
+
+            return redirect('/home');
+        }
+
+        $data = $this->buildMergePreview($request);
+
+        return \Inertia\Inertia::render('Admin/MergePreview/Index', array_merge($data, [
+            'urls' => ['index' => route('app.merge-preview.index', [], false)],
+            'page_translations' => [
+                'admin' => __('admin'),
+                'common' => __('common'),
+            ],
+        ]));
+    }
+
+    protected function buildMergePreview(Request $request): array {
         $preview = null;
         if ($request->isMethod('post')) {
             $autoArrange = $request->has('auto_arrange');
@@ -115,17 +143,14 @@ class MergePreviewController extends Controller {
             ];
         }
 
-        return view('manage.merge-preview', [
-            'page_title' => 'MergePreview',
-            'page_description' => '人物記錄合併預覽',
-            'page_url' => '/merge-preview',
+        return [
             'preview' => $preview,
             'auto_arrange' => $autoArrange,
             'merge_reason' => $mergeReason,
             'form_primary' => $primaryInput,
             'form_secondary' => $secondaryInput,
             'merge_blocked' => $preview['merge_blocked'] ?? false,
-        ]);
+        ];
     }
 
     protected function buildPersonSummary($personId, $mergeReason = '') {

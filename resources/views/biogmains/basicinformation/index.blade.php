@@ -27,7 +27,7 @@
                 </form>
                 @auth
                     @if(Auth::user()->isActive())
-                        <a href="{{ route('basicinformation.create') }}" class="btn btn-secondary">
+                        <a href="{{ person_create_url() }}" class="btn btn-secondary">
                             {{ __('common.add') }}
                         </a>
                     @endif
@@ -53,14 +53,14 @@
                     <tbody>
                         @forelse($names as $item)
                             <tr>
-                                <td><a href="{{ route('basicinformation.edit', $item->c_personid) }}" target="_blank">{{ $item->c_personid }}</a></td>
-                                <td><a href="{{ route('basicinformation.edit', $item->c_personid) }}" target="_blank">{{ $item->c_name_chn }}</a></td>
-                                <td><a href="{{ route('basicinformation.edit', $item->c_personid) }}" target="_blank">{{ $item->c_name }}</a></td>
-                                <td><a href="{{ route('basicinformation.edit', $item->c_personid) }}" target="_blank">{{ $item->c_dynasty_chn ?? '' }}</a></td>
-                                <td><a href="{{ route('basicinformation.edit', $item->c_personid) }}" target="_blank">{{ $item->c_index_year }}</a></td>
-                                <td><a href="{{ route('basicinformation.edit', $item->c_personid) }}" target="_blank">{{ $item->ADDR_c_name_chn ?? '' }}</a></td>
-                                <td><a href="{{ route('basicinformation.edit', $item->c_personid) }}" target="_blank">{{ $item->c_alt_name_chn_zi ?? '' }}</a></td>
-                                <td><a href="{{ route('basicinformation.edit', $item->c_personid) }}" target="_blank">{{ $item->c_alt_name_chn_hao ?? '' }}</a></td>
+                                <td><a href="{{ person_page_url($item->c_personid, 'edit') }}" target="_blank">{{ $item->c_personid }}</a></td>
+                                <td><a href="{{ person_page_url($item->c_personid, 'edit') }}" target="_blank">{{ $item->c_name_chn }}</a></td>
+                                <td><a href="{{ person_page_url($item->c_personid, 'edit') }}" target="_blank">{{ $item->c_name }}</a></td>
+                                <td><a href="{{ person_page_url($item->c_personid, 'edit') }}" target="_blank">{{ $item->c_dynasty_chn ?? '' }}</a></td>
+                                <td><a href="{{ person_page_url($item->c_personid, 'edit') }}" target="_blank">{{ $item->c_index_year }}</a></td>
+                                <td><a href="{{ person_page_url($item->c_personid, 'edit') }}" target="_blank">{{ $item->ADDR_c_name_chn ?? '' }}</a></td>
+                                <td><a href="{{ person_page_url($item->c_personid, 'edit') }}" target="_blank">{{ $item->c_alt_name_chn_zi ?? '' }}</a></td>
+                                <td><a href="{{ person_page_url($item->c_personid, 'edit') }}" target="_blank">{{ $item->c_alt_name_chn_hao ?? '' }}</a></td>
                             </tr>
                         @empty
                             <tr>

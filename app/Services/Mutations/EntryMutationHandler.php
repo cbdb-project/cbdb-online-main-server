@@ -59,11 +59,18 @@ class EntryMutationHandler extends AbstractPersonSubresourceMutationHandler {
             'c_source',
             'c_pages',
             'c_notes',
-            'c_supplement',
-            'c_entry_nh_code',
+            // 年號代碼欄：ENTRY_DATA 真實欄為 c_entry_nh_id（2026_01_22 rename 將 c_nianhao_id 改為此名）。
+            'c_entry_nh_id',
             'c_entry_nh_year',
             'c_entry_range',
-            'c_secondary_source_title',
+            // Task 27 補回舊表單可錄入欄（皆 ENTRY_DATA 真實欄；c_parental_status_code 為真實欄名，
+            // 舊表單 field 名 c_parental_status_code 實為 parentstatus 代碼，存入 c_parental_status_code）。
+            'c_exam_rank',
+            'c_attempt_count',
+            'c_exam_field',
+            'c_parental_status_code',
+            'c_age',
+            'c_posting_notes',
         ];
     }
 
@@ -73,6 +80,8 @@ class EntryMutationHandler extends AbstractPersonSubresourceMutationHandler {
             'c_entry_code', 'c_entry_addr_id', 'c_kin_code',
             'c_assoc_code', 'c_inst_code', 'c_source',
         ]);
+        // sentinel 完全幂等：非 PK 碼欄（legacy 哨兵 0=Unknown）的 null/'' 也→0（normalizeSentinelValues 只做 -999）。
+        $data = $this->normalizeEmptyCodeFields($data, ['c_entry_addr_id', 'c_source']);
 
         return $data;
     }

@@ -232,7 +232,7 @@ class ApiV2DeleteAltnameTest extends TestCase {
     // ── Proposal Delete Tests ───────────────────────────────
 
     #[Test]
-    public function testProposalAltnameDeleteReturns501(): void {
+    public function testProposalAltnameDeleteWritesPendingProposal(): void {
         $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'delete-altname-proposal@example.com');
         $this->actingAs($user);
         $this->seedAltname();
@@ -241,21 +241,33 @@ class ApiV2DeleteAltnameTest extends TestCase {
             'mode' => 'proposal',
         ]));
 
-        $response->assertStatus(501)
+        $response->assertOk()
             ->assertJson([
-                'ok' => false,
-                'errors' => [
-                    'mode' => 'proposal',
-                    'operation' => 'delete',
-                ],
+                'ok' => true,
+                'resource' => 'altnames',
+                'mode' => 'proposal',
+                'operation' => 'delete',
+                'result' => ['status' => 'proposal_deleted'],
             ]);
 
-        // 原始資料未被刪除
+        // 寫入 TYPE_PROPOSAL_DELETE operation，狀態 pending
+        $this->assertDatabaseHas('operations', [
+            'resource' => 'ALTNAME_DATA',
+            'op_type' => Operation::TYPE_PROPOSAL_DELETE,
+        ]);
+        $op = DB::table('operations')->where('op_type', Operation::TYPE_PROPOSAL_DELETE)->first();
+        $payload = json_decode($op->resource_data, true);
+        $this->assertSame('pending', $payload['__review_status']);
+
+        // 目標列未被實際刪除
         $this->assertDatabaseHas('ALTNAME_DATA', [
             'c_personid' => 1000,
             'c_alt_name_chn' => '子美',
             'c_alt_name_type_code' => 4,
         ]);
+
+        // 無 audit DELETE
+        $this->assertSame(0, DB::table('audit_log')->where('table_name', 'ALTNAME_DATA')->where('operation', 'DELETE')->count());
     }
 
     // ── Error Cases ─────────────────────────────────────────

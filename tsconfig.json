@@ -12,7 +12,8 @@
         "isolatedModules": true,
         "noEmit": true,
         "paths": {
-            "@inertia/*": ["./resources/js/inertia/*"]
+            "@inertia/*": ["./resources/js/inertia/*"],
+            "@/*": ["./resources/js/inertia/*"]
         }
     },
     "include": ["resources/js/inertia/**/*"]

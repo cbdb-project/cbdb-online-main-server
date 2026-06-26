@@ -117,11 +117,15 @@ class ApiV2CreateEntryTest extends TestCase {
             $table->integer('c_source')->default(0);
             $table->string('c_pages', 255)->nullable();
             $table->text('c_notes')->nullable();
-            $table->text('c_supplement')->nullable();
-            $table->integer('c_entry_nh_code')->nullable();
+            $table->integer('c_entry_nh_id')->nullable(); // 對齊真實欄名（2026_01_22 rename c_nianhao_id->c_entry_nh_id）
             $table->integer('c_entry_nh_year')->nullable();
             $table->integer('c_entry_range')->nullable();
-            $table->string('c_secondary_source_title', 255)->nullable();
+            $table->string('c_exam_rank', 255)->nullable();
+            $table->integer('c_attempt_count')->nullable();
+            $table->string('c_exam_field', 255)->nullable();
+            $table->integer('c_parental_status_code')->nullable();
+            $table->integer('c_age')->nullable();
+            $table->string('c_posting_notes', 255)->nullable();
             $table->string('c_created_by', 255)->nullable();
             $table->string('c_created_date', 255)->nullable();
             $table->string('c_modified_by', 255)->nullable();
@@ -193,6 +197,33 @@ class ApiV2CreateEntryTest extends TestCase {
         return array_replace_recursive($payload, $overrides);
     }
 
+    #[Test]
+    public function testEntryCreateCodeFieldSentinelFullyIdempotent(): void {
+        // #71：create c_source 完全幂等——null/''/'-999'/-999/'0'/0 落庫皆 0、永不寫 null/''；合法非 0 保留。
+        // 每案用不同 c_sequence 取獨立 PK。≥10 案例。
+        $this->actingAs($this->makeUser(email: 'entry-create-sentinel@example.com'));
+        $T = 'ENTRY_DATA';
+        foreach ([null, '', '-999', -999, '0', 0] as $i => $sent) {
+            $seq = 10 + $i;
+            $this->postJson('/api/v2/create', $this->createPayload([
+                'target' => ['pk' => ['c_sequence' => $seq]],
+                'changes' => ['c_source' => $sent],
+            ]))->assertOk()->assertJson(['ok' => true]);
+            $stored = DB::table($T)->where(['c_personid' => 1000, 'c_entry_code' => 72, 'c_sequence' => $seq])->value('c_source');
+            $this->assertNotNull($stored, 'c_source 送 '.var_export($sent, true).' 不得為 null');
+            $this->assertSame('0', (string) $stored, 'c_source 送 '.var_export($sent, true).' 應規範化為 0');
+        }
+        foreach ([5, 7, 999, 42] as $i => $sent) {
+            $seq = 20 + $i;
+            $this->postJson('/api/v2/create', $this->createPayload([
+                'target' => ['pk' => ['c_sequence' => $seq]],
+                'changes' => ['c_source' => $sent],
+            ]))->assertOk();
+            $stored = DB::table($T)->where(['c_personid' => 1000, 'c_entry_code' => 72, 'c_sequence' => $seq])->value('c_source');
+            $this->assertSame($sent, (int) $stored, '合法非 0 值不得被誤清：'.$sent);
+        }
+    }
+
     // ── Direct Create Tests ─────────────────────────────────
 
     #[Test]
@@ -241,6 +272,62 @@ class ApiV2CreateEntryTest extends TestCase {
             'c_inst_name_code' => 0,
             'c_source' => 20,
             'c_pages' => '10-15',
+        ]);
+    }
+
+    #[Test]
+    public function testDirectEntryCreatePersistsRestoredFields(): void {
+        // 回歸（Task 27）：補回的入仕欄位在 create 路徑須真的寫入 ENTRY_DATA。
+        $user = $this->makeUser(email: 'create-entry-restored@example.com');
+        $this->actingAs($user);
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => [
+                'c_source' => 20,
+                'c_exam_rank' => '進士',
+                'c_attempt_count' => 3,
+                'c_exam_field' => '詩賦',
+                'c_parental_status_code' => 2,
+                'c_age' => 25,
+                'c_posting_notes' => '初任',
+            ],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('ENTRY_DATA', [
+            'c_personid' => 1000,
+            'c_entry_code' => 72,
+            'c_sequence' => 1,
+            'c_exam_rank' => '進士',
+            'c_attempt_count' => 3,
+            'c_exam_field' => '詩賦',
+            'c_parental_status_code' => 2,
+            'c_age' => 25,
+            'c_posting_notes' => '初任',
+        ]);
+    }
+
+    #[Test]
+    public function testDirectEntryCreatePersistsEraNianhaoFields(): void {
+        // 回歸：入仕年的年號代碼欄真實欄名為 c_entry_nh_id（2026_01_22 rename，舊名 c_nianhao_id）。
+        // allowlist 若殘留舊名 c_nianhao_id，year 號將寫不進真實欄，此測試守住該欄與 nh_year/range。
+        $user = $this->makeUser(email: 'create-entry-era@example.com');
+        $this->actingAs($user);
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => [
+                'c_entry_nh_id' => 7,
+                'c_entry_nh_year' => 3,
+                'c_entry_range' => 0,
+            ],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('ENTRY_DATA', [
+            'c_personid' => 1000,
+            'c_entry_code' => 72,
+            'c_sequence' => 1,
+            'c_entry_nh_id' => 7,
+            'c_entry_nh_year' => 3,
+            'c_entry_range' => 0,
         ]);
     }
 

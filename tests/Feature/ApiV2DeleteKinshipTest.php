@@ -1,0 +1,425 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Operation;
+use App\Models\User;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
+
+class ApiV2DeleteKinshipTest extends TestCase {
+    protected function setUp(): void {
+        parent::setUp();
+
+        config()->set('app.env', 'testing');
+        $this->app['env'] = 'testing';
+        config()->set('prometheus.enabled', false);
+        config()->set('prometheus.storage_adapter', 'memory');
+        config()->set('database.default', 'sqlite');
+        config()->set('database.connections.sqlite.database', ':memory:');
+        DB::purge('sqlite');
+        DB::setDefaultConnection('sqlite');
+        DB::reconnect('sqlite');
+
+        $this->createUsersTable();
+        $this->createSanctumTables();
+        $this->createOperationsTable();
+        $this->createAuditLogTable();
+        $this->createKinTable();
+        $this->createKinshipCodesTable();
+    }
+
+    protected function tearDown(): void {
+        Schema::dropIfExists('KINSHIP_CODES');
+        Schema::dropIfExists('KIN_DATA');
+        Schema::dropIfExists('audit_log');
+        Schema::dropIfExists('operations');
+        Schema::dropIfExists('personal_access_tokens');
+        Schema::dropIfExists('users');
+        parent::tearDown();
+    }
+
+    protected function createUsersTable(): void {
+        Schema::create('users', function (Blueprint $table) {
+            $table->increments('id');
+            $table->string('name')->nullable();
+            $table->string('email')->unique();
+            $table->string('password')->nullable();
+            $table->string('confirmation_token')->nullable();
+            $table->integer('is_active')->default(0);
+            $table->integer('is_admin')->default(0);
+            $table->rememberToken();
+            $table->timestamps();
+        });
+    }
+
+    protected function createSanctumTables(): void {
+        Schema::create('personal_access_tokens', function (Blueprint $table) {
+            $table->id();
+            $table->morphs('tokenable');
+            $table->string('name');
+            $table->string('token', 64)->unique();
+            $table->text('abilities')->nullable();
+            $table->timestamp('last_used_at')->nullable();
+            $table->timestamp('expires_at')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    protected function createOperationsTable(): void {
+        Schema::create('operations', function (Blueprint $table) {
+            $table->increments('id');
+            $table->integer('user_id')->nullable();
+            $table->integer('c_personid')->default(0);
+            $table->integer('op_type');
+            $table->string('resource');
+            $table->string('resource_id')->nullable();
+            $table->longText('resource_data')->nullable();
+            $table->longText('resource_original')->nullable();
+            $table->integer('crowdsourcing_status')->default(0);
+            $table->timestamps();
+        });
+    }
+
+    protected function createAuditLogTable(): void {
+        Schema::create('audit_log', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->dateTime('occurred_at');
+            $table->dateTime('created_at');
+            $table->string('table_name', 64);
+            $table->string('operation', 16);
+            $table->string('actor_type', 32);
+            $table->string('actor_id', 128);
+            $table->string('operation_id', 64);
+            $table->text('row_pk');
+            $table->string('row_pk_text', 512)->nullable();
+            $table->longText('old_data')->nullable();
+            $table->longText('new_data')->nullable();
+        });
+    }
+
+    protected function createKinTable(): void {
+        Schema::create('KIN_DATA', function (Blueprint $table) {
+            $table->integer('c_personid');
+            $table->integer('c_kin_id')->default(0);
+            $table->integer('c_kin_code')->default(0);
+            $table->integer('c_source')->default(0);
+            $table->string('c_pages', 255)->nullable();
+            $table->text('c_notes')->nullable();
+            $table->text('c_autogen_notes')->nullable();
+            $table->string('c_modified_by')->nullable();
+            $table->dateTime('c_modified_date')->nullable();
+            $table->primary(['c_personid', 'c_kin_id', 'c_kin_code']);
+        });
+    }
+
+    /** 親屬碼配對表：反向碼一律以 c_kin_pair1 權威推導。72↔73、75↔76 互為配對。 */
+    protected function createKinshipCodesTable(): void {
+        Schema::create('KINSHIP_CODES', function (Blueprint $table) {
+            $table->integer('c_kincode')->primary();
+            $table->integer('c_kin_pair1')->nullable();
+            $table->integer('c_kin_pair2')->nullable();
+        });
+        DB::table('KINSHIP_CODES')->insert([
+            ['c_kincode' => 72, 'c_kin_pair1' => 73, 'c_kin_pair2' => null],
+            ['c_kincode' => 73, 'c_kin_pair1' => 72, 'c_kin_pair2' => null],
+            ['c_kincode' => 75, 'c_kin_pair1' => 76, 'c_kin_pair2' => null],
+            ['c_kincode' => 76, 'c_kin_pair1' => 75, 'c_kin_pair2' => null],
+        ]);
+    }
+
+    protected function seedKin(array $overrides = []): void {
+        DB::table('KIN_DATA')->insert(array_replace([
+            'c_personid' => 1000,
+            'c_kin_id' => 200,
+            'c_kin_code' => 75,
+            'c_source' => 10,
+        ], $overrides));
+    }
+
+    protected function makeUser(int $status = User::STATUS_ACTIVE, int $role = User::ROLE_REGULAR, string $email = 'delete-kin-tester@example.com'): User {
+        return User::create([
+            'name' => 'tester',
+            'email' => $email,
+            'confirmation_token' => 'token-123',
+            'is_active' => $status,
+            'is_admin' => $role,
+        ]);
+    }
+
+    protected function deletePayload(array $overrides = []): array {
+        return array_replace_recursive([
+            'resource' => 'kinship',
+            'person_id' => 1000,
+            'mode' => 'direct',
+            'target' => [
+                'pk' => [
+                    'c_personid' => 1000,
+                    'c_kin_id' => 200,
+                    'c_kin_code' => 75,
+                ],
+            ],
+        ], $overrides);
+    }
+
+    #[Test]
+    public function testDirectKinshipDeleteRemovesReciprocalMirror(): void {
+        // 正向 (1000,200,75) 與反向鏡像 (200,1000,76)（75↔76 配對）同備註；刪正向應連帶刪反向。
+        $user = $this->makeUser(email: 'delete-kin-mirror@example.com');
+        $this->actingAs($user);
+        $this->seedKin(['c_kin_code' => 75, 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 76,
+            'c_source' => 10, 'c_autogen_notes' => 'auto-x',
+        ]);
+
+        $this->postJson('/api/v2/delete', $this->deletePayload())->assertOk();
+
+        // 正向已刪
+        $this->assertDatabaseMissing('KIN_DATA', [
+            'c_personid' => 1000, 'c_kin_id' => 200, 'c_kin_code' => 75,
+        ]);
+        // 反向鏡像連帶刪除
+        $this->assertDatabaseMissing('KIN_DATA', [
+            'c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 76,
+        ]);
+        $this->assertSame(0, DB::table('KIN_DATA')->count());
+    }
+
+    #[Test]
+    public function testDirectKinshipDeleteRemovesReciprocalMirrorDespiteAutogenMismatch(): void {
+        // #87：刪除定位也不再認 autogen。正向與反向 autogen 不對稱時，仍須刪除同段合法反向列，不能漏刪成孤兒。
+        $user = $this->makeUser(email: 'delete-kin-mirror-autogen@example.com');
+        $this->actingAs($user);
+        $this->seedKin(['c_kin_code' => 75, 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 76,
+            'c_source' => 10, 'c_autogen_notes' => 'other',
+        ]);
+
+        $this->postJson('/api/v2/delete', $this->deletePayload())->assertOk();
+
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 200, 'c_kin_code' => 75]);
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 76]);
+        $this->assertSame(0, DB::table('KIN_DATA')->count());
+    }
+
+    #[Test]
+    public function testDirectKinshipDeleteRemovesOrphanProneRankReverse(): void {
+        // #81 §6：反向列以「排行碼」201 編碼（pair1=75 指回正向碼 75，但 ≠ 75 自身 pair1=76）。
+        // 舊窄定位（只認 75 自身 pair1=76）會漏刪→孤兒；對齊 legitReverses 後應命中並刪除。
+        DB::table('KINSHIP_CODES')->insert(['c_kincode' => 201, 'c_kin_pair1' => 75, 'c_kin_pair2' => null]);
+        $user = $this->makeUser(email: 'delete-kin-orphan@example.com');
+        $this->actingAs($user);
+        $this->seedKin(['c_kin_code' => 75, 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 201,
+            'c_source' => 10, 'c_autogen_notes' => 'auto-x',
+        ]);
+
+        $this->postJson('/api/v2/delete', $this->deletePayload())->assertOk();
+
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 200, 'c_kin_code' => 75]);
+        // 排行碼反向列亦連帶刪除（修孤兒）。
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 201]);
+        $this->assertSame(0, DB::table('KIN_DATA')->count());
+    }
+
+    #[Test]
+    public function testDirectKinshipDeleteMultipleReverseBlocksWith409(): void {
+        // #81 §6：對面命中多筆合法反向列（76 與排行碼 201 並存）→ 未確認應 409、整筆回滾（正向亦不刪）。
+        DB::table('KINSHIP_CODES')->insert(['c_kincode' => 201, 'c_kin_pair1' => 75, 'c_kin_pair2' => null]);
+        $user = $this->makeUser(email: 'delete-kin-multi@example.com');
+        $this->actingAs($user);
+        $this->seedKin(['c_kin_code' => 75, 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert([
+            ['c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 76, 'c_source' => 10, 'c_autogen_notes' => 'auto-x'],
+            ['c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 201, 'c_source' => 11, 'c_autogen_notes' => 'auto-x'],
+        ]);
+
+        $resp = $this->postJson('/api/v2/delete', $this->deletePayload());
+        $resp->assertStatus(409)->assertJson(['ok' => false]);
+        $this->assertSame('KIN_DATA', $resp->json('errors.mirror_delete_multiple.table'));
+        $this->assertSame(2, $resp->json('errors.mirror_delete_multiple.count'));
+        $this->assertCount(2, $resp->json('errors.mirror_delete_multiple.candidates'));
+
+        // 回滾：正向與兩筆反向皆原樣保留。
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 200, 'c_kin_code' => 75]);
+        $this->assertSame(3, DB::table('KIN_DATA')->count());
+    }
+
+    #[Test]
+    public function testDirectKinshipDeleteMultipleReverseForceDeletesAll(): void {
+        // #81 §6：使用者確認後帶 meta.force → 一併刪除正向與全部對面反向列。
+        DB::table('KINSHIP_CODES')->insert(['c_kincode' => 201, 'c_kin_pair1' => 75, 'c_kin_pair2' => null]);
+        $user = $this->makeUser(email: 'delete-kin-force@example.com');
+        $this->actingAs($user);
+        $this->seedKin(['c_kin_code' => 75, 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert([
+            ['c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 76, 'c_source' => 10, 'c_autogen_notes' => 'auto-x'],
+            ['c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 201, 'c_source' => 11, 'c_autogen_notes' => 'auto-x'],
+        ]);
+
+        $this->postJson('/api/v2/delete', $this->deletePayload(['meta' => ['force' => true]]))->assertOk();
+
+        $this->assertSame(0, DB::table('KIN_DATA')->count());
+    }
+
+    #[Test]
+    public function testDirectKinshipDeleteRemovesAsymmetricSelfPairReverse(): void {
+        // #87 sync 路徑回歸：對面反向列以「正向碼自身配對碼」180 編碼（75.c_kin_pair2=180，但 180 不回指 75、
+        // 且 76 指向 75）。舊窄定位（僅指向集{76}，非空故不退回自身）漏刪→孤兒；聯集 {76,180} 應命中並刪除。
+        DB::table('KINSHIP_CODES')->where('c_kincode', 75)->update(['c_kin_pair2' => 180]);
+        DB::table('KINSHIP_CODES')->insert(['c_kincode' => 180, 'c_kin_pair1' => null, 'c_kin_pair2' => null]);
+        $user = $this->makeUser(email: 'delete-kin-asym@example.com');
+        $this->actingAs($user);
+        $this->seedKin(['c_kin_code' => 75, 'c_autogen_notes' => 'auto-x']);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 180,
+            'c_source' => 10, 'c_autogen_notes' => 'auto-x',
+        ]);
+
+        $this->postJson('/api/v2/delete', $this->deletePayload())->assertOk();
+
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 200, 'c_kin_code' => 75]);
+        // 非對稱自身配對碼反向列亦連帶刪除（修孤兒）。
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 180]);
+        $this->assertSame(0, DB::table('KIN_DATA')->count());
+    }
+
+    #[Test]
+    public function testDirectKinshipDeleteFailsClosedWhenCodeMissingFromCodeTable(): void {
+        // 正向碼缺於 KINSHIP_CODES（資料完整性破壞）：刪除須 fail-closed 回滾整筆，
+        // 不可正向已刪而反向鏡像孤兒（codex MAJOR 修正）。#87：改拋 MirrorIntegrityException → 結構化 422（不漏成 500）。
+        $user = $this->makeUser(email: 'delete-kin-failclosed@example.com');
+        $this->actingAs($user);
+        $this->seedKin(['c_kin_code' => 99, 'c_autogen_notes' => 'auto-x']); // 99 不在 KINSHIP_CODES
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 98,
+            'c_source' => 10, 'c_autogen_notes' => 'auto-x',
+        ]);
+
+        $this->postJson('/api/v2/delete', $this->deletePayload([
+            'target' => ['pk' => ['c_kin_code' => 99]],
+        ]))->assertStatus(422)->assertJson(['ok' => false, 'errors' => ['mirror_integrity' => ['fail_closed']]]);
+
+        // 交易回滾：正向與反向皆原樣保留（無孤兒、無半刪）。
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 200, 'c_kin_code' => 99]);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 200, 'c_kin_id' => 1000, 'c_kin_code' => 98]);
+        $this->assertSame(2, DB::table('KIN_DATA')->count());
+    }
+
+    #[Test]
+    public function testDirectKinshipDeleteSucceeds(): void {
+        $user = $this->makeUser(email: 'delete-kin-direct@example.com');
+        $this->actingAs($user);
+        $this->seedKin();
+
+        $response = $this->postJson('/api/v2/delete', $this->deletePayload());
+
+        $response->assertOk()->assertJson([
+            'ok' => true,
+            'resource' => 'kinship',
+            'mode' => 'direct',
+            'operation' => 'delete',
+        ]);
+        $this->assertNotNull($response->json('result.operation_id'));
+
+        $this->assertDatabaseMissing('KIN_DATA', [
+            'c_personid' => 1000,
+            'c_kin_id' => 200,
+            'c_kin_code' => 75,
+        ]);
+    }
+
+    #[Test]
+    public function testDirectKinshipDeleteWritesOperationAndAudit(): void {
+        $user = $this->makeUser(email: 'delete-kin-op@example.com');
+        $this->actingAs($user);
+        $this->seedKin();
+
+        $this->postJson('/api/v2/delete', $this->deletePayload());
+
+        $this->assertDatabaseHas('operations', [
+            'resource' => 'KIN_DATA',
+            'op_type' => Operation::TYPE_DELETE,
+        ]);
+        $audit = DB::table('audit_log')->where('table_name', 'KIN_DATA')->first();
+        $this->assertNotNull($audit);
+        $this->assertSame('DELETE', $audit->operation);
+    }
+
+    #[Test]
+    public function testProposalKinshipDeleteWritesPendingProposal(): void {
+        $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'delete-kin-proposal@example.com');
+        $this->actingAs($user);
+        $this->seedKin();
+
+        $this->postJson('/api/v2/delete', $this->deletePayload(['mode' => 'proposal']))
+            ->assertOk()
+            ->assertJson([
+                'ok' => true,
+                'mode' => 'proposal',
+                'operation' => 'delete',
+                'result' => ['status' => 'proposal_deleted'],
+            ]);
+
+        $this->assertDatabaseHas('operations', [
+            'resource' => 'KIN_DATA',
+            'op_type' => Operation::TYPE_PROPOSAL_DELETE,
+        ]);
+        $op = DB::table('operations')->where('op_type', Operation::TYPE_PROPOSAL_DELETE)->first();
+        $payload = json_decode($op->resource_data, true);
+        $this->assertSame('pending', $payload['__review_status']);
+
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 200, 'c_kin_code' => 75]);
+
+        $this->assertSame(0, DB::table('audit_log')->where('table_name', 'KIN_DATA')->where('operation', 'DELETE')->count());
+    }
+
+    #[Test]
+    public function testDeleteTargetMissingReturns404(): void {
+        $user = $this->makeUser(email: 'delete-kin-404@example.com');
+        $this->actingAs($user);
+
+        $this->postJson('/api/v2/delete', $this->deletePayload())->assertStatus(404);
+    }
+
+    #[Test]
+    public function testDeleteWithPersonIdMismatchReturns422(): void {
+        $user = $this->makeUser(email: 'delete-kin-mismatch@example.com');
+        $this->actingAs($user);
+        $this->seedKin();
+
+        $this->postJson('/api/v2/delete', $this->deletePayload(['person_id' => 9999]))
+            ->assertStatus(422)
+            ->assertJson(['ok' => false, 'errors' => ['person_id' => ['mismatch']]]);
+    }
+
+    #[Test]
+    public function testDeleteRejectsUnauthenticatedUser(): void {
+        $this->seedKin();
+        $this->postJson('/api/v2/delete', $this->deletePayload())->assertStatus(401);
+    }
+
+    #[Test]
+    public function testDeleteRejectsInactiveUser(): void {
+        $user = $this->makeUser(User::STATUS_INACTIVE, User::ROLE_REGULAR, 'delete-kin-inactive@example.com');
+        $this->actingAs($user);
+        $this->seedKin();
+
+        $this->postJson('/api/v2/delete', $this->deletePayload())->assertStatus(403);
+    }
+
+    #[Test]
+    public function testDirectDeleteRejectsCrowdsourcingUser(): void {
+        $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'delete-kin-crowd@example.com');
+        $this->actingAs($user);
+        $this->seedKin();
+
+        $this->postJson('/api/v2/delete', $this->deletePayload(['mode' => 'direct']))->assertStatus(403);
+    }
+}

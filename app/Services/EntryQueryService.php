@@ -249,7 +249,8 @@ class EntryQueryService {
         }
 
         if ($filters['person_keyword'] !== null) {
-            $keyword = "%{$filters['person_keyword']}%";
+            // #85：拼音 ü→v 規範化（CBDB 以 v 存 ü 韻）。
+            $keyword = '%' . \App\Support\PinyinSearchNormalizer::umlautToV($filters['person_keyword']) . '%';
 
             $query->where(function (Builder $builder) use ($keyword) {
                 $builder->where('bm.c_name_chn', 'like', $keyword)

@@ -452,6 +452,31 @@ class ApiV2MutateAltnameTest extends TestCase {
         $response->assertStatus(403);
     }
 
+    // ── #56 M 寫入等價（update 路徑，純單表；altname 無鏡像/副表）──────
+
+    #[Test]
+    public function testAltnameCodeFieldSentinelFullyIdempotent(): void {
+        // c_source（legacy 哨兵 0=Unknown）所有空表示 null/''/-999/'0'/0 → 0、合法值保留、來回不翻。≥10 案例。
+        $this->actingAs($this->makeUser(email: 'altname-sentinel@example.com'));
+        $T = 'ALTNAME_DATA';
+        $f = 'c_source';
+        foreach ([null, '', -999, '0', 0] as $sent) {
+            DB::table($T)->delete();
+            $this->seedAltname([$f => 5, 'c_notes' => '初始']);
+            $this->postJson('/api/v2/mutate', $this->altnamePayload(['changes' => [$f => $sent, 'c_notes' => '改'.var_export($sent, true)]]))->assertOk();
+            $this->assertSame(0, (int) DB::table($T)->value($f), $f.' 送 '.var_export($sent, true).' 應規範化為 0');
+            $this->assertNotNull(DB::table($T)->value($f), $f.' 不得為 null');
+        }
+        DB::table($T)->delete();
+        $this->seedAltname([$f => 1, 'c_notes' => 'x']);
+        $this->postJson('/api/v2/mutate', $this->altnamePayload(['changes' => [$f => 7, 'c_notes' => '合法值']]))->assertOk();
+        $this->assertSame(7, (int) DB::table($T)->value($f), '合法非 0 值不得被誤清');
+        foreach ([null, '', -999, 0] as $i => $sent) {
+            $this->postJson('/api/v2/mutate', $this->altnamePayload(['changes' => [$f => $sent, 'c_notes' => '再'.$i]]))->assertOk();
+            $this->assertSame(0, (int) DB::table($T)->value($f), '幂等重送仍為 0（第'.$i.'輪）');
+        }
+    }
+
     #[Test]
     public function testAltnameUpdateAcceptsAlias(): void {
         $user = $this->makeUser(email: 'altname-alias@example.com');

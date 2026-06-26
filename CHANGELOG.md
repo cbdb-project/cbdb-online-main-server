@@ -4,6 +4,31 @@
 
 ## 2026-06
 
+### React / Inertia 遷移正式上線（已列頁面 flag 全翻 new；機制 `default` 仍 old）
+- 全站可遷移的互動頁面 feature flag 由 `old` 翻為 `new`（`config/migration_flags.php`）：人物列表/檢視/詳情中樞、**13 個 React 編輯器**（basic-info + 12 個複合主鍵子資源：altname / addresses / texts / sources / offices / assoc / kinship / events / statuses / entries / possession / socialinst）、Codes CRUD、operations / manage / crowdsourcing、admin 日誌與批次工具、認證頁 / welcome 等，現以 React/Inertia 為**線上預設**。
+- 上線採 **gate-before-flip**：每頁先做新舊機器逐項對比（內容/欄位/說明文字/字體/導流/視覺）+ review agent + codex 雙閘，差異清單清空且使用者人工逐頁驗收後，才翻 `new`（見 [docs/REACT_MIGRATION_SIMULATION_TEST_PLAN.md](docs/REACT_MIGRATION_SIMULATION_TEST_PLAN.md) §0）。
+- 人物詳情中樞（`/app/basicinformation/{id}`）改用 legacy 風格 PersonBanner + 子資源分頁；重建年號轉換 React 元件（EraTimeField）、CHGIS place-link；補齊版面/互動/必填/改鍵 parity，子資源存檔後導向新記錄 edit 頁供複查（#120）。
+- **回退保證**：舊 Blade 視圖與路由**未刪除**，flag-gated 頁面回退只需把對應 flag 改回 `old`（可逆、不需改碼）。例外：Query Playground 無主頁 flag、`/query-playground` 硬導向 React 版，不走 flag 回退。AdminLTE 實體下架（Phase 7）尚未執行，故本階段「下線」指**下線為線上預設、舊版保留供回退**，非移除。
+- 清理 legacy-parity 臨時測試組（#68，刪 18 個耦合舊路徑的 M 寫入等價測試）。
+
+### 親屬／社會關係雙向鏡像「行內化」（編輯器內確認閘）
+- 互逆鏡像的「單邊補建」與「一對多／多對多人工裁決」由專屬 admin 修復頁搬進一般編輯器的點擊/存檔場景，以「鏡像寫入前確認閘」（409 → 彈窗列出將影響的人物/列 → 確認後落庫）處理；專屬修復頁降級為「暫不公開」。
+- 提案核准路徑補上 #66/#70 鍵碰撞/鏡像偵測（與 direct 對等，#77、#82、#117）。全情境對真實資料庫實測通過（見 [docs/RELATIONSHIP_MIRROR_INLINE_DESIGN.md](docs/RELATIONSHIP_MIRROR_INLINE_DESIGN.md) §11.1）。
+
+### 人物搜尋 ü／v 互通（#85）
+- CBDB 拼音以 `v` 儲存 `ü`、collation 視 `ü≈u`；查詢端統一規範化 `ü→v`，移除「ü→v 替代」提示，7 個搜尋入口一致。
+
+### 編輯器一致化收尾（#116–#123）
+- 全 13 編輯器版面/必填標註/碼欄改鍵/按鈕字號一致化；出處 source 編輯期開放改鍵（#116/#117）。
+- i18n：補齊編輯器英文缺漏 key、修年號對話框換行、譯名對齊 CBDB 既有術語（#119）；欄位重排（類型/角色/次序）依使用者建議調整（#118/#121/#122/#123）。
+
+### v2 子資源 mutation 資料安全：雙向鏡像同步 + sentinel 完全幂等
+- **雙向鏡像衝突偵測（#66）**：社會關係（ASSOC）／親屬（KIN）改動會同步對面互逆鏡像列；若對面對應欄已被獨立改成不同內容，改為**警告 + 可點連結跳對面 + 強制覆寫（meta.force）**，不再靜默覆寫（409 `errors.mirror_conflict`）。
+- **鏡像「疑似匹配」（#70）**：嚴格定位（碼∈合法反向集）落空、但放寬查到對面有「碼漂移（∉ 合法代碼表）」的疑似同關係列時，不再靜默 backfill 補出重複鏡像，改為 409 `errors.mirror_suspected`（候選 PK + 權威反向碼）→ 前端跳對面 + 強制就地收斂。**Option 2 安全**：碼∈合法 code 的列視為他段合法關係**絕不覆寫**，只就地收斂純漂移垃圾列。UPDATE 與 **CREATE（#72）** 兩路徑皆覆蓋；子資源「edit 一條對面不存在的鏡像」改為優雅降級頁（取代硬 404）。
+- **sentinel 完全幂等（#71）**：legacy 哨兵 0=Unknown 的碼/FK 欄（c_source 等），`null / '' / -999 / 0 /（CREATE 缺鍵）` 落庫一律為 0、**永不寫 null/''**，達成新舊前端寫入完全一致。修正 possession create 缺 c_source 時 legacy `possessionStoreById` 的 undefined-index（direct 與 proposal-核准兩路徑）。
+- 互逆鏡像反向關係碼一律以代碼表權威配對碼（ASSOC_CODES / KINSHIP_CODES）補齊，不再洗成哨兵 0（「未详」）污染對方人物關係。
+- 以「M 寫入等價」維度（舊版寫入為 ground truth）系統性回歸；全量 phpunit 1918 綠。
+
 ### `/api/v2/persons` 新增 c_created_date / c_modified_date（人物層級修改水位線）
 - `/api/v2/persons` 每筆人物新增輸出 `c_created_date`（建檔時間，取自 BIOG_MAIN）與 `c_modified_date`（人物**任何**資訊——本體或子資源——最後修改時間）。
 - `/api/v2/persons` 新增 `modified_since` 查詢參數供增量同步（只回傳 `c_modified_date >= modified_since` 的人物，含邊界）；嚴格格式守衛 + 時區正規化，無法辨識則忽略（回全部）；命令 `--since` 共用同套規則。水位線納入建檔時間，確保「只有建檔時間、從未被改」的人物不被漏抓。

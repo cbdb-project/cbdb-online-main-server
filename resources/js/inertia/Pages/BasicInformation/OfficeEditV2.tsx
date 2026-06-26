@@ -1,0 +1,70 @@
+import React from 'react';
+import { usePage } from '@inertiajs/react';
+import DashboardLayout from '../../Layouts/DashboardLayout';
+import OfficeEditor, { AddrItem } from '../../components/OfficeEditor';
+import PersonBanner, { PersonBannerData } from '../../components/PersonEditorShared/PersonBanner';
+import { useTranslation } from '../../hooks/useTranslation';
+import type { SharedProps } from '../../types/page';
+
+type Fields = Record<string, string>;
+
+interface PageProps extends SharedProps {
+    person_id: number;
+    person_label: string;
+    dynasty_code: number | null;
+    edit_mode: 'create' | 'edit';
+    initial_fields: Fields;
+    initial_labels: Fields;
+    initial_addr: AddrItem[];
+    can_edit: boolean;
+    can_propose: boolean;
+    create_endpoint: string;
+    mutate_endpoint: string;
+    delete_endpoint: string;
+    index_url: string;
+    breadcrumbs: Array<{ label: string; url?: string }>;
+    person_banner: PersonBannerData;
+    ai_enabled: boolean;
+    ai_model: string;
+    ai_extract_endpoint: string;
+}
+
+export default function OfficeEditV2() {
+    const p = usePage<PageProps>().props;
+    const tb = useTranslation('biogmains');
+    const tp = useTranslation('person');
+    const tc = useTranslation('common');
+    const t = (k: string) => {
+        const v = tb(k);
+        if (v && v !== k) return v;
+        const v2 = tp(k);
+        if (v2 && v2 !== k) return v2;
+        const v3 = tc(k);
+        return v3 && v3 !== k ? v3 : k;
+    };
+
+    return (
+        <DashboardLayout title={p.person_label} headerAlign="center" breadcrumbs={p.breadcrumbs}>
+            <PersonBanner data={p.person_banner} />
+            <OfficeEditor
+                personId={p.person_id}
+                personLabel={p.person_label}
+                dynastyCode={p.dynasty_code}
+                mode={p.edit_mode}
+                initialFields={p.initial_fields}
+                initialLabels={p.initial_labels}
+                initialAddr={p.initial_addr}
+                canEdit={p.can_edit}
+                canPropose={p.can_propose}
+                createEndpoint={p.create_endpoint}
+                mutateEndpoint={p.mutate_endpoint}
+                deleteEndpoint={p.delete_endpoint}
+                indexUrl={p.index_url}
+                aiEnabled={p.ai_enabled}
+                aiModel={p.ai_model}
+                aiExtractEndpoint={p.ai_extract_endpoint}
+                t={t}
+            />
+        </DashboardLayout>
+    );
+}

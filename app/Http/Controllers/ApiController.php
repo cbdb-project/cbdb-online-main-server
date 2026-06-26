@@ -446,7 +446,8 @@ class ApiController extends Controller {
 
     public function searchBiog(Request $request) {
         // 20251218性能優化：使用與 /api/name 相同的 FTS 索引查詢邏輯
-        $request->q = addslashes($request->q);
+        // #85：拼音 ü→v 規範化（CBDB 以 v 存 ü 韻）。
+        $request->q = addslashes(\App\Support\PinyinSearchNormalizer::umlautToV($request->q));
         $num = 20;
 
         // 優化1：當輸入為純數字時，直接按 c_personid 精確查詢

@@ -230,6 +230,19 @@ class BasicInformationProposalTest extends TestCase {
             $table->string('c_modified_by')->nullable();
             $table->string('c_modified_date')->nullable();
         });
+
+        // #82：核准 CREATE 啟用鏡像偵測（detectConflict=true）會查 ASSOC_CODES（createAssocMirrorBaselines→validReverseAssocSet）。
+        // 舊版盲插不查碼表故此 fixture 缺 ASSOC_CODES；補上並 seed 測試用配對碼 10↔20，使核准 create 偵測路徑可正常運作。
+        Schema::dropIfExists('ASSOC_CODES');
+        Schema::create('ASSOC_CODES', function (Blueprint $table) {
+            $table->integer('c_assoc_code')->primary();
+            $table->integer('c_assoc_pair')->nullable();
+            $table->integer('c_assoc_pair2')->nullable();
+        });
+        DB::table('ASSOC_CODES')->insert([
+            ['c_assoc_code' => 10, 'c_assoc_pair' => 20, 'c_assoc_pair2' => null],
+            ['c_assoc_code' => 20, 'c_assoc_pair' => 10, 'c_assoc_pair2' => null],
+        ]);
     }
 
     protected function createOfficeTables(): void {
@@ -632,6 +645,58 @@ class BasicInformationProposalTest extends TestCase {
         $this->assertSame(75, $payload['c_kin_code']);
         $this->assertArrayNotHasKey('c_kinship_pair', $payload);
         $this->assertSame(176, $payload['__proposal_aux']['c_kinship_pair'] ?? null);
+    }
+
+    #[Test]
+    public function testKinshipProposalUpdateRejectsPairOnlyNoopDespiteAutogenMismatch() {
+        $this->createKinshipTables();
+        DB::table('KINSHIP_CODES')->insert([
+            ['c_kincode' => 111, 'c_kin_pair1' => 176, 'c_kin_pair2' => null],
+            ['c_kincode' => 176, 'c_kin_pair1' => 111, 'c_kin_pair2' => null],
+        ]);
+
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 1,
+            'c_kin_id' => 2,
+            'c_kin_code' => 111,
+            'c_source' => 100,
+            'c_pages' => '原頁碼',
+            'c_notes' => '原註記',
+            'c_autogen_notes' => 'mirror-note',
+        ]);
+        DB::table('KIN_DATA')->insert([
+            'c_personid' => 2,
+            'c_kin_id' => 1,
+            'c_kin_code' => 176,
+            'c_source' => 100,
+            'c_pages' => '原頁碼',
+            'c_notes' => '原註記',
+            'c_autogen_notes' => 'other',
+        ]);
+
+        $user = $this->makeActiveUser();
+        $this->actingAs($user);
+
+        $response = $this->post(route('basicinformation.proposal.update', [
+            'personid' => 1,
+            'resource' => 'kinship',
+            'id' => '1-2-111',
+        ]), [
+            'c_kin_id' => 2,
+            'c_kin_code' => 111,
+            'c_source' => 100,
+            'c_pages' => '原頁碼',
+            'c_notes' => '原註記',
+            'c_autogen_notes' => 'mirror-note',
+            'c_kinship_pair' => 176,
+            '__proposal_comment' => '不應建立無變更提案',
+        ]);
+
+        $response->assertRedirect();
+        $flash = session('flash_notification', collect())->toArray();
+        $this->assertNotEmpty($flash);
+        $this->assertStringContainsString('未偵測到任何修改', $flash[0]['message'] ?? '');
+        $this->assertSame(0, Operation::count(), '既有 mirror pair 相同時，不得因 autogen 不對稱誤建 proposal');
     }
 
     #[Test]

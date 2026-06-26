@@ -208,6 +208,99 @@ class ApiV2MutateStatusTest extends TestCase {
     }
 
     #[Test]
+    public function testDirectStatusUpdatePersistsSupplementAndDoesNotNullOtherFields(): void {
+        // 回歸（Task 27）：補欄 c_supplement 必須能寫入；且只改單一欄位時，未送出的欄位
+        // （c_supplement / c_firstyear）不可被清成 null —— 防護「保存即清空」資料流失 bug。
+        $user = $this->makeUser(email: 'status-supplement@example.com');
+        $this->actingAs($user);
+        $this->seedStatus(['c_supplement' => '原始補充', 'c_firstyear' => 1050]);
+
+        // (a) 直接更新 c_supplement 應成功寫入。
+        $this->postJson('/api/v2/mutate', $this->statusPayload([
+            'changes' => ['c_supplement' => '新補充'],
+        ]))->assertOk();
+        $this->assertDatabaseHas('STATUS_DATA', [
+            'c_personid' => 1000, 'c_sequence' => 1, 'c_status_code' => 50,
+            'c_supplement' => '新補充', 'c_firstyear' => 1050,
+        ]);
+
+        // (b) 只改 c_notes（payload 不含 c_supplement/c_firstyear）後，兩者仍保留、未被清空。
+        $this->postJson('/api/v2/mutate', $this->statusPayload([
+            'changes' => ['c_notes' => '只改備註'],
+        ]))->assertOk();
+        $this->assertDatabaseHas('STATUS_DATA', [
+            'c_personid' => 1000, 'c_sequence' => 1, 'c_status_code' => 50,
+            'c_notes' => '只改備註', 'c_supplement' => '新補充', 'c_firstyear' => 1050,
+        ]);
+    }
+
+    #[Test]
+    public function testDirectStatusUpdateRekeyStatusCodePreservesUnchangedFields(): void {
+        // 回歸（StatusEditor V2）：改鍵 c_status_code（同時改一非主鍵欄 c_notes），
+        // 舊 PK row 必須消失、新 PK row 出現，且所有未變更欄位（c_source / c_pages /
+        // c_supplement / 起終年 / 年號）一個都不能漂移或被清成 null。
+        $user = $this->makeUser(email: 'status-rekey@example.com');
+        $this->actingAs($user);
+        $this->seedStatus([
+            'c_status_code' => 50,
+            'c_source' => 10,
+            'c_pages' => '1-5',
+            'c_supplement' => '原始補充',
+            'c_firstyear' => 1050,
+            'c_fy_nh_code' => 7,
+            'c_fy_nh_year' => 3,
+            'c_fy_range' => 0,
+            'c_lastyear' => 1100,
+            'c_ly_nh_code' => 8,
+            'c_ly_nh_year' => 5,
+            'c_ly_range' => 0,
+        ]);
+
+        $response = $this->postJson('/api/v2/mutate', $this->statusPayload([
+            'changes' => [
+                'c_status_code' => 60, // 改鍵
+                'c_notes' => '改鍵後備註',
+            ],
+        ]));
+        $response->assertOk();
+
+        // 舊 PK row 消失
+        $this->assertDatabaseMissing('STATUS_DATA', [
+            'c_personid' => 1000, 'c_sequence' => 1, 'c_status_code' => 50,
+        ]);
+        // 新 PK row 出現，未變更欄位全數保留
+        $this->assertDatabaseHas('STATUS_DATA', [
+            'c_personid' => 1000, 'c_sequence' => 1, 'c_status_code' => 60,
+            'c_notes' => '改鍵後備註',
+            'c_source' => 10, 'c_pages' => '1-5', 'c_supplement' => '原始補充',
+            'c_firstyear' => 1050, 'c_fy_nh_code' => 7, 'c_fy_nh_year' => 3, 'c_fy_range' => 0,
+            'c_lastyear' => 1100, 'c_ly_nh_code' => 8, 'c_ly_nh_year' => 5, 'c_ly_range' => 0,
+        ]);
+    }
+
+    #[Test]
+    public function testDirectStatusUpdateAcceptsAllEraColumns(): void {
+        // 回歸（trap #1 allowlist 全覆蓋）：起/終年的 8 個年號/時限欄位皆須在白名單內，
+        // 任一缺漏會在編輯起終年時造成 422 或靜默資料流失。
+        $user = $this->makeUser(email: 'status-era@example.com');
+        $this->actingAs($user);
+        $this->seedStatus();
+
+        $this->postJson('/api/v2/mutate', $this->statusPayload([
+            'changes' => [
+                'c_firstyear' => 1060, 'c_fy_nh_code' => 11, 'c_fy_nh_year' => 2, 'c_fy_range' => 1,
+                'c_lastyear' => 1090, 'c_ly_nh_code' => 12, 'c_ly_nh_year' => 4, 'c_ly_range' => 1,
+            ],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('STATUS_DATA', [
+            'c_personid' => 1000, 'c_sequence' => 1, 'c_status_code' => 50,
+            'c_firstyear' => 1060, 'c_fy_nh_code' => 11, 'c_fy_nh_year' => 2, 'c_fy_range' => 1,
+            'c_lastyear' => 1090, 'c_ly_nh_code' => 12, 'c_ly_nh_year' => 4, 'c_ly_range' => 1,
+        ]);
+    }
+
+    #[Test]
     public function testDirectStatusUpdateReturnsOperationIdAndRow(): void {
         $user = $this->makeUser(email: 'status-result@example.com');
         $this->actingAs($user);
@@ -411,6 +504,31 @@ class ApiV2MutateStatusTest extends TestCase {
 
         $response = $this->postJson('/api/v2/mutate', $this->statusPayload());
         $response->assertStatus(403);
+    }
+
+    // ── #56 M 寫入等價（update 路徑，純單表；statuses 無鏡像/副表）──────
+
+    #[Test]
+    public function testStatusCodeFieldSentinelFullyIdempotent(): void {
+        // c_source（legacy 哨兵 0=Unknown）所有空表示 null/''/-999/'0'/0 → 0、合法值保留、來回不翻。≥10 案例。
+        $this->actingAs($this->makeUser(email: 'status-sentinel@example.com'));
+        $T = 'STATUS_DATA';
+        $f = 'c_source';
+        foreach ([null, '', -999, '0', 0] as $sent) {
+            DB::table($T)->delete();
+            $this->seedStatus([$f => 5, 'c_notes' => '初始']);
+            $this->postJson('/api/v2/mutate', $this->statusPayload(['changes' => [$f => $sent, 'c_notes' => '改'.var_export($sent, true)]]))->assertOk();
+            $this->assertSame(0, (int) DB::table($T)->value($f), $f.' 送 '.var_export($sent, true).' 應規範化為 0');
+            $this->assertNotNull(DB::table($T)->value($f), $f.' 不得為 null');
+        }
+        DB::table($T)->delete();
+        $this->seedStatus([$f => 1, 'c_notes' => 'x']);
+        $this->postJson('/api/v2/mutate', $this->statusPayload(['changes' => [$f => 7, 'c_notes' => '合法值']]))->assertOk();
+        $this->assertSame(7, (int) DB::table($T)->value($f), '合法非 0 值不得被誤清');
+        foreach ([null, '', -999, 0] as $i => $sent) {
+            $this->postJson('/api/v2/mutate', $this->statusPayload(['changes' => [$f => $sent, 'c_notes' => '再'.$i]]))->assertOk();
+            $this->assertSame(0, (int) DB::table($T)->value($f), '幂等重送仍為 0（第'.$i.'輪）');
+        }
     }
 
     #[Test]

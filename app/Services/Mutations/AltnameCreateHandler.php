@@ -60,7 +60,10 @@ class AltnameCreateHandler extends AbstractPersonSubresourceCreateHandler {
     protected function preprocessCreateData(array $data): array {
         $data = BracketNormalizer::normalizeAltname($data);
 
-        return $this->normalizeSentinelValues($data, ['c_alt_name_type_code', 'c_source']);
+        $data = $this->normalizeSentinelValues($data, ['c_alt_name_type_code', 'c_source']);
+
+        // #71：非 PK 碼欄 c_source 完全幂等（null/''/-999→0），對齊已修的 AltnameMutationHandler。
+        return $this->normalizeEmptyCodeFields($data, ['c_source']);
     }
 
     protected function handleDirect(int $personId, array $actualPk, array $rowData, string $comment): \Illuminate\Http\JsonResponse {

@@ -44,19 +44,33 @@ class AddressCreateHandler extends AbstractPersonSubresourceCreateHandler {
             'c_notes',
             'c_source',
             'c_pages',
+            'c_natal',
             'c_fy_nh_code',
             'c_fy_nh_year',
             'c_fy_range',
             'c_fy_intercalary',
+            'c_fy_month',
+            'c_fy_day',
+            'c_fy_day_gz',
             'c_ly_nh_code',
             'c_ly_nh_year',
             'c_ly_range',
             'c_ly_intercalary',
+            'c_ly_month',
+            'c_ly_day',
+            'c_ly_day_gz',
         ];
     }
 
     protected function preprocessCreateData(array $data): array {
         $data = $this->normalizeSentinelValues($data, ['c_addr_id', 'c_source']);
+
+        // 對齊 legacy emptyToSentinel：地名／出處清空時正規化為 '0'（不可 NULL）。
+        foreach (['c_addr_id', 'c_source'] as $f) {
+            if (array_key_exists($f, $data) && ($data[$f] === null || $data[$f] === '')) {
+                $data[$f] = '0';
+            }
+        }
 
         if (array_key_exists('c_fy_intercalary', $data)) {
             $data['c_fy_intercalary'] = (int) ($data['c_fy_intercalary'] ?? 0);

@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 
 class AdminBatchLoadBookTitlesController extends Controller {
     /**
@@ -60,6 +61,34 @@ class AdminBatchLoadBookTitlesController extends Controller {
     }
 
     /**
+     * Inertia + React 版：批次匯入書稿表單頁。讀取與 Blade 相同的 session 結果。
+     */
+    public function appShowForm(Request $request) {
+        $this->ensureAdmin();
+
+        return Inertia::render('Admin/BatchLoadBookTitles/Index', [
+            'input' => (string) old('entries', ''),
+            'results' => session('batch_results', []),
+            'batch_errors' => array_values(session('batch_errors', [])),
+            'batch_id' => session('batch_id'),
+            'toast' => session('toast'),
+            'urls' => [
+                'store' => route('app.admin.batch-load-book-titles.store', [], false),
+                'undo' => route('app.admin.batch-load-book-titles.undo', [], false),
+                'reset' => route('app.admin.batch-load-book-titles', [], false),
+            ],
+            'page_translations' => [
+                'admin' => is_array($t = trans('admin')) ? $t : [],
+            ],
+        ]);
+    }
+
+    /** 依目前請求路徑決定 store/undo 完成後的列表路由（Blade vs Inertia 共用 store/undo）。 */
+    protected function listRouteName(Request $request): string {
+        return $request->is('app/*') ? 'app.admin.batch-load-book-titles' : 'admin.batch-load-book-titles';
+    }
+
+    /**
      * Handle the batch upload submission.
      */
     public function store(Request $request) {
@@ -80,7 +109,7 @@ class AdminBatchLoadBookTitlesController extends Controller {
 
         if (!empty($errors)) {
             return redirect()
-                ->route('admin.batch-load-book-titles')
+                ->route($this->listRouteName($request))
                 ->withInput()
                 ->with('batch_errors', $errors);
         }
@@ -142,7 +171,7 @@ class AdminBatchLoadBookTitlesController extends Controller {
         });
 
         return redirect()
-            ->route('admin.batch-load-book-titles')
+            ->route($this->listRouteName($request))
             ->with('batch_results', $results)
             ->with('batch_errors', [])
             ->with('batch_id', $batchId)
@@ -184,7 +213,7 @@ class AdminBatchLoadBookTitlesController extends Controller {
         });
 
         return redirect()
-            ->route('admin.batch-load-book-titles')
+            ->route($this->listRouteName($request))
             ->with('toast', $deleted > 0
                 ? ['msg' => "已撤回批次 {$data['batch_id']}，共刪除 {$deleted} 筆。", 'type' => 'success']
                 : ['msg' => "找不到對應批次 {$data['batch_id']} 的資料，可能已被撤回或不存在。", 'type' => 'warning']);

@@ -5,25 +5,23 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 class AiFillLogController extends Controller {
-    /**
-     * AI 填充日誌列表（僅 Super Admin）
-     */
-    public function index(Request $request) {
-        if (!Auth::user()->isSuperAdmin()) {
+    /** 僅 Super Admin。 */
+    protected function guard(): void {
+        if (!Auth::user() || !Auth::user()->isSuperAdmin()) {
             abort(403, '此功能僅限超級管理員使用');
         }
+    }
 
+    /** join users 的基礎查詢 + 套用篩選（search/user_id/category）。Blade 與 Inertia 共用。 */
+    protected function buildQuery(Request $request) {
         $query = DB::table('ai_fill_logs')
             ->leftJoin('users', 'ai_fill_logs.user_id', '=', 'users.id')
-            ->select(
-                'ai_fill_logs.*',
-                'users.name as user_name',
-                'users.email as user_email'
-            );
+            ->select('ai_fill_logs.*', 'users.name as user_name', 'users.email as user_email');
 
-        // 關鍵字搜尋
         if ($request->filled('search')) {
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
@@ -33,58 +31,156 @@ class AiFillLogController extends Controller {
             });
         }
 
-        // 用戶篩選
         if ($request->filled('user_id')) {
             $query->where('ai_fill_logs.user_id', $request->input('user_id'));
         }
 
-        // 類別篩選
         if ($request->filled('category')) {
             $query->where('ai_fill_logs.category', $request->input('category'));
         }
 
-        $query->orderBy('ai_fill_logs.created_at', 'desc');
+        return $query->orderBy('ai_fill_logs.created_at', 'desc');
+    }
 
-        $logs = $query->paginate(20)->withQueryString();
-
-        // 為每條有 user_submitted 的記錄建構比較數據
-        foreach ($logs as $log) {
-            $log->comparison_rows = null;
-            if ($log->ai_matched && $log->user_submitted) {
-                $aiMatched = json_decode($log->ai_matched, true);
-                $userSubmitted = json_decode($log->user_submitted, true);
-                $logCat = $log->category ?? 'posting';
-                if (is_array($aiMatched) && is_array($userSubmitted)) {
-                    $log->comparison_rows = ($logCat === 'assoc' || $logCat === 'status')
-                        ? $this->buildCodeComparisonRows($aiMatched, $userSubmitted, $logCat)
-                        : $this->buildComparisonRows($aiMatched, $userSubmitted);
-                }
+    /** 為一筆 log 補上 comparison_rows（與 Blade 版同邏輯）。 */
+    protected function attachComparison($log): void {
+        $log->comparison_rows = null;
+        if ($log->ai_matched && $log->user_submitted) {
+            $aiMatched = json_decode($log->ai_matched, true);
+            $userSubmitted = json_decode($log->user_submitted, true);
+            $logCat = $log->category ?? 'posting';
+            if (is_array($aiMatched) && is_array($userSubmitted)) {
+                $log->comparison_rows = ($logCat === 'assoc' || $logCat === 'status')
+                    ? $this->buildCodeComparisonRows($aiMatched, $userSubmitted, $logCat)
+                    : $this->buildComparisonRows($aiMatched, $userSubmitted);
             }
         }
+    }
 
-        // 獲取有日誌記錄的用戶列表
-        $users = DB::table('users')
+    /** 有日誌記錄的用戶清單。 */
+    protected function logUsers() {
+        return DB::table('users')
             ->whereIn('id', function ($query) {
-                $query->select('user_id')
-                    ->from('ai_fill_logs')
-                    ->whereNotNull('user_id')
-                    ->distinct();
+                $query->select('user_id')->from('ai_fill_logs')->whereNotNull('user_id')->distinct();
             })
             ->orderBy('name')
             ->get();
+    }
+
+    /**
+     * AI 填充日誌列表（舊 Blade 版，僅 Super Admin）
+     */
+    public function index(Request $request) {
+        $this->guard();
+
+        $logs = $this->buildQuery($request)->paginate(20)->withQueryString();
+        foreach ($logs as $log) {
+            $this->attachComparison($log);
+        }
 
         return view('admin.ai_fill_logs.index', [
             'page_title' => __('admin.ai_fill_logs'),
             'page_title_key' => 'AI 填充日誌',
             'page_url' => route('admin.ai-fill-logs'),
             'logs' => $logs,
-            'users' => $users,
+            'users' => $this->logUsers(),
             'filters' => [
                 'search' => $request->input('search'),
                 'user_id' => $request->input('user_id'),
                 'category' => $request->input('category'),
             ],
         ]);
+    }
+
+    /**
+     * AI 填充日誌列表（Inertia + React 版）。授權/篩選與 Blade 版一致；
+     * 每筆 log 於後端備妥顯示欄位（比較列、統計、人物連結、JSON 美化）。
+     */
+    public function appIndex(Request $request) {
+        $this->guard();
+
+        $paginator = $this->buildQuery($request)->paginate(20)->withQueryString();
+        $rows = array_map(fn ($log) => $this->prepareLog($log), $paginator->items());
+
+        return Inertia::render('Admin/AiFillLogs/Index', [
+            'logs' => [
+                'data' => $rows,
+                'meta' => [
+                    'current_page' => $paginator->currentPage(),
+                    'last_page' => $paginator->lastPage(),
+                    'per_page' => $paginator->perPage(),
+                    'total' => $paginator->total(),
+                    'from' => $paginator->firstItem(),
+                    'to' => $paginator->lastItem(),
+                ],
+            ],
+            'users' => $this->logUsers()->map(fn ($u) => ['id' => $u->id, 'name' => $u->name]),
+            'filters' => [
+                'search' => $request->input('search'),
+                'user_id' => $request->input('user_id'),
+                'category' => $request->input('category'),
+            ],
+            'page_translations' => [
+                'admin' => is_array($t = trans('admin')) ? $t : [],
+            ],
+        ]);
+    }
+
+    /**
+     * 把一筆 log 備妥成前端可直接渲染的結構。
+     *
+     * @param object $log
+     * @return array<string, mixed>
+     */
+    protected function prepareLog($log): array {
+        $this->attachComparison($log);
+
+        $category = $log->category ?? 'posting';
+        $aiMatched = $log->ai_matched ? json_decode($log->ai_matched, true) : null;
+        $statistics = is_array($aiMatched) ? ($aiMatched['statistics'] ?? null) : null;
+
+        // 人物連結（依類別指向對應子資源頁；相對 URL 避免混合內容）。
+        $personRoute = match ($category) {
+            'assoc' => 'basicinformation.assoc.index',
+            'status' => 'basicinformation.statuses.index',
+            default => 'basicinformation.offices.index',
+        };
+        $personUrl = ($log->c_personid && Route::has($personRoute))
+            ? route($personRoute, ['basicinformation' => $log->c_personid], false)
+            : null;
+
+        return [
+            'id' => $log->id,
+            'category' => $category,
+            'user_name' => $log->user_name,
+            'user_email' => $log->user_email,
+            'c_personid' => $log->c_personid,
+            'person_url' => $personUrl,
+            'created_at' => (string) $log->created_at,
+            'execution_time_ms' => $log->execution_time_ms,
+            'has_submission' => (bool) $log->user_submitted,
+            'source_text' => $log->source_text,
+            'statistics' => $statistics,
+            'route_name' => $log->route_name,
+            'route_url' => $log->route_url,
+            'comparison_rows' => $log->comparison_rows,
+            'ai_raw_pretty' => $this->prettyJson($log->ai_raw),
+            'ai_matched_pretty' => $this->prettyJson($log->ai_matched),
+            'user_submitted_pretty' => $this->prettyJson($log->user_submitted),
+        ];
+    }
+
+    /** 把 JSON 字串美化；非 JSON 或空則回 null。 */
+    protected function prettyJson(?string $json): ?string {
+        if ($json === null || $json === '') {
+            return null;
+        }
+        $decoded = json_decode($json, true);
+        if ($decoded === null) {
+            return $json;
+        }
+
+        return json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
     }
 
     /**

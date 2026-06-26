@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { usePage } from '@inertiajs/react';
-import AppShell from '../../Layouts/AppShell';
+import DashboardLayout from '../../Layouts/DashboardLayout';
 import { useTranslation } from '../../hooks/useTranslation';
 import { registerDirtyChecker } from '../../hooks/useDirtyGuard';
 import PeopleSearchPanel from '../../components/PersonBrowser/PeopleSearchPanel';
@@ -17,8 +17,23 @@ interface PageProps {
     summaryEndpoint: string;
     tabEndpoint: string;
     mutateEndpoint: string;
+    createEndpoint: string;
+    deleteEndpoint: string;
     pinyinEndpoint: string;
     canEditBasicInfo: boolean;
+    canProposeEdits: boolean;
+    altnameEditorIsNew: boolean;
+    addressesEditorIsNew: boolean;
+    textsEditorIsNew: boolean;
+    sourcesEditorIsNew: boolean;
+    officesEditorIsNew: boolean;
+    assocEditorIsNew: boolean;
+    kinshipEditorIsNew: boolean;
+    eventsEditorIsNew: boolean;
+    entriesEditorIsNew: boolean;
+    statusesEditorIsNew: boolean;
+    possessionEditorIsNew: boolean;
+    socialInstEditorIsNew: boolean;
     initialPersonId: number | null;
     initialKeyword: string;
     initialDynasty: string;
@@ -41,8 +56,23 @@ export default function PersonBrowserIndex() {
         summaryEndpoint,
         tabEndpoint,
         mutateEndpoint,
+        createEndpoint,
+        deleteEndpoint,
         pinyinEndpoint,
         canEditBasicInfo,
+        canProposeEdits,
+        altnameEditorIsNew,
+        addressesEditorIsNew,
+        textsEditorIsNew,
+        sourcesEditorIsNew,
+        officesEditorIsNew,
+        assocEditorIsNew,
+        kinshipEditorIsNew,
+        eventsEditorIsNew,
+        entriesEditorIsNew,
+        statusesEditorIsNew,
+        possessionEditorIsNew,
+        socialInstEditorIsNew,
         initialPersonId,
         initialKeyword,
         initialDynasty,
@@ -450,7 +480,7 @@ export default function PersonBrowserIndex() {
     }, [handleSelect, runOrWarnUnsaved]);
 
     return (
-        <AppShell>
+        <DashboardLayout disableContentPadding>
             {isMobile && sidebarOpen ? (
                 <div
                     style={mobileBackdropStyle}
@@ -525,8 +555,23 @@ export default function PersonBrowserIndex() {
                             activeTab={activeTab}
                             tabEndpoint={tabEndpoint}
                             mutateEndpoint={mutateEndpoint}
+                            createEndpoint={createEndpoint}
+                            deleteEndpoint={deleteEndpoint}
                             pinyinEndpoint={pinyinEndpoint}
                             canEditBasicInfo={canEditBasicInfo}
+                            canProposeEdits={canProposeEdits}
+                            altnameEditorIsNew={altnameEditorIsNew}
+                            addressesEditorIsNew={addressesEditorIsNew}
+                            textsEditorIsNew={textsEditorIsNew}
+                            sourcesEditorIsNew={sourcesEditorIsNew}
+                            officesEditorIsNew={officesEditorIsNew}
+                            assocEditorIsNew={assocEditorIsNew}
+                            kinshipEditorIsNew={kinshipEditorIsNew}
+                            eventsEditorIsNew={eventsEditorIsNew}
+                            entriesEditorIsNew={entriesEditorIsNew}
+                            statusesEditorIsNew={statusesEditorIsNew}
+                            possessionEditorIsNew={possessionEditorIsNew}
+                            socialInstEditorIsNew={socialInstEditorIsNew}
                             postCE={summary?.dynasty_start != null && summary.dynasty_start > 0}
                             onSelectPerson={guardedHandleSelect}
                             onBasicInfoSaved={handleBasicInfoSaved}
@@ -567,7 +612,7 @@ export default function PersonBrowserIndex() {
                     {tPerson('unsaved_changes_warning')}
                 </div>
             </SelectionDialog>
-        </AppShell>
+        </DashboardLayout>
     );
 }
 
@@ -577,7 +622,8 @@ const MOBILE_BREAKPOINT = 960;
 
 const wrapperStyle: React.CSSProperties = {
     display: 'flex',
-    height: 'calc(100vh - 100px)',
+    // 填滿 DashboardLayout 內容區：扣掉導覽列（h-14 ≈ 57px）與頁尾（py-3 + text-sm ≈ 49px）≈ 106px。
+    height: 'calc(100vh - 106px)',
     overflow: 'hidden',
 };
 

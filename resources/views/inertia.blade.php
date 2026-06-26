@@ -4,6 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    {{-- Google Font: Source Sans Pro（與主站 dashboard-v3 對齊；Noto Sans TC 由 inertia bundle 自托管） --}}
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
     <title>{{ config('app.name', 'CBDB') }}</title>
     <style>
         html, body {
@@ -17,5 +19,9 @@
 </head>
 <body>
     @inertia
+    {{-- CHGIS 地圖前端資源：使 .chgis-place-link 點擊在 React 頁亦能浮出以 chgis_map.mbtiles
+         為底圖的無邊框地圖（取代 /app/maps iframe）。partial 以 @push('scripts') 注入 config + @vite。 --}}
+    @include('biogmains._chgis_map_assets')
+    @stack('scripts')
 </body>
 </html>

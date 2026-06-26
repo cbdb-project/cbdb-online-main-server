@@ -379,7 +379,8 @@ class BiogMainRepository {
      */
     public static function namesByQuery(Request $request, $num = 20) {
         //20220303增加addslashes()防禦查詢參數
-        $request->q = addslashes($request->q ?? '');
+        // #85：拼音 ü→v 規範化（CBDB 以 v 存 ü 韻，如 呂=Lv）——使用者輸入 ü 或 v 皆可命中。
+        $request->q = addslashes(\App\Support\PinyinSearchNormalizer::umlautToV($request->q ?? ''));
         if ($temp = $request->num) {
             $num = addslashes($temp);
         }
@@ -583,7 +584,8 @@ class BiogMainRepository {
             return collect();
         }
 
-        $q = addslashes($q);
+        // #85：拼音 ü→v 規範化（與 namesByQuery 一致，使朝代分面與搜尋結果同口徑）。
+        $q = addslashes(\App\Support\PinyinSearchNormalizer::umlautToV($q));
 
         // 純數字：單筆精確查詢，不需要 facet
         if (ctype_digit($q)) {
@@ -1357,7 +1359,7 @@ class BiogMainRepository {
         return ['row' => $row, 'text_str' => $text_str, 'kin_str' => $kin_str, 'biog_str' => $biog_str, 'kinpair_str' => $kinpair_str, 'k_p_code' => $k_p_code];
     }
 
-    public function kinshipUpdateById(Request $request, $id, $id_) {
+    public function kinshipUpdateById(Request $request, $id, $id_, bool $detectConflict = false) {
         $auditLog = new AuditLogService();
         $id_ = str_replace("--", "-minus", $id_);
         $temp_l = explode("-", $id_);
@@ -1389,7 +1391,7 @@ class BiogMainRepository {
         $ori_data = $data;
         $sumCount = 0;
 
-        DB::transaction(function () use (&$ori_data, &$sumCount, $id, $id_, $temp_l, $row, $data, $kin_pair, $kin_id, $c_autogen_notes, $old_kin_id, $old_kin_code, $auditLog) {
+        DB::transaction(function () use (&$ori_data, &$sumCount, $id, $id_, $temp_l, $row, $data, $kin_pair, $kin_id, $c_autogen_notes, $old_kin_id, $old_kin_code, $auditLog, $detectConflict) {
             DB::table('KIN_DATA')->where([
                 ['c_personid', '=', $temp_l[0]],
                 ['c_kin_id', '=', $temp_l[1]],
@@ -1424,65 +1426,24 @@ class BiogMainRepository {
             $data_mirror = Arr::except($data_mirror, ['c_kin_id']);
 
             #20240710修正對應親屬的查詢方式，依據KINSHIP_CODES的c_kin_pair1和c_kin_pair2查詢
-            $kin_code_pair = KinshipCode::find($old_kin_code);
-            $sumQuery = DB::table('KIN_DATA')->where(function ($query) use ($id, $old_kin_id, $c_autogen_notes, $kin_code_pair) {
-                $query->where('c_kin_id', $id)
-                    ->where('c_personid', $old_kin_id)
-                    ->where('c_autogen_notes', $c_autogen_notes)
-                    ->where('c_kin_code', $kin_code_pair->c_kin_pair1);
-            });
-
-            if (!empty($kin_code_pair->c_kin_pair2)) {
-                $sumQuery->orWhere(function ($query) use ($id, $old_kin_id, $c_autogen_notes, $kin_code_pair) {
-                    $query->where('c_kin_id', $id)
-                        ->where('c_personid', $old_kin_id)
-                        ->where('c_autogen_notes', $c_autogen_notes)
-                        ->where('c_kin_code', $kin_code_pair->c_kin_pair2);
-                });
-            }
-
-            $sum = $sumQuery->get();
-            $sumCount = count($sum);
-            if ($sumCount == 1) {
-                $updateQuery = DB::table('KIN_DATA')->where(function ($query) use ($id, $old_kin_id, $c_autogen_notes, $kin_code_pair) {
-                    $query->where('c_kin_id', $id)
-                        ->where('c_personid', $old_kin_id)
-                        ->where('c_autogen_notes', $c_autogen_notes)
-                        ->where('c_kin_code', $kin_code_pair->c_kin_pair1);
-                });
-
-                if (!empty($kin_code_pair->c_kin_pair2)) {
-                    $updateQuery->orWhere(function ($query) use ($id, $old_kin_id, $c_autogen_notes, $kin_code_pair) {
-                        $query->where('c_kin_id', $id)
-                            ->where('c_personid', $old_kin_id)
-                            ->where('c_autogen_notes', $c_autogen_notes)
-                            ->where('c_kin_code', $kin_code_pair->c_kin_pair2);
-                    });
-                }
-
-                $mirroredRows = (clone $updateQuery)->get();
-                $updateQuery->update($data_mirror);
-            } else {
-                $updateQuery = DB::table('KIN_DATA')->where([['c_kin_id',$id], ['c_personid', $old_kin_id], ['c_autogen_notes', $c_autogen_notes]]);
-                $mirroredRows = (clone $updateQuery)->get();
-                $updateQuery->update($data_mirror);
-            }
-
-            foreach ($mirroredRows as $mirroredRow) {
-                $oldMirroredData = $auditLog->normalizeRow($mirroredRow);
-                $newMirroredData = array_merge($oldMirroredData, $data_mirror);
-
-                $auditLog->write(
-                    'KIN_DATA',
-                    'UPDATE',
-                    $auditLog->buildRowPkFromData('KIN_DATA', $newMirroredData),
-                    $oldMirroredData,
-                    $newMirroredData,
-                    'user',
-                    (string) Auth::id(),
-                    $operationId
-                );
-            }
+            // 反向鏡像同步抽出為共用方法（legacy 與 v2 KinshipMutationHandler 共用）；
+            // 舊碼配對查找與缺碼 fail-closed 一併移入該方法（保留 legacy 原子失敗語意）。
+            $sumCount = $this->syncKinMirrorOnUpdate(
+                $data_mirror,
+                (int) $id,
+                $old_kin_id,
+                $c_autogen_notes,
+                $old_kin_code,
+                $operation,
+                $auditLog,
+                // kin 維持 allowBackfill=false：syncKinMirrorOnUpdate 的 #70 疑似偵測**不受 allowBackfill 閘控**（與 assoc
+                // 不同，無 early-return），故 detectConflict=true 下對面碼漂移仍會拋 MirrorSuspectedException 中止核准；
+                // 對面無鏡像時 sumCount=0 → applyKinshipProposal 既有 guard 拋「更新失敗」中止（亦 fail-safe）。
+                // 不可改 true：backfill 雖補列但 sumCount 仍 0 → guard 仍拋 → 反把 backfill 回滾（測試實證）。
+                false,            // allowBackfill
+                $detectConflict,  // detectConflict
+                $detectConflict ? $this->buildApprovalMirrorBaselines('KIN_DATA', $row) : []
+            );
         });
 
         $ori_data['err'] = $sumCount;
@@ -1490,7 +1451,7 @@ class BiogMainRepository {
         return $ori_data;
     }
 
-    public function kinshipStoreById(Request $request, $id) {
+    public function kinshipStoreById(Request $request, $id, bool $detectConflict = false) {
         $auditLog = new AuditLogService();
         $data = $request->all();
         $kin_pair = $data['c_kinship_pair'];
@@ -1503,7 +1464,7 @@ class BiogMainRepository {
 
         $ori_Data = $data;
 
-        DB::transaction(function () use ($id, $data, $kin_pair, $auditLog, &$ori_Data) {
+        DB::transaction(function () use ($id, $data, $kin_pair, $auditLog, $detectConflict, &$ori_Data) {
             DB::table('KIN_DATA')->insert($data);
             $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
                 'c_personid' => $data['c_personid'],
@@ -1526,25 +1487,47 @@ class BiogMainRepository {
                 $operationId
             );
 
-            $data_mirror = $data;
-            $data_mirror['c_kin_code'] = $kin_pair;
-            $data_mirror['c_personid'] = $data['c_kin_id'];
-            $data_mirror['c_kin_id'] = $id;
-            DB::table('KIN_DATA')->insert($data_mirror);
-            $auditLog->write(
-                'KIN_DATA',
-                'INSERT',
-                [
-                    'c_personid' => $data_mirror['c_personid'],
-                    'c_kin_id' => $data_mirror['c_kin_id'],
-                    'c_kin_code' => $data_mirror['c_kin_code'],
-                ],
-                null,
-                $data_mirror,
-                'user',
-                (string) Auth::id(),
-                $operationId
-            );
+            // #82：提案核准（$detectConflict=true）且反向碼非哨兵 0 時，反向鏡像改走已 gate 的 syncKinMirrorOnUpdate
+            // （含 #66 衝突 + #72 疑似偵測 + allowBackfill），與 v2 direct create 行為一致——對面分歧/碼漂移→拋例外
+            // 中止核准（approve() 友善 flash + 整筆回滾），不再盲插重複/衝突鏡像。legacy direct（false）維持原盲插 parity。
+            if ($detectConflict && (int) $kin_pair !== 0) {
+                $dataMirror = $data;
+                unset($dataMirror['c_kin_id']);
+                $dataMirror['c_kin_code'] = $kin_pair;
+                $dataMirror['c_personid'] = $data['c_kin_id'];
+                $this->syncKinMirrorOnUpdate(
+                    $dataMirror,
+                    (int) $id,
+                    (int) $data['c_kin_id'],
+                    $data['c_autogen_notes'] ?? null,
+                    $data['c_kin_code'],
+                    $operation,
+                    $auditLog,
+                    true,   // allowBackfill：對面無對應列即補建
+                    true,   // detectConflict：偵測對面衝突/疑似
+                    $this->createKinMirrorBaselines($dataMirror, $data['c_kin_code'])
+                );
+            } else {
+                $data_mirror = $data;
+                $data_mirror['c_kin_code'] = $kin_pair;
+                $data_mirror['c_personid'] = $data['c_kin_id'];
+                $data_mirror['c_kin_id'] = $id;
+                DB::table('KIN_DATA')->insert($data_mirror);
+                $auditLog->write(
+                    'KIN_DATA',
+                    'INSERT',
+                    [
+                        'c_personid' => $data_mirror['c_personid'],
+                        'c_kin_id' => $data_mirror['c_kin_id'],
+                        'c_kin_code' => $data_mirror['c_kin_code'],
+                    ],
+                    null,
+                    $data_mirror,
+                    'user',
+                    (string) Auth::id(),
+                    $operationId
+                );
+            }
         });
 
         return $ori_Data;
@@ -1569,10 +1552,6 @@ class BiogMainRepository {
         }
 
         DB::transaction(function () use ($id, $temp_l, $row, $auditLog) {
-            #20240710修正對應親屬的查詢方式，依據KINSHIP_CODES的c_kin_pair1和c_kin_pair2查詢
-            $old_kin_code = $row->c_kin_code;
-            $kin_code_pair = KinshipCode::find($old_kin_code);
-
             $operation = (new OperationRepository())->store(Auth::id(), $id, 4, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
                 'c_personid' => $temp_l[0],
                 'c_kin_id' => $temp_l[1],
@@ -1594,92 +1573,16 @@ class BiogMainRepository {
                 $operationId
             );
 
-            $row2Query = DB::table('KIN_DATA')->where(function ($query) use ($row, $kin_code_pair) {
-                $query->where('c_kin_id', $row->c_personid)
-                    ->where('c_personid', $row->c_kin_id)
-                    ->where('c_autogen_notes', $row->c_autogen_notes)
-                    ->where('c_kin_code', $kin_code_pair->c_kin_pair1);
-            });
-
-            if (!empty($kin_code_pair->c_kin_pair2)) {
-                $row2Query->orWhere(function ($query) use ($row, $kin_code_pair) {
-                    $query->where('c_kin_id', $row->c_personid)
-                        ->where('c_personid', $row->c_kin_id)
-                        ->where('c_autogen_notes', $row->c_autogen_notes)
-                        ->where('c_kin_code', $kin_code_pair->c_kin_pair2);
-                });
-            }
-
-            $row2 = $row2Query->first();
-
             DB::table('KIN_DATA')->where([
                 ['c_personid', '=', $temp_l[0]],
                 ['c_kin_id', '=', $temp_l[1]],
                 ['c_kin_code', '=', $temp_l[2]],
             ])->delete();
 
-            //先檢查$row2是否存在，再檢查$row2->c_modified_date是否為null，依照c_kin_id, c_personid, c_source, c_created_date, c_modified_date查詢後進行刪除反向關係。
-            if ($row2 !== null && is_null($row2->c_modified_date)) {
-                $deleteQuery = DB::table('KIN_DATA')->where(function ($query) use ($row2, $kin_code_pair) {
-                    $query->where('c_kin_id', $row2->c_kin_id)
-                        ->where('c_personid', $row2->c_personid)
-                        ->where('c_source', $row2->c_source)
-                        ->where('c_autogen_notes', $row2->c_autogen_notes)
-                        ->where('c_kin_code', $kin_code_pair->c_kin_pair1);
-                });
-
-                if (!empty($kin_code_pair->c_kin_pair2)) {
-                    $deleteQuery->orWhere(function ($query) use ($row2, $kin_code_pair) {
-                        $query->where('c_kin_id', $row2->c_kin_id)
-                            ->where('c_personid', $row2->c_personid)
-                            ->where('c_source', $row2->c_source)
-                            ->where('c_autogen_notes', $row2->c_autogen_notes)
-                            ->where('c_kin_code', $kin_code_pair->c_kin_pair2);
-                    });
-                }
-
-                $mirroredRows = (clone $deleteQuery)->get();
-                $deleteQuery->delete();
-            } elseif ($row2 !== null) {
-                $deleteQuery = DB::table('KIN_DATA')->where(function ($query) use ($row2, $kin_code_pair) {
-                    $query->where('c_kin_id', $row2->c_kin_id)
-                        ->where('c_personid', $row2->c_personid)
-                        ->where('c_source', $row2->c_source)
-                        ->where('c_autogen_notes', $row2->c_autogen_notes)
-                        ->where('c_kin_code', $kin_code_pair->c_kin_pair1)
-                        ->where('c_modified_date', $row2->c_modified_date);
-                });
-
-                if (!empty($kin_code_pair->c_kin_pair2)) {
-                    $deleteQuery->orWhere(function ($query) use ($row2, $kin_code_pair) {
-                        $query->where('c_kin_id', $row2->c_kin_id)
-                            ->where('c_personid', $row2->c_personid)
-                            ->where('c_source', $row2->c_source)
-                            ->where('c_autogen_notes', $row2->c_autogen_notes)
-                            ->where('c_kin_code', $kin_code_pair->c_kin_pair2)
-                            ->where('c_modified_date', $row2->c_modified_date);
-                    });
-                }
-
-                $mirroredRows = (clone $deleteQuery)->get();
-                $deleteQuery->delete();
-            } else {
-                $mirroredRows = collect();
-            }
-
-            foreach ($mirroredRows as $mirroredRow) {
-                $mirroredRowData = $auditLog->normalizeRow($mirroredRow);
-                $auditLog->write(
-                    'KIN_DATA',
-                    'DELETE',
-                    $auditLog->buildRowPkFromData('KIN_DATA', $mirroredRowData),
-                    $mirroredRowData,
-                    null,
-                    'user',
-                    (string) Auth::id(),
-                    $operationId
-                );
-            }
+            // 反向鏡像刪除抽出為共用方法（legacy 與 v2 KinshipDeleteHandler 共用）。
+            // legacy 路徑無互動確認，沿用「刪除全部對應反向列」語義（$force=true）：取得 #81 §6 廣集定位的孤兒修正，
+            // 但不啟用多筆確認閘（避免在非互動的 legacy 刪除拋 MirrorDeleteMultipleException 中斷）。
+            $this->syncKinMirrorOnDelete((array) $row, $operation, $auditLog, true);
         });
     }
 
@@ -1706,7 +1609,9 @@ class BiogMainRepository {
 
     public function possessionUpdateById(Request $request, $id, $id_) {
         $data = $request->all();
-        $c_addr_id = $data['c_addr_id'];
+        // 僅當 c_addr_id 為陣列才同步 POSSESSION_ADDR（legacy 表單與帶 aux 的 proposal 會送）；
+        // 未送（proposal 未帶地址 aux）時為 null → 不動既有地址，避免 TypeError 與誤刪副表。
+        $c_addr_id = $data['c_addr_id'] ?? null;
         $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_addr_id']);
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository())->timestamp($data);
@@ -1716,7 +1621,9 @@ class BiogMainRepository {
         }
 
         DB::transaction(function () use ($id, $id_, $data, $c_addr_id, $ori) {
-            $this->insertAddrPo($c_addr_id, $id_, $id);
+            if (is_array($c_addr_id)) {
+                $this->insertAddrPo($c_addr_id, $id_, $id);
+            }
             DB::table('POSSESSION_DATA')->where('c_possession_record_id', $id_)->update($data);
             $operation = (new OperationRepository())->store(Auth::id(), $id, 3, 'POSSESSION_DATA', $id_, $data, $ori);
             (new AuditLogService())->write(
@@ -1734,21 +1641,29 @@ class BiogMainRepository {
 
     public function possessionStoreById(Request $request, $id) {
         $data = $request->all();
-        $data['c_possession_record_id'] = DB::table('POSSESSION_DATA')->max('c_possession_record_id') + 1;
         $data['c_personid'] = $id;
         $addr = $data['c_addr_id'];
         $data = Arr::except($data, ['_token', 'action', '__proposal_comment', 'c_addr_id']);
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         $data = (new ToolsRepository())->timestamp($data, true);
 
-        DB::transaction(function () use ($id, $data, $addr) {
+        $newId = null;
+        DB::transaction(function () use ($id, $data, $addr, &$newId) {
+            // surrogate id 必須在交易內以 lockForUpdate 配發，避免併發 create 取得相同 id（與 officeStoreById 一致）
+            $lastId = DB::table('POSSESSION_DATA')
+                ->lockForUpdate()
+                ->orderByDesc('c_possession_record_id')
+                ->value('c_possession_record_id');
+            $newId = ((int) $lastId) + 1;
+            $data['c_possession_record_id'] = $newId;
+
             DB::table('POSSESSION_DATA')->insert($data);
-            $this->insertAddrPo($addr, $data['c_possession_record_id'], $data['c_personid']);
-            $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'POSSESSION_DATA', $data['c_possession_record_id'], $data);
+            $this->insertAddrPo($addr, $newId, $data['c_personid']);
+            $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'POSSESSION_DATA', $newId, $data);
             (new AuditLogService())->write(
                 'POSSESSION_DATA',
                 'INSERT',
-                ['c_possession_record_id' => $data['c_possession_record_id']],
+                ['c_possession_record_id' => $newId],
                 null,
                 $data,
                 'user',
@@ -1757,7 +1672,7 @@ class BiogMainRepository {
             );
         });
 
-        return $data['c_possession_record_id'];
+        return $newId;
     }
 
     public function possessionDeleteById($id, $c_personid) {
@@ -2280,7 +2195,7 @@ class BiogMainRepository {
         return $this->assocPerformUpdate($request, $whereConditions, $row, $c_personid);
     }
 
-    public function assocUpdateById(Request $request, $id, $c_personid) {
+    public function assocUpdateById(Request $request, $id, $c_personid, bool $detectConflict = false) {
         $auditLog = new AuditLogService();
         //20200709聯合主鍵保留字弱點防禦函式
         // 複合主鍵格式: c_personid-c_assoc_code-c_assoc_id-c_kin_code-c_kin_id-c_assoc_kin_code-c_assoc_kin_id-c_text_title-c_assoc_first_year
@@ -2373,7 +2288,7 @@ class BiogMainRepository {
             ['c_assoc_first_year', '=', $c_assoc_first_year],
         ];
 
-        return $this->assocPerformUpdate($request, $whereConditions, $row, $c_personid);
+        return $this->assocPerformUpdate($request, $whereConditions, $row, $c_personid, $detectConflict);
     }
 
     /**
@@ -2385,7 +2300,7 @@ class BiogMainRepository {
      * @param int|string $c_personid 人物 ID
      * @return array 更新後的資料
      */
-    private function assocPerformUpdate(Request $request, array $whereConditions, $row, $c_personid) {
+    private function assocPerformUpdate(Request $request, array $whereConditions, $row, $c_personid, bool $detectConflict = false) {
         $auditLog = new AuditLogService();
 
         $data = $request->all();
@@ -2408,7 +2323,7 @@ class BiogMainRepository {
 
         $ori_data = $data;
 
-        DB::transaction(function () use (&$ori_data, $c_personid, $whereConditions, $row, $data, $kin_pair, $assoc_kin_pair, $assoc_pair, $assoc_id, $old_assoc_id, $old_c_text_title, $old_c_assoc_first_year, $old_c_assocship_pair1, $old_c_assocship_pair2, $auditLog) {
+        DB::transaction(function () use (&$ori_data, $c_personid, $whereConditions, $row, $data, $kin_pair, $assoc_kin_pair, $assoc_pair, $assoc_id, $old_assoc_id, $old_c_text_title, $old_c_assoc_first_year, $old_c_assocship_pair1, $old_c_assocship_pair2, $auditLog, $detectConflict) {
             DB::table('ASSOC_DATA')->where($whereConditions)->update($data);
 
             // 修正：operation record ID 包含第 9 個欄位 c_assoc_first_year
@@ -2453,47 +2368,559 @@ class BiogMainRepository {
             $data_mirror['c_assoc_kin_id'] = $c_personid;
             $data_mirror['c_assoc_code'] = $assoc_pair;
             $data_mirror['c_personid'] = $assoc_id;
-            $data_mirror = Arr::except($data_mirror, ['c_assoc_id']);
+            // 反向列指回原人；補建鏡像時需要此 PK 段（update 為同值無害）。
+            $data_mirror['c_assoc_id'] = $c_personid;
 
-            $mirrorQuery = DB::table('ASSOC_DATA')->where([
-                ['c_assoc_id', '=', $c_personid],
-                ['c_personid', '=', $old_assoc_id],
-                ['c_text_title', '=', $old_c_text_title],
-                ['c_assoc_first_year', '=', $old_c_assoc_first_year],
-            ])
-            ->where(function ($query) use ($old_c_assocship_pair1, $old_c_assocship_pair2) {
-                if ($old_c_assocship_pair1 !== null) {
-                    $query->where('c_assoc_code', '=', $old_c_assocship_pair1);
-                }
-                if ($old_c_assocship_pair2 !== null) {
-                    $query->orWhere('c_assoc_code', '=', $old_c_assocship_pair2);
-                }
-            });
-
-            $mirroredRows = (clone $mirrorQuery)->get();
-            $mirrorQuery->update($data_mirror);
-
-            foreach ($mirroredRows as $mirroredRow) {
-                $oldMirroredData = $auditLog->normalizeRow($mirroredRow);
-                $newMirroredData = array_merge($oldMirroredData, $data_mirror);
-
-                $auditLog->write(
-                    'ASSOC_DATA',
-                    'UPDATE',
-                    $auditLog->buildRowPkFromData('ASSOC_DATA', $newMirroredData),
-                    $oldMirroredData,
-                    $newMirroredData,
-                    'user',
-                    (string) Auth::id(),
-                    $operationId
-                );
-            }
+            // 定位並同步反向鏡像列（共用方法；找不到反向列則補建＝永遠雙向同步）。
+            $this->syncAssocMirrorOnUpdate(
+                $data_mirror,
+                (int) $c_personid,
+                $old_assoc_id,
+                $old_c_text_title,
+                $old_c_assoc_first_year,
+                $old_c_assocship_pair1,
+                $old_c_assocship_pair2,
+                $operation,
+                $auditLog,
+                // #77：核准（detectConflict=true）視為「比照 v2 direct 的權威雙向套用」→ allowBackfill 亦 true：
+                // (a) 嚴格命中+內容分歧 → #66 衝突中止；(b) 嚴格落空+對面碼漂移 → #70 疑似中止（allowBackfill=false 會在
+                // 偵測前 early-return 而漏掉，造成「核准成功但鏡像沒同步」的 false-green，codex SERIOUS）；(c) 對面無鏡像
+                // → 補建（雙向同步）。legacy direct（detectConflict=false）維持 allowBackfill=false＝行為不變。
+                $detectConflict,  // allowBackfill
+                $detectConflict,  // detectConflict
+                $detectConflict ? $this->buildApprovalMirrorBaselines('ASSOC_DATA', $row) : []
+            );
         });
 
         return $ori_data;
     }
 
-    public function assocStoreById(Request $request, $id) {
+    /**
+     * #77：以「正向編輯前的列」($row) 建提案核准用的鏡像衝突基準。
+     * 內容欄基準＝舊值（對面≠舊值＝被獨立改過＝真分歧）；碼欄基準＝舊碼的合法反向集（對面碼∉集＝被改成無關碼＝分歧）。
+     *
+     * 與 v2 *MutationHandler::conflictBaselines 的差異（刻意）：v2 只對「本次有變更」的內容欄建基準，因 v2 鏡像同步
+     * 只寫變更欄（$dataMirror=changed-only）；但 legacy assocPerformUpdate/kinshipUpdateById 的 $data_mirror=**整列**，
+     * 核准時會把整列鏡像欄覆寫成提案值——故須對**全部**內容欄建基準（任一欄被對面獨立改過都會被覆寫，理應擋下）。
+     * 此「全欄」基準對 full-row 覆寫語義是正確的、且核准為高風險不可逆操作，從嚴合理。僅供 detectConflict=true（提案核准）
+     * 使用；legacy direct 寫入不傳（行為不變）。
+     */
+    private function buildApprovalMirrorBaselines(string $table, $row): array {
+        $row = (array) $row;
+        $baselines = [];
+        if ($table === 'ASSOC_DATA') {
+            foreach (['c_notes', 'c_source', 'c_pages', 'c_assoc_first_year', 'c_assoc_last_year'] as $f) {
+                if (array_key_exists($f, $row)) {
+                    $baselines[$f] = $row[$f];
+                }
+            }
+            if ($vr = $this->validAssocReverseSet($row['c_assoc_code'] ?? null)) {
+                $baselines['c_assoc_code'] = $vr;
+            }
+            if ($vr = $this->validKinReverseSet($row['c_kin_code'] ?? null)) {
+                $baselines['c_kin_code'] = $vr;
+            }
+            if ($vr = $this->validKinReverseSet($row['c_assoc_kin_code'] ?? null)) {
+                $baselines['c_assoc_kin_code'] = $vr;
+            }
+        } elseif ($table === 'KIN_DATA') {
+            foreach (['c_notes', 'c_source', 'c_pages'] as $f) {
+                if (array_key_exists($f, $row)) {
+                    $baselines[$f] = $row[$f];
+                }
+            }
+            if ($vr = $this->validKinReverseSet($row['c_kin_code'] ?? null)) {
+                $baselines['c_kin_code'] = $vr;
+            }
+        }
+
+        return $baselines;
+    }
+
+    /** §8：合法反向碼集收斂於 RelationshipMirrorService（單一真相來源）。 */
+    private function validAssocReverseSet($code): array {
+        return app(\App\Services\RelationshipMirrorService::class)->validReverseAssocSet($code);
+    }
+
+    private function validKinReverseSet($code): array {
+        return app(\App\Services\RelationshipMirrorService::class)->validReverseKinSet($code);
+    }
+
+    /**
+     * #82：核准 CREATE 反向鏡像的真分歧基準（對齊 v2 KinshipCreateHandler::createMirrorBaselines）。
+     * 以「本次欲寫入鏡像內容」為基準：對面同內容→冪等通過、不同→真分歧→MirrorConflictException；碼欄＝正向碼合法反向集。
+     */
+    private function createKinMirrorBaselines(array $dataMirror, $forwardKinCode): array {
+        $baselines = [];
+        foreach (['c_notes', 'c_source', 'c_pages'] as $f) {
+            if (array_key_exists($f, $dataMirror)) {
+                $baselines[$f] = $dataMirror[$f];
+            }
+        }
+        if ($vr = $this->validKinReverseSet($forwardKinCode)) {
+            $baselines['c_kin_code'] = $vr;
+        }
+
+        return $baselines;
+    }
+
+    /**
+     * #82：核准 CREATE 反向鏡像的真分歧基準（對齊 v2 AssociationCreateHandler::createMirrorBaselines）。
+     */
+    private function createAssocMirrorBaselines(array $mirror, $forwardAssocCode): array {
+        $baselines = [];
+        foreach (['c_notes', 'c_source', 'c_pages', 'c_assoc_first_year', 'c_assoc_last_year'] as $f) {
+            if (array_key_exists($f, $mirror)) {
+                $baselines[$f] = $mirror[$f];
+            }
+        }
+        if ($vr = $this->validAssocReverseSet($forwardAssocCode)) {
+            $baselines['c_assoc_code'] = $vr;
+        }
+
+        return $baselines;
+    }
+
+    /**
+     * 定位並同步 ASSOC_DATA 反向（互逆）鏡像列。供 legacy assocPerformUpdate 與 v2 AssociationMutationHandler 共用。
+     *
+     * 行為對齊 legacy assocPerformUpdate 的鏡像區塊：用「對方擁有(c_personid=oldAssocId)、指回原人(c_assoc_id=cPersonid)、
+     * 同舊 c_text_title / c_assoc_first_year、且 c_assoc_code 屬舊關係碼的配對碼(pair1/pair2)」定位反向列，找到則更新成 $dataMirror。
+     *
+     * 「永遠雙向同步」改進（修正 legacy 選擇性跳過）：若定位不到反向列（舊資料缺鏡像、或舊關係碼無配對碼而漏更新），
+     * 則直接補建 $dataMirror，確保關係恆為雙向。更新既有列時不覆蓋其建檔資訊（c_created_by/date）。
+     *
+     * @param array      $dataMirror 反向鏡像列的完整資料（已反向變換：含 c_personid=對方、c_assoc_id=原人、反向關係/親屬碼、其餘欄位）
+     * @param int        $cPersonid  原人 c_personid（反向列的 c_assoc_id）
+     * @param mixed      $oldAssocId 更新前的對方 c_assoc_id（反向列擁有者）
+     * @param mixed      $oldTextTitle 更新前的 c_text_title
+     * @param mixed      $oldFirstYear 更新前的 c_assoc_first_year
+     * @param mixed      $oldPair1   舊關係碼的 ASSOC_CODES.c_assoc_pair
+     * @param mixed      $oldPair2   舊關係碼的 ASSOC_CODES.c_assoc_pair2
+     * @param mixed      $operation  本次操作的 Operation（鏡像 audit 沿用其 id）；可為 null
+     */
+    /**
+     * 雙向鏡像同步衝突偵測（#66 資料安全；僅 v2 direct 路徑啟用、legacy 不傳＝不偵測）。
+     *
+     * 「真分歧」語義（修正過度觸發）：對每筆既有鏡像列，逐 $conflictFields 比對
+     * **鏡像當前值（非空）vs 正向「編輯前的舊值」($forwardOld)**——
+     * - 鏡像當前值 == 正向舊值 → 二者本來同步（鏡像只是跟隨正向）→ 正常編輯，**不報警**、靜默同步。
+     * - 鏡像當前值 ≠ 正向舊值 → 對面被**獨立改過**（存了正向這側不知道的內容）→ 同步會洗掉它 → **報衝突**。
+     * 注意：基準是「正向舊值」**不是「即將寫入的新值」**——否則任何把已填欄位改成新值的正常編輯都會誤報。
+     * 既有值為空白／哨兵（null/''/0/-1/-999/-9999）視為無內容、可安全覆寫，不算衝突。
+     * 有衝突則拋 MirrorConflictException（在 handleDirect 交易內 → 整筆回滾），帶對面鏡像列 PK 與衝突明細
+     *（existing=對面現值、incoming=本次將寫入值，供前端展示）。
+     *
+     * @param iterable<int,object> $mirroredRows 既有鏡像列
+     * @param array<string,mixed> $baselines 欄位 → 同步基準。每欄基準有兩型（達成「真分歧」）：
+     *   - 純量（內容欄）：正向「編輯前的舊值」；對面值 ≠ 此 → 對面被獨立改過 → 真分歧。
+     *   - 陣列（關係/配對碼）：正向舊碼的「合法反向碼集」（含 pair1/pair2）；對面碼 ∈ 此集＝仍是合法反向（同步，
+     *     pair1↔pair2 互換不誤報）、∉ 此集＝被改成無關碼 → 真分歧。
+     * @param array<string,mixed> $incoming 即將寫入鏡像列的值（僅供衝突明細展示）
+     */
+    private function detectMirrorConflicts(string $table, iterable $mirroredRows, array $baselines, array $incoming, AuditLogService $auditLog): void {
+        $isBlank = static fn ($v): bool => $v === null || trim((string) $v) === '' || in_array(trim((string) $v), ['0', '-1', '-999', '-9999'], true);
+        foreach ($mirroredRows as $row) {
+            $existingRow = $auditLog->normalizeRow($row);
+            $conflicts = [];
+            foreach ($baselines as $f => $baseline) {
+                $existing = $existingRow[$f] ?? null; // 鏡像當前值
+                if ($isBlank($existing)) {
+                    continue; // 對面空白／哨兵 → 無內容、可安全覆寫
+                }
+                if (is_array($baseline)) {
+                    // 碼欄：對面碼 ∈ baseline 集 → 非分歧；否則真分歧。assoc baseline 為 validReverseAssocSet；
+                    // kin 經 #86（語義 b）已於 syncKinMirrorOnUpdate 把 baseline 覆寫為 [本次欲寫入反向碼]（preserve 模式則移除碼欄不判）。
+                    $valid = array_map(static fn ($v) => (string) (int) $v, $baseline);
+                    $isConflict = !in_array((string) (int) $existing, $valid, true);
+                } else {
+                    // 內容欄：對面值 ≠ 正向舊值 → 對面被獨立改過 → 真分歧。
+                    $isConflict = trim((string) $existing) !== trim((string) ($baseline ?? ''));
+                }
+                if ($isConflict) {
+                    $conflicts[] = ['field' => $f, 'existing' => $existing, 'incoming' => $incoming[$f] ?? null];
+                }
+            }
+            if ($conflicts !== []) {
+                throw new \App\Services\Mutations\MirrorConflictException(
+                    $table,
+                    $auditLog->buildRowPkFromData($table, $existingRow),
+                    $conflicts
+                );
+            }
+        }
+    }
+
+    public function syncAssocMirrorOnUpdate(array $dataMirror, int $cPersonid, $oldAssocId, $oldTextTitle, $oldFirstYear, $oldPair1, $oldPair2, $operation = null, ?AuditLogService $auditLog = null, bool $allowBackfill = false, bool $detectConflict = false, array $conflictBaselines = []): void {
+        $auditLog = $auditLog ?? new AuditLogService();
+        $operationId = $operation ? (string) $operation->id : null;
+
+        $query = DB::table('ASSOC_DATA')->where([
+            ['c_assoc_id', '=', $cPersonid],
+            ['c_personid', '=', $oldAssocId],
+            ['c_text_title', '=', $oldTextTitle],
+            ['c_assoc_first_year', '=', $oldFirstYear],
+        ])
+        ->where(function ($q) use ($oldPair1, $oldPair2) {
+            if ($oldPair1 !== null) {
+                $q->where('c_assoc_code', '=', $oldPair1);
+            }
+            if ($oldPair2 !== null) {
+                $q->orWhere('c_assoc_code', '=', $oldPair2);
+            }
+        });
+
+        $mirroredRows = (clone $query)->get();
+
+        if ($mirroredRows->isEmpty()) {
+            // legacy 預設行為：找不到反向列即跳過（不補建），保持原選擇性行為不變。
+            // v2 在「調用方明確送了配對碼」時才補建（$allowBackfill=true）＝永遠雙向同步，
+            // 修正 legacy 單邊缺鏡像；且不臆造無效反向碼（c_assoc_code=0）的垃圾列。
+            $mirrorCode = $dataMirror['c_assoc_code'] ?? null;
+            if (!$allowBackfill || $mirrorCode === null || (string) $mirrorCode === '0' || (int) $mirrorCode === 0) {
+                return;
+            }
+
+            // #70 放寬探測：嚴格定位（含碼∈合法反向集）落空時，再以「相同對方/本人/書名/首年、不限關係碼」查疑似列。
+            // 僅作 UI 疑似提示／強制收斂之用，不入冪等／確定匹配規則（確定性同步永遠只認上方嚴格定位）。
+            $relaxed = DB::table('ASSOC_DATA')->where([
+                ['c_assoc_id', '=', $cPersonid],
+                ['c_personid', '=', $oldAssocId],
+                ['c_text_title', '=', $oldTextTitle],
+                ['c_assoc_first_year', '=', $oldFirstYear],
+            ]);
+            $suspects = (clone $relaxed)->get();
+
+            // Option 2 安全判別：ASSOC_DATA 為 9 鍵 PK，同對方+同書+同首年下可合法存在「另一段不同社會關係」（僅 c_assoc_code 等不同）。
+            // 故放寬命中的列**只有碼不是任何合法 ASSOC_CODE（純漂移垃圾值，如 99）**時，才可能是本段關係的漂移鏡像、可警告／就地收斂；
+            // 碼是合法 code 的列極可能是另一段合法關係的鏡像，**絕不可覆寫**（會靜默吞掉他段關係）→ 視為非本段疑似、不阻擋本段 backfill。
+            if ($suspects->isNotEmpty()) {
+                $validCodes = DB::table('ASSOC_CODES')->pluck('c_assoc_code')->map(static fn ($c) => (int) $c)->all();
+                $drifted = $suspects->filter(static fn ($r) => !in_array((int) $r->c_assoc_code, $validCodes, true))->values();
+
+                if ($drifted->isNotEmpty()) {
+                    if ($detectConflict) {
+                        // 非強制：偵測到漂移疑似列 → 不自動同步、不 backfill → 拋疑似中止 → 整筆回滾 → 409 + 跳對面 + 強制收斂。
+                        throw new \App\Services\Mutations\MirrorSuspectedException(
+                            'ASSOC_DATA',
+                            $drifted->map(fn ($r) => $auditLog->buildRowPkFromData('ASSOC_DATA', $auditLog->normalizeRow($r)))->all(),
+                            (int) $mirrorCode
+                        );
+                    }
+                    // 強制：就地收斂「第一條」漂移列為權威反向鏡像（碼為垃圾值、確定非合法他段關係，安全）；以「該列
+                    // 完整 PK」精確定位，不可用放寬 query 更新（會誤改同位置的他段合法關係）。多條漂移時其餘留待人工去
+                    // 對面刪——對齊 kin 的「至少收斂第一條」（修掉舊「多條→落 backfill 補新列、舊漂移全保留＝對面殘留
+                    // 多條垃圾鏡像、force 名義成功實際沒清」的不一致；codex MINOR）。
+                    $only = $drifted->first();
+                    $updateSet = Arr::except($dataMirror, ['c_created_by', 'c_created_date']);
+                    $pkWhere = [];
+                    foreach (CompositePrimaryKey::SCHEMAS['ASSOC_DATA'] as $col) {
+                        $pkWhere[] = [$col, '=', $only->$col];
+                    }
+                    DB::table('ASSOC_DATA')->where($pkWhere)->update($updateSet);
+                    $oldData = $auditLog->normalizeRow($only);
+                    $newData = array_merge($oldData, $updateSet);
+                    $auditLog->write(
+                        'ASSOC_DATA',
+                        'UPDATE',
+                        $auditLog->buildRowPkFromData('ASSOC_DATA', $newData),
+                        $oldData,
+                        $newData,
+                        'user',
+                        (string) Auth::id(),
+                        $operationId
+                    );
+
+                    return;
+                }
+                // 無漂移疑似（命中的都是合法他段關係或無）→ 落到 backfill 補本段鏡像，不動他段。
+            }
+
+            $insert = $dataMirror;
+            if (empty($insert['c_created_by'])) {
+                $insert['c_created_by'] = Auth::user()->name ?? '';
+                $insert['c_created_date'] = Carbon::now();
+            }
+            DB::table('ASSOC_DATA')->insert($insert);
+            $auditLog->write(
+                'ASSOC_DATA',
+                'INSERT',
+                $auditLog->buildRowPkFromData('ASSOC_DATA', $insert),
+                null,
+                $insert,
+                'user',
+                (string) Auth::id(),
+                $operationId
+            );
+
+            return;
+        }
+
+        // 更新既有反向鏡像列；不覆蓋其建檔資訊（c_created_by/date）。
+        $updateSet = Arr::except($dataMirror, ['c_created_by', 'c_created_date']);
+
+        // #66：覆寫前偵測衝突（僅 v2 direct 啟用）。對面對應欄已有不同內容 → 拋例外回滾整筆，回 409 警告。
+        if ($detectConflict) {
+            $this->detectMirrorConflicts('ASSOC_DATA', $mirroredRows, $conflictBaselines, $updateSet, $auditLog);
+        }
+
+        $query->update($updateSet);
+
+        foreach ($mirroredRows as $mirroredRow) {
+            $oldMirroredData = $auditLog->normalizeRow($mirroredRow);
+            $newMirroredData = array_merge($oldMirroredData, $updateSet);
+
+            $auditLog->write(
+                'ASSOC_DATA',
+                'UPDATE',
+                $auditLog->buildRowPkFromData('ASSOC_DATA', $newMirroredData),
+                $oldMirroredData,
+                $newMirroredData,
+                'user',
+                (string) Auth::id(),
+                $operationId
+            );
+        }
+    }
+
+    /**
+     * 同步親屬（KIN_DATA）反向鏡像列（update 場景）。legacy kinshipUpdateById 與 v2 KinshipMutationHandler 共用。
+     *
+     * 反向列定位（對齊 legacy）：對方為客體指向本人（c_kin_id=本人、c_personid=舊對方），舊備註相符，
+     * 親屬碼 ∈ kinReverseLocatorCodes(舊正向碼)＝「指向該碼的碼集」∪「該碼自身 pair1/pair2」聯集（#87，與偵測
+     * locateOppositeEdges 同源，涵蓋非對稱配對）。精確命中 ≥1 筆＝以配對定位更新全部命中列；否則退回寬鬆定位
+     * （僅 c_kin_id/c_personid/c_autogen_notes）＝完全保留 legacy 行為。
+     *
+     * $dataMirror 須已備妥：c_kin_code=反向碼、c_personid=新對方、且「不含 c_kin_id」（反向列 c_kin_id 維持本人）。
+     * $allowBackfill=true 時（v2 永遠雙向同步），找不到反向列且鏡像碼有效則補建——修正 legacy 單邊缺鏡像；
+     * legacy 呼叫一律傳 false＝行為不變。回傳精確配對命中數（legacy 以此填 err）。
+     */
+    public function syncKinMirrorOnUpdate(array $dataMirror, int $cPersonid, $oldKinId, $oldAutogenNotes, $oldKinCode, $operation = null, ?AuditLogService $auditLog = null, bool $allowBackfill = false, bool $detectConflict = false, array $conflictBaselines = [], bool $reverseCodeAuthoritative = false): int {
+        $auditLog = $auditLog ?? new AuditLogService();
+        $operationId = $operation ? (string) $operation->id : null;
+
+        // 反向列以「舊正向碼」的權威配對定位。舊碼缺於 KINSHIP_CODES＝資料完整性已破壞：
+        // fail-closed 中止（拋例外回滾整筆交易），與 legacy（解參考 null 致命錯誤）同為原子失敗，
+        // 避免 fall-through 到寬鬆定位誤改他組關係或留下單邊鏡像孤兒（codex MAJOR 修正）。
+        $kinCodePair = KinshipCode::find($oldKinCode);
+        if (!$kinCodePair) {
+            throw new \App\Services\Mutations\MirrorIntegrityException('找不到原親屬關係碼的配對資訊（KINSHIP_CODES 缺碼），為避免反向鏡像失準已中止本次同步。');
+        }
+        // 反向鏡像定位碼集＝聯集（#87，收斂於 RelationshipMirrorService::kinReverseLocatorCodes，單一真相）：
+        // 「指向 oldKinCode 的碼」（含使用者手選替代反向碼，如 74↔72，非僅權威 c_kin_pair1）∪「oldKinCode 自身 pair1/pair2
+        // 指向的碼」。修正原「僅指向集、空集才退回自身」在非對稱配對（如 75.c_kin_pair2=180 但無碼回指 75）漏掉以 180
+        // 編碼的合法反向列 → 落 relaxed 被誤判他段、偵測誤報缺邊、sync 漏定位補重複。偵測 locateOppositeEdges 用同一聯集。
+        $legitReverses = app(\App\Services\RelationshipMirrorService::class)->kinReverseLocatorCodes($oldKinCode);
+
+        // #87（autogen 根因）：嚴格定位**不**納入 c_autogen_notes。它是描述性註記、鏡像兩側天生不對稱（自動生成側帶
+        // 「Auto-generated from PersonID=…」字串、原始手填側為 NULL），舊版精確比對 autogen 會讓「自動生成側 vs NULL 原始側」
+        // 嚴格落空 → 偵測誤報缺邊、且 sync 漏定位（存檔時對面反向列不被同步、或補出重複）。反向關係身分由
+        // (c_kin_id=本人, c_personid=對方, c_kin_code ∈ 反向碼集) 唯一決定；與偵測 locateOppositeEdges 同套（皆不認 autogen）。
+        $pairWhere = function ($query) use ($cPersonid, $oldKinId, $legitReverses) {
+            $query->where('c_kin_id', $cPersonid)
+                ->where('c_personid', $oldKinId)
+                ->whereIn('c_kin_code', $legitReverses ?: [-99999]); // 空集 → 不命中（落 relaxed）
+        };
+
+        $sumCount = DB::table('KIN_DATA')->where($pairWhere)->count();
+
+        // 找不到反向列即補建（僅 allowBackfill；legacy 一律 false＝跳過）。抽成閉包供多處重用。
+        $mirrorCode = $dataMirror['c_kin_code'] ?? null;
+        $backfill = function () use ($dataMirror, $cPersonid, $mirrorCode, $allowBackfill, $auditLog, $operationId): void {
+            if (!$allowBackfill || $mirrorCode === null || (string) $mirrorCode === '0' || (int) $mirrorCode === 0) {
+                return;
+            }
+            $insert = $dataMirror;
+            $insert['c_kin_id'] = $cPersonid; // 反向列客體＝本人（dataMirror 不含 c_kin_id，補回）
+            if (empty($insert['c_created_by'])) {
+                $insert['c_created_by'] = Auth::user()->name ?? '';
+                $insert['c_created_date'] = Carbon::now();
+            }
+            DB::table('KIN_DATA')->insert($insert);
+            $auditLog->write('KIN_DATA', 'INSERT', $auditLog->buildRowPkFromData('KIN_DATA', $insert), null, $insert, 'user', (string) Auth::id(), $operationId);
+        };
+
+        if ($sumCount >= 1) {
+            // 精確配對命中（一筆或多筆本段合法反向列）：走 #66 內容衝突偵測 + 同步全部命中列。
+            // 用 >= 1（非 === 1）：拓寬後合法反向集可 ≥2（如 73 與 74 並存或重複髒列），它們都是本段鏡像、應一併同步，
+            // 不可落到下方 relaxed 把合法反向碼誤判他段而漏同步（review S1）。
+            $updateQuery = DB::table('KIN_DATA')->where($pairWhere);
+            $mirroredRows = (clone $updateQuery)->get();
+            if ($detectConflict) {
+                // #86（語義 b）：碼欄衝突基準＝本次「實際欲寫入對面的反向碼」（$dataMirror['c_kin_code']），於此單點權威覆寫
+                // 呼叫端傳入的碼欄基準。理由：定位器命中列其碼必為合法反向，但若對面碼 ≠ 我方欲寫入碼（如對面為更具體的排行碼
+                // 77、我方寫通用 76），update 會覆寫丟失原碼 → 應提示確認；對面碼 == 欲寫入碼（含手選同碼）→ 冪等通過、不誤擋。
+                // 內容欄基準（c_notes/c_source/c_pages）維持呼叫端所傳不變。
+                $kinBaselines = $conflictBaselines;
+                if ($reverseCodeAuthoritative) {
+                    // #88 pair-only：使用者顯式設定反向配對碼（authoritative）——對面持有的「舊」反向碼正被遷移到新碼，
+                    // 非分歧；沿用呼叫端傳入的寬碼基準（validReverseKinSet，含舊反向碼）→ 對面舊碼 ∈ 即不誤擋、僅擋∉合法集的漂移碼。
+                    // 不套用下方 (b) 的 [欲寫入碼] 窄覆寫（否則改反向碼必撞「對面舊碼≠新碼」誤判衝突，逼使用者 force）。
+                    // 另把「欲寫入新碼」併入碼基準：使「對面現值已等於目標新碼」（冪等重送/先前已修好）不被誤判衝突（review MINOR）。
+                    if (isset($dataMirror['c_kin_code']) && isset($kinBaselines['c_kin_code']) && is_array($kinBaselines['c_kin_code'])) {
+                        $kinBaselines['c_kin_code'] = array_values(array_unique(array_merge(
+                            [(int) $dataMirror['c_kin_code']],
+                            array_map('intval', $kinBaselines['c_kin_code'])
+                        )));
+                    }
+                } elseif (isset($dataMirror['c_kin_code'])) {
+                    $writtenReverse = (int) $dataMirror['c_kin_code'];
+                    if (in_array($writtenReverse, $legitReverses, true)) {
+                        // 未改正向碼（欲寫入反向碼仍屬舊正向碼的反向集）：嚴格＝[欲寫入碼]（保護：對面為「別的」合法反向碼→提示）。
+                        $kinBaselines['c_kin_code'] = [$writtenReverse];
+                    } else {
+                        // 正向碼改碼(recode)：欲寫入的是「新正向碼」的反向碼，對面持有的是「舊正向碼」的合法反向碼（$legitReverses）、
+                        // 正被遷移到新碼——非分歧，不應誤擋。故基準併入舊反向集，容許遷移既有鏡像（仍擋真正∉兩者的漂移/他段碼）。
+                        $kinBaselines['c_kin_code'] = array_values(array_unique(array_merge([$writtenReverse], $legitReverses)));
+                    }
+                } else {
+                    // preserve 模式（純內容編輯：未送 c_kinship_pair、正向碼未變 → KinshipMutationHandler unset c_kin_code）：
+                    // 本次根本不改寫對面反向碼 → 不應對碼欄判衝突（否則對面既有合法手選碼如 74 ∉ 呼叫端窄基準會被誤擋）。
+                    unset($kinBaselines['c_kin_code']);
+                }
+                $this->detectMirrorConflicts('KIN_DATA', $mirroredRows, $kinBaselines, $dataMirror, $auditLog);
+            }
+            $updateQuery->update($dataMirror);
+            foreach ($mirroredRows as $mirroredRow) {
+                $oldMirroredData = $auditLog->normalizeRow($mirroredRow);
+                $newMirroredData = array_merge($oldMirroredData, $dataMirror);
+                $auditLog->write('KIN_DATA', 'UPDATE', $auditLog->buildRowPkFromData('KIN_DATA', $newMirroredData), $oldMirroredData, $newMirroredData, 'user', (string) Auth::id(), $operationId);
+            }
+
+            return $sumCount;
+        }
+
+        // sumCount === 0（本段合法反向集無命中）：#70 放寬探測「相同對方/本人、不限親屬碼」的疑似列。
+        // 僅作 UI 疑似提示／強制收斂之用，不入冪等／確定匹配（確定性同步只認上方精確配對）。
+        // #87：與 strict/偵測一致，relaxed 亦**不**認 c_autogen_notes（鏡像兩側天生不對稱、非身分；當前程式已不生成 autogen）。
+        // 否則「漂移碼 + autogen 不對稱」時 relaxed 漏抓疑似 → create 補出重複、direct update 靜默漏同步、本該 409 變成功。
+        $relaxed = DB::table('KIN_DATA')->where([
+            ['c_kin_id', '=', $cPersonid],
+            ['c_personid', '=', $oldKinId],
+        ]);
+        $suspects = (clone $relaxed)->get();
+
+        if ($suspects->isEmpty()) {
+            $backfill();
+
+            return $sumCount;
+        }
+
+        // Option 2 防資料損壞：同對方/本人/舊備註下可能存在「另一段合法親屬關係」（僅 c_kin_code 不同）。
+        // 故只有「碼∉任何合法 KINSHIP_CODE 的漂移垃圾列」才可能是本段漂移鏡像、可警告／就地收斂；
+        // 碼∈合法 code 的列極可能是他段合法關係，**絕不可覆寫**（修掉舊「寬鬆定位無條件更新」會吞他段的 latent bug）。
+        $validCodes = DB::table('KINSHIP_CODES')->pluck('c_kincode')->map(static fn ($c) => (int) $c)->all();
+        $drifted = $suspects->filter(static fn ($r) => !in_array((int) $r->c_kin_code, $validCodes, true))->values();
+
+        if ($drifted->isNotEmpty()) {
+            // 權威反向碼：mirrorCode（preserveMirrorCode 場景被 handler unset 為 null/0）時回退到合法反向集首碼。
+            // 收斂漂移列**必須**把主鍵碼修為此權威碼——否則純內容編輯（preserve、未送配對碼）下強制收斂只改內容、
+            // 漂移碼 99 不會被修回 73，資料仍 drift（codex 揪出的真漏洞）。
+            $authoritative = (int) ($mirrorCode ?? 0);
+            if ($authoritative === 0) {
+                // 權威預設＝正向碼的 c_kin_pair1（與 ResolvesKinshipReversePair 一致、確定性）；再退合法反向集首碼。
+                $authoritative = (int) ($kinCodePair->c_kin_pair1 ?? ($legitReverses[0] ?? 0));
+            }
+            // fail-closed：若連權威反向碼都推不出（正向碼無任何反向配對，極端髒資料），不可靜默跳過收斂假成功——
+            // 與同方法「缺配對碼」fail-closed 一致，拋例外回滾整筆（codex：不能 200 後什麼都沒做）。
+            if ($authoritative === 0) {
+                throw new \App\Services\Mutations\MirrorIntegrityException('偵測到對面疑似漂移鏡像，但正向親屬碼無任何權威反向碼可收斂（KINSHIP_CODES 配對缺失），為避免假成功已中止本次同步。');
+            }
+
+            if ($detectConflict) {
+                // 非強制：偵測到漂移疑似列 → 不自動同步 → 拋疑似中止 → 整筆回滾 → 409 + 跳對面 + 強制收斂。
+                throw new \App\Services\Mutations\MirrorSuspectedException(
+                    'KIN_DATA',
+                    $drifted->map(fn ($r) => $auditLog->buildRowPkFromData('KIN_DATA', $auditLog->normalizeRow($r)))->all(),
+                    $authoritative
+                );
+            }
+            // legacy／強制：收斂「第一條」漂移列為權威反向碼（按該列完整 PK 精確定位，不用寬鬆 query，避免誤改他段）——
+            // 修出一條正確鏡像。多條漂移時其餘留待人工去對面刪（kin allowBackfill=false，不能像 assoc 用 backfill 補；
+            // 故改為收斂第一條，避免「多條→backfill no-op→force 名義成功實際沒修」的漏洞）。
+            // 不做 targetExists 防呆：若目標 PK（權威碼）罕見地已被他列佔用（同人同碼、不同 autogen），任 update 撞 KIN_DATA
+            // 唯一鍵 → QueryException → handleDirect 既有 catch 轉 409「主鍵衝突」（誠實告知無法自動解，需人工），
+            // 而非靜默 no-op 假成功（codex 修正：先前的 targetExists guard 反而造成 silent no-op）。
+            $only = $drifted->first();
+            $pkWhere = [];
+            foreach (CompositePrimaryKey::SCHEMAS['KIN_DATA'] as $col) {
+                $pkWhere[] = [$col, '=', $only->$col];
+            }
+            // 強制把漂移碼修為權威反向碼（即使 preserve 場景 dataMirror 不含 c_kin_code）——這才是「收斂」。
+            $collapseSet = array_merge($dataMirror, ['c_kin_code' => $authoritative]);
+            DB::table('KIN_DATA')->where($pkWhere)->update($collapseSet);
+            $oldMirroredData = $auditLog->normalizeRow($only);
+            $newMirroredData = array_merge($oldMirroredData, $collapseSet);
+            $auditLog->write('KIN_DATA', 'UPDATE', $auditLog->buildRowPkFromData('KIN_DATA', $newMirroredData), $oldMirroredData, $newMirroredData, 'user', (string) Auth::id(), $operationId);
+
+            return $sumCount;
+        }
+
+        // 無漂移疑似（命中的都是合法碼他段關係或無）→ 不覆寫他段，改 backfill 補本段鏡像（kin update allowBackfill=false 即跳過）。
+        $backfill();
+
+        return $sumCount;
+    }
+
+    /**
+     * 同步親屬（KIN_DATA）反向鏡像列（delete 場景）。legacy kinshipDeleteById 與 v2 KinshipDeleteHandler 共用。
+     * $row 為被刪除的「正向列」（陣列）。以 kinReverseLocatorCodes（指向正向碼 ∪ 正向碼自身配對的聯集，#87；與
+     * update/偵測 locateOppositeEdges 同源）定位反向列（c_kin_id=正向 c_personid、c_personid=正向 c_kin_id、
+     * c_kin_code ∈ kinReverseLocatorCodes(正向碼)；#87 起不認 c_autogen_notes，鏡像兩側天生不對稱非身分），
+     * 涵蓋排行子/非對稱配對等多碼，修正舊窄定位漏刪→孤兒。
+     * 命中 0 → 不刪（合法單邊）；命中 1 → 精確刪該列；命中 >1 且未帶 $force → 拋 MirrorDeleteMultipleException
+     * （整筆交易回滾，回 409 供使用者確認）；>1 且 $force → 一併精確刪除全部候選。正向列本身由呼叫端負責刪除。
+     */
+    public function syncKinMirrorOnDelete(array $row, $operation = null, ?AuditLogService $auditLog = null, bool $force = false): void {
+        $auditLog = $auditLog ?? new AuditLogService();
+        $operationId = $operation ? (string) $operation->id : null;
+
+        // 正向碼缺於 KINSHIP_CODES＝資料完整性已破壞：fail-closed 中止（拋 MirrorIntegrityException 回滾整筆交易，
+        // 與 update/create 同型別→由 handleDirect/approve 轉結構化 422，而非裸 RuntimeException 漏成 500，三路一致）。
+        // 注意：這與「反向列不存在」（合法的單邊資料）不同——後者下方仍正常 return 不刪。
+        if (!KinshipCode::find($row['c_kin_code'] ?? null)) {
+            throw new \App\Services\Mutations\MirrorIntegrityException('找不到親屬關係碼的配對資訊（KINSHIP_CODES 缺碼），為避免反向鏡像孤兒已中止刪除。');
+        }
+
+        // 反向鏡像定位用 kinReverseLocatorCodes 聯集（與 update / 偵測 locateOppositeEdges 同源，#87），
+        // 涵蓋排行子/非對稱配對等多碼，修正舊窄定位漏刪具體反向碼列→孤兒。
+        $mirror = app(\App\Services\RelationshipMirrorService::class);
+        $candidates = $mirror->locateOppositeEdges('kinship', [
+            'person_id' => $row['c_personid'] ?? null,
+            'opposite_id' => $row['c_kin_id'] ?? null,
+            'autogen_notes' => $row['c_autogen_notes'] ?? null,
+            'forward_code' => $row['c_kin_code'] ?? 0,
+        ]);
+
+        if ($candidates->isEmpty()) {
+            return; // 對面無對應反向列（合法的單邊資料），不刪。
+        }
+
+        // 安全單筆：對面命中多筆且未確認 → 偵測即停（拋例外 → handleDirect 交易回滾，正向列亦不刪），
+        // 回 409 + 候選明細供使用者裁決；確認後帶 $force 重送才一併刪除全部候選。單筆則直接精確刪除。
+        if ($candidates->count() > 1 && !$force) {
+            throw new \App\Services\Mutations\MirrorDeleteMultipleException('KIN_DATA', $mirror->formatRecords('kinship', $candidates));
+        }
+
+        foreach ($candidates as $mirroredRow) {
+            // 逐列以完整識別欄精確刪除（c_modified_date 有值時加入），不誤刪他列。
+            $deleteQuery = DB::table('KIN_DATA')
+                ->where('c_personid', $mirroredRow->c_personid)
+                ->where('c_kin_id', $mirroredRow->c_kin_id)
+                ->where('c_kin_code', $mirroredRow->c_kin_code)
+                ->where('c_source', $mirroredRow->c_source)
+                ->where('c_autogen_notes', $mirroredRow->c_autogen_notes);
+            if (!is_null($mirroredRow->c_modified_date ?? null)) {
+                $deleteQuery->where('c_modified_date', $mirroredRow->c_modified_date);
+            }
+            $deleteQuery->delete();
+
+            $mirroredRowData = $auditLog->normalizeRow($mirroredRow);
+            $auditLog->write('KIN_DATA', 'DELETE', $auditLog->buildRowPkFromData('KIN_DATA', $mirroredRowData), $mirroredRowData, null, 'user', (string) Auth::id(), $operationId);
+        }
+    }
+
+    public function assocStoreById(Request $request, $id, bool $detectConflict = false) {
         $auditLog = new AuditLogService();
         $data = $request->all();
         $data = $this->formatSelect($data);
@@ -2511,7 +2938,7 @@ class BiogMainRepository {
 
         $ori_Data = $data;
 
-        DB::transaction(function () use ($id, $data, $assoc_pair, $kin_pair, $assoc_kin_pair, &$ori_Data, $auditLog) {
+        DB::transaction(function () use ($id, $data, $assoc_pair, $kin_pair, $assoc_kin_pair, $detectConflict, &$ori_Data, $auditLog) {
             DB::table('ASSOC_DATA')->insert($data);
             // 修正：operation record ID 包含第 9 個欄位 c_assoc_first_year
             $operation = (new OperationRepository())->store(Auth::id(), $id, 1, 'ASSOC_DATA', CompositePrimaryKey::buildStoredResourceId([
@@ -2557,27 +2984,47 @@ class BiogMainRepository {
             $data_mirror['c_kin_id'] = $id;
             $data_mirror['c_assoc_kin_id'] = $id;
 
-            DB::table('ASSOC_DATA')->insert($data_mirror);
-            $auditLog->write(
-                'ASSOC_DATA',
-                'INSERT',
-                [
-                    'c_personid' => $data_mirror['c_personid'],
-                    'c_assoc_code' => $data_mirror['c_assoc_code'],
-                    'c_assoc_id' => $data_mirror['c_assoc_id'],
-                    'c_kin_code' => $data_mirror['c_kin_code'],
-                    'c_kin_id' => $data_mirror['c_kin_id'],
-                    'c_assoc_kin_code' => $data_mirror['c_assoc_kin_code'],
-                    'c_assoc_kin_id' => $data_mirror['c_assoc_kin_id'],
-                    'c_text_title' => $data_mirror['c_text_title'] ?? '',
-                    'c_assoc_first_year' => $data_mirror['c_assoc_first_year'] ?? '-9999',
-                ],
-                null,
-                $data_mirror,
-                'user',
-                (string) Auth::id(),
-                $operationId
-            );
+            // #82：提案核准（$detectConflict=true）且反向社會關係碼非哨兵 0 時，反向鏡像改走已 gate 的
+            // syncAssocMirrorOnUpdate（含 #66 衝突 + #72 疑似偵測 + allowBackfill），與 v2 direct create 一致——
+            // 對面分歧/碼漂移→拋例外中止核准（approve() 友善 flash + 回滾）。legacy direct（false）維持原盲插 parity。
+            if ($detectConflict && (int) $assoc_pair !== 0) {
+                $this->syncAssocMirrorOnUpdate(
+                    $data_mirror,
+                    (int) $id,
+                    (int) $data['c_assoc_id'],
+                    $data['c_text_title'] ?? '',
+                    $data['c_assoc_first_year'] ?? '-9999',
+                    $assoc_pair,
+                    null,
+                    $operation,
+                    $auditLog,
+                    true,   // allowBackfill
+                    true,   // detectConflict
+                    $this->createAssocMirrorBaselines($data_mirror, $data['c_assoc_code'])
+                );
+            } else {
+                DB::table('ASSOC_DATA')->insert($data_mirror);
+                $auditLog->write(
+                    'ASSOC_DATA',
+                    'INSERT',
+                    [
+                        'c_personid' => $data_mirror['c_personid'],
+                        'c_assoc_code' => $data_mirror['c_assoc_code'],
+                        'c_assoc_id' => $data_mirror['c_assoc_id'],
+                        'c_kin_code' => $data_mirror['c_kin_code'],
+                        'c_kin_id' => $data_mirror['c_kin_id'],
+                        'c_assoc_kin_code' => $data_mirror['c_assoc_kin_code'],
+                        'c_assoc_kin_id' => $data_mirror['c_assoc_kin_id'],
+                        'c_text_title' => $data_mirror['c_text_title'] ?? '',
+                        'c_assoc_first_year' => $data_mirror['c_assoc_first_year'] ?? '-9999',
+                    ],
+                    null,
+                    $data_mirror,
+                    'user',
+                    (string) Auth::id(),
+                    $operationId
+                );
+            }
         });
 
         return $ori_Data;
@@ -2707,52 +3154,6 @@ class BiogMainRepository {
         $auditLog = new AuditLogService();
 
         DB::transaction(function () use ($c_personid, $whereConditions, $row, $auditLog) {
-            // 修正：查找配對記錄時使用多層次策略
-            // 1. 如果 c_kin_id 和 c_assoc_kin_id 都是 0，反向記錄也應該是 0（對稱情況）
-            // 2. 否則使用 paired c_assoc_code 來精確匹配
-            // 3. 如果沒有配對映射且非 0,0 情況，為避免誤刪不嘗試反向刪除
-            $row2 = null;
-            $reverseDeleteSkipReason = null;
-
-            // 策略 1：如果 c_kin_id = 0 且 c_assoc_kin_id = 0，直接用這些值匹配反向記錄
-            if ($row->c_kin_id == 0 && $row->c_assoc_kin_id == 0) {
-                $row2 = DB::table('ASSOC_DATA')->where([
-                    ['c_personid', $row->c_assoc_id],
-                    ['c_assoc_id', $row->c_personid],
-                    ['c_kin_id', 0],
-                    ['c_assoc_kin_id', 0],
-                    ['c_text_title', $row->c_text_title],
-                    ['c_assoc_first_year', $row->c_assoc_first_year],
-                ])->first();
-            }
-
-            // 策略 2：如果策略 1 沒找到，使用 paired c_assoc_code 匹配
-            if (!$row2) {
-                $assocCodePair = AssocCode::where('c_assoc_code', '=', $row->c_assoc_code)->first();
-                $assocPair1 = $assocCodePair?->c_assoc_pair;
-                $assocPair2 = $assocCodePair?->c_assoc_pair2;
-
-                if ($assocPair1 !== null || $assocPair2 !== null) {
-                    $row2Query = DB::table('ASSOC_DATA')->where([
-                        ['c_personid', $row->c_assoc_id],
-                        ['c_assoc_id', $row->c_personid],
-                        ['c_text_title', $row->c_text_title],
-                        ['c_assoc_first_year', $row->c_assoc_first_year],
-                    ]);
-                    $row2Query->where(function ($query) use ($assocPair1, $assocPair2) {
-                        if ($assocPair1 !== null) {
-                            $query->where('c_assoc_code', '=', $assocPair1);
-                        }
-                        if ($assocPair2 !== null) {
-                            $query->orWhere('c_assoc_code', '=', $assocPair2);
-                        }
-                    });
-                    $row2 = $row2Query->first();
-                } else {
-                    $reverseDeleteSkipReason = 'no_pair_mapping';
-                }
-            }
-
             DB::table('ASSOC_DATA')->where($whereConditions)->delete();
 
             $assocResourceId = CompositePrimaryKey::buildStoredResourceId([
@@ -2790,47 +3191,140 @@ class BiogMainRepository {
                 $operationId
             );
 
-            // 檢查$row2是否存在後再刪除反向關係
-            if ($row2 !== null) {
-                $deleteMirrorQuery = DB::table('ASSOC_DATA')->where([
-                    ['c_personid', $row2->c_personid],
-                    ['c_assoc_id', $row2->c_assoc_id],
-                    ['c_assoc_code', $row2->c_assoc_code],
-                    ['c_kin_code', $row2->c_kin_code],
-                    ['c_kin_id', $row2->c_kin_id],
-                    ['c_assoc_kin_code', $row2->c_assoc_kin_code],
-                    ['c_assoc_kin_id', $row2->c_assoc_kin_id],
-                    ['c_text_title', $row2->c_text_title],
-                    ['c_assoc_first_year', $row2->c_assoc_first_year],
-                ]);
-
-                $mirroredRows = (clone $deleteMirrorQuery)->get();
-                $deleteMirrorQuery->delete();
-
-                foreach ($mirroredRows as $mirroredRow) {
-                    $mirroredRowData = $auditLog->normalizeRow($mirroredRow);
-                    $auditLog->write(
-                        'ASSOC_DATA',
-                        'DELETE',
-                        $auditLog->buildRowPkFromData('ASSOC_DATA', $mirroredRowData),
-                        $mirroredRowData,
-                        null,
-                        'user',
-                        (string) Auth::id(),
-                        $operationId
-                    );
-                }
-            } elseif ($reverseDeleteSkipReason !== null) {
-                Log::info('[ASSOC_DATA] 跳過反向記錄刪除', [
-                    'reason' => $reverseDeleteSkipReason,
-                    'c_personid' => $row->c_personid,
-                    'c_assoc_id' => $row->c_assoc_id,
-                    'c_assoc_code' => $row->c_assoc_code,
-                    'c_kin_id' => $row->c_kin_id,
-                    'c_assoc_kin_id' => $row->c_assoc_kin_id,
-                ]);
-            }
+            // 同步刪除反向鏡像列（共用方法；定位策略：對稱 0,0 → 舊關係碼配對碼；找不到則跳過不誤刪）。
+            $this->syncAssocMirrorOnDelete((array) $row, $operation, $auditLog);
         });
+    }
+
+    /**
+     * 定位並刪除 ASSOC_DATA 反向（互逆）鏡像列。供 legacy assocPerformDelete 與 v2 AssociationDeleteHandler 共用。
+     *
+     * 定位策略（對齊 legacy）：(1) 若 c_kin_id 與 c_assoc_kin_id 皆 0，直接以對稱 0,0 匹配反向列；
+     * (2) 否則以舊關係碼的 ASSOC_CODES.c_assoc_pair / c_assoc_pair2 匹配。找不到配對映射則跳過（避免誤刪）。
+     * 須在刪除正向列之後呼叫（反向列以 c_personid=對方、c_assoc_id=原人 定位，不受正向列刪除影響）。
+     *
+     * @param array $row 被刪除的正向列資料（c_personid / c_assoc_id / c_assoc_code / c_kin_id / c_assoc_kin_id / c_text_title / c_assoc_first_year）
+     */
+    public function syncAssocMirrorOnDelete(array $row, $operation = null, ?AuditLogService $auditLog = null): void {
+        $auditLog = $auditLog ?? new AuditLogService();
+        $operationId = $operation ? (string) $operation->id : null;
+        $textTitle = $row['c_text_title'] ?? '';
+        $firstYear = $row['c_assoc_first_year'] ?? '-9999';
+
+        // 反向鏡像定位：優先以舊關係碼的配對碼精確匹配反向列的 c_assoc_code（避免同對人／同書名／同年
+        // 有多筆關係時，僅憑 person/0,0/text/year 抓錯反向列而誤刪——對齊「永遠正確同步」）。
+        // 無配對映射但對稱 0,0 時，回退 legacy 的對稱匹配（罕見；此時無 code 可驗）。
+        $assocCodePair = AssocCode::where('c_assoc_code', '=', $row['c_assoc_code'])->first();
+        $assocPair1 = $assocCodePair?->c_assoc_pair;
+        $assocPair2 = $assocCodePair?->c_assoc_pair2;
+        $isSymmetric = (int) ($row['c_kin_id'] ?? 0) === 0 && (int) ($row['c_assoc_kin_id'] ?? 0) === 0;
+
+        if ($assocPair1 === null && $assocPair2 === null && !$isSymmetric) {
+            // 無關係配對映射且非對稱：無法可靠定位反向列，跳過不誤刪（對齊 legacy no_pair_mapping）。
+            Log::info('[ASSOC_DATA] 跳過反向記錄刪除', [
+                'reason' => 'no_pair_mapping',
+                'c_personid' => $row['c_personid'] ?? null,
+                'c_assoc_id' => $row['c_assoc_id'] ?? null,
+                'c_assoc_code' => $row['c_assoc_code'] ?? null,
+            ]);
+
+            return;
+        }
+
+        // 反向鏡像基底：對方擁有、指回原人、同書名/年。
+        $baseWhere = [
+            ['c_personid', $row['c_assoc_id']],
+            ['c_assoc_id', $row['c_personid']],
+            ['c_text_title', $textTitle],
+            ['c_assoc_first_year', $firstYear],
+        ];
+        $pairFilter = function ($query) use ($assocPair1, $assocPair2) {
+            if ($assocPair1 !== null) {
+                $query->where('c_assoc_code', '=', $assocPair1);
+            }
+            if ($assocPair2 !== null) {
+                $query->orWhere('c_assoc_code', '=', $assocPair2);
+            }
+        };
+
+        // 第一級：以反向鏡像的完整親屬維度精確定位（對齊 legacy create/update 鏡像的反向變換：
+        // 親屬碼取反向配對碼、kin_id/assoc_kin_id 皆為原人）。唯一識別，合法多筆（同對人/書/年/碼、
+        // 僅 kin 維度不同）也能各自命中正確反向列，不誤刪、不漏刪。
+        $row2 = null;
+        if ($assocPair1 !== null || $assocPair2 !== null) {
+            $row2 = DB::table('ASSOC_DATA')->where($baseWhere)
+                ->where('c_kin_code', $this->reverseKinPairCode($row['c_kin_code'] ?? 0))
+                ->where('c_kin_id', $row['c_personid'])
+                ->where('c_assoc_kin_code', $this->reverseKinPairCode($row['c_assoc_kin_code'] ?? 0))
+                ->where('c_assoc_kin_id', $row['c_personid'])
+                ->where($pairFilter)
+                ->first();
+        }
+
+        // 第二級回退（兼容不完全符合鏡像約定的舊資料）：僅以 person/書名/年（＋配對碼或對稱 0,0）定位，
+        // 唯一才刪；多筆無法區分則跳過（寧留待人工，也不誤刪他筆關係的反向列）。
+        if ($row2 === null) {
+            $fallback = DB::table('ASSOC_DATA')->where($baseWhere);
+            if ($assocPair1 !== null || $assocPair2 !== null) {
+                $fallback->where($pairFilter);
+            } elseif ($isSymmetric) {
+                $fallback->where('c_kin_id', 0)->where('c_assoc_kin_id', 0);
+            }
+            $candidates = $fallback->get();
+            if ($candidates->count() === 1) {
+                $row2 = $candidates->first();
+            } elseif ($candidates->count() > 1) {
+                Log::warning('[ASSOC_DATA] 反向鏡像列不唯一，跳過刪除以避免誤刪', [
+                    'c_personid' => $row['c_personid'] ?? null,
+                    'c_assoc_id' => $row['c_assoc_id'] ?? null,
+                    'c_assoc_code' => $row['c_assoc_code'] ?? null,
+                    'candidates' => $candidates->count(),
+                ]);
+
+                return;
+            } else {
+                return;
+            }
+        }
+
+        $deleteMirrorQuery = DB::table('ASSOC_DATA')->where([
+            ['c_personid', $row2->c_personid],
+            ['c_assoc_id', $row2->c_assoc_id],
+            ['c_assoc_code', $row2->c_assoc_code],
+            ['c_kin_code', $row2->c_kin_code],
+            ['c_kin_id', $row2->c_kin_id],
+            ['c_assoc_kin_code', $row2->c_assoc_kin_code],
+            ['c_assoc_kin_id', $row2->c_assoc_kin_id],
+            ['c_text_title', $row2->c_text_title],
+            ['c_assoc_first_year', $row2->c_assoc_first_year],
+        ]);
+
+        $mirroredRows = (clone $deleteMirrorQuery)->get();
+        $deleteMirrorQuery->delete();
+
+        foreach ($mirroredRows as $mirroredRow) {
+            $mirroredRowData = $auditLog->normalizeRow($mirroredRow);
+            $auditLog->write(
+                'ASSOC_DATA',
+                'DELETE',
+                $auditLog->buildRowPkFromData('ASSOC_DATA', $mirroredRowData),
+                $mirroredRowData,
+                null,
+                'user',
+                (string) Auth::id(),
+                $operationId
+            );
+        }
+    }
+
+    /** 親屬碼的反向配對碼（KINSHIP_CODES.c_kin_pair1）；0／查無 → 0。供 syncAssocMirrorOnDelete 精確定位反向列。 */
+    private function reverseKinPairCode($kinCode): int {
+        if ($kinCode === null || (int) $kinCode === 0) {
+            return 0;
+        }
+        $v = DB::table('KINSHIP_CODES')->where('c_kincode', $kinCode)->value('c_kin_pair1');
+
+        return $v !== null ? (int) $v : 0;
     }
 
     public function addrStoreById(Request $request, $id) {
@@ -3388,6 +3882,14 @@ class BiogMainRepository {
         }
 
         return $originalText." ".$add;
+    }
+
+    /**
+     * 公開包裝：v2 PossessionMutationHandler 於同交易內同步 POSSESSION_ADDR 副表
+     * （以 c_possession_record_id 刪除既有列後重插整組；-999→0）。create 路徑沿用 possessionStoreById。
+     */
+    public function syncPossessionAddresses(array $c_addr_id, $c_possession_record_id, $c_personid): void {
+        $this->insertAddrPo($c_addr_id, $c_possession_record_id, $c_personid);
     }
 
     protected function insertAddrPo(array $c_addr_id, $c_possession_record_id, $c_personid) {

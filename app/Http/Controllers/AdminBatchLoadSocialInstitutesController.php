@@ -7,6 +7,7 @@ use App\Repositories\OperationRepository;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 
 class AdminBatchLoadSocialInstitutesController extends Controller {
     /**
@@ -32,6 +33,31 @@ class AdminBatchLoadSocialInstitutesController extends Controller {
         ]);
     }
 
+    /**
+     * Inertia + React 版：批次匯入社會機構表單頁。
+     */
+    public function appShowForm(Request $request) {
+        $this->ensureAdmin();
+
+        return Inertia::render('Admin/BatchLoadSocialInstitutes/Index', [
+            'input' => (string) old('entries', ''),
+            'results' => session('batch_results', []),
+            'batch_errors' => array_values(session('batch_errors', [])),
+            'urls' => [
+                'store' => route('app.admin.batch-load-social-institutes.store', [], false),
+                'reset' => route('app.admin.batch-load-social-institutes', [], false),
+            ],
+            'page_translations' => [
+                'admin' => is_array($t = trans('admin')) ? $t : [],
+            ],
+        ]);
+    }
+
+    /** store 完成後的列表路由（依請求路徑，Blade 與 Inertia 共用 store）。 */
+    protected function listRouteName(Request $request): string {
+        return $request->is('app/*') ? 'app.admin.batch-load-social-institutes' : 'admin.batch-load-social-institutes';
+    }
+
     public function store(Request $request) {
         $this->ensureAdmin();
 
@@ -42,7 +68,7 @@ class AdminBatchLoadSocialInstitutesController extends Controller {
         [$rows, $errors] = $this->parseEntries($data['entries']);
 
         if (!empty($errors)) {
-            return $this->backWithErrors($errors);
+            return $this->backWithErrors($request, $errors);
         }
 
         $typeMap = $this->getTypeMap();
@@ -51,7 +77,7 @@ class AdminBatchLoadSocialInstitutesController extends Controller {
 
         $additionalErrors = $this->validateLookups($rows, $typeMap, $dynastyMap);
         if (!empty($additionalErrors)) {
-            return $this->backWithErrors($additionalErrors);
+            return $this->backWithErrors($request, $additionalErrors);
         }
 
         $addressErrors = $this->validateAddressIds(array_column($rows, 'addr_id'));
@@ -59,7 +85,7 @@ class AdminBatchLoadSocialInstitutesController extends Controller {
 
         $allErrors = array_merge($addressErrors, $sourceErrors);
         if (!empty($allErrors)) {
-            return $this->backWithErrors($allErrors);
+            return $this->backWithErrors($request, $allErrors);
         }
 
         $results = [];
@@ -148,7 +174,7 @@ class AdminBatchLoadSocialInstitutesController extends Controller {
         });
 
         return redirect()
-            ->route('admin.batch-load-social-institutes')
+            ->route($this->listRouteName($request))
             ->with('batch_results', $results)
             ->with('batch_errors', []);
     }
@@ -456,9 +482,9 @@ class AdminBatchLoadSocialInstitutesController extends Controller {
      *
      * @param array<int,string> $errors
      */
-    protected function backWithErrors(array $errors) {
+    protected function backWithErrors(Request $request, array $errors) {
         return redirect()
-            ->route('admin.batch-load-social-institutes')
+            ->route($this->listRouteName($request))
             ->withInput()
             ->with('batch_errors', $errors);
     }

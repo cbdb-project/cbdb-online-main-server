@@ -1,0 +1,178 @@
+/*
+ * Inertia/React 專用樣式入口（Phase 0 F1）
+ *
+ * 僅由 resources/js/inertia/app.tsx 載入，因此 Tailwind 的 preflight reset
+ * 只作用於 inertia.blade.php 根模板下的 React 頁面，不會污染仍走
+ * layouts/dashboard-v3（AdminLTE 3 + Bootstrap 4）的 Blade 頁面。
+ *
+ * 設計 token 取自既有 AdminLTE 3 / CBDB 主視覺（resources/js/inertia/theme.ts
+ * 的 APP_THEME 與 AdminLTE 預設色），作為「像素級復刻」的保真錨點。
+ *
+ * 慣例（對齊現行 shadcn/ui v4 CLI 輸出）：CSS 變數內存放「完整色彩函式」，
+ * @theme 直接以 var(--x) 取用、不再二次包 hsl()，避免日後 `npx shadcn add`
+ * 產生的元件與手寫 token 格式分歧。
+ */
+@import 'tailwindcss';
+
+/*
+ * Font Awesome 6 free（自托管，由 Vite 打包 webfonts，不走 CDN）。
+ * Inertia 根模板 inertia.blade.php 為獨立 HTML，不繼承 AdminLTE layout，故 React 頁面
+ * 的 `fa*` 圖示需在此 bundle 內自備字型。沿用後端 Navigation 與各頁既有的 FA class 字串
+ * （fas/far/fab/v4 兩段式 `fa fa-*`）；FA6 保留 v5 別名，舊名稱多數可直接渲染。
+ */
+@import '@fortawesome/fontawesome-free/css/all.min.css';
+
+/* shadcn/ui 動畫工具（accordion、dialog 進出場等） */
+@plugin 'tailwindcss-animate';
+
+/* 深色模式：沿用既有 localStorage['darkMode'] 機制，由殼層（useDarkMode）在
+   <html> 掛上 .dark class（與 AdminLTE 的 body.dark-mode 概念對齊）。 */
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * 語意化 CSS 變數（shadcn/ui 慣例）。色值對齊 CBDB 主視覺：
+ *   primary  = CBDB 品牌藍 #4E88C7
+ *   destructive = Harvard 紅 #A51C30
+ */
+:root {
+    --background: hsl(0 0% 100%);
+    --foreground: hsl(210 11% 15%);            /* AdminLTE body 文字 #212529 近似 */
+    --card: hsl(0 0% 100%);
+    --card-foreground: hsl(210 11% 15%);
+    --popover: hsl(0 0% 100%);
+    --popover-foreground: hsl(210 11% 15%);
+    --primary: hsl(211 53% 54%);               /* #4E88C7 CBDB 品牌藍 */
+    --primary-foreground: hsl(0 0% 100%);
+    --secondary: hsl(210 16% 93%);             /* AdminLTE light/gray-200 */
+    --secondary-foreground: hsl(210 11% 15%);
+    --muted: hsl(210 16% 93%);
+    --muted-foreground: hsl(208 7% 46%);       /* #6c757d secondary text */
+    --accent: hsl(210 16% 93%);
+    --accent-foreground: hsl(210 11% 15%);
+    --destructive: hsl(351 70% 38%);           /* #A51C30 Harvard 紅 */
+    --destructive-foreground: hsl(0 0% 100%);
+    --border: hsl(210 14% 83%);                /* #dee2e6 */
+    --input: hsl(210 14% 83%);
+    --ring: hsl(211 53% 54%);
+    --radius: 0.375rem;                        /* AdminLTE 預設圓角 .25rem~.375rem */
+
+    /* 側邊欄（AdminLTE 3 預設深色 sidebar #343a40 / 文字 #c2c7d0） */
+    --sidebar: hsl(210 10% 23%);
+    --sidebar-foreground: hsl(213 9% 79%);
+    --sidebar-primary: hsl(211 53% 54%);
+    --sidebar-primary-foreground: hsl(0 0% 100%);
+    --sidebar-accent: hsl(210 10% 28%);
+    --sidebar-accent-foreground: hsl(0 0% 100%);
+    --sidebar-border: hsl(210 10% 18%);
+}
+
+.dark {
+    --background: hsl(210 10% 15%);
+    --foreground: hsl(213 9% 85%);
+    --card: hsl(210 10% 19%);
+    --card-foreground: hsl(213 9% 85%);
+    --popover: hsl(210 10% 19%);
+    --popover-foreground: hsl(213 9% 85%);
+    --primary: hsl(211 53% 60%);
+    --primary-foreground: hsl(210 11% 10%);
+    --secondary: hsl(210 10% 25%);
+    --secondary-foreground: hsl(213 9% 85%);
+    --muted: hsl(210 10% 25%);
+    --muted-foreground: hsl(210 8% 60%);
+    --accent: hsl(210 10% 25%);
+    --accent-foreground: hsl(213 9% 85%);
+    --destructive: hsl(351 60% 50%);
+    --destructive-foreground: hsl(0 0% 100%);
+    --border: hsl(210 10% 28%);
+    --input: hsl(210 10% 28%);
+    --ring: hsl(211 53% 60%);
+
+    --sidebar: hsl(210 10% 12%);
+    --sidebar-foreground: hsl(213 9% 79%);
+    --sidebar-primary: hsl(211 53% 60%);
+    --sidebar-primary-foreground: hsl(210 11% 10%);
+    --sidebar-accent: hsl(210 10% 20%);
+    --sidebar-accent-foreground: hsl(0 0% 100%);
+    --sidebar-border: hsl(210 10% 8%);
+}
+
+/* 把語意變數對映成 Tailwind v4 的 color/radius token，
+   讓 `bg-primary`、`text-muted-foreground`、`rounded-md` 等類別可用。 */
+@theme inline {
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+
+    --radius-sm: calc(var(--radius) - 2px);
+    --radius-md: var(--radius);
+    --radius-lg: calc(var(--radius) + 2px);
+
+    /* 字體：沿用主站 Source Sans Pro / Noto Sans TC（見近期 commit） */
+    --font-sans: 'Source Sans Pro', 'Noto Sans TC', -apple-system, BlinkMacSystemFont,
+        'Segoe UI', Roboto, sans-serif;
+
+    /*
+     * 正文字級對齊 AdminLTE 16px 基準。
+     * React 元件普遍以 `text-sm` 當正文/表格字級，預設 0.875rem(14px) 較舊 Blade 頁偏小；
+     * 此處把 text-sm 提到 1rem(16px)、text-xs 提到 0.8125rem(13px)，使整體閱讀字級與舊頁齊平。
+     * 僅調「字級 token」，不動 Tailwind 間距/圓角等 rem token，故不會造成版面重排。
+     */
+    --text-sm: 1rem;
+    --text-sm--line-height: 1.5rem;
+    --text-xs: 0.8125rem;
+    --text-xs--line-height: 1.25rem;
+}
+
+@layer base {
+    * {
+        border-color: var(--border);
+    }
+    body {
+        background-color: var(--background);
+        color: var(--foreground);
+        font-family: var(--font-sans);
+    }
+}
+
+/* 深色側邊欄細捲軸：取代深色背景上突兀的預設白色捲軸（Firefox + WebKit） */
+.sidebar-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+.sidebar-scroll::-webkit-scrollbar {
+    width: 8px;
+}
+.sidebar-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.25);
+    border-radius: 4px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.4);
+}

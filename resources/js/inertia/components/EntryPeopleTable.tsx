@@ -68,7 +68,7 @@ export default function EntryPeopleTable({ rows, pagination, onPageChange }: Pro
                                 <td style={cellStyle}>{row.entry_count}</td>
                                 <td style={cellStyle}>
                                     <a
-                                        href={`/basicinformation/${row.c_personid}`}
+                                        href={`/app/basicinformation/${row.c_personid}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         style={actionLinkStyle}

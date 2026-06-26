@@ -45,7 +45,7 @@ class CbdbTableMaintenanceController extends Controller {
         });
     }
 
-    public function index(Request $request) {
+    protected function buildTableStats(): array {
         // 獲取各表的統計信息
         $stats = [];
         foreach ($this->tables as $tableName => $tableInfo) {
@@ -62,6 +62,12 @@ class CbdbTableMaintenanceController extends Controller {
             }
         }
 
+        return $stats;
+    }
+
+    public function index(Request $request) {
+        $stats = $this->buildTableStats();
+
         return view('admin.cbdb-table-maintenance', [
             'page_title' => __('admin.table_maintenance'),
             'page_title_key' => 'CBDB 內部表維護',
@@ -69,6 +75,31 @@ class CbdbTableMaintenanceController extends Controller {
             'page_url' => route('admin.cbdb-table-maintenance'),
             'tables' => $this->tables,
             'stats' => $stats,
+        ]);
+    }
+
+    public function appIndex(Request $request) {
+        $stats = $this->buildTableStats();
+
+        $tables = [];
+        foreach ($this->tables as $tableName => $info) {
+            $tables[] = array_merge($info, [
+                'table_key' => $tableName,
+                'exists' => $stats[$tableName]['exists'],
+                'count' => $stats[$tableName]['count'],
+            ]);
+        }
+
+        return \Inertia\Inertia::render('Admin/CbdbTableMaintenance/Index', [
+            'tables' => $tables,
+            'urls' => [
+                'rebuild' => route('admin.cbdb-table-maintenance.rebuild', [], false),
+                'progress_base' => '/admin/cbdb-table-maintenance/progress/',
+            ],
+            'page_translations' => [
+                'admin' => __('admin'),
+                'common' => __('common'),
+            ],
         ]);
     }
 

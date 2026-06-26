@@ -23,7 +23,7 @@ class CodesControllerTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
 
-        config(['codes.tables' => ['TEST_CODES', 'TEXT_CODES', 'POSSESSION_DATA', 'CBDB__NAME_FTS', 'APPOINTMENT_CODE_TYPE_REL', 'OFFICE_CODE_TYPE_REL']]);
+        config(['codes.tables' => ['TEST_CODES', 'TEXT_CODES', 'POSSESSION_DATA', 'CBDB__NAME_FTS', 'APPOINTMENT_CODE_TYPE_REL', 'OFFICE_CODE_TYPE_REL', 'APPOINTMENT_TYPES']]);
         config(['codes.connection' => null]);
 
         $compiledPath = base_path('tests/storage/views');
@@ -41,6 +41,7 @@ class CodesControllerTest extends TestCase {
                 'CBDB__NAME_FTS' => [],
                 'APPOINTMENT_CODE_TYPE_REL' => [],
                 'OFFICE_CODE_TYPE_REL' => [],
+                'APPOINTMENT_TYPES' => [],
                 'operations' => [],
             ],
             [
@@ -50,7 +51,17 @@ class CodesControllerTest extends TestCase {
                 'CBDB__NAME_FTS' => ['id', 'person_name'],
                 'APPOINTMENT_CODE_TYPE_REL' => ['c_appt_code', 'c_appt_type_code'],
                 'OFFICE_CODE_TYPE_REL' => ['c_office_id', 'c_office_tree_id'],
+                'APPOINTMENT_TYPES' => ['c_appt_type_code', 'c_appt_type_desc', 'c_appt_type_desc_chn'],
                 'operations' => ['id', 'user_id', 'resource', 'resource_id', 'op_type', 'resource_data', 'resource_original', 'created_at', 'updated_at'],
+            ],
+            [
+                'APPOINTMENT_TYPES' => [[
+                    'name' => 'primary',
+                    'columns' => ['c_appt_type_code'],
+                    'type' => 'btree',
+                    'unique' => true,
+                    'primary' => true,
+                ]],
             ]
         );
         DB::swap($this->fakeDb);
@@ -58,7 +69,7 @@ class CodesControllerTest extends TestCase {
 
         $this->app->instance(CodesRepository::class, new class () extends CodesRepository {
             public function allowedTables(): array {
-                return ['TEST_CODES', 'TEXT_CODES', 'POSSESSION_DATA', 'CBDB__NAME_FTS', 'APPOINTMENT_CODE_TYPE_REL', 'OFFICE_CODE_TYPE_REL'];
+                return ['TEST_CODES', 'TEXT_CODES', 'POSSESSION_DATA', 'CBDB__NAME_FTS', 'APPOINTMENT_CODE_TYPE_REL', 'OFFICE_CODE_TYPE_REL', 'APPOINTMENT_TYPES'];
             }
 
             public function allowedTableMap(): array {
@@ -69,6 +80,7 @@ class CodesControllerTest extends TestCase {
                     'CBDB__NAME_FTS' => 'CBDB__NAME_FTS',
                     'APPOINTMENT_CODE_TYPE_REL' => 'APPOINTMENT_CODE_TYPE_REL',
                     'OFFICE_CODE_TYPE_REL' => 'OFFICE_CODE_TYPE_REL',
+                    'APPOINTMENT_TYPES' => 'APPOINTMENT_TYPES',
                 ];
             }
         });
@@ -692,6 +704,45 @@ class CodesControllerTest extends TestCase {
         $response->assertSee('c_modified_date', false);
         $response->assertSee('Sample Title CHN');
         $this->assertEmpty($this->operationSpy->calls);
+    }
+
+    #[Test]
+    public function testSingleColumnPrimaryKeyUsesSchemaPrimaryIndexForLinksAndOperationIds() {
+        DB::table('APPOINTMENT_TYPES')->insert([
+            [
+                'c_appt_type_code' => 'T001',
+                'c_appt_type_desc' => 'Desc 1',
+                'c_appt_type_desc_chn' => '描述一',
+            ],
+        ]);
+
+        $user = new User([
+            'name' => 'appt-admin',
+            'email' => 'appt-admin@example.com',
+            'confirmation_token' => Str::random(32),
+        ]);
+        $user->id = 51;
+        $user->is_active = 1;
+        $this->actingAs($user);
+
+        $response = $this->get('/codes/APPOINTMENT_TYPES');
+
+        $response->assertStatus(200);
+        $response->assertViewHas('keyColumns', ['c_appt_type_code']);
+        $response->assertSee('/codes/APPOINTMENT_TYPES/T001/edit');
+        $response->assertDontSee('href="/codes/APPOINTMENT_TYPES/T001_._', false);
+
+        $this->operationSpy->calls = [];
+
+        $storeResponse = $this->post('/codes/APPOINTMENT_TYPES', [
+            'c_appt_type_code' => 'T002',
+            'c_appt_type_desc' => 'Desc 2',
+            'c_appt_type_desc_chn' => '描述二',
+        ]);
+
+        $storeResponse->assertRedirect(route('codes.edit', ['table_name' => 'APPOINTMENT_TYPES', 'id' => 'T002']));
+        $this->assertCount(1, $this->operationSpy->calls);
+        $this->assertSame('T002', $this->operationSpy->calls[0]['resource_id']);
     }
 
     #[Test]
@@ -1405,11 +1456,13 @@ class FakeDatabaseManager {
     public $failures = [];
     public $failuresCleared = [];
     public $schemaColumns = [];
+    public $schemaIndexes = [];
     public array $recordedOrderBys = [];
 
-    public function __construct(array $tables = [], array $schemaColumns = []) {
+    public function __construct(array $tables = [], array $schemaColumns = [], array $schemaIndexes = []) {
         $this->tables = $tables;
         $this->schemaColumns = $schemaColumns;
+        $this->schemaIndexes = $schemaIndexes;
     }
 
     public function table($name) {
@@ -1436,7 +1489,7 @@ class FakeDatabaseManager {
     }
 
     public function getSchemaBuilder() {
-        return new FakeSchemaBuilder($this->schemaColumns);
+        return new FakeSchemaBuilder($this->schemaColumns, $this->schemaIndexes);
     }
 
     public function setFailure(string $operation, string $message = 'Simulated failure'): void {
@@ -1475,9 +1528,11 @@ class FakeTableDetails {
 
 class FakeSchemaBuilder {
     private $schemaColumns = [];
+    private $schemaIndexes = [];
 
-    public function __construct(array $schemaColumns = []) {
+    public function __construct(array $schemaColumns = [], array $schemaIndexes = []) {
         $this->schemaColumns = $schemaColumns;
+        $this->schemaIndexes = $schemaIndexes;
     }
 
     public function getColumnListing($table) {
@@ -1490,6 +1545,10 @@ class FakeSchemaBuilder {
 
     public function hasTable($table) {
         return array_key_exists($table, $this->schemaColumns);
+    }
+
+    public function getIndexes($table) {
+        return $this->schemaIndexes[$table] ?? [];
     }
 }
 

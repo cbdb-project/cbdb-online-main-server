@@ -245,6 +245,50 @@ class ApiV2MutateTest extends TestCase {
     }
 
     #[Test]
+    public function testBiogMainNullableFieldsSentinelFullyIdempotent() {
+        // basic_info 的 nullable 欄（c_female / c_index_year 等，real schema nullable（0/值有意義））語義與子資源碼欄不同：
+        // 空表示（null/''/'NULL'）一律規範化為 **null**（非 0）、有效數值原樣保留、來回不翻。≥10 案例。
+        $this->actingAs($this->makeUser(email: 'biog-sentinel@example.com'));
+        $pid = 138841;
+        $patch = function ($field, $value) use ($pid) {
+            return $this->postJson('/api/v2/mutate', [
+                'resource' => 'basicinformation', 'person_id' => $pid, 'mode' => 'direct', 'operation' => 'update',
+                'target' => ['pk' => ['c_personid' => $pid]],
+                'changes' => [$field => $value],
+            ]);
+        };
+        $val = fn ($field) => DB::table('BIOG_MAIN')->where('c_personid', $pid)->value($field);
+
+        // c_female：空表示（null/''/'NULL'）→ null（從非 null seed 確保真寫入）。
+        foreach ([null, '', 'NULL'] as $sent) {
+            DB::table('BIOG_MAIN')->where('c_personid', $pid)->delete();
+            $this->seedBiogMain(['c_female' => 1]);
+            $patch('c_female', $sent)->assertOk();
+            $this->assertNull($val('c_female'), 'c_female 送 '.var_export($sent, true).' 應規範化為 null');
+        }
+        // c_female：有效數值（0/1/2）原樣保留為 int。
+        foreach ([0, 1, 2] as $sent) {
+            DB::table('BIOG_MAIN')->where('c_personid', $pid)->delete();
+            $this->seedBiogMain(['c_female' => 9]);
+            $patch('c_female', $sent)->assertOk();
+            $this->assertSame($sent, (int) $val('c_female'), 'c_female 送 '.$sent.' 應保留');
+        }
+        // c_index_year：空→null；有效值保留。
+        foreach ([null, ''] as $sent) {
+            DB::table('BIOG_MAIN')->where('c_personid', $pid)->delete();
+            $this->seedBiogMain(['c_index_year' => 1050]);
+            $patch('c_index_year', $sent)->assertOk();
+            $this->assertNull($val('c_index_year'), 'c_index_year 送 '.var_export($sent, true).' 應→null');
+        }
+        foreach ([500, -200] as $sent) {
+            DB::table('BIOG_MAIN')->where('c_personid', $pid)->delete();
+            $this->seedBiogMain(['c_index_year' => 1050]);
+            $patch('c_index_year', $sent)->assertOk();
+            $this->assertSame($sent, (int) $val('c_index_year'), 'c_index_year 送 '.$sent.' 應保留');
+        }
+    }
+
+    #[Test]
     public function testDirectBiogMainUpdateCanPatchSingleFieldAndWritesAuditInfo() {
         $user = $this->makeUser(email: 'biog-main-single@example.com');
         $this->actingAs($user);

@@ -171,6 +171,33 @@ class ApiV2CreateAltnameTest extends TestCase {
         return array_replace_recursive($payload, $overrides);
     }
 
+    #[Test]
+    public function testAltnameCreateCodeFieldSentinelFullyIdempotent(): void {
+        // #71：create c_source 完全幂等——null/''/'-999'/-999/'0'/0 落庫皆 0、永不寫 null/''；合法非 0 保留。
+        // 每案用不同 c_alt_name_chn 取獨立 PK。≥10 案例。
+        $this->actingAs($this->makeUser(email: 'altname-create-sentinel@example.com'));
+        $T = 'ALTNAME_DATA';
+        foreach ([null, '', '-999', -999, '0', 0] as $i => $sent) {
+            $chn = '哨名'.$i;
+            $this->postJson('/api/v2/create', $this->createPayload([
+                'target' => ['pk' => ['c_alt_name_chn' => $chn]],
+                'changes' => ['c_source' => $sent],
+            ]))->assertOk()->assertJson(['ok' => true]);
+            $stored = DB::table($T)->where(['c_personid' => 1000, 'c_alt_name_chn' => $chn, 'c_alt_name_type_code' => 5])->value('c_source');
+            $this->assertNotNull($stored, 'c_source 送 '.var_export($sent, true).' 不得為 null');
+            $this->assertSame('0', (string) $stored, 'c_source 送 '.var_export($sent, true).' 應規範化為 0');
+        }
+        foreach ([5, 7, 999, 42] as $i => $sent) {
+            $chn = '合名'.$i;
+            $this->postJson('/api/v2/create', $this->createPayload([
+                'target' => ['pk' => ['c_alt_name_chn' => $chn]],
+                'changes' => ['c_source' => $sent],
+            ]))->assertOk();
+            $stored = DB::table($T)->where(['c_personid' => 1000, 'c_alt_name_chn' => $chn, 'c_alt_name_type_code' => 5])->value('c_source');
+            $this->assertSame($sent, (int) $stored, '合法非 0 值不得被誤清：'.$sent);
+        }
+    }
+
     // ── Direct Create Tests ─────────────────────────────────
 
     #[Test]

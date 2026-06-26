@@ -111,6 +111,10 @@ class ApiV2MutateTextTest extends TestCase {
             $table->text('c_notes')->nullable();
             $table->text('c_supplement')->nullable();
             $table->integer('c_text_year')->nullable();
+            $table->string('c_created_by', 255)->nullable();
+            $table->string('c_created_date', 255)->nullable();
+            $table->string('c_modified_by', 255)->nullable();
+            $table->string('c_modified_date', 255)->nullable();
             $table->primary(['c_personid', 'c_textid', 'c_role_id']);
         });
     }
@@ -159,7 +163,74 @@ class ApiV2MutateTextTest extends TestCase {
         return array_replace_recursive($payload, $overrides);
     }
 
+    // ── Sentinel 幂等（碼/FK 欄 0/null/''/-999 規範化一致）──────────────
+
+    #[Test]
+    public function testTextCodeFieldSentinelFullyIdempotent(): void {
+        // 「完全幂等」：碼/FK 欄（c_source/c_textid，legacy 哨兵 0=Unknown（DDL 實為 nullable））的所有「空表示」
+        // ——0 / null / '' / -999——v2 一律規範化為 0，落庫穩定、來回不翻。逐一送出，斷言皆存 0（不出現 null/''）。
+        $this->actingAs($this->makeUser(email: 'text-sentinel@example.com'));
+        $pk = ['c_personid' => 1000, 'c_textid' => 200, 'c_role_id' => 1];
+
+        foreach ([0, null, '', -999, '0'] as $sent) {
+            DB::table('BIOG_TEXT_DATA')->delete();
+            $this->seedText(['c_source' => 10]); // 先非 0，確保「送空 → 規範化為 0」是真寫入而非巧合
+            $this->postJson('/api/v2/mutate', $this->textPayload([
+                'changes' => ['c_source' => $sent, 'c_notes' => '改'],
+            ]))->assertOk();
+            $stored = DB::table('BIOG_TEXT_DATA')->where($pk)->value('c_source');
+            $this->assertSame(0, (int) $stored, '送出 '.var_export($sent, true).' 應規範化為 0');
+            $this->assertNotNull($stored, 'c_source 不得為 null（NOT NULL 欄）');
+        }
+
+        // 冪等性：DB 已是 0，再送 0 / null / '' → 仍是 0，無翻動（c_notes 每輪唯一以確保有有效變更、不觸 no_effective_changes）。
+        foreach ([0, null, ''] as $i => $sent) {
+            $this->postJson('/api/v2/mutate', $this->textPayload([
+                'changes' => ['c_source' => $sent, 'c_notes' => '再改第'.$i.'輪'],
+            ]))->assertOk();
+            $this->assertSame(0, (int) DB::table('BIOG_TEXT_DATA')->where($pk)->value('c_source'));
+        }
+    }
+
     // ── Direct Update Tests ─────────────────────────────────
+
+    #[Test]
+    public function testDirectTextUpdateCanRekeyTextid(): void {
+        // 回歸（人物編輯重做）：著述編輯器允許在編輯模式改主鍵（c_textid／c_role_id），
+        // 後端據 changes 對舊列改鍵。驗證改 c_textid 後舊列消失、新列以新 PK 存在且非 PK 欄位保留。
+        $user = $this->makeUser(email: 'text-rekey@example.com');
+        $this->actingAs($user);
+        $this->seedText(['c_textid' => 200, 'c_role_id' => 1, 'c_pages' => '1-5']);
+
+        $this->postJson('/api/v2/mutate', $this->textPayload([
+            'changes' => ['c_textid' => 300],
+        ]))->assertOk();
+
+        $this->assertDatabaseMissing('BIOG_TEXT_DATA', [
+            'c_personid' => 1000, 'c_textid' => 200, 'c_role_id' => 1,
+        ]);
+        $this->assertDatabaseHas('BIOG_TEXT_DATA', [
+            'c_personid' => 1000, 'c_textid' => 300, 'c_role_id' => 1, 'c_pages' => '1-5',
+        ]);
+    }
+
+    #[Test]
+    public function testDirectTextUpdateClearingSourceNormalizesToSentinelZero(): void {
+        // 回歸（人物編輯重做）：清空出處（c_source）時 React 編輯器送 null，後端須對齊 legacy
+        // emptyToSentinel 正規化為 0（Unknown），不可寫成 NULL（legacy 哨兵 0=Unknown，空碼一律落 0；real DDL 雖 nullable）。
+        $user = $this->makeUser(email: 'text-clearsource@example.com');
+        $this->actingAs($user);
+        $this->seedText(['c_source' => 10]);
+
+        $this->postJson('/api/v2/mutate', $this->textPayload([
+            'changes' => ['c_source' => null],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('BIOG_TEXT_DATA', [
+            'c_personid' => 1000, 'c_textid' => 200, 'c_role_id' => 1,
+            'c_source' => 0,
+        ]);
+    }
 
     #[Test]
     public function testDirectTextUpdateSucceeds(): void {
@@ -399,6 +470,8 @@ class ApiV2MutateTextTest extends TestCase {
         $response = $this->postJson('/api/v2/mutate', $this->textPayload());
         $response->assertStatus(403);
     }
+
+    // ── #56 M 寫入等價（update 路徑，純單表；texts 無鏡像/副表）──────
 
     #[Test]
     public function testTextUpdateAcceptsAlias(): void {

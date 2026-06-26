@@ -1,18 +1,17 @@
-import React from 'react';
-import TabCard from '../shared/TabCard';
-import MetaRow from '../shared/MetaRow';
+import React, { useState } from 'react';
 import TabPager from '../shared/TabPager';
-import EmptyState from '../shared/EmptyState';
 import LegacyCreateButton from '../shared/LegacyCreateButton';
 import LegacyEditButton from '../shared/LegacyEditButton';
 import LegacyDeleteButton from '../shared/LegacyDeleteButton';
-import CardActions from '../shared/CardActions';
+import { NavButton } from '../../ui/NavButton';
 import { useTabPager } from '../shared/useTabPager';
-import { formatBilingualLabel, formatYearRange } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
-import { formatTextTitle } from '../shared/textLookup';
-import { useTextCodes } from '../shared/useTextCodes';
+import { getCsrfToken } from '../shared/csrf';
+import { buildEditV2CreateUrl, buildEditV2EditUrl } from '../shared/legacyEditUrl';
+import SubresourceTable from '../../PersonEditorShared/SubresourceTable';
 import { useTranslation } from '../../../hooks/useTranslation';
+import { Button } from '../../ui/Button';
+import { ConfirmDialog } from '../../ui/ConfirmDialog';
 
 interface StatusItem {
     pk: {
@@ -34,34 +33,140 @@ interface StatusItem {
 interface Props {
     data: { tab: string; items: StatusItem[] };
     canEdit: boolean;
+    /** 可提案但不可直接寫入（眾包用戶）。 */
+    canPropose?: boolean;
     postCE?: boolean;
+    /** 由 PersonBrowser 透過 props 注入的遷移開關（basicinformation.statuses）。 */
+    statusesEditorIsNew?: boolean;
+    personId?: number | null;
+    createEndpoint?: string;
+    mutateEndpoint?: string;
+    deleteEndpoint?: string;
+    /** 編輯/刪除成功後刷新該分頁。 */
+    onRefresh?: () => void;
 }
 
-export default function StatusesTab({ data, canEdit, postCE }: Props) {
+export default function StatusesTab({
+    data,
+    canEdit,
+    canPropose = false,
+    postCE,
+    statusesEditorIsNew = false,
+    personId = null,
+    createEndpoint = '',
+    mutateEndpoint = '',
+    deleteEndpoint = '',
+    onRefresh,
+}: Props) {
     const t = useTranslation('person');
+    const tb = useTranslation('biogmains');
     const { pageItems, currentPage, totalPages, setCurrentPage, showAll, setShowAll, totalItems } = useTabPager(data.items);
-    const { records: textRecords } = useTextCodes(data.items.map((item) => item.source_id));
+
+    const [deleteTarget, setDeleteTarget] = useState<StatusItem | null>(null);
+    const [deleting, setDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
+
+    // 新編輯器在 flag=new 且（可直接編輯 或 可提案）且必要端點齊全時啟用。
+    const useReactEditor =
+        statusesEditorIsNew && (canEdit || canPropose) && personId != null && !!createEndpoint && !!mutateEndpoint && !!deleteEndpoint;
+    // 可直接寫入者走 direct；否則（僅可提案）走 proposal。
+    const proposalMode = !canEdit && canPropose;
+    const createHref = buildEditV2CreateUrl('statuses', personId);
+    const editHref = (item: StatusItem) => buildEditV2EditUrl('statuses', item.pk, personId);
+
+    const handleDelete = async () => {
+        if (!deleteTarget || !personId) {
+            return;
+        }
+        setDeleting(true);
+        setDeleteError(null);
+        try {
+            const response = await fetch(deleteEndpoint, {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    resource: 'statuses',
+                    person_id: personId,
+                    mode: proposalMode ? 'proposal' : 'direct',
+                    target: { pk: deleteTarget.pk },
+                }),
+            });
+            const json = await response.json().catch(() => ({}));
+            if (!response.ok || !json?.ok) {
+                setDeleteError(json?.message || `${t('delete_failed')}（HTTP ${response.status}）`);
+                return;
+            }
+            setDeleteTarget(null);
+            onRefresh?.();
+        } catch (err) {
+            setDeleteError(err instanceof Error ? err.message : t('delete_failed'));
+        } finally {
+            setDeleting(false);
+        }
+    };
 
     return (
         <div style={containerStyle}>
-            <LegacyCreateButton tabKey="statuses" canEdit={canEdit} />
-            {data.items.length === 0 ? <EmptyState /> : null}
-            {pageItems.map((item) => (
-                <TabCard key={stableKey(item.pk)}>
-                    <MetaRow label={t('seq_no')} value={item.sequence ?? '—'} />
-                    <MetaRow label={t('status_label')} value={formatBilingualLabel(item.status_chn, item.status)} />
-                    <MetaRow label={t('status_code_label')} value={item.status_code} />
-                    <MetaRow label={t('time_range')} value={formatYearRange(item.first_year, item.last_year, postCE)} />
-                    <MetaRow label={t('source_label')} value={formatTextTitle(textRecords[item.source_id ?? 0], item.source_id)} />
-                    <MetaRow label={t('pages_label')} value={item.pages} />
-                    <MetaRow label={t('remarks')} value={item.notes} />
-                    <CardActions>
+            {useReactEditor ? (
+                <div style={createBarStyle}>
+                    <NavButton size="sm" href={createHref}>
+                        {t('add_btn')}
+                    </NavButton>
+                </div>
+            ) : (
+                <LegacyCreateButton tabKey="statuses" canEdit={canEdit} />
+            )}
+
+            <SubresourceTable
+                items={pageItems}
+                rowKey={(item) => stableKey(item.pk)}
+                emptyText={t('no_records')}
+                actionsHeader={tb('actions')}
+                columns={[
+                    { header: t('seq_no'), width: 56, render: (item) => data.items.indexOf(item) + 1 },
+                    { header: tb('sequence'), render: (item) => item.sequence ?? '—' },
+                    { header: tb('status_en_col'), render: (item) => item.status },
+                    { header: tb('status_zh_col'), render: (item) => item.status_chn },
+                    { header: tb('start_year'), render: (item) => formatYear(item.first_year, postCE) },
+                    { header: tb('end_year'), render: (item) => formatYear(item.last_year, postCE) },
+                ]}
+                actions={(canEdit || canPropose) ? (item) => (useReactEditor ? (
+                    <span style={actionCellStyle}>
+                        <NavButton size="sm" variant="outline" href={editHref(item)}>{t('edit_btn')}</NavButton>
+                        <Button size="sm" variant="destructive" onClick={() => { setDeleteError(null); setDeleteTarget(item); }}>{t('delete_btn')}</Button>
+                    </span>
+                ) : (
+                    <span style={actionCellStyle}>
                         <LegacyEditButton tabKey="statuses" pk={item.pk} canEdit={canEdit} />
                         <LegacyDeleteButton tabKey="statuses" pk={item.pk} canEdit={canEdit} />
-                    </CardActions>
-                </TabCard>
-            ))}
+                    </span>
+                )) : undefined}
+            />
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} showAll={showAll} onToggleShowAll={() => setShowAll(!showAll)} totalItems={totalItems} />
+
+            {useReactEditor ? (
+                <>
+                    <ConfirmDialog
+                        open={deleteTarget != null}
+                        onOpenChange={(o) => {
+                            if (!o) setDeleteTarget(null);
+                        }}
+                        title={proposalMode ? t('proposal_delete_btn') : t('status_delete_title')}
+                        description={deleteError ?? (proposalMode ? `${t('proposal_delete_prefix')}\n${t('status_delete_confirm')}` : t('status_delete_confirm'))}
+                        confirmLabel={deleting ? (proposalMode ? t('submitting_proposal') : t('saving')) : (proposalMode ? t('proposal_delete_btn') : t('delete_btn'))}
+                        cancelLabel={t('cancel_btn')}
+                        destructive
+                        loading={deleting}
+                        onConfirm={() => void handleDelete()}
+                    />
+                </>
+            ) : null}
         </div>
     );
 }
@@ -71,3 +176,21 @@ const containerStyle: React.CSSProperties = {
     flexDirection: 'column',
     gap: 8,
 };
+
+const createBarStyle: React.CSSProperties = {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginBottom: 8,
+};
+
+const actionCellStyle: React.CSSProperties = { display: 'inline-flex', gap: 6 };
+
+/**
+ * 格式化單一年份（始年／終年），過濾 CBDB 哨兵值 0 與 -9999；
+ * postCE 為 true 時額外過濾負數年份。對齊 legacy status index 的純值年欄。
+ */
+function formatYear(year: number | null, postCE: boolean = false): number | null {
+    if (year == null || year === 0 || year === -9999) return null;
+    if (postCE && year < 0) return null;
+    return year;
+}

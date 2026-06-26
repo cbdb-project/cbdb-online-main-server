@@ -29,9 +29,11 @@ class ApiV2MutateEventTest extends TestCase {
         $this->createOperationsTable();
         $this->createAuditLogTable();
         $this->createEventTable();
+        $this->createEventsAddrTable();
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('EVENTS_ADDR');
         Schema::dropIfExists('EVENTS_DATA');
         Schema::dropIfExists('audit_log');
         Schema::dropIfExists('operations');
@@ -109,18 +111,41 @@ class ApiV2MutateEventTest extends TestCase {
             $table->integer('c_source')->default(0);
             $table->string('c_pages', 255)->nullable();
             $table->text('c_notes')->nullable();
-            $table->text('c_supplement')->nullable();
             $table->integer('c_year')->nullable();
             $table->integer('c_month')->nullable();
             $table->integer('c_day')->nullable();
+            $table->integer('c_day_ganzhi')->nullable();
             $table->integer('c_nh_code')->nullable();
             $table->integer('c_nh_year')->nullable();
-            $table->integer('c_range')->nullable();
+            $table->integer('c_yr_range')->nullable();
             $table->integer('c_intercalary')->default(0);
-            $table->integer('c_event_type')->nullable();
-            $table->integer('c_event_addr')->nullable();
+            $table->integer('c_addr_id')->nullable();
+            $table->longText('c_event')->nullable();
+            $table->string('c_role', 255)->nullable();
+            // 真實 EVENTS_DATA 含建檔/修改稽核欄；legacy eventUpdateById（提案核准路徑）會經
+            // ToolsRepository::timestamp 寫入 c_modified_*，測試表須補齊 nullable 欄否則核准會靜默回滾。
+            $table->string('c_created_by', 255)->nullable();
+            $table->dateTime('c_created_date')->nullable();
+            $table->string('c_modified_by', 255)->nullable();
+            $table->dateTime('c_modified_date')->nullable();
             $table->primary(['c_personid', 'c_sequence', 'c_event_code']);
         });
+    }
+
+    protected function createEventsAddrTable(): void {
+        Schema::create('EVENTS_ADDR', function (Blueprint $table) {
+            $table->integer('c_personid');
+            $table->integer('c_sequence')->default(0);
+            $table->integer('c_event_code')->default(0);
+            $table->integer('c_addr_id')->default(0);
+            $table->primary(['c_personid', 'c_sequence', 'c_event_code', 'c_addr_id']);
+        });
+    }
+
+    protected function seedEventAddr(int $addrId, array $tuple = []): void {
+        DB::table('EVENTS_ADDR')->insert(array_replace([
+            'c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50, 'c_addr_id' => $addrId,
+        ], $tuple));
     }
 
     // ── Helpers ──────────────────────────────────────────────
@@ -200,6 +225,101 @@ class ApiV2MutateEventTest extends TestCase {
             'c_personid' => 1000,
             'c_notes' => '更新備註',
             'c_pages' => '10-20',
+        ]);
+    }
+
+    #[Test]
+    public function testDirectEventUpdatePersistsRoleAndDoesNotNullOtherFields(): void {
+        // 回歸（Task 27）：補欄 c_role 必須能寫入；且只改單一欄位時，未送出的欄位
+        // （c_role / c_year）不可被清成 null —— 防護先前發現的「保存即清空」資料流失 bug。
+        $user = $this->makeUser(email: 'event-role@example.com');
+        $this->actingAs($user);
+        $this->seedEvent(['c_role' => '原始角色', 'c_year' => 1060]);
+
+        // (a) 直接更新 c_role 應成功寫入。
+        $this->postJson('/api/v2/mutate', $this->eventPayload([
+            'changes' => ['c_role' => '新角色'],
+        ]))->assertOk();
+        $this->assertDatabaseHas('EVENTS_DATA', [
+            'c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50,
+            'c_role' => '新角色', 'c_year' => 1060,
+        ]);
+
+        // (b) 只改 c_notes（payload 不含 c_role/c_year）後，c_role/c_year 仍保留、未被清空。
+        $this->postJson('/api/v2/mutate', $this->eventPayload([
+            'changes' => ['c_notes' => '只改備註'],
+        ]))->assertOk();
+        $this->assertDatabaseHas('EVENTS_DATA', [
+            'c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50,
+            'c_notes' => '只改備註', 'c_role' => '新角色', 'c_year' => 1060,
+        ]);
+    }
+
+    #[Test]
+    public function testEventUpdateSyncsAddrSubtable(): void {
+        // 改備註 + c_addr_id 一併送 → EVENTS_ADDR 同步為新集合（刪舊重插）。
+        $this->actingAs($this->makeUser(email: 'event-addr-sync@example.com'));
+        $this->seedEvent();
+        $this->seedEventAddr(111); // 舊地址
+
+        $this->postJson('/api/v2/mutate', $this->eventPayload([
+            'changes' => ['c_notes' => '改後', 'c_addr_id' => [222, 333]],
+        ]))->assertOk();
+
+        $this->assertDatabaseMissing('EVENTS_ADDR', ['c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50, 'c_addr_id' => 111]);
+        $this->assertDatabaseHas('EVENTS_ADDR', ['c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50, 'c_addr_id' => 222]);
+        $this->assertDatabaseHas('EVENTS_ADDR', ['c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50, 'c_addr_id' => 333]);
+    }
+
+    #[Test]
+    public function testEventUpdateAddrOnlyChange(): void {
+        // 僅改地址（無其他欄）→ 走 address-only 路徑，EVENTS_ADDR 更新成功。
+        $this->actingAs($this->makeUser(email: 'event-addr-only@example.com'));
+        $this->seedEvent();
+        $this->seedEventAddr(111);
+
+        $this->postJson('/api/v2/mutate', $this->eventPayload([
+            'changes' => ['c_addr_id' => [222]],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('EVENTS_ADDR', ['c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50, 'c_addr_id' => 222]);
+        $this->assertDatabaseMissing('EVENTS_ADDR', ['c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50, 'c_addr_id' => 111]);
+    }
+
+    #[Test]
+    public function testEventUpdatePkChangeMigratesAddresses(): void {
+        // 改邏輯主鍵（c_sequence 1→2）而未送地址 → 既有地址遷移到新 tuple，不留舊 tuple 孤兒。
+        $this->actingAs($this->makeUser(email: 'event-addr-migrate@example.com'));
+        $this->seedEvent();
+        $this->seedEventAddr(111);
+
+        $this->postJson('/api/v2/mutate', $this->eventPayload([
+            'changes' => ['c_sequence' => 2],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('EVENTS_ADDR', ['c_personid' => 1000, 'c_sequence' => 2, 'c_event_code' => 50, 'c_addr_id' => 111]);
+        $this->assertDatabaseMissing('EVENTS_ADDR', ['c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50, 'c_addr_id' => 111]);
+    }
+
+    #[Test]
+    public function testDirectEventUpdatePersistsDayGanzhi(): void {
+        // React EventEditor 農曆干支日對應 c_day_ganzhi；該欄先前漏列於白名單（會被丟棄／422），
+        // 已補回。確認更新可正確落庫（無欄位遺失）。
+        $user = $this->makeUser(email: 'event-ganzhi@example.com');
+        $this->actingAs($user);
+        $this->seedEvent();
+
+        $response = $this->postJson('/api/v2/mutate', $this->eventPayload([
+            'changes' => ['c_day_ganzhi' => 7, 'c_day' => 5],
+        ]));
+
+        $response->assertOk()->assertJson(['ok' => true]);
+        $this->assertDatabaseHas('EVENTS_DATA', [
+            'c_personid' => 1000,
+            'c_sequence' => 1,
+            'c_event_code' => 50,
+            'c_day_ganzhi' => 7,
+            'c_day' => 5,
         ]);
     }
 
@@ -292,6 +412,44 @@ class ApiV2MutateEventTest extends TestCase {
 
         // 無 audit_log
         $this->assertDatabaseMissing('audit_log', ['table_name' => 'EVENTS_DATA']);
+    }
+
+    #[Test]
+    public function testApprovingEventUpdateProposalSyncsAddrSubtable(): void {
+        // 完整往返：眾包提案改地址 → __proposal_aux 帶 c_addr_id；管理員核准後 applyEventProposal
+        // 重用 eventUpdateById（is_array 守衛）同步 EVENTS_ADDR（同 tuple 刪舊重插），而非掉進泛用單表 apply 漏掉地址。
+        $proposer = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'event-prop-approve@example.com');
+        $this->actingAs($proposer);
+        $this->seedEvent();
+        $this->seedEventAddr(111);
+
+        $this->postJson('/api/v2/mutate', $this->eventPayload([
+            'mode' => 'proposal',
+            'changes' => ['c_notes' => '提案改地址', 'c_addr_id' => [222, 333]],
+            'meta' => ['comment' => '提案：改地址'],
+        ]))->assertOk();
+
+        // 提案階段：原資料與副表皆未變動
+        $this->assertDatabaseHas('EVENTS_ADDR', ['c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50, 'c_addr_id' => 111]);
+        $this->assertDatabaseMissing('EVENTS_ADDR', ['c_addr_id' => 222]);
+
+        $operation = Operation::query()
+            ->where('resource', 'EVENTS_DATA')
+            ->where('op_type', Operation::TYPE_PROPOSAL_UPDATE)
+            ->firstOrFail();
+        $aux = json_decode($operation->resource_data, true)['__proposal_aux'] ?? [];
+        $this->assertSame([222, 333], $aux['c_addr_id'] ?? null);
+
+        // 管理員核准 → 副表落庫
+        $admin = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_SUPER_ADMIN, 'event-admin@example.com');
+        $this->actingAs($admin);
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '同意'])
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('EVENTS_ADDR', ['c_addr_id' => 111]);
+        $this->assertDatabaseHas('EVENTS_ADDR', ['c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50, 'c_addr_id' => 222]);
+        $this->assertDatabaseHas('EVENTS_ADDR', ['c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50, 'c_addr_id' => 333]);
+        $this->assertDatabaseHas('EVENTS_DATA', ['c_personid' => 1000, 'c_sequence' => 1, 'c_event_code' => 50, 'c_notes' => '提案改地址']);
     }
 
     // ── Error Cases ─────────────────────────────────────────
@@ -407,6 +565,31 @@ class ApiV2MutateEventTest extends TestCase {
 
         $response = $this->postJson('/api/v2/mutate', $this->eventPayload());
         $response->assertStatus(403);
+    }
+
+    // ── #56 M 寫入等價（update 路徑，地址副表 EVENTS_ADDR；events 無鏡像）──────
+
+    #[Test]
+    public function testEventCodeFieldSentinelFullyIdempotent(): void {
+        // c_source（legacy 哨兵 0=Unknown）所有空表示 null/''/-999/'0'/0 → 0、合法值保留、來回不翻。≥10 案例。
+        $this->actingAs($this->makeUser(email: 'event-sentinel@example.com'));
+        $T = 'EVENTS_DATA';
+        $f = 'c_source';
+        foreach ([null, '', -999, '0', 0] as $sent) {
+            DB::table($T)->delete();
+            $this->seedEvent([$f => 5, 'c_notes' => '初始']);
+            $this->postJson('/api/v2/mutate', $this->eventPayload(['changes' => [$f => $sent, 'c_notes' => '改'.var_export($sent, true)]]))->assertOk();
+            $this->assertSame(0, (int) DB::table($T)->value($f), $f.' 送 '.var_export($sent, true).' 應規範化為 0');
+            $this->assertNotNull(DB::table($T)->value($f), $f.' 不得為 null');
+        }
+        DB::table($T)->delete();
+        $this->seedEvent([$f => 1, 'c_notes' => 'x']);
+        $this->postJson('/api/v2/mutate', $this->eventPayload(['changes' => [$f => 7, 'c_notes' => '合法值']]))->assertOk();
+        $this->assertSame(7, (int) DB::table($T)->value($f), '合法非 0 值不得被誤清');
+        foreach ([null, '', -999, 0] as $i => $sent) {
+            $this->postJson('/api/v2/mutate', $this->eventPayload(['changes' => [$f => $sent, 'c_notes' => '再'.$i]]))->assertOk();
+            $this->assertSame(0, (int) DB::table($T)->value($f), '幂等重送仍為 0（第'.$i.'輪）');
+        }
     }
 
     #[Test]

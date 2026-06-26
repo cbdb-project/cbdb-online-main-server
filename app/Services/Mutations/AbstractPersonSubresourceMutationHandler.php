@@ -185,6 +185,15 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
     // ── Direct Update ────────────────────────────────────────
 
     protected function handleDirect(int $personId, array $targetPk, array $updateData, array $originalArray, string $comment): JsonResponse {
+        // 對齊 legacy ToolsRepository::timestamp()（update 分支）：direct 更新一律於主列蓋更新者/
+        // 更新時間，並移除建檔欄位以免覆寫原始建檔資訊。修正 v2 子資源直改未寫 c_modified_* 的稽核/
+        // 對齊缺口（11/12 子資源原本不刷新；source 走 BiogSourceRepository 另已處理）。
+        // 須在 transaction 閉包捕獲 $updateData 前注入；有效變更判斷已在 handle() 以未注入前的 changes 完成，
+        // 故此注入不影響「無變更」攔截。
+        $updateData['c_modified_by'] = Auth::user()->name ?? '';
+        $updateData['c_modified_date'] = Carbon::now();
+        unset($updateData['c_created_by'], $updateData['c_created_date']);
+
         $operationId = (string) Str::ulid();
         /** @var Operation|null $operation */
         $operation = null;
@@ -230,6 +239,11 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
                     (string) Auth::id(),
                     $operation ? (string) $operation->id : null
                 );
+
+                // #66：把「正向編輯前的舊值」暫存，供子類 afterDirectUpdate 的鏡像衝突偵測作「真分歧」基準。
+                $this->directForwardOld = $originalArray;
+                // 子類在同一交易內的後續處理（例如任官地址副表同步），保證原子性
+                $this->afterDirectUpdate($personId, $targetPk, $updateData, $newArray, $operation);
             });
         } catch (\InvalidArgumentException $e) {
             // performUpdate() 明確拋出的 PK 衝突（如 AltnameMutationHandler、AddressMutationHandler）
@@ -241,6 +255,31 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
             }
 
             throw $e;
+        } catch (MirrorConflictException $e) {
+            // #66：對面鏡像列已有不同內容 → 整筆交易已回滾（含正向列），回 409 + 衝突明細 + 對面鏡像 PK，
+            // 供前端彈警告 + 可點連結跳對面 edit-v2 + 提供「強制覆寫」(meta.force) 重送。
+            return $this->errorResponse($e->getMessage(), 409, [
+                'mirror_conflict' => [
+                    'table' => $e->mirrorTable,
+                    'pk' => $e->mirrorPk,
+                    'fields' => $e->conflicts,
+                ],
+            ]);
+        } catch (MirrorIntegrityException $e) {
+            // #70：鏡像同步資料完整性 fail-closed（缺配對碼／無權威反向碼可收斂）→ 整筆已回滾，回結構化 422，
+            // 而非裸 RuntimeException 漏成 500。
+            return $this->errorResponse($e->getMessage(), 422, ['mirror_integrity' => ['fail_closed']]);
+        } catch (MirrorSuspectedException $e) {
+            // #70：嚴格定位（碼∈合法反向集）落空、但放寬查到對面有疑似同一關係的列（碼已漂移）→ 整筆已回滾，
+            // 回 409 + 疑似列 PK 清單 + 權威反向碼，供前端彈「對面無匹配反向碼／N 條疑似」警告 + 跳對面連結 + 強制收斂。
+            return $this->errorResponse($e->getMessage(), 409, [
+                'mirror_suspected' => [
+                    'table' => $e->mirrorTable,
+                    'candidates' => $e->candidates,
+                    'authoritative_code' => $e->authoritativeCode,
+                    'count' => $e->count(),
+                ],
+            ]);
         }
 
         return response()->json([
@@ -250,7 +289,9 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
             'operation' => 'update',
             'result' => [
                 'pk' => $this->buildNewPk($targetPk, $updateData),
-                'updated_fields' => array_keys($updateData),
+                // updated_fields 只反映使用者實際變更，排除自動蓋的稽核欄（c_modified_*）；
+                // 刷新後的稽核欄由 result.row 提供給前端。
+                'updated_fields' => array_values(array_diff(array_keys($updateData), ['c_modified_by', 'c_modified_date'])),
                 'operation_id' => $operation?->id,
                 'row' => $newArray,
             ],
@@ -299,6 +340,12 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
             '__review_status' => 'pending',
             '__key_columns' => $this->keyColumns(),
         ]);
+
+        // 子類可附加副表提案資料（例如任官地址 c_addr，核准時由 applyOfficeProposal 套用）
+        $auxiliaryPayload = $this->proposalAuxiliaryPayload();
+        if ($auxiliaryPayload !== []) {
+            $proposalData['__proposal_aux'] = $auxiliaryPayload;
+        }
 
         $operation = $this->operationRepository->store(
             Auth::id(),
@@ -366,6 +413,24 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
         return $newPk;
     }
 
+    /** #66：本次 direct 更新「正向編輯前的舊值」（normalizeRow 後）；handleDirect 於呼叫 afterDirectUpdate 前設定，供鏡像衝突偵測作真分歧基準。 */
+    protected array $directForwardOld = [];
+
+    /**
+     * direct 更新成功後、仍在同一交易內的後續處理鉤子（預設無動作）。
+     * 子類可覆寫以在原子交易內同步副表（例如任官 PostingMutationHandler 同步 POSTED_TO_ADDR_DATA）。
+     */
+    protected function afterDirectUpdate(int $personId, array $targetPk, array $updateData, array $newArray, ?Operation $operation): void {
+    }
+
+    /**
+     * proposal 更新時附加的副表提案資料（預設空）。
+     * 子類可覆寫以把副表（例如任官地址 c_addr）寫入 __proposal_aux，核准時套用。
+     */
+    protected function proposalAuxiliaryPayload(): array {
+        return [];
+    }
+
     /** 欄位值驗證（預設無驗證，子類可覆寫） */
     protected function validateFields(array $data): array {
         return [];
@@ -389,6 +454,30 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
         foreach ($fields as $field) {
             if (array_key_exists($field, $data) && ($data[$field] === -999 || $data[$field] === '-999')) {
                 $data[$field] = '0';
+            }
+        }
+
+        return $data;
+    }
+
+    /**
+     * 碼/FK 欄「完全規範化」：把所有空表示（null / '' / -999）一律→'0'（等同 emptyToSentinel）。
+     *
+     * 用於「legacy 哨兵語義 0=Unknown」的非 PK 碼/FK 欄（如 c_source）：DDL 雖為 nullable，但 legacy 資料流
+     * 一律把空碼落 0（見 BasicInformationPossessionController `?? '0'`、Entry `emptyToSentinel`），故 v2 對齊＝
+     * 達成 sentinel 完全幂等：0 / null / '' / -999 落庫皆為 0、永不寫 null/''、來回重送不翻，與「表單送 0」的 legacy 一致。
+     * normalizeSentinelValues 只做 -999→0（漏 null/''），故對這類欄需改用本法（前端中介層常把空欄轉 null，送 null 是真實場景）。
+     *
+     * @param array $data 待處理資料
+     * @param array $fields 需完全規範化的碼/FK 欄名（限 legacy 哨兵 0=Unknown 語義者；真正 nullable FK（如 basic_info 空→null）勿用）
+     */
+    protected function normalizeEmptyCodeFields(array $data, array $fields): array {
+        foreach ($fields as $field) {
+            if (array_key_exists($field, $data)) {
+                $v = $data[$field];
+                if ($v === null || $v === '' || (int) $v === -999) {
+                    $data[$field] = '0';
+                }
             }
         }
 

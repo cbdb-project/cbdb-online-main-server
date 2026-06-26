@@ -83,11 +83,9 @@ export default function PersonSummaryPanel({ summary, loading, error }: Props) {
                         <AddressDisplayWithMap
                             labelChn={summary.index_addr_chn}
                             labelEng={summary.index_addr}
-                            adminCatCode={summary.index_addr_admin_cat_code}
-                            adminCatLabel={summary.index_addr_admin_cat_label}
                             latitude={summary.index_addr_latitude}
                             longitude={summary.index_addr_longitude}
-                            year={summary.c_index_year}
+                            personId={summary.c_personid}
                         />
                     ) : '(未詳)'}
                 />

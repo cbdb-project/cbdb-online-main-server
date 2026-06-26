@@ -15,6 +15,7 @@ use App\Repositories\YearRangeRepository;
 use App\Services\AuditLogService;
 use App\Services\BracketNormalizer;
 use App\Services\NameSearchIndexService;
+use App\Services\PersonBrowserService;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -22,7 +23,9 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
+use Inertia\Inertia;
 
 /**
  * Class BiogBasicInformationController
@@ -41,13 +44,14 @@ class BasicInformationController extends Controller {
     protected $operationRepository;
     protected $toolRepository;
     protected $nameSearchIndexService;
+    protected $personBrowserService;
 
     /**
      * Create a new controller instance.
      *
      * @param BiogMainRepository $biogMainRepository
      */
-    public function __construct(BiogMainRepository $biogMainRepository, EthnicityRepository $ethnicityRepository, DynastyRepository $dynastyRepository, NianHaoRepository $nianHaoRepository, ChoronymRepository $choronymRepository, YearRangeRepository $yearRangeRepository, ToolsRepository $toolsRepository, OperationRepository $operationRepository, NameSearchIndexService $nameSearchIndexService) {
+    public function __construct(BiogMainRepository $biogMainRepository, EthnicityRepository $ethnicityRepository, DynastyRepository $dynastyRepository, NianHaoRepository $nianHaoRepository, ChoronymRepository $choronymRepository, YearRangeRepository $yearRangeRepository, ToolsRepository $toolsRepository, OperationRepository $operationRepository, NameSearchIndexService $nameSearchIndexService, PersonBrowserService $personBrowserService) {
         $this->biogMainRepository = $biogMainRepository;
         $this->ethnicityRepository = $ethnicityRepository;
         $this->dynastyRepository = $dynastyRepository;
@@ -57,7 +61,11 @@ class BasicInformationController extends Controller {
         $this->operationRepository = $operationRepository;
         $this->toolRepository = $toolsRepository;
         $this->nameSearchIndexService = $nameSearchIndexService;
-        $this->middleware('auth')->except(['index', 'show', 'edit']);
+        $this->personBrowserService = $personBrowserService;
+        // 檢視類路由（含 React appShow/appEdit 與其 summary/tab JSON 端點）可公開；
+        // 實際寫入由 /api/v2 handler 授權把關。summary/tab 與舊唯讀人物頁同樣公開，
+        // 確保訪客也能檢視（編輯能力由 canEditBasicInfo + 後端 v2 授權決定）。
+        $this->middleware('auth')->except(['index', 'show', 'edit', 'appIndex', 'appShow', 'appEdit', 'summary', 'tab']);
     }
 
     private function normalizePersonId($id): int {
@@ -114,6 +122,1412 @@ class BasicInformationController extends Controller {
             'q' => $q,
             'c_dy' => $cDy,
             'dynastyFacets' => $dynastyFacets,
+        ]);
+    }
+
+    /**
+     * Inertia + React 版：人物列表（實質首頁）。授權/查詢邏輯與 Blade index 一致。
+     */
+    public function appIndex(Request $request) {
+        $q = trim((string) ($request->input('q') ?? ''));
+        $num = $request->input('num', 20);
+        $cDyInput = $request->input('c_dy');
+        $cDy = $cDyInput === null ? '' : trim((string) $cDyInput);
+
+        $dynastyFacets = $q !== '' ? BiogMainRepository::dynastyFacetsByQuery($q) : [];
+
+        // c_dy 不在當前查詢的朝代分佈中 → 重導乾淨 URL（與 Blade 同邏輯，導向 app 路由）。
+        if ($cDy !== '' && !empty($dynastyFacets)) {
+            $validDynasties = collect($dynastyFacets)->pluck('c_dy')->map(fn ($v) => (string) $v)->toArray();
+            if (!in_array((string) $cDy, $validDynasties, true)) {
+                $params = $request->only(['q', 'num']);
+
+                return redirect()->route('app.basicinformation.index', array_filter($params, fn ($v) => $v !== null && $v !== ''));
+            }
+        }
+
+        $names = $this->biogMainRepository->namesByQuery($request, $num);
+
+        $rows = array_map(fn ($item) => [
+            'c_personid' => $item->c_personid,
+            'c_name_chn' => $item->c_name_chn,
+            'c_name' => $item->c_name,
+            'c_dynasty_chn' => $item->c_dynasty_chn ?? '',
+            'c_index_year' => $item->c_index_year,
+            'addr_name_chn' => $item->ADDR_c_name_chn ?? '',
+            'zi' => $item->c_alt_name_chn_zi ?? '',
+            'hao' => $item->c_alt_name_chn_hao ?? '',
+        ], $names->items());
+
+        $editIsNew = migration_flag_is_new('basicinformation.editor') && Route::has('app.basicinformation.edit');
+
+        return Inertia::render('BasicInformation/Index', [
+            'names' => [
+                'data' => $rows,
+                'meta' => [
+                    'current_page' => $names->currentPage(),
+                    'last_page' => $names->lastPage(),
+                    'per_page' => $names->perPage(),
+                    'total' => $names->total(),
+                    'from' => $names->firstItem(),
+                    'to' => $names->lastItem(),
+                ],
+            ],
+            'q' => $q,
+            'c_dy' => $cDy,
+            'dynasty_facets' => array_map(fn ($f) => [
+                'c_dy' => $f->c_dy,
+                'c_dynasty_chn' => $f->c_dynasty_chn,
+                'count' => $f->count,
+            ], is_array($dynastyFacets) ? $dynastyFacets : $dynastyFacets->all()),
+            'can_add' => Auth::check() && Auth::user()->isActive(),
+            // 人物編輯器仍為 Blade（Phase 4，受 F7 硬前置）；連結模板 flag-aware。
+            'edit_template' => $editIsNew
+                ? route('app.basicinformation.edit', ['id' => '__ID__'], false)
+                : route('basicinformation.edit', ['basicinformation' => '__ID__'], false),
+            // create_url flag-aware（對齊 edit_template）：編輯器已遷移時「新增」導向 React 建立頁（單一姓名欄、後端 auto_pinyin 切分），否則 legacy。
+            'create_url' => ($editIsNew && Route::has('app.basicinformation.create'))
+                ? route('app.basicinformation.create', [], false)
+                : route('basicinformation.create', [], false),
+            'page_translations' => [
+                'biogmains' => is_array($t = trans('biogmains')) ? $t : [],
+                'person' => is_array($t = trans('person')) ? $t : [],
+            ],
+        ]);
+    }
+
+    /**
+     * 共用：組出 React 編輯/檢視頁所需的 person props（sections + form + 摘要標籤）。
+     * sections/form 與 PersonBrowser basic_info 分頁同源（PersonBrowserService::tabData），
+     * BasicInfoView 可直接消費；不存在則 404。
+     *
+     * @return array{0: array, 1: string}  [props, personLabel]
+     */
+    protected function buildPersonViewProps(int $personId): array {
+        $basic = $this->personBrowserService->tabData($personId, 'basic_info');
+
+        if ($basic === null || empty($basic['sections'])) {
+            abort(404);
+        }
+
+        // 名稱標籤直接從 BIOG_MAIN 取（含朝代），避免耦合 summary() 的完整欄位需求。
+        $nameRow = DB::table('BIOG_MAIN')
+            ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
+            ->where('BIOG_MAIN.c_personid', $personId)
+            ->first(['BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn']);
+        $nameChn = $nameRow->c_name_chn ?? '';
+        $name = $nameRow->c_name ?? '';
+        $dynasty = $nameRow->c_dynasty_chn ?? '';
+
+        // 身份標題：id / 中文名(拼音) / 朝代 一律以中點「·」分隔（不混用 - 與 ·）。
+        // 中點表「同級並列」，較 dash 的「標題—副標」更貼合 id/名/朝代為並列詮釋資料。
+        $personLabel = (string) $personId;
+        if ($nameChn || $name) {
+            $personLabel .= ' · ' . $nameChn;
+            if ($name) {
+                $personLabel .= ' (' . $name . ')';
+            }
+        }
+        // 朝代併入標題（h1），避免在 PersonBanner 另起一行孤立顯示「朝代：X」。
+        if ($dynasty) {
+            $personLabel .= ' · ' . $dynasty;
+        }
+
+        return [
+            [
+                'person_id' => $personId,
+                'sections' => $basic['sections'] ?? [],
+                'form' => $basic['form'] ?? null,
+                'name_chn' => $nameChn,
+                'name' => $name,
+            ],
+            $personLabel,
+        ];
+    }
+
+    /**
+     * 人物 banner 資料（對齊 legacy biogmains/banner.blade.php）：人物名 + 13 分頁計數，
+     * 供各 editv2 編輯器頁與詳情中樞顯示「人物頭 + 子資源導航（含計數）」，
+     * 修正 React 編輯器頁丟失人物基本資訊頭的問題。$activeTab 為當前頁對應的 hub 分頁鍵。
+     */
+    protected function personBannerProps(int $personId, string $activeTab): array {
+        $row = DB::table('BIOG_MAIN')
+            ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
+            ->where('BIOG_MAIN.c_personid', $personId)
+            ->first(['BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn']);
+
+        return [
+            'person_id' => $personId,
+            'name_chn' => $row->c_name_chn ?? '',
+            'name' => $row->c_name ?? '',
+            'dynasty' => $row->c_dynasty_chn ?? '',
+            'active_tab' => $activeTab,
+            'counts' => $this->personBrowserService->tabCounts($personId),
+            // 對齊 legacy history-button 的授權（Auth::user()->canViewAuditLogs()）。
+            'can_view_audit_logs' => Auth::check() && Auth::user()->canViewAuditLogs(),
+            // 稽核紀錄頁的 base URL（flag-aware）：admin.audit-logs 翻 new 後自動指向 React 版。
+            'audit_logs_base' => migration_flag_is_new('admin.audit-logs')
+                ? route('app.admin.audit-logs', [], false)
+                : route('admin.audit-logs', [], false),
+        ];
+    }
+
+    /**
+     * 端點與授權旗標（Edit/Show 共用）。實際寫入授權由 /api/v2 handler 把關，
+     * 前端 can_* 僅控制 UI 顯示。
+     *
+     * @return array<string, mixed>
+     */
+    protected function personEditorMeta(): array {
+        $user = Auth::user();
+
+        return [
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            // 可提案但不可直接寫入者（眾包用戶）亦可送 update 提案；BIOG_MAIN create/delete 提案
+            // v2 尚未支援（回 501），故前端對 proposal-only 用戶隱藏新增/刪除入口。
+            'can_propose' => $user ? $user->canPropose() : false,
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'pinyin_endpoint' => '/api/select/search/pinyin',
+            'index_url' => migration_flag_is_new('basicinformation.index') && Route::has('app.basicinformation.index')
+                ? route('app.basicinformation.index', [], false)
+                : route('basicinformation.index', [], false),
+        ];
+    }
+
+    /**
+     * 編輯器頁麵包屑（對齊 legacy header-v3）：人物記錄 / {id - 名} / {資源} / 編輯|新增。
+     * 渲染於頂部導覽列「首頁」之後（見 React Navbar，#113）。$tab 為 hub 分頁鍵（如 addresses）。
+     */
+    protected function editorBreadcrumbs(int $personId, string $personLabel, string $tab, string $mode): array {
+        $personIndexUrl = migration_flag_is_new('basicinformation.index') && Route::has('app.basicinformation.index')
+            ? route('app.basicinformation.index', [], false)
+            : route('basicinformation.index', [], false);
+
+        return [
+            ['label' => __('person.person_records'), 'url' => $personIndexUrl],
+            ['label' => $personLabel, 'url' => route('app.basicinformation.show', ['id' => $personId], false)],
+            ['label' => __('person.tab_'.$tab), 'url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => $tab], false)],
+            ['label' => $mode === 'create' ? __('common.add') : __('common.edit')],
+        ];
+    }
+
+    /**
+     * Inertia + React 版：人物編輯主界面（PersonEditor，對齊舊 /basicinformation/{id} 的
+     * 13 分頁高效錄入界面）。複用 PersonBrowser 的 BrowserTabs + TabContentLoader，但聚焦
+     * 單一人物（無搜尋 sidebar）、basic_info 分頁進場即可錄入、12 子資源分頁各帶 React 編輯器。
+     * 頁面本身可公開載入（檢視/可編輯由 can_edit 與 /api/v2 handler 把關）。
+     */
+    public function appEdit($id) {
+        return $this->renderPersonEditor($id);
+    }
+
+    /**
+     * Task 27 重做：對齊 legacy /basicinformation/{id}/edit 的 React 基本資料編輯器（BasicInfoEditor）。
+     * 把 form.fields（富物件）攤平成 BasicInfoEditor 需要的 initial_fields（c_* → 原始值字串）
+     * 與 initial_labels（c_* → 顯示標籤）。獨立路由供逐步重做/端到端驗證，不受 flag 影響、不上線。
+     */
+    public function appEditV2($id) {
+        $personId = $this->normalizePersonId($id);
+        [$person, $personLabel] = $this->buildPersonViewProps($personId);
+
+        $formFields = $person['form']['fields'] ?? [];
+        $initialFields = [];
+        $initialLabels = [];
+        foreach ($formFields as $key => $f) {
+            $initialFields[$key] = (string) ($f['value'] ?? '');
+            if (isset($f['display_value']) && $f['display_value'] !== '') {
+                $initialLabels[$key] = (string) $f['display_value'];
+            }
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/EditV2', [
+            'personId' => $personId,
+            'person_label' => $personLabel,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'pinyin_endpoint' => '/api/select/search/pinyin',
+            // #34 詳情中樞接線：存檔/取消後返回 React 詳情中樞基本資料分頁（show=new 時）；
+            // 否則回退人物列表（standalone 測試或 show 仍 old）。
+            'index_url' => migration_flag_is_new('basicinformation.show') && Route::has('app.basicinformation.show')
+                ? route('app.basicinformation.show', ['id' => $personId, 'tab' => 'basic_info'], false)
+                : (migration_flag_is_new('basicinformation.index') && Route::has('app.basicinformation.index')
+                    ? route('app.basicinformation.index', [], false)
+                    : route('basicinformation.index', [], false)),
+            'breadcrumbs' => $this->editorBreadcrumbs($personId, $personLabel, 'basic_info', 'edit'),
+            'person_banner' => $this->personBannerProps($personId, 'basic_info'),
+            'duplicate_collateral_url' => "/basicinformation/{$personId}/Duplicate_Collateral_Info",
+            'saveas_url' => "/basicinformation/{$personId}/saveas",
+        ]);
+    }
+
+    /**
+     * Inertia + React 版：地址編輯器（對齊 legacy biogmains/addresses/_form）。獨立測試路由，
+     * flag 仍 old、不上線。有 c_addr_id+c_addr_type+c_sequence 即編輯，否則新增。
+     */
+    public function appAddressEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        $person = BiogMain::find($personId);
+        $cDy = $person ? (int) $person->c_dy : 0;
+        $dynasty = $cDy ? DB::table('DYNASTIES')->where('c_dy', $cDy)->first() : null;
+
+        $hasPk = $request->filled('c_addr_id') && $request->filled('c_addr_type') && $request->filled('c_sequence');
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        $otherBelongs = '';
+        if ($mode === 'edit') {
+            $row = DB::table('BIOG_ADDR_DATA')->where([
+                'c_personid' => $personId,
+                'c_addr_id' => (int) $request->input('c_addr_id'),
+                'c_addr_type' => (int) $request->input('c_addr_type'),
+                'c_sequence' => (int) $request->input('c_sequence'),
+            ])->first();
+            if (!$row) {
+                abort(404);
+            }
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // 對齊 legacy：c_addr_id（地名）與 c_source（出處）為非同步搜尋欄位，
+            // 無 label 將顯示空白，故於編輯模式補回 addr_str / text_str；並補回 other_belongs 顯示。
+            try {
+                $addrCode = DB::table('ADDR_CODES')->where('c_addr_id', (int) $row->c_addr_id)->first();
+                if ($addrCode) {
+                    $belongs = DB::table('ADDR_BELONGS_DATA')->where('c_addr_id', (int) $row->c_addr_id)->get();
+                    $belongLabels = [];
+                    foreach ($belongs as $b) {
+                        $parent = DB::table('ADDR_CODES')->where('c_addr_id', (int) $b->c_belongs_to)->first();
+                        if ($parent) {
+                            $belongLabels[] = '[['.$parent->c_addr_id.' '.$parent->c_name_chn.' '.$parent->c_firstyear.'~'.$parent->c_lastyear.']]';
+                        }
+                    }
+                    $base = trim($addrCode->c_addr_id.' '.$addrCode->c_name.' '.$addrCode->c_name_chn.' '.$addrCode->c_firstyear.'~'.$addrCode->c_lastyear);
+                    $initialLabels['c_addr_id'] = trim($base.' '.($belongLabels[0] ?? ''));
+                    if (count($belongLabels) > 1) {
+                        $otherBelongs = implode('、', array_slice($belongLabels, 1));
+                    }
+                }
+                if ($row->c_source !== null && $row->c_source !== '') {
+                    $textCode = DB::table('TEXT_CODES')->where('c_textid', (int) $row->c_source)->first();
+                    if ($textCode) {
+                        $initialLabels['c_source'] = trim($textCode->c_textid.' '.$textCode->c_title.' '.$textCode->c_title_chn);
+                    }
+                }
+            } catch (\Throwable $e) {
+                // 標籤補水失敗不影響編輯主流程（例如測試環境缺碼表）
+            }
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/AddressEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'dynasty_code' => $cDy ?: null,
+            'dynasty_start' => (string) ($dynasty->c_start ?? ''),
+            'dynasty_end' => (string) ($dynasty->c_end ?? ''),
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'other_belongs' => $otherBelongs,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'addresses'], false),
+            'breadcrumbs' => $this->editorBreadcrumbs($personId, $personLabel, 'addresses', $mode),
+            'person_banner' => $this->personBannerProps($personId, 'addresses'),
+        ]);
+    }
+
+    /**
+     * Inertia + React 版：著述（texts）編輯器（對齊 legacy biogmains/texts/_form）。獨立測試路由，
+     * flag 仍 old、不上線。有 c_textid+c_role_id 即編輯，否則新增。
+     */
+    public function appTextEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        $hasPk = $request->filled('c_textid') && $request->filled('c_role_id');
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        if ($mode === 'edit') {
+            $textid = (int) $request->input('c_textid');
+            $roleId = (int) $request->input('c_role_id');
+            $row = DB::table('BIOG_TEXT_DATA')->where([
+                'c_personid' => $personId,
+                'c_textid' => $textid,
+                'c_role_id' => $roleId,
+            ])->first();
+            if (!$row) {
+                abort(404);
+            }
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // 對齊 legacy textById：c_textid（著述）與 c_source（出處）為非同步搜尋欄位，
+            // 無 label 會顯示空白，故補回 res['text'] / res['text_str']。
+            try {
+                $res = $this->biogMainRepository->textById($personId.'-'.$textid.'-'.$roleId);
+                if (!empty($res['text'])) {
+                    $initialLabels['c_textid'] = trim($res['text']);
+                }
+                if (!empty($res['text_str'])) {
+                    $initialLabels['c_source'] = trim($res['text_str']);
+                }
+            } catch (\Throwable $e) {
+                // label 補水失敗不影響編輯主流程
+            }
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/TextEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'texts'], false),
+            'breadcrumbs' => $this->editorBreadcrumbs($personId, $personLabel, 'texts', $mode),
+            'person_banner' => $this->personBannerProps($personId, 'texts'),
+        ]);
+    }
+
+    /**
+     * Inertia + React 版：別名（altname）編輯器（對齊 legacy biogmains/altname/_form）。
+     * 主鍵 (c_personid, c_alt_name_chn[字串], c_alt_name_type_code)；獨立測試路由、未上線。
+     */
+    public function appAltnameEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        $hasPk = $request->filled('c_alt_name_chn') && $request->filled('c_alt_name_type_code');
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        if ($mode === 'edit') {
+            $altNameChn = (string) $request->input('c_alt_name_chn');
+            $typeCode = (int) $request->input('c_alt_name_type_code');
+            $row = DB::table('ALTNAME_DATA')->where([
+                'c_personid' => $personId,
+                'c_alt_name_chn' => $altNameChn,
+                'c_alt_name_type_code' => $typeCode,
+            ])->first();
+            if (!$row) {
+                abort(404);
+            }
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // c_source（出處）為非同步搜尋欄位，補回顯示標籤（失敗不影響編輯）。
+            try {
+                $sourceId = (int) ($initialFields['c_source'] ?? 0);
+                if ($sourceId > 0) {
+                    $text = DB::table('TEXT_CODES')->where('c_textid', $sourceId)->first();
+                    if ($text) {
+                        $initialLabels['c_source'] = trim((string) ($text->c_title_chn ?? $text->c_title ?? $sourceId));
+                    }
+                }
+            } catch (\Throwable $e) {
+                // label 補水失敗不影響編輯主流程
+            }
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/AltnameEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'alt_names'], false),
+            'breadcrumbs' => $this->editorBreadcrumbs($personId, $personLabel, 'alt_names', $mode),
+            'person_banner' => $this->personBannerProps($personId, 'alt_names'),
+        ]);
+    }
+
+    /**
+     * Inertia + React 版：社會機構（socialinst）編輯器（對齊 legacy biogmains/socialinst/_form）。
+     * 主鍵 (c_personid, c_inst_code, c_inst_name_code, c_bi_role_code)；獨立測試路由、flag 仍 old、不上線。
+     */
+    public function appSocialinstEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        $person = BiogMain::find($personId);
+        $cDy = $person ? (int) $person->c_dy : 0;
+
+        $hasPk = $request->filled('c_inst_code') && $request->filled('c_inst_name_code') && $request->filled('c_bi_role_code');
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        if ($mode === 'edit') {
+            $instCode = (int) $request->input('c_inst_code');
+            $instNameCode = (int) $request->input('c_inst_name_code');
+            $roleCode = (int) $request->input('c_bi_role_code');
+            $row = DB::table('BIOG_INST_DATA')->where([
+                'c_personid' => $personId,
+                'c_inst_code' => $instCode,
+                'c_inst_name_code' => $instNameCode,
+                'c_bi_role_code' => $roleCode,
+            ])->first();
+            if (!$row) {
+                abort(404);
+            }
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // c_inst_code（合併搜尋）與 c_source（出處）為非同步搜尋欄位，補回顯示標籤；
+            // c_bi_role_code 為 list 模式自行解析。補水失敗不影響編輯。
+            try {
+                $res = $this->biogMainRepository->socialInstById($personId.'-'.$instCode.'-'.$instNameCode.'-'.$roleCode);
+                if (!empty($res['inst_code'])) {
+                    $initialLabels['c_inst_code'] = trim($res['inst_code']);
+                }
+                if (!empty($res['text_str'])) {
+                    $initialLabels['c_source'] = trim($res['text_str']);
+                }
+            } catch (\Throwable $e) {
+                // label 補水失敗不影響編輯主流程
+            }
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/SocialInstEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'dynasty_code' => $cDy ?: null,
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'social_institutions'], false),
+            'breadcrumbs' => $this->editorBreadcrumbs($personId, $personLabel, 'social_institutions', $mode),
+            'person_banner' => $this->personBannerProps($personId, 'social_institutions'),
+        ]);
+    }
+
+    /**
+     * Inertia + React 版：占有／財產（possession）編輯器（對齊 legacy biogmains/possession/_form）。
+     * 主鍵 c_possession_record_id 為伺服器配發 surrogate；新增由 PossessionCreateHandler 配發 + 寫 POSSESSION_ADDR。
+     * 地址副表（c_addr_id 多選）僅於新增可編輯；編輯模式為唯讀（v2 update 尚未支援副表，標 TODO）。
+     */
+    public function appPossessionEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        $person = BiogMain::find($personId);
+        $cDy = $person ? (int) $person->c_dy : 0;
+        $dynasty = $cDy ? DB::table('DYNASTIES')->where('c_dy', $cDy)->first() : null;
+
+        $hasPk = $request->filled('c_possession_record_id');
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        $initialAddr = [];
+        if ($mode === 'edit') {
+            $recordId = (int) $request->input('c_possession_record_id');
+            $row = DB::table('POSSESSION_DATA')
+                ->where('c_possession_record_id', $recordId)
+                ->where('c_personid', $personId)
+                ->first();
+            if (!$row) {
+                abort(404);
+            }
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // c_source（出處）為非同步搜尋欄位，補回顯示標籤；地址副表補回供唯讀顯示。
+            // c_measure_code / c_possession_act_code 為 list 模式自行解析。補水失敗不影響編輯。
+            try {
+                $res = $this->biogMainRepository->possessionById($recordId);
+                if (!empty($res['text_str'])) {
+                    $initialLabels['c_source'] = trim($res['text_str']);
+                }
+                foreach (($res['addr_str'] ?? []) as $item) {
+                    $initialAddr[] = ['id' => (string) $item[0], 'label' => (string) $item[1]];
+                }
+            } catch (\Throwable $e) {
+                // label 補水失敗不影響編輯主流程
+            }
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/PossessionEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'dynasty_code' => $cDy ?: null,
+            'dynasty_start' => (string) ($dynasty->c_start ?? ''),
+            'dynasty_end' => (string) ($dynasty->c_end ?? ''),
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'initial_addr' => $initialAddr,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'possessions'], false),
+            'breadcrumbs' => $this->editorBreadcrumbs($personId, $personLabel, 'possessions', $mode),
+            'person_banner' => $this->personBannerProps($personId, 'possessions'),
+        ]);
+    }
+
+    /**
+     * Inertia + React 版：事件（events）編輯器（對齊 legacy biogmains/events/_form）。
+     * 邏輯主鍵 (c_personid, c_sequence, c_event_code)；含農曆年份（干支日 c_day_ganzhi）。
+     * 地址（EVENTS_ADDR 副表）v2 尚未支援，編輯器唯讀顯示並標 TODO。獨立測試路由、flag 仍 old、不上線。
+     */
+    public function appEventEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        $person = BiogMain::find($personId);
+        $cDy = $person ? (int) $person->c_dy : 0;
+
+        $hasPk = $request->filled('c_sequence') && $request->filled('c_event_code');
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        $initialAddr = [];
+        if ($mode === 'edit') {
+            $sequence = (int) $request->input('c_sequence');
+            $eventCode = (int) $request->input('c_event_code');
+            $row = DB::table('EVENTS_DATA')->where([
+                'c_personid' => $personId,
+                'c_sequence' => $sequence,
+                'c_event_code' => $eventCode,
+            ])->first();
+            if (!$row) {
+                abort(404);
+            }
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // c_event_code（事件搜尋）與 c_source（出處）為非同步搜尋欄位，補回顯示標籤；
+            // 地址副表補回供唯讀顯示。補水失敗不影響編輯主流程。
+            try {
+                $res = app(\App\Repositories\EventStatusRepository::class)->eventById($personId.'-'.$sequence.'-'.$eventCode);
+                if (!empty($res['event_str'])) {
+                    $initialLabels['c_event_code'] = trim($res['event_str']);
+                }
+                if (!empty($res['text_str'])) {
+                    $initialLabels['c_source'] = trim($res['text_str']);
+                }
+                foreach (($res['addr_str'] ?? []) as $item) {
+                    $initialAddr[] = ['id' => (string) $item[0], 'label' => (string) $item[1]];
+                }
+            } catch (\Throwable $e) {
+                // label 補水失敗不影響編輯主流程
+            }
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/EventEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'dynasty_code' => $cDy ?: null,
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'initial_addr' => $initialAddr,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'events'], false),
+            'breadcrumbs' => $this->editorBreadcrumbs($personId, $personLabel, 'events', $mode),
+            'person_banner' => $this->personBannerProps($personId, 'events'),
+        ]);
+    }
+
+    /**
+     * Inertia + React 版：入仕（entries）編輯器（對齊 legacy biogmains/entries/_form）。獨立測試路由，
+     * flag 仍 old、不上線。10 段複合主鍵；有 c_entry_code+c_sequence+c_kin_code+c_assoc_code+
+     * c_kin_id+c_year+c_assoc_id+c_inst_code+c_inst_name_code 即編輯，否則新增。
+     */
+    public function appEntriesEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        $person = BiogMain::find($personId);
+        $cDy = $person ? (int) $person->c_dy : 0;
+        $dynasty = $cDy ? DB::table('DYNASTIES')->where('c_dy', $cDy)->first() : null;
+
+        // 10 段主鍵齊備才視為編輯。
+        $pkKeys = ['c_entry_code', 'c_sequence', 'c_kin_code', 'c_assoc_code', 'c_kin_id', 'c_year', 'c_assoc_id', 'c_inst_code', 'c_inst_name_code'];
+        $hasPk = collect($pkKeys)->every(fn ($k) => $request->has($k) && $request->input($k) !== '');
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        if ($mode === 'edit') {
+            $where = ['c_personid' => $personId];
+            foreach ($pkKeys as $k) {
+                $where[$k] = (int) $request->input($k);
+            }
+            $row = DB::table('ENTRY_DATA')->where($where)->first();
+            if (!$row) {
+                abort(404);
+            }
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // 各非同步搜尋欄位補回顯示標籤（補水失敗不影響編輯主流程，僅顯示空白）。
+            try {
+                $entryCode = (int) $row->c_entry_code;
+                if ($entryCode) {
+                    $c = DB::table('ENTRY_CODES')->where('c_entry_code', $entryCode)->first();
+                    if ($c) {
+                        $initialLabels['c_entry_code'] = trim($entryCode.' '.($c->c_entry_desc_chn ?? '').' '.($c->c_entry_desc ?? ''));
+                    }
+                }
+                $kinCode = (int) $row->c_kin_code;
+                if ($kinCode) {
+                    $c = DB::table('KINSHIP_CODES')->where('c_kincode', $kinCode)->first();
+                    if ($c) {
+                        $initialLabels['c_kin_code'] = trim($kinCode.' '.($c->c_kinrel_chn ?? '').' '.($c->c_kinrel ?? ''));
+                    }
+                }
+                $assocCode = (int) $row->c_assoc_code;
+                if ($assocCode) {
+                    $c = DB::table('ASSOC_CODES')->where('c_assoc_code', $assocCode)->first();
+                    if ($c) {
+                        $initialLabels['c_assoc_code'] = trim($assocCode.' '.($c->c_assoc_desc_chn ?? '').' '.($c->c_assoc_desc ?? ''));
+                    }
+                }
+                foreach (['c_kin_id' => (int) $row->c_kin_id, 'c_assoc_id' => (int) $row->c_assoc_id] as $field => $pid) {
+                    if ($pid) {
+                        $b = DB::table('BIOG_MAIN')->where('c_personid', $pid)->first();
+                        if ($b) {
+                            $initialLabels[$field] = trim($pid.' '.($b->c_name_chn ?? '').' '.($b->c_name ?? ''));
+                        }
+                    }
+                }
+                $instCode = (int) $row->c_inst_code;
+                $instNameCode = (int) $row->c_inst_name_code;
+                if ($instCode || $instNameCode) {
+                    $n = DB::table('SOCIAL_INSTITUTION_NAME_CODES')->where('c_inst_name_code', $instNameCode)->first();
+                    $initialLabels['c_inst_code'] = trim($instCode.'-'.$instNameCode.' '.($n->c_inst_name_hz ?? ''));
+                }
+                if ((int) ($row->c_entry_addr_id ?? 0)) {
+                    $a = DB::table('ADDR_CODES')->where('c_addr_id', (int) $row->c_entry_addr_id)->first();
+                    if ($a) {
+                        $initialLabels['c_entry_addr_id'] = trim($a->c_addr_id.' '.($a->c_name ?? '').' '.($a->c_name_chn ?? '').' '.($a->c_firstyear ?? '').'~'.($a->c_lastyear ?? ''));
+                    }
+                }
+                if ((int) ($row->c_source ?? 0)) {
+                    $tx = DB::table('TEXT_CODES')->where('c_textid', (int) $row->c_source)->first();
+                    if ($tx) {
+                        $initialLabels['c_source'] = trim($tx->c_textid.' '.($tx->c_title ?? '').' '.($tx->c_title_chn ?? ''));
+                    }
+                }
+            } catch (\Throwable $e) {
+                // label 補水失敗不影響編輯主流程（例如測試環境缺碼表）
+            }
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/EntriesEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'dynasty_code' => $cDy ?: null,
+            'dynasty_start' => (string) ($dynasty->c_start ?? ''),
+            'dynasty_end' => (string) ($dynasty->c_end ?? ''),
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'entries'], false),
+            'breadcrumbs' => $this->editorBreadcrumbs($personId, $personLabel, 'entries', $mode),
+            'person_banner' => $this->personBannerProps($personId, 'entries'),
+        ]);
+    }
+
+    /**
+     * Inertia + React 版：社會區分（statuses）編輯器 V2。
+     * 對齊 legacy biogmains/statuses/_form.blade.php（含 AI 智能識別社會區分類別代碼）。
+     * 獨立測試路由，statuses migration flag 維持 old、不上線。
+     *
+     * 主鍵 3 段（c_personid, c_sequence, c_status_code）。0 為合法主鍵段（c_status_code=0=未詳），
+     * 故以 has() && input!=='' 判斷編輯/新增（不可用 (int) 後是否為 0 判斷）。
+     */
+    public function appStatusEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        $person = BiogMain::find($personId);
+        $cDy = $person ? (int) $person->c_dy : 0;
+
+        // 主鍵齊備（含 c_sequence、c_status_code，0 為合法值）才視為編輯。
+        $pkKeys = ['c_sequence', 'c_status_code'];
+        $hasPk = collect($pkKeys)->every(fn ($k) => $request->has($k) && $request->input($k) !== '');
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        if ($mode === 'edit') {
+            $where = ['c_personid' => $personId];
+            foreach ($pkKeys as $k) {
+                $where[$k] = (int) $request->input($k);
+            }
+            $row = DB::table('STATUS_DATA')->where($where)->first();
+            if (!$row) {
+                abort(404);
+            }
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // 非同步搜尋欄位補回顯示標籤（補水失敗不影響編輯主流程，僅顯示空白）。
+            try {
+                $statusCode = (int) $row->c_status_code;
+                if ($statusCode) {
+                    $c = DB::table('STATUS_CODES')->where('c_status_code', $statusCode)->first();
+                    if ($c) {
+                        $initialLabels['c_status_code'] = trim($statusCode . ' ' . ($c->c_status_desc_chn ?? '') . ' ' . ($c->c_status_desc ?? ''));
+                    }
+                }
+                if ((int) ($row->c_source ?? 0)) {
+                    $tx = DB::table('TEXT_CODES')->where('c_textid', (int) $row->c_source)->first();
+                    if ($tx) {
+                        $initialLabels['c_source'] = trim($tx->c_textid . ' ' . ($tx->c_title ?? '') . ' ' . ($tx->c_title_chn ?? ''));
+                    }
+                }
+                // 年號（起/終）標籤補水。
+                foreach (['c_fy_nh_code', 'c_ly_nh_code'] as $nhField) {
+                    $nhId = (int) ($row->{$nhField} ?? 0);
+                    if ($nhId) {
+                        $nh = DB::table('NIAN_HAO')->where('c_nianhao_id', $nhId)->first();
+                        if ($nh) {
+                            $initialLabels[$nhField] = trim((string) ($nh->c_nianhao_chn ?? ''));
+                        }
+                    }
+                }
+                // 時限（起/終）標籤補水。
+                foreach (['c_fy_range', 'c_ly_range'] as $rField) {
+                    $rCode = (int) ($row->{$rField} ?? 0);
+                    if ($rCode) {
+                        $rg = DB::table('YEAR_RANGE_CODES')->where('c_range_code', $rCode)->first();
+                        if ($rg) {
+                            $initialLabels[$rField] = trim((string) ($rg->c_range_chn ?? ''));
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                // label 補水失敗不影響編輯主流程（例如測試環境缺碼表）
+            }
+        }
+
+        $user = Auth::user();
+        $aiEnabled = (bool) config('services.gemini.api_key') && $user && $user->isActive();
+
+        return Inertia::render('BasicInformation/StatusEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'dynasty_code' => $cDy ?: null,
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'ai_enabled' => $aiEnabled,
+            'ai_model' => (string) config('services.gemini.model', ''),
+            'ai_suggest_endpoint' => route('ai.code-lookup.suggest', [], false),
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'statuses'], false),
+            'breadcrumbs' => $this->editorBreadcrumbs($personId, $personLabel, 'statuses', $mode),
+            'person_banner' => $this->personBannerProps($personId, 'statuses'),
+            'route_name' => 'app.basicinformation.statuses.editv2',
+        ]);
+    }
+
+    /**
+     * Inertia + React 版：著述出處（sources）編輯器 V2。
+     * 對齊 legacy biogmains/sources/_form.blade.php（含維基資料來源警告）。
+     * 獨立測試路由，sources migration flag 維持 old、不上線。
+     *
+     * 主鍵 3 段（c_personid, c_textid, c_pages）。c_pages 為 varchar 主鍵，哨兵為 ''（空字串）；
+     * c_textid=0 為合法值。故以「c_textid 是否存在且非空」判斷編輯/新增（0 仍視為已選編輯目標），
+     * c_pages 省略時視為 ''（對齊 BiogSourceRepository::normalizePk canonical 形式）。
+     * 後端 SourceMutationHandler 在 update 模式視 PK 不可變（c_textid/c_pages 唯讀）。
+     */
+    public function appSourceEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        // c_textid 存在且非空才視為編輯（0 為合法 textid，故不可用 (int) 是否為 0 判斷）。
+        $hasPk = $request->has('c_textid') && $request->input('c_textid') !== '';
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        $isWikiSource = false;
+        if ($mode === 'edit') {
+            $textId = (int) $request->input('c_textid');
+            // c_pages 省略時視為 ''（canonical），對齊 normalizePk。
+            $pages = (string) $request->input('c_pages', '');
+            $row = DB::table('BIOG_SOURCE_DATA')
+                ->where('c_personid', $personId)
+                ->where('c_textid', $textId)
+                ->where('c_pages', $pages)
+                ->first();
+            if (!$row) {
+                abort(404);
+            }
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // 出處（c_textid，search 欄位）補回顯示標籤；補水失敗不影響編輯主流程。
+            // 注意：c_textid=0（未詳）為合法代碼，亦須補水（對齊 legacy；不可用 if ($textId) 略過 0）。
+            try {
+                $tx = DB::table('TEXT_CODES')->where('c_textid', $textId)->first();
+                if ($tx) {
+                    $initialLabels['c_textid'] = trim($tx->c_textid . ' ' . ($tx->c_title ?? '') . ' ' . ($tx->c_title_chn ?? ''));
+                }
+            } catch (\Throwable $e) {
+                // label 補水失敗不影響編輯主流程（例如測試環境缺碼表）
+            }
+
+            // 維基資料來源警告（對齊 legacy $wikiSourceIds）。
+            $isWikiSource = in_array($textId, [60795, 68942, 68943], true);
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/SourceEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'sources'], false),
+            'breadcrumbs' => $this->editorBreadcrumbs($personId, $personLabel, 'sources', $mode),
+            'person_banner' => $this->personBannerProps($personId, 'sources'),
+            'is_wiki_source' => $isWikiSource,
+        ]);
+    }
+
+    /**
+     * Inertia + React 版：官名／任官（offices/postings）編輯器（對齊 legacy offices/_form，非 person-browser）。
+     * 編輯模式以 ?c_office_id=&c_posting_id= 深連結；地址副表（POSTED_TO_ADDR_DATA）多筆載入。
+     */
+    public function appOfficeEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        // 人物朝代（供官名/地名搜尋過濾，對齊 legacy $biog_dy）。
+        $dynastyCode = DB::table('BIOG_MAIN')->where('c_personid', $personId)->value('c_dy');
+        $dynastyCode = $dynastyCode !== null ? (int) $dynastyCode : null;
+
+        // 編輯模式：c_office_id 與 c_posting_id 皆存在（0 為合法 office id，故以 has() 判斷）。
+        $hasPk = $request->has('c_office_id') && $request->has('c_posting_id')
+            && $request->input('c_posting_id') !== '';
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        $initialAddr = [];
+        if ($mode === 'edit') {
+            $officeId = (int) $request->input('c_office_id');
+            $postingId = (int) $request->input('c_posting_id');
+            $row = DB::table('POSTED_TO_OFFICE_DATA')
+                ->where('c_office_id', $officeId)
+                ->where('c_posting_id', $postingId)
+                ->where('c_personid', $personId)
+                ->first();
+            if (!$row) {
+                abort(404);
+            }
+            // 整列補水（含農曆等隱藏欄），避免回存時把未載入欄位清成 NULL（四步法則）。
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // 標籤補水（search 欄位）：官名 / 出處 / 社會機構。list 欄位（朝代/任命/方式/分類）自行載入。
+            try {
+                $office = DB::table('OFFICE_CODES')->where('c_office_id', $officeId)->first();
+                if ($office) {
+                    $initialLabels['c_office_id'] = trim($office->c_office_id . ' ' . ($office->c_office_chn ?? '') . ' ' . ($office->c_office_pinyin ?? ''));
+                }
+            } catch (\Throwable $e) {
+            }
+
+            try {
+                $tx = DB::table('TEXT_CODES')->where('c_textid', (int) $row->c_source)->first();
+                if ($tx) {
+                    $initialLabels['c_source'] = trim($tx->c_textid . ' ' . ($tx->c_title ?? '') . ' ' . ($tx->c_title_chn ?? ''));
+                }
+            } catch (\Throwable $e) {
+            }
+
+            try {
+                if ((int) $row->c_inst_code) {
+                    $name = DB::table('SOCIAL_INSTITUTION_NAME_CODES')->where('c_inst_name_code', $row->c_inst_name_code)->value('c_inst_name_hz');
+                    $initialLabels['c_inst_code'] = trim($row->c_inst_code . '-' . $row->c_inst_name_code . ' ' . ($name ?? ''));
+                }
+            } catch (\Throwable $e) {
+            }
+
+            // 地址副表（多筆）→ initial_addr [{id,label}]。
+            try {
+                $addrRows = DB::table('POSTED_TO_ADDR_DATA')
+                    ->where('c_personid', $personId)
+                    ->where('c_posting_id', $postingId)
+                    ->get();
+                foreach ($addrRows as $ar) {
+                    $addrCode = DB::table('ADDR_CODES')->where('c_addr_id', $ar->c_addr_id)->first();
+                    $label = $addrCode ? trim(($addrCode->c_name_chn ?? '') . ' ' . ($addrCode->c_name ?? '')) : '';
+
+                    $initialAddr[] = ['id' => (string) $ar->c_addr_id, 'label' => $label !== '' ? $label : ('ADDR ' . $ar->c_addr_id)];
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/OfficeEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'dynasty_code' => $dynastyCode,
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'initial_addr' => $initialAddr,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'postings'], false),
+            'breadcrumbs' => $this->editorBreadcrumbs($personId, $personLabel, 'postings', $mode),
+            'person_banner' => $this->personBannerProps($personId, 'postings'),
+            // AI 任官自動填：僅在 Gemini 已設定且使用者啟用時提供（對齊 legacy offices/_form 條件，新增模式才顯示）。
+            'ai_enabled' => (bool) config('services.gemini.api_key') && $user && $user->isActive(),
+            'ai_model' => (string) config('services.gemini.model', ''),
+            'ai_extract_endpoint' => Route::has('ai.posting.extract') ? route('ai.posting.extract', [], false) : '',
+        ]);
+    }
+
+    /**
+     * Inertia + React 版：社會關係（assoc）編輯器（對齊 legacy assoc/_form，非 person-browser）。
+     * 9 段複合主鍵以 query 帶入編輯。pair codes 由後端自動權威補齊，編輯器不送。
+     */
+    /**
+     * #70：子資源「記錄不存在」優雅降級。取代 edit-v2 在對應列不存在時硬 abort(404)——
+     * 渲染共用 SubresourceNotFound 頁（明確訊息 + 返回人物詳情中樞對應分頁連結）。
+     * 典型情境：從鏡像「疑似匹配」提示跳對面，但該列已被刪除或主鍵不符。
+     * **保留 404 狀態碼**（語義正確、不影響監控/快取/狀態判斷），僅把錯誤頁換成自訂 Inertia 頁。
+     * 不傳資源中文名（避免 en locale 混中文）；訊息為通用「記錄不存在」，由前端 i18n 呈現。
+     */
+    private function renderSubresourceNotFound(Request $request, int $personId, string $personLabel, string $tab) {
+        return Inertia::render('BasicInformation/SubresourceNotFound', [
+            'person_label' => $personLabel,
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => $tab], false),
+            'person_banner' => $this->personBannerProps($personId, $tab),
+        ])->toResponse($request)->setStatusCode(404);
+    }
+
+    public function appAssocEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        $dynastyCode = DB::table('BIOG_MAIN')->where('c_personid', $personId)->value('c_dy');
+        $dynastyCode = $dynastyCode !== null ? (int) $dynastyCode : null;
+
+        // 編輯模式：以 9 段複合主鍵（除 c_personid，由路由帶入）皆存在判斷。
+        $pkCols = ['c_assoc_code', 'c_assoc_id', 'c_kin_code', 'c_kin_id', 'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year'];
+        $hasPk = collect($pkCols)->every(fn ($c) => $request->has($c));
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        if ($mode === 'edit') {
+            $row = DB::table('ASSOC_DATA')
+                ->where('c_personid', $personId)
+                ->where('c_assoc_code', (int) $request->input('c_assoc_code'))
+                ->where('c_assoc_id', (int) $request->input('c_assoc_id'))
+                ->where('c_kin_code', (int) $request->input('c_kin_code'))
+                ->where('c_kin_id', (int) $request->input('c_kin_id'))
+                ->where('c_assoc_kin_code', (int) $request->input('c_assoc_kin_code'))
+                ->where('c_assoc_kin_id', (int) $request->input('c_assoc_kin_id'))
+                ->where('c_text_title', (string) $request->input('c_text_title'))
+                ->where('c_assoc_first_year', (int) $request->input('c_assoc_first_year'))
+                ->first();
+            if (!$row) {
+                // #70 優雅降級：對面記錄不存在（可能已刪除或主鍵不符，如從鏡像疑似提示跳對面）→ 不硬報 404，
+                // 渲染「記錄不存在」態 + 返回中樞連結，取代舊版點 edit 直接報錯的痛點。
+                return $this->renderSubresourceNotFound($request, $personId, $personLabel, 'associations');
+            }
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // 標籤補水（失敗不影響編輯主流程）。person 欄查 BIOG_MAIN；代碼欄查各 codes 表。
+            $hydratePerson = function (string $col) use ($row, &$initialLabels) {
+                $pid = (int) ($row->{$col} ?? 0);
+                if ($pid) {
+                    try {
+                        $p = DB::table('BIOG_MAIN')->where('c_personid', $pid)->first();
+                        if ($p) {
+                            $initialLabels[$col] = trim($p->c_personid . ' ' . ($p->c_name_chn ?? '') . ' ' . ($p->c_name ?? ''));
+                        }
+                    } catch (\Throwable $e) {
+                    }
+                }
+            };
+            foreach (['c_kin_id', 'c_assoc_id', 'c_assoc_kin_id', 'c_tertiary_personid', 'c_assoc_claimer_id'] as $pc) {
+                $hydratePerson($pc);
+            }
+
+            try {
+                $ac = DB::table('ASSOC_CODES')->where('c_assoc_code', (int) $row->c_assoc_code)->first();
+                if ($ac) {
+                    $initialLabels['c_assoc_code'] = trim($ac->c_assoc_code . ' ' . ($ac->c_assoc_desc_chn ?? '') . ' ' . ($ac->c_assoc_desc ?? ''));
+                }
+            } catch (\Throwable $e) {
+            }
+            foreach (['c_kin_code', 'c_assoc_kin_code'] as $kc) {
+                try {
+                    $code = (int) ($row->{$kc} ?? 0);
+                    if ($code) {
+                        $k = DB::table('KINSHIP_CODES')->where('c_kincode', $code)->first();
+                        if ($k) {
+                            $initialLabels[$kc] = trim($k->c_kincode . ' ' . ($k->c_kinrel_chn ?? '') . ' ' . ($k->c_kinrel ?? ''));
+                        }
+                    }
+                } catch (\Throwable $e) {
+                }
+            }
+
+            try {
+                $tx = DB::table('TEXT_CODES')->where('c_textid', (int) $row->c_source)->first();
+                if ($tx) {
+                    $initialLabels['c_source'] = trim($tx->c_textid . ' ' . ($tx->c_title ?? '') . ' ' . ($tx->c_title_chn ?? ''));
+                }
+            } catch (\Throwable $e) {
+            }
+
+            try {
+                $addr = DB::table('ADDR_CODES')->where('c_addr_id', (int) $row->c_addr_id)->first();
+                if ($addr && (int) $row->c_addr_id) {
+                    $initialLabels['c_addr_id'] = trim(($addr->c_name_chn ?? '') . ' ' . ($addr->c_name ?? ''));
+                }
+            } catch (\Throwable $e) {
+            }
+
+            try {
+                if ((int) $row->c_inst_code) {
+                    $name = DB::table('SOCIAL_INSTITUTION_NAME_CODES')->where('c_inst_name_code', $row->c_inst_name_code)->value('c_inst_name_hz');
+                    $initialLabels['c_inst_code'] = trim($row->c_inst_code . '-' . $row->c_inst_name_code . ' ' . ($name ?? ''));
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/AssocEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'dynasty_code' => $dynastyCode,
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            // #34 詳情中樞接線：存檔/取消後返回 React 人物詳情中樞的對應分頁（非 legacy index）。
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'associations'], false),
+            'breadcrumbs' => $this->editorBreadcrumbs($personId, $personLabel, 'associations', $mode),
+            'person_banner' => $this->personBannerProps($personId, 'associations'),
+            'ai_enabled' => (bool) config('services.gemini.api_key') && $user && $user->isActive(),
+            'ai_model' => (string) config('services.gemini.model', ''),
+            'ai_suggest_endpoint' => Route::has('ai.code-lookup.suggest') ? route('ai.code-lookup.suggest', [], false) : '',
+        ]);
+    }
+
+    /**
+     * Inertia + React 版：親屬關係（kinship / KIN_DATA）編輯器（對齊 legacy kinship/_form）。
+     * 3 段複合主鍵（c_personid 由路由帶入、c_kin_id、c_kin_code）；互逆配對碼由後端權威推導，
+     * 故不需前端送 c_kinship_pair。#34 詳情中樞已接線：flag=new 時 KinshipTab 新增/編輯導向此頁，
+     * 存檔後返回 React 中樞 ?tab=kinship。
+     */
+    public function appKinshipEditV2(Request $request, $id) {
+        $personId = $this->normalizePersonId($id);
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        // 編輯模式：以 2 段非 c_personid 主鍵（c_kin_id、c_kin_code）皆存在判斷。
+        $hasPk = $request->has('c_kin_id') && $request->has('c_kin_code');
+        $mode = $hasPk ? 'edit' : 'create';
+
+        $initialFields = ['c_personid' => (string) $personId];
+        $initialLabels = [];
+        if ($mode === 'edit') {
+            $row = DB::table('KIN_DATA')
+                ->where('c_personid', $personId)
+                ->where('c_kin_id', (int) $request->input('c_kin_id'))
+                ->where('c_kin_code', (int) $request->input('c_kin_code'))
+                ->first();
+            if (!$row) {
+                // #70 優雅降級：對面記錄不存在（可能已刪除或主鍵不符，如從鏡像疑似提示跳對面）→ 不硬報 404，
+                // 渲染「記錄不存在」態 + 返回中樞連結，取代舊版點 edit 直接報錯的痛點。
+                return $this->renderSubresourceNotFound($request, $personId, $personLabel, 'kinship');
+            }
+            foreach ((array) $row as $k => $v) {
+                $initialFields[$k] = $v === null ? '' : (string) $v;
+            }
+
+            // 標籤補水（失敗不影響編輯主流程）。
+            try {
+                $kid = (int) ($row->c_kin_id ?? 0);
+                if ($kid) {
+                    $p = DB::table('BIOG_MAIN')->where('c_personid', $kid)->first();
+                    if ($p) {
+                        $initialLabels['c_kin_id'] = trim($p->c_personid . ' ' . ($p->c_name_chn ?? '') . ' ' . ($p->c_name ?? ''));
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+
+            try {
+                $code = (int) ($row->c_kin_code ?? 0);
+                if ($code) {
+                    $k = DB::table('KINSHIP_CODES')->where('c_kincode', $code)->first();
+                    if ($k) {
+                        $initialLabels['c_kin_code'] = trim($k->c_kincode . ' ' . ($k->c_kinrel_chn ?? '') . ' ' . ($k->c_kinrel ?? ''));
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+
+            try {
+                $tx = DB::table('TEXT_CODES')->where('c_textid', (int) $row->c_source)->first();
+                if ($tx) {
+                    $initialLabels['c_source'] = trim($tx->c_textid . ' ' . ($tx->c_title ?? '') . ' ' . ($tx->c_title_chn ?? ''));
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+
+        $user = Auth::user();
+
+        return Inertia::render('BasicInformation/KinshipEditV2', [
+            'person_id' => $personId,
+            'person_label' => $personLabel,
+            'edit_mode' => $mode,
+            'initial_fields' => (object) $initialFields,
+            'initial_labels' => (object) $initialLabels,
+            'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'mutate_endpoint' => route('api.v2.mutate.web', [], false),
+            'delete_endpoint' => route('api.v2.delete.web', [], false),
+            // #34 詳情中樞接線：存檔/取消後返回 React 人物詳情中樞的對應分頁（非 legacy index）。
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'kinship'], false),
+            'breadcrumbs' => $this->editorBreadcrumbs($personId, $personLabel, 'kinship', $mode),
+            'person_banner' => $this->personBannerProps($personId, 'kinship'),
+        ]);
+    }
+
+    /**
+     * Inertia + React 版：人物詳情頁。與 appEdit 同為 PersonEditor 編輯中樞
+     * （舊頁 /basicinformation/{id} 即載入可錄入的 basic_info 分頁，故詳情=編輯中樞）。
+     */
+    public function appShow($id) {
+        return $this->renderPersonEditor($id);
+    }
+
+    /**
+     * 渲染 PersonEditor 編輯中樞。先以 buildPersonViewProps 確認人物存在（404）並取標籤。
+     */
+    protected function renderPersonEditor($id) {
+        $personId = $this->normalizePersonId($id);
+        // 確認人物存在並取得顯示標籤（不存在則 404）。
+        [, $personLabel] = $this->buildPersonViewProps($personId);
+
+        // 支援 ?tab= 深連結（對齊舊頁各子資源獨立 URL 的可深連結性）；非法值回退 basic_info。
+        $validTabs = array_merge(['basic_info'], \App\Services\PersonBrowserService::validTabKeys());
+        $requestedTab = (string) request('tab', '');
+        $initialTab = in_array($requestedTab, $validTabs, true) ? $requestedTab : 'basic_info';
+
+        return Inertia::render('BasicInformation/PersonEditor', array_merge([
+            'personId' => $personId,
+            'person_label' => $personLabel,
+            'initialTab' => $initialTab,
+            'index_url' => migration_flag_is_new('basicinformation.index') && Route::has('app.basicinformation.index')
+                ? route('app.basicinformation.index', [], false)
+                : route('basicinformation.index', [], false),
+            // #34 中樞改用 legacy 風格 PersonBanner（人物頭 + 子資源導航）取代 person-browser 的
+            // PersonSummaryPanel/BrowserTabs；active_tab/counts 於前端以即時狀態覆蓋。
+            'person_banner' => $this->personBannerProps($personId, $initialTab),
+            'page_translations' => [
+                'person' => is_array($t = trans('person')) ? $t : [],
+            ],
+        ], $this->personEditorTabProps()));
+    }
+
+    /**
+     * PersonEditor 所需的端點 + 旗標（與 PersonBrowserController@index 對齊），
+     * 但 summary/tab 端點改指向「編輯者/訪客可用」的 app.basicinformation.summary/.tab
+     * （非 superadmin-only）。__PERSON_ID__ / __TAB_KEY__ 由前端替換。
+     *
+     * @return array<string, mixed>
+     */
+    protected function personEditorTabProps(): array {
+        $user = Auth::user();
+
+        return [
+            'tabKeys' => PersonBrowserService::validTabKeys(),
+            'summaryEndpoint' => route('app.basicinformation.summary', ['id' => '__PERSON_ID__'], false),
+            'tabEndpoint' => route('app.basicinformation.tab', ['id' => '__PERSON_ID__', 'tabKey' => '__TAB_KEY__'], false),
+            'mutateEndpoint' => route('api.v2.mutate.web', [], false),
+            'createEndpoint' => route('api.v2.create.web', [], false),
+            'deleteEndpoint' => route('api.v2.delete.web', [], false),
+            'pinyinEndpoint' => '/api/select/search/pinyin',
+            'canEditBasicInfo' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'canProposeEdits' => $user ? $user->canPropose() : false,
+            // basic_info 分頁編輯入口（flag=new 時導向獨立 BasicInfoEditor edit-v2，含年號轉換）。
+            'basicInfoEditorIsNew' => migration_flag_is_new('basicinformation.editor'),
+            'altnameEditorIsNew' => migration_flag_is_new('basicinformation.altname'),
+            'addressesEditorIsNew' => migration_flag_is_new('basicinformation.addresses'),
+            'textsEditorIsNew' => migration_flag_is_new('basicinformation.texts'),
+            'sourcesEditorIsNew' => migration_flag_is_new('basicinformation.sources'),
+            'officesEditorIsNew' => migration_flag_is_new('basicinformation.offices'),
+            'assocEditorIsNew' => migration_flag_is_new('basicinformation.assoc'),
+            'kinshipEditorIsNew' => migration_flag_is_new('basicinformation.kinship'),
+            'eventsEditorIsNew' => migration_flag_is_new('basicinformation.events'),
+            'entriesEditorIsNew' => migration_flag_is_new('basicinformation.entries'),
+            'statusesEditorIsNew' => migration_flag_is_new('basicinformation.statuses'),
+            'possessionEditorIsNew' => migration_flag_is_new('basicinformation.possession'),
+            'socialInstEditorIsNew' => migration_flag_is_new('basicinformation.socialinst'),
+        ];
+    }
+
+    /**
+     * PersonEditor 用：人物摘要（JSON，header + tab_counts）。委託 PersonBrowserService::summary。
+     * 與 person-browser summary 同資料，但路由不在 superadmin 組，供編輯主界面取用。
+     */
+    public function summary($id) {
+        $personId = $this->normalizePersonId($id);
+        $data = $this->personBrowserService->summary($personId);
+
+        if ($data === null) {
+            return response()->json(['error' => 'Person not found'], 404);
+        }
+
+        return response()->json($data);
+    }
+
+    /**
+     * PersonEditor 用：分頁資料（JSON）。先校驗 tabKey 合法，委託 PersonBrowserService::tabData。
+     */
+    public function tab($id, $tabKey) {
+        $personId = $this->normalizePersonId($id);
+
+        if (!in_array($tabKey, PersonBrowserService::validTabKeys(), true)) {
+            return response()->json(['error' => 'Invalid tab key'], 404);
+        }
+
+        $data = $this->personBrowserService->tabData($personId, $tabKey);
+
+        if ($data === null) {
+            return response()->json(['error' => 'Tab data not available'], 404);
+        }
+
+        return response()->json($data);
+    }
+
+    /**
+     * Inertia + React 版：新增人物表單頁（c_personid + 核心姓名欄位）→ /api/v2/create。
+     * 須登入（middleware auth 已涵蓋本方法）；實際寫入授權由 v2 handler 把關。
+     */
+    public function appCreate() {
+        $user = Auth::user();
+
+        // BIOG_MAIN create 提案 v2 尚未支援（回 501）：可提案但不可直接寫入者導回舊版新增流程。
+        if ($user && !$user->canWriteDirectly() && $user->canPropose()) {
+            flash('人物新增提案請使用舊版眾包流程 @ '.Carbon::now(), 'info');
+
+            return redirect()->route('basicinformation.create');
+        }
+
+        $tempId = (int) BiogMain::max('c_personid') + 1;
+
+        return Inertia::render('BasicInformation/Create', [
+            'temp_id' => $tempId,
+            'can_create' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
+            'create_endpoint' => route('api.v2.create.web', [], false),
+            'edit_template' => migration_flag_is_new('basicinformation.editor') && Route::has('app.basicinformation.edit')
+                ? route('app.basicinformation.edit', ['id' => '__ID__'], false)
+                : route('basicinformation.edit', ['basicinformation' => '__ID__'], false),
+            'index_url' => migration_flag_is_new('basicinformation.index') && Route::has('app.basicinformation.index')
+                ? route('app.basicinformation.index', [], false)
+                : route('basicinformation.index', [], false),
+            'page_translations' => [
+                'person' => is_array($t = trans('person')) ? $t : [],
+            ],
         ]);
     }
 

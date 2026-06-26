@@ -117,11 +117,15 @@ class ApiV2MutateEntryTest extends TestCase {
             $table->integer('c_source')->default(0);
             $table->string('c_pages', 255)->nullable();
             $table->text('c_notes')->nullable();
-            $table->text('c_supplement')->nullable();
-            $table->integer('c_entry_nh_code')->nullable();
+            $table->integer('c_entry_nh_id')->nullable(); // 對齊真實欄名（2026_01_22 rename c_nianhao_id->c_entry_nh_id）
             $table->integer('c_entry_nh_year')->nullable();
             $table->integer('c_entry_range')->nullable();
-            $table->string('c_secondary_source_title', 255)->nullable();
+            $table->string('c_exam_rank', 255)->nullable();
+            $table->integer('c_attempt_count')->nullable();
+            $table->string('c_exam_field', 255)->nullable();
+            $table->integer('c_parental_status_code')->nullable();
+            $table->integer('c_age')->nullable();
+            $table->string('c_posting_notes', 255)->nullable();
             $table->string('c_created_by', 255)->nullable();
             $table->string('c_created_date', 255)->nullable();
             $table->string('c_modified_by', 255)->nullable();
@@ -194,6 +198,64 @@ class ApiV2MutateEntryTest extends TestCase {
     }
 
     // ── Direct Update Tests ─────────────────────────────────
+
+    #[Test]
+    public function testUpdatePreservesHiddenInstitutionPk(): void {
+        // 回歸：ENTRY_DATA 10-key PK 含 c_inst_code/c_inst_name_code（編輯器不顯示）。
+        // 編輯一筆 institution PK 非零的記錄、只改 c_notes 時（changes 不含這兩個隱藏 PK 欄），
+        // 後端 buildNewPk 須以 target.pk 保留原值，不可把 institution PK 改成 0。
+        $user = $this->makeUser(email: 'entry-instpk@example.com');
+        $this->actingAs($user);
+        $this->seedEntry(['c_inst_code' => 500, 'c_inst_name_code' => 7, 'c_notes' => '原備註']);
+
+        $response = $this->postJson('/api/v2/mutate', $this->entryPayload([
+            'target' => ['pk' => ['c_inst_code' => 500, 'c_inst_name_code' => 7]],
+            'changes' => ['c_notes' => '改後備註'],
+        ]));
+
+        $response->assertOk()->assertJson(['ok' => true]);
+        $this->assertDatabaseHas('ENTRY_DATA', [
+            'c_personid' => 1000,
+            'c_entry_code' => 36,
+            'c_inst_code' => 500,
+            'c_inst_name_code' => 7,
+            'c_notes' => '改後備註',
+        ]);
+        // institution PK 未被改成 0
+        $this->assertSame(0, DB::table('ENTRY_DATA')->where('c_inst_code', 0)->count());
+    }
+
+    #[Test]
+    public function testDirectEntryUpdatePersistsRestoredFieldsAndDoesNotNullOthers(): void {
+        // 回歸（Task 27）：補回的入仕欄位（exam_rank/attempt_count/exam_field/parental_status/age/posting_notes）
+        // 須能寫入；且只改 c_notes 時不可清空這些欄（防「保存即清空」資料流失）。
+        $user = $this->makeUser(email: 'entry-restored@example.com');
+        $this->actingAs($user);
+        $this->seedEntry([
+            'c_exam_rank' => '進士', 'c_attempt_count' => 2, 'c_exam_field' => '經義',
+            'c_parental_status_code' => 1, 'c_age' => 30, 'c_posting_notes' => '原任官備註',
+        ]);
+
+        // (a) 直接更新補回欄位應寫入。
+        $this->postJson('/api/v2/mutate', $this->entryPayload([
+            'changes' => ['c_exam_rank' => '探花', 'c_age' => 28],
+        ]))->assertOk();
+        $this->assertDatabaseHas('ENTRY_DATA', [
+            'c_personid' => 1000, 'c_entry_code' => 36, 'c_sequence' => 1,
+            'c_exam_rank' => '探花', 'c_age' => 28, 'c_exam_field' => '經義', 'c_parental_status_code' => 1,
+        ]);
+
+        // (b) 只改 c_notes 後，補回欄位仍保留、未被清空。
+        $this->postJson('/api/v2/mutate', $this->entryPayload([
+            'changes' => ['c_notes' => '只改備註'],
+        ]))->assertOk();
+        $this->assertDatabaseHas('ENTRY_DATA', [
+            'c_personid' => 1000, 'c_entry_code' => 36, 'c_sequence' => 1,
+            'c_notes' => '只改備註', 'c_exam_rank' => '探花', 'c_age' => 28,
+            'c_exam_field' => '經義', 'c_parental_status_code' => 1, 'c_attempt_count' => 2,
+            'c_posting_notes' => '原任官備註',
+        ]);
+    }
 
     #[Test]
     public function testDirectEntryUpdateSucceeds(): void {
@@ -443,6 +505,29 @@ class ApiV2MutateEntryTest extends TestCase {
         $response->assertStatus(403);
     }
 
+    // ── #56 M 寫入等價（update 路徑，純單表 10 段 PK；entries 無鏡像/副表）──────
+
+    #[Test]
+    public function testEntryCodeFieldsSentinelFullyIdempotent(): void {
+        // 兩個非 PK 碼欄 c_source / c_entry_addr_id（legacy 哨兵 0=Unknown）所有空表示 → 0、合法值保留、不翻。≥10 案例。
+        $this->actingAs($this->makeUser(email: 'entry-sentinel@example.com'));
+        $T = 'ENTRY_DATA';
+        $fields = ['c_source', 'c_entry_addr_id'];
+        foreach ($fields as $f) {
+            foreach ([null, '', -999, '0', 0] as $sent) {
+                DB::table($T)->delete();
+                $this->seedEntry([$f => 5, 'c_notes' => '初始']);
+                $this->postJson('/api/v2/mutate', $this->entryPayload(['changes' => [$f => $sent, 'c_notes' => '改'.$f.var_export($sent, true)]]))->assertOk();
+                $this->assertSame(0, (int) DB::table($T)->value($f), $f.' 送 '.var_export($sent, true).' 應規範化為 0');
+                $this->assertNotNull(DB::table($T)->value($f), $f.' 不得為 null');
+            }
+        }
+        DB::table($T)->delete();
+        $this->seedEntry(['c_source' => 1, 'c_notes' => 'x']);
+        $this->postJson('/api/v2/mutate', $this->entryPayload(['changes' => ['c_source' => 7, 'c_notes' => '合法值']]))->assertOk();
+        $this->assertSame(7, (int) DB::table($T)->value('c_source'), '合法非 0 值不得被誤清');
+    }
+
     #[Test]
     public function testEntryUpdateAcceptsAlias(): void {
         $user = $this->makeUser(email: 'entry-alias@example.com');
@@ -455,5 +540,23 @@ class ApiV2MutateEntryTest extends TestCase {
 
         $response->assertOk()
             ->assertJson(['ok' => true, 'resource' => 'entries']);
+    }
+
+    #[Test]
+    public function testDirectEntryUpdatePersistsEraNianhaoField(): void {
+        // 回歸：入仕年的年號代碼欄真實欄名為 c_entry_nh_id（2026_01_22 rename，舊名 c_nianhao_id）。
+        // allowlist 若殘留舊名，更新年號將寫不進真實欄。
+        $user = $this->makeUser(email: 'entry-era@example.com');
+        $this->actingAs($user);
+        $this->seedEntry(['c_entry_nh_id' => 1, 'c_entry_nh_year' => 2]);
+
+        $this->postJson('/api/v2/mutate', $this->entryPayload([
+            'changes' => ['c_entry_nh_id' => 9, 'c_entry_nh_year' => 4],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('ENTRY_DATA', [
+            'c_personid' => 1000, 'c_entry_code' => 36, 'c_sequence' => 1,
+            'c_entry_nh_id' => 9, 'c_entry_nh_year' => 4,
+        ]);
     }
 }

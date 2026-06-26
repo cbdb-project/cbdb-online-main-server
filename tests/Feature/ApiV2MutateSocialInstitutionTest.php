@@ -110,13 +110,18 @@ class ApiV2MutateSocialInstitutionTest extends TestCase {
             $table->integer('c_source')->default(0);
             $table->string('c_pages', 255)->nullable();
             $table->text('c_notes')->nullable();
-            $table->text('c_supplement')->nullable();
-            $table->integer('c_bi_firstyear')->nullable();
-            $table->integer('c_bi_lastyear')->nullable();
-            $table->integer('c_bi_fy_nh_code')->nullable();
-            $table->integer('c_bi_fy_nh_year')->nullable();
-            $table->integer('c_bi_ly_nh_code')->nullable();
-            $table->integer('c_bi_ly_nh_year')->nullable();
+            $table->integer('c_bi_begin_year')->nullable();
+            $table->integer('c_bi_by_nh_code')->nullable();
+            $table->integer('c_bi_by_nh_year')->nullable();
+            $table->integer('c_bi_by_range')->nullable();
+            $table->integer('c_bi_end_year')->nullable();
+            $table->integer('c_bi_ey_nh_code')->nullable();
+            $table->integer('c_bi_ey_nh_year')->nullable();
+            $table->integer('c_bi_ey_range')->nullable();
+            $table->string('c_created_by', 255)->nullable();
+            $table->string('c_created_date', 255)->nullable();
+            $table->string('c_modified_by', 255)->nullable();
+            $table->string('c_modified_date', 255)->nullable();
             $table->primary(['c_personid', 'c_inst_code', 'c_inst_name_code', 'c_bi_role_code']);
         });
     }
@@ -199,6 +204,37 @@ class ApiV2MutateSocialInstitutionTest extends TestCase {
             'c_personid' => 1000,
             'c_notes' => '更新備註',
             'c_pages' => '10-20',
+        ]);
+    }
+
+    #[Test]
+    public function testDirectSocialInstitutionRekeyPreservesUnchangedFields(): void {
+        // React SocialInstEditor 編輯模式可改鍵（c_bi_role_code）；改鍵時未變更的非鍵欄位不得遺失。
+        $user = $this->makeUser(email: 'socinst-rekey@example.com');
+        $this->actingAs($user);
+        $this->seedSocialInstitution(['c_pages' => 'p.99', 'c_notes' => '原備註']);
+
+        $response = $this->postJson('/api/v2/mutate', $this->socialInstitutionPayload([
+            'changes' => ['c_bi_role_code' => 2, 'c_notes' => '新備註'],
+        ]));
+
+        $response->assertOk()->assertJson(['ok' => true]);
+
+        // 新鍵列存在，且未變更的 c_pages 仍保留（無欄位遺失）。
+        $this->assertDatabaseHas('BIOG_INST_DATA', [
+            'c_personid' => 1000,
+            'c_inst_code' => 10,
+            'c_inst_name_code' => 20,
+            'c_bi_role_code' => 2,
+            'c_notes' => '新備註',
+            'c_pages' => 'p.99',
+        ]);
+        // 舊鍵列已移除（改鍵而非新增）。
+        $this->assertDatabaseMissing('BIOG_INST_DATA', [
+            'c_personid' => 1000,
+            'c_inst_code' => 10,
+            'c_inst_name_code' => 20,
+            'c_bi_role_code' => 1,
         ]);
     }
 
@@ -408,6 +444,31 @@ class ApiV2MutateSocialInstitutionTest extends TestCase {
 
         $response = $this->postJson('/api/v2/mutate', $this->socialInstitutionPayload());
         $response->assertStatus(403);
+    }
+
+    // ── #56 M 寫入等價（update 路徑，純單表；socialinst 無鏡像/副表）──────
+
+    #[Test]
+    public function testSocialInstitutionCodeFieldSentinelFullyIdempotent(): void {
+        // c_source（legacy 哨兵 0=Unknown）所有空表示 null/''/-999/'0'/0 → 0、合法值保留、來回不翻。≥10 案例。
+        $this->actingAs($this->makeUser(email: 'socinst-sentinel@example.com'));
+        $T = 'BIOG_INST_DATA';
+        $f = 'c_source';
+        foreach ([null, '', -999, '0', 0] as $sent) {
+            DB::table($T)->delete();
+            $this->seedSocialInstitution([$f => 5, 'c_notes' => '初始']);
+            $this->postJson('/api/v2/mutate', $this->socialInstitutionPayload(['changes' => [$f => $sent, 'c_notes' => '改'.var_export($sent, true)]]))->assertOk();
+            $this->assertSame(0, (int) DB::table($T)->value($f), $f.' 送 '.var_export($sent, true).' 應規範化為 0');
+            $this->assertNotNull(DB::table($T)->value($f), $f.' 不得為 null');
+        }
+        DB::table($T)->delete();
+        $this->seedSocialInstitution([$f => 1, 'c_notes' => 'x']);
+        $this->postJson('/api/v2/mutate', $this->socialInstitutionPayload(['changes' => [$f => 7, 'c_notes' => '合法值']]))->assertOk();
+        $this->assertSame(7, (int) DB::table($T)->value($f), '合法非 0 值不得被誤清');
+        foreach ([null, '', -999, 0] as $i => $sent) {
+            $this->postJson('/api/v2/mutate', $this->socialInstitutionPayload(['changes' => [$f => $sent, 'c_notes' => '再'.$i]]))->assertOk();
+            $this->assertSame(0, (int) DB::table($T)->value($f), '幂等重送仍為 0（第'.$i.'輪）');
+        }
     }
 
     #[Test]

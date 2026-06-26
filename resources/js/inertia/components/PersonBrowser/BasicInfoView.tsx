@@ -9,9 +9,25 @@ interface Props {
     mutateEndpoint: string;
     pinyinEndpoint: string;
     canEdit?: boolean;
+    /**
+     * 進場即直接進入編輯狀態（編輯主界面 PersonEditor 用，對齊舊頁「打開即可錄入」）。
+     * 預設 false：PersonBrowser 維持「先檢視、點『編輯基本資料』才進編輯」的原行為。
+     * 僅在 canEdit 為真時生效。
+     */
+    startEditing?: boolean;
+    /**
+     * 隱藏元件內建的（legacy 表單）刪除按鈕。供獨立 Edit 頁改用頁面層 /api/v2/delete
+     * 時關閉，避免出現兩個刪除入口。預設 false（PersonBrowser 維持原行為）。
+     */
+    hideDelete?: boolean;
     onSaved?: () => void;
     onEditorStateChange?: (state: { editing: boolean; dirty: boolean }) => void;
     onRegisterSaveHandler?: ((handler: (() => Promise<boolean>) | null) => void) | undefined;
+    /**
+     * 覆寫「編輯基本資料」按鈕行為：提供時點擊不進入內聯編輯，改執行此回呼
+     * （#34 詳情中樞用於導向獨立 BasicInfoEditor edit-v2，含年號轉換）。
+     */
+    onEditClick?: () => void;
 }
 
 interface Section {
@@ -57,6 +73,27 @@ const hiddenFields: Record<string, string[]> = {
     nianhao: ['c_firstyear', 'c_lastyear'],
 };
 
+// 逐欄位說明文字（help/hint），對齊舊 basicinformation/edit.blade.php 的 __('biogmains.*')：
+//   - 合併生成的顯示用姓名欄（name_auto_hint / pinyin_auto_hint / foreign_full_auto_hint / rm_auto_hint）
+//   - 算法定期計算的指數欄（auto_calc_hint）
+//   - 生卒年農曆月/日輸入範圍（month_range_hint / day_range_hint）
+// 字串照抄 resources/lang/zh-TW/biogmains.php；與本元件既有硬編碼 zh-TW 一致（i18n 待後續統一）。
+const FIELD_HINTS: Record<string, string> = {
+    c_name_chn: '此欄位由「姓」和「名」自動合併生成，無需手動填寫',
+    c_name: '此欄位由「Xing」和「Ming」自動合併生成，無需手動填寫',
+    c_name_proper: '此欄位由「外文名」和「外文姓」自動合併生成（名+姓順序），無需手動填寫',
+    c_name_rm: '此欄位由「外文羅馬字轉寫姓」和「外文羅馬字轉寫名」自動合併生成，無需手動填寫',
+    c_index_year: '此欄位由算法定期自動計算生成，無需手動填寫',
+    c_index_year_type_code: '此欄位由算法定期自動計算生成，無需手動填寫',
+    c_index_year_source_id: '此欄位由算法定期自動計算生成，無需手動填寫',
+    c_index_addr_id: '此欄位由算法定期自動計算生成，無需手動填寫',
+    c_index_addr_type_code: '此欄位由算法定期自動計算生成，無需手動填寫',
+    c_by_month: '請輸入 1-12 或留空',
+    c_by_day: '請輸入 1-30 或留空',
+    c_dy_month: '請輸入 1-12 或留空',
+    c_dy_day: '請輸入 1-30 或留空',
+};
+
 export default function BasicInfoView({
     sections,
     form,
@@ -64,14 +101,17 @@ export default function BasicInfoView({
     mutateEndpoint,
     pinyinEndpoint,
     canEdit = false,
+    startEditing = false,
+    hideDelete = false,
     onSaved,
     onEditorStateChange,
     onRegisterSaveHandler,
+    onEditClick,
 }: Props) {
     const t = useTranslation('person');
     const tCommon = useTranslation('common');
     const panelRef = useRef<HTMLDivElement | null>(null);
-    const [editing, setEditing] = useState(false);
+    const [editing, setEditing] = useState<boolean>(Boolean(startEditing && canEdit));
     const [formState, setFormState] = useState<FormState>({});
     const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
     const [message, setMessage] = useState<string | null>(null);
@@ -94,12 +134,12 @@ export default function BasicInfoView({
     }, [form]);
 
     useEffect(() => {
-        setEditing(false);
+        setEditing(Boolean(startEditing && canEdit));
         setFormState(initialState);
         setFieldErrors({});
         setMessage(null);
         setError(null);
-    }, [initialState, personId]);
+    }, [initialState, personId, startEditing, canEdit]);
 
     useEffect(() => {
         if (!editing || !form) {
@@ -273,7 +313,7 @@ export default function BasicInfoView({
                     <div style={toolbarButtonGroupStyle}>
                         {!editing && canEdit ? (
                             <>
-                                <button type="button" style={primaryButtonStyle} onClick={beginEdit}>
+                                <button type="button" style={primaryButtonStyle} onClick={onEditClick ?? beginEdit}>
                                     {t('edit_basic_info')}
                                 </button>
                                 <form ref={deleteFormRef} method="POST" action={`/basicinformation/${personId}`} style={{ display: 'none' }}>
@@ -328,7 +368,7 @@ export default function BasicInfoView({
                             {renderReadOnlySection(section, undefined, editableKeys)}
                         </div>
                     ))}
-                    {!editing && canEdit ? (
+                    {!editing && canEdit && !hideDelete ? (
                         <div style={dangerActionWrapStyle}>
                             <button type="button" style={dangerButtonStyle} onClick={handleDelete}>
                                 {t('delete_person')}
@@ -580,6 +620,8 @@ function renderEditor(
 
             <div style={sectionWithDividerStyle}>
                 <SectionHeading title={t ? t('create_or_modify') : '建立 / 修改資訊'} />
+                {/* 對齊舊頁 audit_display_hint：此區塊為顯示用、不提交（§0.2 不可遺漏舊頁說明文字）。 */}
+                <small style={fieldHintStyle} className="text-muted">此為顯示用資訊，不會包含在表單提交中</small>
                 <div style={editorCompactGridStyle}>
                     {[
                         'c_created_by',
@@ -719,6 +761,8 @@ function EditorField({
         return null;
     }
 
+    const hint = FIELD_HINTS[field.key];
+
     if (!field.editable) {
         return (
             <ReadOnlyField
@@ -727,6 +771,7 @@ function EditorField({
                 fullWidth={fullWidth}
                 derived
                 dirty={dirty}
+                hint={hint}
             />
         );
     }
@@ -740,6 +785,7 @@ function EditorField({
         >
             <div style={{ ...fieldLabelStyle, ...(dirty ? dirtyFieldLabelStyle : {}) }}>{field.label}</div>
             {renderInputControl(field, value, onChange, dirty)}
+            {hint ? <small style={fieldHintStyle} className="text-muted">{hint}</small> : null}
             {error && error.length > 0 ? <div style={fieldErrorStyle}>{error[0]}</div> : null}
         </div>
     );
@@ -1186,6 +1232,8 @@ function renderAuditSection(section: Section) {
     return (
         <>
             <SectionHeading title={section.title} />
+            {/* 對齊舊頁 audit_display_hint：此區塊為顯示用、不提交（§0.2 不可遺漏舊頁說明文字）。 */}
+            <small style={fieldHintStyle} className="text-muted">此為顯示用資訊，不會包含在表單提交中</small>
             <div style={compactGridStyle}>
                 <ReadOnlyField label="Created By (c_created_by)" value={fields['Created By']} />
                 <ReadOnlyField label="Created Date (c_created_date)" value={fields['Created Date']} />
@@ -1254,6 +1302,7 @@ function ReadOnlyField({
     emphasis = false,
     derived = false,
     dirty = false,
+    hint,
     onClickEdit,
 }: {
     label: string;
@@ -1264,6 +1313,7 @@ function ReadOnlyField({
     emphasis?: boolean;
     derived?: boolean;
     dirty?: boolean;
+    hint?: string;
     onClickEdit?: () => void;
 }) {
     return (
@@ -1291,6 +1341,7 @@ function ReadOnlyField({
             >
                 {displayValue(value)}
             </div>
+            {hint ? <small style={fieldHintStyle} className="text-muted">{hint}</small> : null}
         </div>
     );
 }
@@ -1977,6 +2028,16 @@ const fieldErrorStyle: React.CSSProperties = {
     marginTop: 6,
     fontSize: '0.77rem',
     color: '#b23a3a',
+};
+
+// 逐欄位說明文字（對齊舊頁 <small class="text-muted">）；用 <small> 標籤確保被擷取工具的 hints 選擇器涵蓋。
+const fieldHintStyle: React.CSSProperties = {
+    display: 'block',
+    marginTop: 6,
+    fontSize: '0.77rem',
+    color: '#6c757d',
+    lineHeight: 1.5,
+    whiteSpace: 'normal',
 };
 
 const mutedValueBoxStyle: React.CSSProperties = {

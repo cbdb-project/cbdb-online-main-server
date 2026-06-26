@@ -1,11 +1,20 @@
 # 以 React + Inertia 重寫全站 AdminLTE 頁面：遷移計畫
 
-> 狀態：**規劃草案（待人工審核）**　·　方向：**漸進式 strangler，逐頁取代，非一次性重寫**
+> 狀態：**Phase 0–6 全部完成並已翻 flag 上線（2026-06-26）**　·　方向：**漸進式 strangler，逐頁取代，非一次性重寫**
 > 本文件只描述「做什麼、為何、依何順序」，不含實作程式碼。每個階段落地時請遵循專案的「小環節 → review → codex → 推進」節奏。
 
+> ✅ **2026-06-26 上線里程碑**：全站可遷移頁面 feature flag 已全翻 `new`（使用者人工逐頁驗收通過），React/Inertia 為線上預設。**剩餘人類待辦**：Phase 7（AdminLTE/Blade 實體下架——目前舊視圖/路由仍保留供回退）、P6-C1/C2 死碼清理。舊版「下線」指下線為線上預設、未實體刪除。
+
 > 📍 **狀態與接手指引（活頁，每次迭代更新）** —— 接手的 AI 從這裡開始：
-> - **目前進度**：尚未開工（文件規劃中）。完整頁面狀態見 [REACT_MIGRATION_BACKLOG.md](./REACT_MIGRATION_BACKLOG.md)。
-> - **下一步**：完成全域前置 F1–F6（Phase 0 地基）→ 實作參考頁 `admin/audit-logs` → 才可交接 24/7 自走。
+> - **目前進度**：**Phase 0（F1–F6）、Phase 1（P1-1…P1-6）、Phase 2（P2-1…P2-5）全部完成**；Phase 3 **P3-1 完成、P3-2 blocked**（需人決策）；**Phase 5 全部可遷移頁完成（P5-1…P5-11，P5-12 排除）**。全部 commit 於 `feat/phase0-f1-tailwind-tokens`，逐項過 review agent + codex gate（按：當時 flag 預設 old；**已於 2026-06-26 全翻 new 上線**，見頂部里程碑）。write-path（codes/manage 的 store/update/destroy/proposal，operations restore/proposal、crowdsourcing confirm/reject、wiki/table-maintenance rebuild/import、unidirectional repair）一律未改或採 perform*/listRouteName 單一來源抽取，舊 Blade byte-equivalent。全測試 1533 綠。
+> - **人類關卡（agent 不可跨越）**：① ~~**F7**~~ **done（2026-06-22）**；② ~~**P3-2**~~ **done（2026-06-22，P4-0-B 建獨立 BasicInformation/Show React 頁取代 editor-readonly；使用者選「另做獨立編輯頁」）**。
+> - **Phase 4 現況（2026-06-22 完整完成、全套 1729 綠；flag 當時 old，已於 2026-06-26 翻 new 上線）**：
+>   - **P4-1…P4-12**：12 個複合主鍵子資源 React 編輯器（PersonBrowser 分頁內 create/edit/delete，走 API v2）。
+>   - **P4-0**：人物主檔獨立 React 編輯頁（Edit/Show/Create + appEdit/appCreate/appShow 路由 + BiogMainCreate/DeleteHandler 軟刪除），解 P3-2。
+>   - **P4-P**：提案流程補齊——後端 proposal DELETE（提交+審核，含 offices/possession 副表）、offices/possession proposal CREATE、12 編輯器加提案模式 UI（眾包 mode:proposal；後端 authorizeDirect/authorizeProposal 強制無權限升級）。
+>   - 期間 codex/review 抓出並修多個既有 latent 生產 bug：EVENTS/ENTRY/POSSESSION/BIOG_INST handler allowedFields 假欄名（正式庫會 Unknown column）、offices/entries 隱藏 PK 編輯漂移、assoc 哨兵 update 漂移、possession surrogate id 併發競態與單位 clobber。
+> - **下一步（剩餘）**：~~各頁 flag 待切換~~ **已於 2026-06-26 全翻 new 上線（使用者逐頁驗收通過）**；~~Phase 6 決策~~ **已完成（認證頁/入口 React 化）**；剩死碼清理（P6-C1/C2）／ view Blade 實體退役 ／ Phase 7 下架 AdminLTE 為 **agent 禁止項（必由人）**。
+> - **執行順序**：F1→F4→F5→F2→F3→F6（依賴調整，見附錄 D.1）。
 > - **最近心得/坑**：見附錄 D。
 > - **執行規則**：見附錄 C（自主執行協定）。
 
@@ -313,11 +322,30 @@
 | 日期 | 變更 | 原因 | 核可人 |
 |---|---|---|---|
 | （示例）2026-06-18 | UI 元件庫鎖定 Tailwind+shadcn | 保真度原則：需可完全掌控視覺 | 使用者 |
+| 2026-06-18 | Phase 0 執行順序調整為 F1→F4→F5→F2→F3→F6（非表序 F1..F6） | 依賴：F2(AppShell 側邊欄) 消費 F4(roles) 與 F5(nav schema)，故後端基礎先行 | 使用者（/goal 授權自走） |
+| 2026-06-18 | F5「導覽單一來源」採「真正單一來源」：Blade sidebar 與 React 共用 App\Support\Navigation；Blade 改以遞迴 partial 渲染 schema | 降低雙殼期側邊欄漂移（§五緩解）；active-state 仍沿用既有 $page_title 字串以相容未遷移頁面，僅 React 端改用 route pattern | 使用者（/goal 授權自走） |
+| 2026-06-18 | F2：正式殼建為**新元件 DashboardLayout**，不改既有精簡 AppShell（5 個已上線頁續用） | 避免對線上工具造成非預期版面變動；新遷移頁改用 DashboardLayout，舊頁日後折入 | 使用者（/goal 授權自走） |
+| 2026-06-18 | nav 的 label 由 Navigation 於後端以 __() 解析為顯示字串（Blade 與 React 直接輸出，不再前端翻譯） | codes/views/admin 翻譯群組未在 shared translations；伺服器解析最簡且 locale 正確（切換為伺服器往返） | 使用者（/goal 授權自走） |
+| 2026-06-18 | React 側邊欄 active 改以 **href 路徑比對**（精確+祖先前綴），非 route 名稱 glob | React 無 Laravel route 名稱對照表，無法評估 active.patterns；patterns 仍供 Blade routeIs 使用 | 使用者（/goal 授權自走） |
+| 2026-06-18 | F6：assertInertia 範式沿用既有（已 5 檔使用）；新增 share() 契約測試守護 roles/can/flash/nav/shell。**Playwright E2E 延後**至 Phase 3/4（首個複雜互動流＝人物編輯器）再導入 | Phase 0–2 為唯讀/簡單 CRUD，後端 assertInertia + parity review 已足；先不增 E2E 基礎設施負擔 | 使用者（/goal 授權自走） |
+| 2026-06-18 | P5-12 maps/index 列為 shell 遷移範圍外 | 獨立全螢幕 Leaflet 地圖應用（自有 entry），非 AdminLTE dashboard 頁；包進 DashboardLayout 破壞 UX。已在 /app/maps、superadmin。 | 使用者（/goal 授權自走） |
+| 2026-06-19 | **撤回 D.1（F2）「5 個已上線頁續用精簡 AppShell」之決策**：PersonBrowser / QueryPlayground / SearchByEntry / ViewTables(List+Show) 改套 DashboardLayout（帶側邊欄），與遷移頁一致。DashboardLayout 新增 `disableContentPadding` prop（預設 off，遷移頁不受影響），舊工具沿用自身內距、不雙重 padding；不傳 title 故無雙標頭。AppShell.tsx 已刪除（語言切換／dirty-guard 行為由 Navbar 提供）。PersonBrowser 工作台高度由 `calc(100vh-100px)` 調為 `calc(100vh-106px)`，對齊新 chrome（Navbar 57px + 頁尾 49px）。 | 使用者明確要求「現在做」 | 使用者 |
+| 2026-06-22 | **F7 範圍重新定義 + 收斂方向定案**：F7 以 **API v2 mutate 為新寫入層單一通道**，12 子資源 C/U/D + NULL-PK-段測試齊備即可翻 done；create 一律走 **API v2 create handler（選項 A）**，不新增 web `storeQuery`；舊 Blade 4 表單（texts/addresses/altname/entries）於對應 React 頁完成後再下線（不阻 F7）。工作分解（W1–W5）見 backlog「F7 收斂工作分解」。**背景**：2026-06-22 調查發現路由層已 100% 收斂、update 主流程齊，但 create 未進 query 模式、create/delete + NULL 測試只覆蓋 4/12（altname/address/entry/status，#942）。設計文件附錄 C/D 所列資料完整性地雷（ALTNAME 3-key、EVENTS 無主鍵、c_pages 含 `-`）均已於先前 commit 解決，附錄未同步。 | 使用者 |
+| 2026-06-18 | **P3-2 標 blocked，待人決策**：`basicinformation/show` 路由實際 render `edit.blade.php`（533 行編輯器）的 readonly 模式；`show.blade.php`（唯一 layouts.app 使用者）為孤兒死碼（無 controller render）。忠實復刻 P3-2 = 建 Phase 4 編輯器的唯讀 React 版（受 F7 硬前置）。**需人類拍板**：(A) 等 F7／Phase 4 一併做編輯器唯讀版；或 (B) 核可以 PersonBrowser 風格的解耦唯讀視圖「合理化」取代（plan §四 Phase 3 建議方向），並確認 show.blade.php 可刪。 | 待人類 | — |
 
 ### D.2 經驗與踩坑（每頁完成後沉澱可複用心得）
 | 日期 | 頁面/範圍 | 坑 / 心得 | 後續頁如何套用 |
 |---|---|---|---|
-| （尚無，待第一頁實作後填入） | | | |
+| 2026-06-22 | **feature-flag 機制（全站）** | **重大既有 bug**：`migration_flag($page)` 用 `config("migration_flags.pages.$page")`，Laravel `config()` 把點號當巢狀路徑 → **讀不到 config 檔字面含點號的 key**（auth.login、admin.audit-logs、basicinformation.* 等）→ 永遠回退 'old'。後果：**所有含點號 flag 從未真正生效**（含先前 session 在 .env 設 new 的 basicinformation.index/admin.*/nl-query-logs，一直跑舊 Blade；只有無點號 codes/dashboard/manage 真上線）。修法：config `pages` 含點號 key 改**巢狀陣列**（env() 對應原樣搬位置），helper 不改。flag 修好後 BasicInformationController 4 處呼叫新路由 app.basicinformation.edit/.show 用錯參數名 `['basicinformation'=>]`（路由是 `{id}`）立即拋 UrlGenerationException（先前被 flag bug 掩蓋）→ 已改 `['id'=>]`。 | 新增 flag 一律用無點號或確認巢狀；含點號 flag 上線前務必 `migration_flag('x.y')` 實證；翻 flag 後要實際走一次新路由（flag bug 會掩蓋路由/render 錯誤） |
+| 2026-06-22 | F7 write-path（API v2 mutate） | **兩條 mutation 通道並存**：web `.query` 路由與 API v2 mutate（`/api/v2/{create,mutate,delete}`，`app/Services/Mutations/*`）。F7 收斂以 API v2 為單一新寫入通道。create/delete handler 多數只需繼承 `AbstractPersonSubresource{Create,Delete}Handler` 宣告 metadata；但 **surrogate-id + 副表資源（possession/offices）須委派既有 repository**（`possessionStoreById`/`officeStoreById`/`possessionDeleteById`/`officeDeleteById`），並先白名單化 changes、檢查存在性+person 歸屬。proposal 模式對這兩者回 501（與既有 v2 proposal delete 一致）。 | Phase 4 React 編輯表單一律呼叫 API v2 mutate；新增/刪除走 create/delete 端點，主鍵走結構化 `target.pk` |
+| 2026-06-22 | F7 / 複合主鍵邊界 | **空字串 PK 不會寫壞資料**：`ConvertEmptyStringsToNull` global middleware 把 JSON 的 `''`→`null`，`validateOrFail` 再以 4xx 擋下必填 null 段。真正可空段只有 `BIOG_SOURCE_DATA.c_pages`（canonical `''`）——delete 須 `normalizeTargetPk` 把 null→'' 才能刪到 create 寫入的 `''`（round-trip）。assoc 的「未知」PK 用哨兵（`[n/a]`/`-9999`/`0`，`emptyToSentinel`）。 | 任何複合主鍵 mutation：PK 哨兵/canonical 形式 create 與 delete 必須一致；勿假設空段為 null |
+| 2026-06-22 | possession 併發 | `possessionStoreById` 原在交易**外** `max+1` 配發 surrogate id（併發會重複 PK）；已改為交易內 `lockForUpdate()->orderByDesc()->value()+1`（與 `officeStoreById` 一致）。 | 任何 max+1 surrogate id 配發都必須在交易內 + lockForUpdate |
+| 2026-06-18 | Phase 5 共用 | **重列表頁配方**：把 index() 的每列資料建構抽成 `buildXxxListing()`，Blade index() 與新 appIndex() 共用，appIndex 再以 `serializeXxxRow()` 攤平。Blade 保持 byte-equivalent，靠既有 Blade 回歸測試把關。 | 任何含複雜每列 @php 計算的列表頁皆套此模式 |
+| 2026-06-18 | operations (P5-1) | Blade 視圖內 `@include('biogmains.defense')` 才定義的全域 helper（`unionPKDef*`）控制器用不到 → 移到自動載入的 `app/helpers.php`（function_exists 守衛，函式體逐字相同），defense.blade 重複定義自動略過。 | 控制器需用 Blade-only 全域函式時，集中到 app/helpers.php 而非重寫 |
+| 2026-06-18 | 寫入/敏感端點 | restore/approve/reject/confirm/reject/rebuild/import 等寫入端點**完全不改**：React 以 `router.post`/`router.delete`（Inertia 重導）或 `fetch`+`X-XSRF-TOKEN`（回 JSON 的端點）呼叫既有路由。`redirect()->back()` 會回到 app 頁 referer → 同 shell 不跳出。 | 所有含寫入動作的頁沿用；JSON 端點用 fetch + XSRF cookie 範式（同 Profile/TokenManager） |
+| 2026-06-18 | wiki/table maintenance (P5-9/10) | **非同步輪詢**：fetch POST → task_id → `setInterval` 每 2–5 秒 poll progress 端點 → 進度條；completed/error/cancelled 時 `clearInterval` 並 alert，完成用 `router.reload()` 更新統計。務必在所有終止/錯誤分支清理 interval（用 `stopPoll()`/`reset()`）。 | 其餘輪詢頁沿用；interval 清理是必檢項 |
+| 2026-06-18 | 序列化保真 | 連結/URL 組裝（如 wiki 條目 link 的 CJK `rawurlencode`、resource 編輯連結）一律在 PHP appIndex 端算好再傳，避免 JS 端重算與 Blade 不一致；測試斷言編碼後字串。 | 任何含伺服器端 URL 組裝的頁，序列化時就算好 |
+| 2026-06-18 | Navigation flag-aware | `self::url(flag, oldRoute, newRoute)` 需帶 query 參數時（如 operations proposals_only=1）擴充第 4 參數 `$params`；兩個指向同路由不同參數的節點共用同一 flag。 | nav 帶參數的 flag-aware 節點沿用 |
 
 ---
 

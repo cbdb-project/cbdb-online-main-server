@@ -207,15 +207,20 @@ class EventStatusRepository {
         $ori = $oriQuery->first();
 
         // 使用原始值刪除舊地址，再用新值插入新地址
-        // 這樣即使用戶修改了 c_sequence 或 c_event_code，也不會留下孤兒記錄
-        $this->updateAddrEvent(
-            $data['c_addr_id'],
-            $id,
-            $ori->c_sequence,
-            $ori->c_event_code,
-            $data['c_sequence'],
-            $data['c_event_code']
-        );
+        // 這樣即使用戶修改了 c_sequence 或 c_event_code，也不會留下孤兒記錄。
+        // 僅當 c_addr_id 為陣列（legacy 表單一律送、v2 proposal 帶 aux 時）才同步；
+        // 否則（v2 proposal 未帶地址 aux，$data['c_addr_id'] 為 EVENTS_DATA 純量/null）不動既有地址，
+        // 避免 TypeError 與誤刪 EVENTS_ADDR。
+        if (is_array($data['c_addr_id'] ?? null)) {
+            $this->updateAddrEvent(
+                $data['c_addr_id'],
+                $id,
+                $ori->c_sequence,
+                $ori->c_event_code,
+                $data['c_sequence'],
+                $data['c_event_code']
+            );
+        }
 
         $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_addr_id']);
         $data['c_intercalary'] = (int)($data['c_intercalary']);
@@ -258,7 +263,10 @@ class EventStatusRepository {
         if (!isset($data['c_sequence']) || $data['c_sequence'] === '' || $data['c_sequence'] === null) {
             $data['c_sequence'] = 0;
         }
-        $this->insertAddrEvent($data['c_addr_id'], $id, $data['c_sequence'], $data['c_event_code']);
+        // 僅當 c_addr_id 為陣列才寫 EVENTS_ADDR（同 update：v2 proposal 未帶地址 aux 時為純量，跳過）。
+        if (is_array($data['c_addr_id'] ?? null)) {
+            $this->insertAddrEvent($data['c_addr_id'], $id, $data['c_sequence'], $data['c_event_code']);
+        }
         $data = Arr::except($data, ['_token', 'action', '__proposal_comment', 'c_addr_id']);
         $data['c_intercalary'] = (int)($data['c_intercalary']);
         $data = (new ToolsRepository())->timestamp($data, true);
@@ -348,6 +356,15 @@ class EventStatusRepository {
         }
 
         return $originalText." ".$add;
+    }
+
+    /**
+     * 公開包裝：v2 EventCreate/MutationHandler 於同交易內同步 EVENTS_ADDR 副表。
+     * 以「舊」(sequence,event_code) 刪除既有列、以「新」重插（對齊 legacy updateAddrEvent；
+     * create 時 old==new）。-999→0 由底層處理。
+     */
+    public function syncEventAddresses(array $c_addr_id, $c_personid, $old_sequence, $old_event_code, $new_sequence, $new_event_code): void {
+        $this->updateAddrEvent($c_addr_id, $c_personid, $old_sequence, $old_event_code, $new_sequence, $new_event_code);
     }
 
     protected function insertAddrEvent(array $c_addr_id, $c_personid, $c_sequence, $c_event_code) {

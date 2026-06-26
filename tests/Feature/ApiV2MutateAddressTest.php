@@ -112,14 +112,21 @@ class ApiV2MutateAddressTest extends TestCase {
             $table->text('c_notes')->nullable();
             $table->integer('c_source')->default(0);
             $table->string('c_pages', 255)->nullable();
+            $table->integer('c_natal')->nullable();
             $table->integer('c_fy_nh_code')->nullable();
             $table->integer('c_fy_nh_year')->nullable();
             $table->integer('c_fy_range')->nullable();
             $table->integer('c_fy_intercalary')->default(0);
+            $table->integer('c_fy_month')->nullable();
+            $table->integer('c_fy_day')->nullable();
+            $table->integer('c_fy_day_gz')->nullable();
             $table->integer('c_ly_nh_code')->nullable();
             $table->integer('c_ly_nh_year')->nullable();
             $table->integer('c_ly_range')->nullable();
             $table->integer('c_ly_intercalary')->default(0);
+            $table->integer('c_ly_month')->nullable();
+            $table->integer('c_ly_day')->nullable();
+            $table->integer('c_ly_day_gz')->nullable();
             $table->string('c_created_by', 255)->nullable();
             $table->string('c_created_date', 255)->nullable();
             $table->string('c_modified_by', 255)->nullable();
@@ -208,6 +215,75 @@ class ApiV2MutateAddressTest extends TestCase {
             'c_personid' => 1000,
             'c_firstyear' => 1060,
             'c_notes' => '測試備註',
+        ]);
+    }
+
+    #[Test]
+    public function testDirectAddressUpdatePersistsNatalAndDoesNotNullOthers(): void {
+        // 回歸（Task 27）：補欄 c_natal（是否本貫）須能寫入；且只改單一欄位時，未送出的
+        // c_natal / c_firstyear 不可被清成 null —— 防護「保存即清空」資料流失 bug。
+        $user = $this->makeUser(email: 'addr-natal@example.com');
+        $this->actingAs($user);
+        // 注意：addressPayload 預設 changes 含 c_firstyear=1060（會被 array_replace_recursive 併入），
+        // 故 seed 與斷言一律用 1060；本測試重點是 c_natal 的寫入與「不送即不被清空」。
+        $this->seedAddress(['c_natal' => 1, 'c_firstyear' => 1060]);
+
+        // (a) 直接更新 c_natal 應成功寫入。
+        $this->postJson('/api/v2/mutate', $this->addressPayload([
+            'changes' => ['c_natal' => 0],
+        ]))->assertOk();
+        $this->assertDatabaseHas('BIOG_ADDR_DATA', [
+            'c_personid' => 1000, 'c_addr_id' => 100, 'c_addr_type' => 1, 'c_sequence' => 1,
+            'c_natal' => 0, 'c_firstyear' => 1060,
+        ]);
+
+        // (b) changes 不含 c_natal（僅改 c_notes）後，c_natal 仍保留、未被清空。
+        $this->postJson('/api/v2/mutate', $this->addressPayload([
+            'changes' => ['c_notes' => '只改備註'],
+        ]))->assertOk();
+        $this->assertDatabaseHas('BIOG_ADDR_DATA', [
+            'c_personid' => 1000, 'c_addr_id' => 100, 'c_addr_type' => 1, 'c_sequence' => 1,
+            'c_notes' => '只改備註', 'c_natal' => 0, 'c_firstyear' => 1060,
+        ]);
+    }
+
+    #[Test]
+    public function testDirectAddressUpdatePersistsLunarFields(): void {
+        // 回歸（人物編輯重做）：地址編輯器 EraTimeField showLunar 會送出農曆月/日/干支
+        // （c_fy_month/c_fy_day/c_fy_day_gz、c_ly_*）；這些欄位須在 allowlist 內，否則整筆保存 422。
+        $user = $this->makeUser(email: 'addr-lunar@example.com');
+        $this->actingAs($user);
+        $this->seedAddress();
+
+        $this->postJson('/api/v2/mutate', $this->addressPayload([
+            'changes' => [
+                'c_fy_month' => 3, 'c_fy_day' => 15, 'c_fy_day_gz' => 12,
+                'c_ly_month' => 8, 'c_ly_day' => 20, 'c_ly_day_gz' => 30,
+            ],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('BIOG_ADDR_DATA', [
+            'c_personid' => 1000, 'c_addr_id' => 100, 'c_addr_type' => 1, 'c_sequence' => 1,
+            'c_fy_month' => 3, 'c_fy_day' => 15, 'c_fy_day_gz' => 12,
+            'c_ly_month' => 8, 'c_ly_day' => 20, 'c_ly_day_gz' => 30,
+        ]);
+    }
+
+    #[Test]
+    public function testDirectAddressUpdateClearingSourceNormalizesToSentinelZero(): void {
+        // 回歸（人物編輯重做）：清空出處（c_source）時前端送 null，後端須對齊 legacy emptyToSentinel
+        // 正規化為 0（Unknown），不可寫成 NULL（legacy 哨兵 0=Unknown，空碼一律落 0；real DDL 雖 nullable）。
+        $user = $this->makeUser(email: 'addr-clearsource@example.com');
+        $this->actingAs($user);
+        $this->seedAddress(['c_source' => 10]);
+
+        $this->postJson('/api/v2/mutate', $this->addressPayload([
+            'changes' => ['c_source' => null],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('BIOG_ADDR_DATA', [
+            'c_personid' => 1000, 'c_addr_id' => 100, 'c_addr_type' => 1, 'c_sequence' => 1,
+            'c_source' => 0,
         ]);
     }
 
@@ -418,6 +494,32 @@ class ApiV2MutateAddressTest extends TestCase {
 
         $response = $this->postJson('/api/v2/mutate', $this->addressPayload());
         $response->assertStatus(403);
+    }
+
+    // ── #56 M 寫入等價（update 路徑，純單表；addresses 無鏡像/副表）──────
+
+    #[Test]
+    public function testAddressCodeFieldSentinelFullyIdempotent(): void {
+        // c_source（legacy 哨兵 0=Unknown）所有空表示 null/''/-999/'0'/0 → 0、合法值保留、來回不翻。≥10 案例。
+        // addresses 早已完全幂等（AddressMutationHandler 顯式 null/''→0）；本測試鎖住該行為。
+        $this->actingAs($this->makeUser(email: 'addr-sentinel@example.com'));
+        $T = 'BIOG_ADDR_DATA';
+        $f = 'c_source';
+        foreach ([null, '', -999, '0', 0] as $sent) {
+            DB::table($T)->delete();
+            $this->seedAddress([$f => 5, 'c_notes' => '初始']);
+            $this->postJson('/api/v2/mutate', $this->addressPayload(['changes' => [$f => $sent, 'c_notes' => '改'.var_export($sent, true)]]))->assertOk();
+            $this->assertSame(0, (int) DB::table($T)->value($f), $f.' 送 '.var_export($sent, true).' 應規範化為 0');
+            $this->assertNotNull(DB::table($T)->value($f), $f.' 不得為 null');
+        }
+        DB::table($T)->delete();
+        $this->seedAddress([$f => 1, 'c_notes' => 'x']);
+        $this->postJson('/api/v2/mutate', $this->addressPayload(['changes' => [$f => 7, 'c_notes' => '合法值']]))->assertOk();
+        $this->assertSame(7, (int) DB::table($T)->value($f), '合法非 0 值不得被誤清');
+        foreach ([null, '', -999, 0] as $i => $sent) {
+            $this->postJson('/api/v2/mutate', $this->addressPayload(['changes' => [$f => $sent, 'c_notes' => '再'.$i]]))->assertOk();
+            $this->assertSame(0, (int) DB::table($T)->value($f), '幂等重送仍為 0（第'.$i.'輪）');
+        }
     }
 
     #[Test]

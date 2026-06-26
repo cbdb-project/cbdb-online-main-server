@@ -29,9 +29,11 @@ class ApiV2MutatePostingTest extends TestCase {
         $this->createOperationsTable();
         $this->createAuditLogTable();
         $this->createPostingTable();
+        $this->createPostingAddrTable();
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('POSTED_TO_ADDR_DATA');
         Schema::dropIfExists('POSTED_TO_OFFICE_DATA');
         Schema::dropIfExists('audit_log');
         Schema::dropIfExists('operations');
@@ -116,15 +118,51 @@ class ApiV2MutatePostingTest extends TestCase {
             $table->integer('c_fy_nh_year')->nullable();
             $table->integer('c_fy_range')->nullable();
             $table->integer('c_fy_intercalary')->default(0);
+            $table->integer('c_fy_month')->nullable();
+            $table->integer('c_fy_day')->nullable();
+            $table->integer('c_fy_day_gz')->nullable();
             $table->integer('c_lastyear')->nullable();
             $table->integer('c_ly_nh_code')->nullable();
             $table->integer('c_ly_nh_year')->nullable();
             $table->integer('c_ly_range')->nullable();
             $table->integer('c_ly_intercalary')->default(0);
+            $table->integer('c_ly_month')->nullable();
+            $table->integer('c_ly_day')->nullable();
+            $table->integer('c_ly_day_gz')->nullable();
             $table->integer('c_appt_code')->default(0);
             $table->integer('c_assume_office_code')->nullable();
+            $table->integer('c_dy')->nullable();
+            $table->integer('c_inst_code')->default(0);
+            $table->integer('c_inst_name_code')->default(0);
+            $table->integer('c_office_category_id')->nullable();
+            $table->string('c_created_by', 255)->nullable();
+            $table->string('c_created_date', 255)->nullable();
+            $table->string('c_modified_by', 255)->nullable();
+            $table->string('c_modified_date', 255)->nullable();
             $table->primary(['c_office_id', 'c_posting_id']);
         });
+    }
+
+    protected function createPostingAddrTable(): void {
+        Schema::create('POSTED_TO_ADDR_DATA', function (Blueprint $table) {
+            $table->integer('c_personid')->default(0);
+            $table->integer('c_posting_id')->default(0);
+            $table->integer('c_office_id')->default(0);
+            $table->integer('c_addr_id')->default(0);
+            $table->string('c_created_by', 255)->nullable();
+            $table->string('c_created_date', 255)->nullable();
+            $table->string('c_modified_by', 255)->nullable();
+            $table->string('c_modified_date', 255)->nullable();
+        });
+    }
+
+    protected function seedAddr(int $addrId, array $overrides = []): void {
+        DB::table('POSTED_TO_ADDR_DATA')->insert(array_replace([
+            'c_personid' => 1000,
+            'c_posting_id' => 400,
+            'c_office_id' => 300,
+            'c_addr_id' => $addrId,
+        ], $overrides));
     }
 
     // ── Helpers ──────────────────────────────────────────────
@@ -202,6 +240,169 @@ class ApiV2MutatePostingTest extends TestCase {
             'c_posting_id' => 400,
             'c_notes' => '更新備註',
             'c_pages' => '10-20',
+        ]);
+    }
+
+    #[Test]
+    public function testDirectPostingUpdatePersistsLunarFields(): void {
+        // 回歸：legacy 表單（showLunar=true）會送出 c_fy_month/day/day_gz、c_ly_month/day/day_gz，
+        // officeStoreById/$request->all() 會寫入；v2 白名單原本漏掉這些農曆欄 → 靜默流失。
+        $user = $this->makeUser(email: 'posting-lunar@example.com');
+        $this->actingAs($user);
+        $this->seedPosting();
+
+        $this->postJson('/api/v2/mutate', $this->postingPayload([
+            'changes' => [
+                'c_fy_month' => 5, 'c_fy_day' => 12, 'c_fy_day_gz' => 7,
+                'c_ly_month' => 9, 'c_ly_day' => 30, 'c_ly_day_gz' => 21,
+            ],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('POSTED_TO_OFFICE_DATA', [
+            'c_office_id' => 300, 'c_posting_id' => 400,
+            'c_fy_month' => 5, 'c_fy_day' => 12, 'c_fy_day_gz' => 7,
+            'c_ly_month' => 9, 'c_ly_day' => 30, 'c_ly_day_gz' => 21,
+        ]);
+    }
+
+    // ── 地址副表同步（31b：v2 update 重用 officeUpdateById 抽出的 syncPostingAddresses）──
+
+    #[Test]
+    public function testPostingUpdateWithOfficeFieldAlsoSyncsAddress(): void {
+        $this->actingAs($this->makeUser(email: 'posting-addr1@example.com'));
+        $this->seedPosting();
+
+        // 同時改官名欄與地址：afterDirectUpdate 於同一交易內同步地址。
+        $this->postJson('/api/v2/mutate', $this->postingPayload([
+            'changes' => ['c_notes' => '改備註', 'c_addr' => [130, 131]],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('POSTED_TO_ADDR_DATA', ['c_posting_id' => 400, 'c_office_id' => 300, 'c_addr_id' => 130]);
+        $this->assertDatabaseHas('POSTED_TO_ADDR_DATA', ['c_posting_id' => 400, 'c_office_id' => 300, 'c_addr_id' => 131]);
+        $this->assertDatabaseHas('POSTED_TO_OFFICE_DATA', ['c_office_id' => 300, 'c_posting_id' => 400, 'c_notes' => '改備註']);
+    }
+
+    /** 純地址 payload（不經 postingPayload 的 array_replace_recursive，避免帶入預設 c_notes）。 */
+    protected function addressOnlyPayload(array $changes): array {
+        return [
+            'resource' => 'postings',
+            'person_id' => 1000,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_office_id' => 300, 'c_posting_id' => 400]],
+            'changes' => $changes,
+        ];
+    }
+
+    #[Test]
+    public function testPostingAddressOnlyUpdateAddsAndRemoves(): void {
+        $this->actingAs($this->makeUser(email: 'posting-addr2@example.com'));
+        $this->seedPosting();
+        $this->seedAddr(130);
+        $this->seedAddr(131);
+
+        // 僅送 c_addr（無官名欄變更）：走 handleAddressOnlyDirect。保留 130、移除 131、新增 140。
+        $this->postJson('/api/v2/mutate', $this->addressOnlyPayload(['c_addr' => [130, 140]]))
+            ->assertOk()->assertJson(['ok' => true, 'operation' => 'update']);
+
+        $this->assertDatabaseHas('POSTED_TO_ADDR_DATA', ['c_posting_id' => 400, 'c_addr_id' => 130]);
+        $this->assertDatabaseHas('POSTED_TO_ADDR_DATA', ['c_posting_id' => 400, 'c_addr_id' => 140]);
+        $this->assertDatabaseMissing('POSTED_TO_ADDR_DATA', ['c_posting_id' => 400, 'c_addr_id' => 131]);
+    }
+
+    #[Test]
+    public function testPostingAddressOnlyUpdateNoChangeReturns422(): void {
+        $this->actingAs($this->makeUser(email: 'posting-addr3@example.com'));
+        $this->seedPosting();
+        $this->seedAddr(130);
+
+        // 地址未變更 → 與父類 no_effective_changes 一致，回 422（不建立虛假 operation）。
+        $this->postJson('/api/v2/mutate', $this->addressOnlyPayload(['c_addr' => [130]]))
+            ->assertStatus(422)->assertJson(['ok' => false]);
+    }
+
+    #[Test]
+    public function testPostingUpdateClearsAddressesViaClearedFlag(): void {
+        $this->actingAs($this->makeUser(email: 'posting-addr4@example.com'));
+        $this->seedPosting();
+        $this->seedAddr(130);
+        $this->seedAddr(131);
+
+        // c_addr_cleared='1' 且未送 c_addr → 清空全部地址（incomingAddr = []）。
+        $this->postJson('/api/v2/mutate', $this->postingPayload([
+            'changes' => ['c_addr_cleared' => '1'],
+        ]))->assertOk();
+
+        $this->assertDatabaseMissing('POSTED_TO_ADDR_DATA', ['c_posting_id' => 400, 'c_addr_id' => 130]);
+        $this->assertDatabaseMissing('POSTED_TO_ADDR_DATA', ['c_posting_id' => 400, 'c_addr_id' => 131]);
+    }
+
+    #[Test]
+    public function testPostingUpdateOfficeIdChangeMigratesAddresses(): void {
+        // 關鍵對齊：改 c_office_id 時地址須遷移到新官職，不可流失（OfficeIdChangeAddressLoss 的 v2 版）。
+        $this->actingAs($this->makeUser(email: 'posting-addr5@example.com'));
+        $this->seedPosting();
+        $this->seedAddr(130);
+
+        $this->postJson('/api/v2/mutate', $this->postingPayload([
+            'changes' => ['c_office_id' => 301, 'c_addr' => [130]],
+        ]))->assertOk();
+
+        // 官名列主鍵改到 301；地址 130 遷移到 office 301（未流失）。
+        $this->assertDatabaseHas('POSTED_TO_OFFICE_DATA', ['c_office_id' => 301, 'c_posting_id' => 400]);
+        $this->assertDatabaseHas('POSTED_TO_ADDR_DATA', ['c_posting_id' => 400, 'c_office_id' => 301, 'c_addr_id' => 130]);
+        $this->assertDatabaseMissing('POSTED_TO_ADDR_DATA', ['c_posting_id' => 400, 'c_office_id' => 300, 'c_addr_id' => 130]);
+    }
+
+    #[Test]
+    public function testPostingProposalUpdateStoresAddressInAux(): void {
+        $this->actingAs($this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'posting-addr6@example.com'));
+        $this->seedPosting();
+
+        $this->postJson('/api/v2/mutate', $this->postingPayload([
+            'mode' => 'proposal',
+            'changes' => ['c_notes' => '提案備註', 'c_addr' => [130]],
+            'meta' => ['comment' => '請審'],
+        ]))->assertOk()->assertJson(['ok' => true, 'mode' => 'proposal']);
+
+        $op = DB::table('operations')->where('resource', 'POSTED_TO_OFFICE_DATA')
+            ->where('op_type', Operation::TYPE_PROPOSAL_UPDATE)->latest('id')->first();
+        $this->assertNotNull($op);
+        $data = json_decode($op->resource_data, true);
+        $this->assertSame([130], $data['__proposal_aux']['c_addr'] ?? null);
+        // 提案不應實際寫入地址列。
+        $this->assertDatabaseMissing('POSTED_TO_ADDR_DATA', ['c_posting_id' => 400, 'c_addr_id' => 130]);
+    }
+
+    #[Test]
+    public function testDirectPostingUpdatePersistsRestoredFieldsAndDoesNotNullOthers(): void {
+        // 回歸（Task 27）：補回的 c_assume_office_code/c_dy/c_inst_code/c_inst_name_code/c_office_category_id
+        // 須能寫入；且只改一個欄位時，未送出的補回欄不可被清空（防「保存即清空」資料流失）。
+        $user = $this->makeUser(email: 'posting-restored@example.com');
+        $this->actingAs($user);
+        $this->seedPosting([
+            'c_assume_office_code' => 1, 'c_dy' => 15, 'c_inst_code' => 12,
+            'c_inst_name_code' => 34, 'c_office_category_id' => 2,
+        ]);
+
+        // (a) 直接更新補回欄位應成功寫入。
+        $this->postJson('/api/v2/mutate', $this->postingPayload([
+            'changes' => ['c_dy' => 16, 'c_office_category_id' => 3],
+        ]))->assertOk();
+        $this->assertDatabaseHas('POSTED_TO_OFFICE_DATA', [
+            'c_office_id' => 300, 'c_posting_id' => 400,
+            'c_dy' => 16, 'c_office_category_id' => 3,
+            'c_assume_office_code' => 1, 'c_inst_code' => 12, 'c_inst_name_code' => 34,
+        ]);
+
+        // (b) 只改 c_notes（不送補回欄）後，補回欄仍保留、未被清空。
+        $this->postJson('/api/v2/mutate', $this->postingPayload([
+            'changes' => ['c_notes' => '只改備註'],
+        ]))->assertOk();
+        $this->assertDatabaseHas('POSTED_TO_OFFICE_DATA', [
+            'c_office_id' => 300, 'c_posting_id' => 400, 'c_notes' => '只改備註',
+            'c_assume_office_code' => 1, 'c_dy' => 16, 'c_inst_code' => 12,
+            'c_inst_name_code' => 34, 'c_office_category_id' => 3,
         ]);
     }
 
@@ -408,6 +609,30 @@ class ApiV2MutatePostingTest extends TestCase {
 
         $response = $this->postJson('/api/v2/mutate', $this->postingPayload());
         $response->assertStatus(403);
+    }
+
+    #[Test]
+    public function testPostingCodeFieldSentinelFullyIdempotent(): void {
+        // c_source（legacy 哨兵 0=Unknown）所有空表示 null/''/-999/'0'/0 → 0、合法值保留、來回不翻。≥10 案例。
+        // （c_appt_code 早已是完全幂等範本；本測試補齊 c_source。）
+        $this->actingAs($this->makeUser(email: 'posting-sentinel@example.com'));
+        $T = 'POSTED_TO_OFFICE_DATA';
+        $f = 'c_source';
+        foreach ([null, '', -999, '0', 0] as $sent) {
+            DB::table($T)->delete();
+            $this->seedPosting([$f => 5, 'c_notes' => '初始']);
+            $this->postJson('/api/v2/mutate', $this->postingPayload(['changes' => [$f => $sent, 'c_notes' => '改'.var_export($sent, true)]]))->assertOk();
+            $this->assertSame(0, (int) DB::table($T)->value($f), $f.' 送 '.var_export($sent, true).' 應規範化為 0');
+            $this->assertNotNull(DB::table($T)->value($f), $f.' 不得為 null');
+        }
+        DB::table($T)->delete();
+        $this->seedPosting([$f => 1, 'c_notes' => 'x']);
+        $this->postJson('/api/v2/mutate', $this->postingPayload(['changes' => [$f => 7, 'c_notes' => '合法值']]))->assertOk();
+        $this->assertSame(7, (int) DB::table($T)->value($f), '合法非 0 值不得被誤清');
+        foreach ([null, '', -999, 0] as $i => $sent) {
+            $this->postJson('/api/v2/mutate', $this->postingPayload(['changes' => [$f => $sent, 'c_notes' => '再'.$i]]))->assertOk();
+            $this->assertSame(0, (int) DB::table($T)->value($f), '幂等重送仍為 0（第'.$i.'輪）');
+        }
     }
 
     #[Test]

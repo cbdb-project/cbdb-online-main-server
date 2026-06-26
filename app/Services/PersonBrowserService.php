@@ -26,7 +26,7 @@ class PersonBrowserService {
      * @return array{data: array, pagination: array}
      */
     public function search(Request $request): array {
-        $q = trim($request->input('q', ''));
+        $q = \App\Support\PinyinSearchNormalizer::umlautToV(trim($request->input('q', '')));
         $dynasty = $request->input('c_dy', '');
         $perPage = (int) $request->input('per_page', 20);
         $page = (int) $request->input('page', 1);
@@ -674,7 +674,10 @@ class PersonBrowserService {
                 'BIOG_ADDR_DATA.c_firstyear',
                 'BIOG_ADDR_DATA.c_lastyear',
                 'BIOG_ADDR_DATA.c_sequence',
+                'BIOG_ADDR_DATA.c_source',
+                'BIOG_ADDR_DATA.c_pages',
                 'BIOG_ADDR_DATA.c_notes',
+                'BIOG_ADDR_DATA.c_natal',
             ])
             ->leftJoin('ADDR_CODES AS AC', 'AC.c_addr_id', '=', 'BIOG_ADDR_DATA.c_addr_id')
             ->leftJoin('ADMIN_CAT_CODES AS ACC', 'ACC.c_admin_cat_code', '=', 'AC.c_admin_cat_code')
@@ -706,7 +709,10 @@ class PersonBrowserService {
                 'last_year' => $r->c_lastyear,
                 'longitude' => $r->x_coord,
                 'latitude' => $r->y_coord,
+                'source_id' => $r->c_source,
+                'pages' => $r->c_pages,
                 'notes' => $r->c_notes,
+                'natal' => $r->c_natal,
             ])->values()->all(),
         ];
     }
@@ -721,6 +727,9 @@ class PersonBrowserService {
                 'TEXT_ROLE_CODES.c_role_desc',
                 'BIOG_TEXT_DATA.c_textid',
                 'BIOG_TEXT_DATA.c_role_id',
+                'BIOG_TEXT_DATA.c_source',
+                'BIOG_TEXT_DATA.c_pages',
+                'BIOG_TEXT_DATA.c_notes',
             ])
             ->leftJoin('TEXT_CODES', 'TEXT_CODES.c_textid', '=', 'BIOG_TEXT_DATA.c_textid')
             ->leftJoin('TEXT_ROLE_CODES', 'TEXT_ROLE_CODES.c_role_id', '=', 'BIOG_TEXT_DATA.c_role_id')
@@ -742,6 +751,10 @@ class PersonBrowserService {
                 'role_id' => $r->c_role_id,
                 'role_chn' => $r->c_role_desc_chn,
                 'role' => $r->c_role_desc,
+                // P4-3 React 編輯器預填所需欄位（純 additive，唯讀顯示不變）。
+                'source_id' => $r->c_source,
+                'pages' => $r->c_pages,
+                'notes' => $r->c_notes,
             ])->values()->all(),
         ];
     }
@@ -794,6 +807,16 @@ class PersonBrowserService {
                 'ENTRY_DATA.c_assoc_id',
                 'ENTRY_DATA.c_inst_code',
                 'ENTRY_DATA.c_inst_name_code',
+                'ENTRY_DATA.c_source',
+                'ENTRY_DATA.c_pages',
+                'ENTRY_DATA.c_notes',
+                // Task 27 補回欄位（防編輯態清空：編輯器送這些欄，tab 必須返回）。
+                'ENTRY_DATA.c_exam_rank',
+                'ENTRY_DATA.c_attempt_count',
+                'ENTRY_DATA.c_exam_field',
+                'ENTRY_DATA.c_parental_status_code',
+                'ENTRY_DATA.c_age',
+                'ENTRY_DATA.c_posting_notes',
             ])
             ->leftJoin('ENTRY_CODES', 'ENTRY_CODES.c_entry_code', '=', 'ENTRY_DATA.c_entry_code')
             ->where('ENTRY_DATA.c_personid', $personId)
@@ -888,6 +911,16 @@ class PersonBrowserService {
                     'kin_summary' => $kinSummary,
                     'assoc_id' => $r->c_assoc_id,
                     'assoc_summary' => $assocSummary,
+                    'source_id' => $r->c_source,
+                    'pages' => $r->c_pages,
+                    'notes' => $r->c_notes,
+                    // Task 27 補回欄位
+                    'exam_rank' => $r->c_exam_rank,
+                    'attempt_count' => $r->c_attempt_count,
+                    'exam_field' => $r->c_exam_field,
+                    'parental_status' => $r->c_parental_status_code,
+                    'age' => $r->c_age,
+                    'posting_notes' => $r->c_posting_notes,
                 ];
             })->values()->all(),
         ];
@@ -906,6 +939,8 @@ class PersonBrowserService {
                 'EVENTS_DATA.c_source',
                 'EVENTS_DATA.c_pages',
                 'EVENTS_DATA.c_notes',
+                'EVENTS_DATA.c_event',
+                'EVENTS_DATA.c_role',
             ])
             ->leftJoin('EVENT_CODES', 'EVENT_CODES.c_event_code', '=', 'EVENTS_DATA.c_event_code')
             ->where('EVENTS_DATA.c_personid', $personId)
@@ -941,6 +976,8 @@ class PersonBrowserService {
                     'month' => $r->c_month,
                     'day' => $r->c_day,
                     'date_summary' => implode('', $dateParts) ?: null,
+                    'event_text' => $r->c_event ?? null,
+                    'role' => $r->c_role ?? null,
                     'source_id' => $r->c_source,
                     'pages' => $r->c_pages,
                     'notes' => $r->c_notes,
@@ -961,6 +998,7 @@ class PersonBrowserService {
                 'STATUS_DATA.c_source',
                 'STATUS_DATA.c_pages',
                 'STATUS_DATA.c_notes',
+                'STATUS_DATA.c_supplement',
             ])
             ->leftJoin('STATUS_CODES', 'STATUS_CODES.c_status_code', '=', 'STATUS_DATA.c_status_code')
             ->where('STATUS_DATA.c_personid', $personId)
@@ -983,6 +1021,7 @@ class PersonBrowserService {
                 'last_year' => $r->c_lastyear,
                 'source_id' => $r->c_source,
                 'pages' => $r->c_pages,
+                'supplement' => $r->c_supplement ?? null,
                 'notes' => $r->c_notes,
             ])->values()->all(),
         ];
@@ -993,6 +1032,7 @@ class PersonBrowserService {
             ->select([
                 'ASSOC_CODES.c_assoc_desc_chn',
                 'ASSOC_CODES.c_assoc_desc',
+                'ASSOC_DATA.c_sequence',
                 'ASSOC_DATA.c_assoc_code',
                 'ASSOC_DATA.c_assoc_id',
                 'ASSOC_DATA.c_kin_code',
@@ -1007,6 +1047,15 @@ class PersonBrowserService {
                 'ASSOC_DATA.c_source',
                 'ASSOC_DATA.c_pages',
                 'ASSOC_DATA.c_notes',
+                // Task 27：補回舊表單可錄入但 React 編輯器缺漏的欄位（編輯態預填 + 防保存清空）。
+                'ASSOC_DATA.c_topic_code',
+                'ASSOC_DATA.c_occasion_code',
+                'ASSOC_DATA.c_tertiary_personid',
+                'ASSOC_DATA.c_tertiary_type_notes',
+                'ASSOC_DATA.c_assoc_claimer_id',
+                'ASSOC_DATA.c_addr_id',
+                'ASSOC_DATA.c_inst_code',
+                'ASSOC_DATA.c_inst_name_code',
             ])
             ->leftJoin('ASSOC_CODES', 'ASSOC_CODES.c_assoc_code', '=', 'ASSOC_DATA.c_assoc_code')
             ->leftJoin('BIOG_MAIN AS BM', 'BM.c_personid', '=', 'ASSOC_DATA.c_assoc_id')
@@ -1028,6 +1077,7 @@ class PersonBrowserService {
                     'c_text_title' => $r->c_text_title,
                     'c_assoc_first_year' => $r->c_assoc_first_year,
                 ],
+                'sequence' => $r->c_sequence,
                 'assoc_code' => $r->c_assoc_code,
                 'assoc_desc_chn' => $r->c_assoc_desc_chn,
                 'assoc_desc' => $r->c_assoc_desc,
@@ -1039,6 +1089,14 @@ class PersonBrowserService {
                 'source_id' => $r->c_source,
                 'pages' => $r->c_pages,
                 'notes' => $r->c_notes,
+                'topic_code' => $r->c_topic_code,
+                'occasion_code' => $r->c_occasion_code,
+                'tertiary_personid' => $r->c_tertiary_personid,
+                'tertiary_type_notes' => $r->c_tertiary_type_notes,
+                'assoc_claimer_id' => $r->c_assoc_claimer_id,
+                'addr_id' => $r->c_addr_id,
+                'inst_code' => $r->c_inst_code,
+                'inst_name_code' => $r->c_inst_name_code,
             ])->values()->all(),
         ];
     }
@@ -1055,6 +1113,7 @@ class PersonBrowserService {
                 'KIN_DATA.c_source',
                 'KIN_DATA.c_pages',
                 'KIN_DATA.c_notes',
+                'KIN_DATA.c_autogen_notes',
             ])
             ->leftJoin('KINSHIP_CODES', 'KINSHIP_CODES.c_kincode', '=', 'KIN_DATA.c_kin_code')
             ->leftJoin('BIOG_MAIN AS BM', 'BM.c_personid', '=', 'KIN_DATA.c_kin_id')
@@ -1078,6 +1137,7 @@ class PersonBrowserService {
                 'source_id' => $r->c_source,
                 'pages' => $r->c_pages,
                 'notes' => $r->c_notes,
+                'autogen_notes' => $r->c_autogen_notes,
             ])->values()->all(),
         ];
     }
@@ -1087,18 +1147,24 @@ class PersonBrowserService {
             ->select([
                 'POSSESSION_ACT_CODES.c_possession_act_desc_chn',
                 'POSSESSION_ACT_CODES.c_possession_act_desc',
+                'POSSESSION_DATA.c_sequence',
                 'POSSESSION_DATA.c_possession_record_id',
                 'POSSESSION_DATA.c_possession_act_code',
                 'POSSESSION_DATA.c_possession_desc_chn',
                 'POSSESSION_DATA.c_possession_desc',
                 'POSSESSION_DATA.c_quantity',
+                'POSSESSION_DATA.c_measure_code',
                 'POSSESSION_DATA.c_possession_yr',
+                'POSSESSION_DATA.c_possession_nh_code',
+                'POSSESSION_DATA.c_possession_nh_yr',
+                'POSSESSION_DATA.c_possession_yr_range',
                 'POSSESSION_DATA.c_source',
                 'POSSESSION_DATA.c_pages',
                 'POSSESSION_DATA.c_notes',
             ])
             ->leftJoin('POSSESSION_ACT_CODES', 'POSSESSION_ACT_CODES.c_possession_act_code', '=', 'POSSESSION_DATA.c_possession_act_code')
             ->where('POSSESSION_DATA.c_personid', $personId)
+            ->orderBy('POSSESSION_DATA.c_sequence')
             ->get();
 
         return [
@@ -1107,13 +1173,19 @@ class PersonBrowserService {
                 'pk' => [
                     'c_possession_record_id' => $r->c_possession_record_id,
                 ],
+                'sequence' => $r->c_sequence,
                 'act_code' => $r->c_possession_act_code,
                 'act_chn' => $r->c_possession_act_desc_chn,
                 'act' => $r->c_possession_act_desc,
                 'desc_chn' => $r->c_possession_desc_chn,
                 'desc' => $r->c_possession_desc,
                 'quantity' => $r->c_quantity,
+                'measure_code' => $r->c_measure_code,
                 'year' => $r->c_possession_yr,
+                // 年號/時限（Task 27 補回；防清空關鍵腿：編輯態預填、保存不清空）。
+                'nh_code' => $r->c_possession_nh_code,
+                'nh_yr' => $r->c_possession_nh_yr,
+                'yr_range' => $r->c_possession_yr_range,
                 'source_id' => $r->c_source,
                 'pages' => $r->c_pages,
                 'notes' => $r->c_notes,
@@ -1131,6 +1203,14 @@ class PersonBrowserService {
                 'INST_NAMES.c_inst_name_hz',
                 'INST_NAMES.c_inst_name_py',
                 'BIOG_INST_DATA.c_inst_name_code',
+                'BIOG_INST_DATA.c_bi_begin_year',
+                'BIOG_INST_DATA.c_bi_by_nh_code',
+                'BIOG_INST_DATA.c_bi_by_nh_year',
+                'BIOG_INST_DATA.c_bi_by_range',
+                'BIOG_INST_DATA.c_bi_end_year',
+                'BIOG_INST_DATA.c_bi_ey_nh_code',
+                'BIOG_INST_DATA.c_bi_ey_nh_year',
+                'BIOG_INST_DATA.c_bi_ey_range',
                 'BIOG_INST_DATA.c_source',
                 'BIOG_INST_DATA.c_pages',
                 'BIOG_INST_DATA.c_notes',
@@ -1156,6 +1236,15 @@ class PersonBrowserService {
                 'inst_name_code' => $r->c_inst_name_code,
                 'inst_name_chn' => $r->c_inst_name_hz,
                 'inst_name' => $r->c_inst_name_py,
+                'first_year' => $r->c_bi_begin_year,
+                'last_year' => $r->c_bi_end_year,
+                // 始/終年的年號/時限（Task 27 補回；防清空關鍵腿）。
+                'by_nh_code' => $r->c_bi_by_nh_code,
+                'by_nh_year' => $r->c_bi_by_nh_year,
+                'by_range' => $r->c_bi_by_range,
+                'ey_nh_code' => $r->c_bi_ey_nh_code,
+                'ey_nh_year' => $r->c_bi_ey_nh_year,
+                'ey_range' => $r->c_bi_ey_range,
                 'source_id' => $r->c_source,
                 'pages' => $r->c_pages,
                 'notes' => $r->c_notes,
@@ -1177,8 +1266,18 @@ class PersonBrowserService {
                 'POSTED_TO_OFFICE_DATA.c_source',
                 'POSTED_TO_OFFICE_DATA.c_pages',
                 'POSTED_TO_OFFICE_DATA.c_notes',
+                'POSTED_TO_OFFICE_DATA.c_appt_code',
+                // Task 27 補回：就任/朝代/機構/官職類別（編輯態預填，避免保存清空）
+                'POSTED_TO_OFFICE_DATA.c_assume_office_code',
+                'POSTED_TO_OFFICE_DATA.c_dy',
+                'POSTED_TO_OFFICE_DATA.c_inst_code',
+                'POSTED_TO_OFFICE_DATA.c_inst_name_code',
+                'POSTED_TO_OFFICE_DATA.c_office_category_id',
+                'APPT.c_appt_desc_chn AS appt_chn',
+                'APPT.c_appt_desc AS appt_trans',
             ])
             ->leftJoin('OFFICE_CODES', 'OFFICE_CODES.c_office_id', '=', 'POSTED_TO_OFFICE_DATA.c_office_id')
+            ->leftJoin('APPOINTMENT_CODES AS APPT', 'APPT.c_appt_code', '=', 'POSTED_TO_OFFICE_DATA.c_appt_code')
             ->where('POSTED_TO_OFFICE_DATA.c_personid', $personId)
             ->orderBy('POSTED_TO_OFFICE_DATA.c_sequence')
             ->get();
@@ -1248,6 +1347,15 @@ class PersonBrowserService {
                     'source_id' => $r->c_source,
                     'pages' => $r->c_pages,
                     'notes' => $r->c_notes,
+                    'appt_code' => $r->c_appt_code,
+                    'appt_chn' => $r->appt_chn,
+                    'appt' => $r->appt_trans,
+                    // Task 27 補回欄位（編輯態預填）
+                    'assume_office_code' => $r->c_assume_office_code,
+                    'dy' => $r->c_dy,
+                    'inst_code' => $r->c_inst_code,
+                    'inst_name_code' => $r->c_inst_name_code,
+                    'office_category_id' => $r->c_office_category_id,
                 ];
             })->values()->all(),
         ];

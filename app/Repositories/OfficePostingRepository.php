@@ -126,230 +126,19 @@ class OfficePostingRepository {
                     ['c_posting_id', '=', $_postingid],
                 ])->update(['c_modified_by' => $c_created_by, 'c_modified_date' => $c_created_date]);
 
-            $addrBeforeAuditRows = [];
             if ($shouldUpdateAddress) {
-                $addrBeforeAuditRows = DB::table('POSTED_TO_ADDR_DATA')
-                    ->where('c_personid', $_id)
-                    ->where('c_posting_id', $_postingid)
-                    ->get();
-
-                $beforeRows = DB::table('POSTED_TO_ADDR_DATA')
-                    ->where('c_personid', $_id)
-                    ->where('c_posting_id', $_postingid)
-                    ->where('c_office_id', $previousOfficeId)
-                    ->get()
-                    ->map(function ($row) {
-                        return [
-                            'c_personid' => (int) $row->c_personid,
-                            'c_posting_id' => (int) $row->c_posting_id,
-                            'c_office_id' => (int) $row->c_office_id,
-                            'c_addr_id' => (int) $row->c_addr_id,
-                        ];
-                    })
-            ->all();
-
-                //dd($previousOfficeId, $currentOfficeId, $beforeRows);
-
-                // 先計算最終要保留的地址列表（用於衝突檢測和後續操作）
-                // - $incomingAddr === null: 保留現有地址（用戶沒有修改）
-                // - $incomingAddr 有值（包含空陣列）: 使用用戶指定的地址列表
-                // 將 -999 正規化為 0（-999 是表單中「未選擇」的 sentinel 值，0 代表「未詳」地址）
-                $sourceAddresses = $incomingAddr !== null ? $incomingAddr : $existingAddresses;
-                $addressesForInsert = array_map(function ($v) {
-                    $v = (int) $v;
-
-                    return $v === -999 ? 0 : $v;
-                }, $sourceAddresses);
-
-                // 當 c_office_id 改變時，將現有地址記錄遷移到新的 office_id
-                // 使用 UPDATE 而非 DELETE，避免地址記錄丟失
-                if ($previousOfficeId !== $currentOfficeId && !empty($beforeRows)) {
-                    // 檢查目標 office_id 下是否已存在「將保留的地址」記錄（主鍵衝突檢測）
-                    // POSTED_TO_ADDR_DATA 主鍵為 (c_addr_id, c_office_id, c_posting_id)
-                    // 只檢查「將保留/新增」的地址，允許用戶通過移除衝突地址來解決問題
-                    // 這裡額外加上 c_personid 條件是為了縮小查詢範圍，確保只檢查同一人的記錄
-                    // $addressesForInsert 已正規化（-999 → 0）
-                    $addressesToKeep = $addressesForInsert;
-                    if (!empty($addressesToKeep)) {
-                        $conflictingRecords = DB::table('POSTED_TO_ADDR_DATA')
-                            ->where('c_personid', $_id)
-                            ->where('c_posting_id', $_postingid)
-                            ->where('c_office_id', $currentOfficeId)
-                            ->whereIn('c_addr_id', $addressesToKeep)
-                            ->count();
-
-                        if ($conflictingRecords > 0) {
-                            throw ValidationException::withMessages([
-                                'c_office_id' => "無法修改官名：目標官名（c_office_id={$currentOfficeId}）下已存在相同的地址記錄，" .
-                                    '可能會導致數據衝突。請先檢查並處理 POSTED_TO_ADDR_DATA 表中的異常數據。',
-                            ]);
-                        }
-                    }
-
-                    // 遷移地址記錄到新的 office_id（只遷移將保留的地址）
-                    // 將被移除的地址不需要遷移，會在後續的差異比對中被刪除
-                    if (!empty($addressesToKeep)) {
-                        DB::table('POSTED_TO_ADDR_DATA')
-                            ->where('c_personid', $_id)
-                            ->where('c_posting_id', $_postingid)
-                            ->where('c_office_id', $previousOfficeId)
-                            ->whereIn('c_addr_id', $addressesToKeep)
-                            ->update([
-                                'c_office_id' => $currentOfficeId,
-                                'c_modified_by' => $c_created_by,
-                                'c_modified_date' => $c_created_date,
-                            ]);
-                    }
-                    // 更新 beforeRows 中已遷移地址的 c_office_id 以反映遷移後的狀態
-                    $beforeRows = array_map(function ($row) use ($currentOfficeId, $addressesToKeep) {
-                        if (in_array($row['c_addr_id'], $addressesToKeep)) {
-                            $row['c_office_id'] = $currentOfficeId;
-                        }
-
-                        return $row;
-                    }, $beforeRows);
-                }
-
-                //比對修改前後的Addr陣列，刪除更新時被移除的addr。
-                $beforeAddressesForUpdate = [];
-                $beforeRowsByAddrId = [];  // 用於記錄每個地址的 office_id
-                foreach ($beforeRows as $addr_v) {
-                    $beforeAddressesForUpdate[] = $addr_v['c_addr_id'];
-                    $beforeRowsByAddrId[$addr_v['c_addr_id']] = $addr_v['c_office_id'];
-                }
-                //dd($beforeRows, $addressesForInsert);
-                //dd($beforeAddressesForUpdate, $addressesForInsert);
-                $oldHave_diff = array_diff($beforeAddressesForUpdate, $addressesForInsert);
-                $newHave_diff = array_diff($addressesForInsert, $beforeAddressesForUpdate);
-                //dd($oldHave_diff);
-                //dd($newHave_diff);
-
-                //比對結束，刪除更新時被移除的addr。
-                // 使用 beforeRows 中記錄的 office_id，因為未遷移的地址仍在原 office_id 下
-                foreach ($oldHave_diff as $addr_v) {
-                    $addrOfficeId = $beforeRowsByAddrId[$addr_v] ?? $currentOfficeId;
-                    DB::table('POSTED_TO_ADDR_DATA')
-                        ->where('c_personid', $_id)
-                        ->where('c_posting_id', $_postingid)
-                        ->where('c_office_id', $addrOfficeId)
-                        ->where('c_addr_id', $addr_v)
-                        ->delete();
-                }
-
-                //比對結束，新增後來新加的addr。
-                // 注意：使用 $currentOfficeId 確保新地址插入到正確的 office_id
-                // $addr_v 已經正規化（-999 → 0），直接使用即可
-                foreach ($newHave_diff as $addr_v) {
-                    DB::table('POSTED_TO_ADDR_DATA')->insert([
-                        'c_personid' => $_id,
-                        'c_posting_id' => $_postingid,
-                        'c_office_id' => $currentOfficeId,
-                        'c_addr_id' => $addr_v,
-                        'c_created_by' => $c_created_by,
-                        'c_created_date' => $c_created_date,
-                        'c_modified_by' => $c_created_by,
-                        'c_modified_date' => $c_created_date,
-                    ]);
-                }
-
-
-                $afterRows = DB::table('POSTED_TO_ADDR_DATA')
-                    ->where('c_personid', $_id)
-                    ->where('c_posting_id', $_postingid)
-                    ->where('c_office_id', $currentOfficeId)
-                    ->get()
-                    ->map(function ($row) {
-                        return [
-                            'c_personid' => (int) $row->c_personid,
-                            'c_posting_id' => (int) $row->c_posting_id,
-                            'c_office_id' => (int) $row->c_office_id,
-                            'c_addr_id' => (int) $row->c_addr_id,
-                        ];
-                    })
-                    ->all();
-
-                $addrResourceId = CompositePrimaryKey::buildStoredResourceId([
-                    'c_office_id' => $currentOfficeId,
-                    'c_posting_id' => $_postingid,
-                ]);
-
-                $addrOperation = $officeOperation;
-                if ($addrOperation === null) {
-                    $addrOperation = (new OperationRepository())->store(
-                        Auth::id(),
-                        $c_personid,
-                        3,
-                        'POSTED_TO_ADDR_DATA',
-                        $addrResourceId,
-                        ['rows' => $afterRows],
-                        ['rows' => $beforeRows]
-                    );
-                }
-
-                $addrAfterAuditRows = DB::table('POSTED_TO_ADDR_DATA')
-                    ->where('c_personid', $_id)
-                    ->where('c_posting_id', $_postingid)
-                    ->get();
-
-                $beforeMap = [];
-                foreach ($addrBeforeAuditRows as $row) {
-                    $rowData = $auditLog->normalizeRow($row);
-                    $rowPk = $auditLog->buildRowPkFromData('POSTED_TO_ADDR_DATA', $rowData);
-                    $rowPkText = $auditLog->buildRowPkText('POSTED_TO_ADDR_DATA', $rowPk);
-                    $beforeMap[$rowPkText] = ['pk' => $rowPk, 'row' => $rowData];
-                }
-
-                $afterMap = [];
-                foreach ($addrAfterAuditRows as $row) {
-                    $rowData = $auditLog->normalizeRow($row);
-                    $rowPk = $auditLog->buildRowPkFromData('POSTED_TO_ADDR_DATA', $rowData);
-                    $rowPkText = $auditLog->buildRowPkText('POSTED_TO_ADDR_DATA', $rowPk);
-                    $afterMap[$rowPkText] = ['pk' => $rowPk, 'row' => $rowData];
-                }
-
-                $addrOperationId = $addrOperation ? (string) $addrOperation->id : null;
-                $allKeys = array_unique(array_merge(array_keys($beforeMap), array_keys($afterMap)));
-                foreach ($allKeys as $key) {
-                    $beforeEntry = $beforeMap[$key] ?? null;
-                    $afterEntry = $afterMap[$key] ?? null;
-
-                    if ($beforeEntry && !$afterEntry) {
-                        $auditLog->logChange(
-                            'POSTED_TO_ADDR_DATA',
-                            'DELETE',
-                            $beforeEntry['pk'],
-                            $beforeEntry['row'],
-                            null,
-                            $addrOperationId
-                        );
-
-                        continue;
-                    }
-
-                    if (!$beforeEntry && $afterEntry) {
-                        $auditLog->logChange(
-                            'POSTED_TO_ADDR_DATA',
-                            'INSERT',
-                            $afterEntry['pk'],
-                            null,
-                            $afterEntry['row'],
-                            $addrOperationId
-                        );
-
-                        continue;
-                    }
-
-                    if ($beforeEntry && $afterEntry && $beforeEntry['row'] != $afterEntry['row']) {
-                        $auditLog->logChange(
-                            'POSTED_TO_ADDR_DATA',
-                            'UPDATE',
-                            $afterEntry['pk'],
-                            $beforeEntry['row'],
-                            $afterEntry['row'],
-                            $addrOperationId
-                        );
-                    }
-                }
+                $this->syncPostingAddresses(
+                    $_id,
+                    $_postingid,
+                    $previousOfficeId,
+                    $currentOfficeId,
+                    $incomingAddr,
+                    $existingAddresses,
+                    $c_created_by,
+                    $c_created_date,
+                    $officeOperation,
+                    $c_personid
+                );
             }
 
             $updateResourceId = CompositePrimaryKey::buildStoredResourceId([
@@ -362,6 +151,260 @@ class OfficePostingRepository {
                 'no_changes' => false,
             ];
         });
+    }
+
+    /**
+     * 同步任官地址副表（POSTED_TO_ADDR_DATA）。
+     *
+     * 由 legacy officeUpdateById 與 API v2 PostingMutationHandler 共用，避免重複實作。
+     * 行為與原 officeUpdateById 的 `if ($shouldUpdateAddress)` 區塊逐字一致：
+     * - c_office_id 改變時的衝突檢測與遷移到新 office_id（避免地址流失）
+     * - 差異比對的 delete/insert
+     * - before/after audit rows
+     * - 地址 Operation：$officeOperation 非 null 時沿用，否則建立 POSTED_TO_ADDR_DATA operation
+     * - 每列 INSERT/UPDATE/DELETE audit 記錄
+     *
+     * @param int                       $personId         人物 id（c_personid）
+     * @param int                       $postingId        任官 id（c_posting_id）
+     * @param int                       $previousOfficeId 更新前 c_office_id
+     * @param int                       $currentOfficeId  更新後 c_office_id
+     * @param array|null                $incomingAddr     null=未修改地址（保留現有）；[]=明確清空；[ids]=明確列表（含 -999→0 正規化）
+     * @param array                     $existingAddresses 既有地址 c_addr_id 列表（incomingAddr 為 null 時的來源）
+     * @param string                    $createdBy        c_created_by / c_modified_by
+     * @param mixed                     $createdDate      c_created_date / c_modified_date
+     * @param \App\Models\Operation|null $officeOperation 官名列的 Operation；非 null 時地址沿用，避免重複建立
+     * @param int                       $operationPersonId Operation 紀錄用的 c_personid
+     */
+    public function syncPostingAddresses(int $personId, int $postingId, int $previousOfficeId, int $currentOfficeId, ?array $incomingAddr, array $existingAddresses, string $createdBy, $createdDate, ?\App\Models\Operation $officeOperation, int $operationPersonId): void {
+        $_id = $personId;
+        $_postingid = $postingId;
+        $c_created_by = $createdBy;
+        $c_created_date = $createdDate;
+        $c_personid = $operationPersonId;
+        $auditLog = new AuditLogService();
+
+        $addrBeforeAuditRows = DB::table('POSTED_TO_ADDR_DATA')
+            ->where('c_personid', $_id)
+            ->where('c_posting_id', $_postingid)
+            ->get();
+
+        $beforeRows = DB::table('POSTED_TO_ADDR_DATA')
+            ->where('c_personid', $_id)
+            ->where('c_posting_id', $_postingid)
+            ->where('c_office_id', $previousOfficeId)
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'c_personid' => (int) $row->c_personid,
+                    'c_posting_id' => (int) $row->c_posting_id,
+                    'c_office_id' => (int) $row->c_office_id,
+                    'c_addr_id' => (int) $row->c_addr_id,
+                ];
+            })
+            ->all();
+
+        //dd($previousOfficeId, $currentOfficeId, $beforeRows);
+
+        // 先計算最終要保留的地址列表（用於衝突檢測和後續操作）
+        // - $incomingAddr === null: 保留現有地址（用戶沒有修改）
+        // - $incomingAddr 有值（包含空陣列）: 使用用戶指定的地址列表
+        // 將 -999 正規化為 0（-999 是表單中「未選擇」的 sentinel 值，0 代表「未詳」地址）
+        $sourceAddresses = $incomingAddr !== null ? $incomingAddr : $existingAddresses;
+        $addressesForInsert = array_map(function ($v) {
+            $v = (int) $v;
+
+            return $v === -999 ? 0 : $v;
+        }, $sourceAddresses);
+
+        // 當 c_office_id 改變時，將現有地址記錄遷移到新的 office_id
+        // 使用 UPDATE 而非 DELETE，避免地址記錄丟失
+        if ($previousOfficeId !== $currentOfficeId && !empty($beforeRows)) {
+            // 檢查目標 office_id 下是否已存在「將保留的地址」記錄（主鍵衝突檢測）
+            // POSTED_TO_ADDR_DATA 主鍵為 (c_addr_id, c_office_id, c_posting_id)
+            // 只檢查「將保留/新增」的地址，允許用戶通過移除衝突地址來解決問題
+            // 這裡額外加上 c_personid 條件是為了縮小查詢範圍，確保只檢查同一人的記錄
+            // $addressesForInsert 已正規化（-999 → 0）
+            $addressesToKeep = $addressesForInsert;
+            if (!empty($addressesToKeep)) {
+                $conflictingRecords = DB::table('POSTED_TO_ADDR_DATA')
+                    ->where('c_personid', $_id)
+                    ->where('c_posting_id', $_postingid)
+                    ->where('c_office_id', $currentOfficeId)
+                    ->whereIn('c_addr_id', $addressesToKeep)
+                    ->count();
+
+                if ($conflictingRecords > 0) {
+                    throw ValidationException::withMessages([
+                        'c_office_id' => "無法修改官名：目標官名（c_office_id={$currentOfficeId}）下已存在相同的地址記錄，" .
+                            '可能會導致數據衝突。請先檢查並處理 POSTED_TO_ADDR_DATA 表中的異常數據。',
+                    ]);
+                }
+            }
+
+            // 遷移地址記錄到新的 office_id（只遷移將保留的地址）
+            // 將被移除的地址不需要遷移，會在後續的差異比對中被刪除
+            if (!empty($addressesToKeep)) {
+                DB::table('POSTED_TO_ADDR_DATA')
+                    ->where('c_personid', $_id)
+                    ->where('c_posting_id', $_postingid)
+                    ->where('c_office_id', $previousOfficeId)
+                    ->whereIn('c_addr_id', $addressesToKeep)
+                    ->update([
+                        'c_office_id' => $currentOfficeId,
+                        'c_modified_by' => $c_created_by,
+                        'c_modified_date' => $c_created_date,
+                    ]);
+            }
+            // 更新 beforeRows 中已遷移地址的 c_office_id 以反映遷移後的狀態
+            $beforeRows = array_map(function ($row) use ($currentOfficeId, $addressesToKeep) {
+                if (in_array($row['c_addr_id'], $addressesToKeep)) {
+                    $row['c_office_id'] = $currentOfficeId;
+                }
+
+                return $row;
+            }, $beforeRows);
+        }
+
+        //比對修改前後的Addr陣列，刪除更新時被移除的addr。
+        $beforeAddressesForUpdate = [];
+        $beforeRowsByAddrId = [];  // 用於記錄每個地址的 office_id
+        foreach ($beforeRows as $addr_v) {
+            $beforeAddressesForUpdate[] = $addr_v['c_addr_id'];
+            $beforeRowsByAddrId[$addr_v['c_addr_id']] = $addr_v['c_office_id'];
+        }
+        //dd($beforeRows, $addressesForInsert);
+        //dd($beforeAddressesForUpdate, $addressesForInsert);
+        $oldHave_diff = array_diff($beforeAddressesForUpdate, $addressesForInsert);
+        $newHave_diff = array_diff($addressesForInsert, $beforeAddressesForUpdate);
+        //dd($oldHave_diff);
+        //dd($newHave_diff);
+
+        //比對結束，刪除更新時被移除的addr。
+        // 使用 beforeRows 中記錄的 office_id，因為未遷移的地址仍在原 office_id 下
+        foreach ($oldHave_diff as $addr_v) {
+            $addrOfficeId = $beforeRowsByAddrId[$addr_v] ?? $currentOfficeId;
+            DB::table('POSTED_TO_ADDR_DATA')
+                ->where('c_personid', $_id)
+                ->where('c_posting_id', $_postingid)
+                ->where('c_office_id', $addrOfficeId)
+                ->where('c_addr_id', $addr_v)
+                ->delete();
+        }
+
+        //比對結束，新增後來新加的addr。
+        // 注意：使用 $currentOfficeId 確保新地址插入到正確的 office_id
+        // $addr_v 已經正規化（-999 → 0），直接使用即可
+        foreach ($newHave_diff as $addr_v) {
+            DB::table('POSTED_TO_ADDR_DATA')->insert([
+                'c_personid' => $_id,
+                'c_posting_id' => $_postingid,
+                'c_office_id' => $currentOfficeId,
+                'c_addr_id' => $addr_v,
+                'c_created_by' => $c_created_by,
+                'c_created_date' => $c_created_date,
+                'c_modified_by' => $c_created_by,
+                'c_modified_date' => $c_created_date,
+            ]);
+        }
+
+
+        $afterRows = DB::table('POSTED_TO_ADDR_DATA')
+            ->where('c_personid', $_id)
+            ->where('c_posting_id', $_postingid)
+            ->where('c_office_id', $currentOfficeId)
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'c_personid' => (int) $row->c_personid,
+                    'c_posting_id' => (int) $row->c_posting_id,
+                    'c_office_id' => (int) $row->c_office_id,
+                    'c_addr_id' => (int) $row->c_addr_id,
+                ];
+            })
+            ->all();
+
+        $addrResourceId = CompositePrimaryKey::buildStoredResourceId([
+            'c_office_id' => $currentOfficeId,
+            'c_posting_id' => $_postingid,
+        ]);
+
+        $addrOperation = $officeOperation;
+        if ($addrOperation === null) {
+            $addrOperation = (new OperationRepository())->store(
+                Auth::id(),
+                $c_personid,
+                3,
+                'POSTED_TO_ADDR_DATA',
+                $addrResourceId,
+                ['rows' => $afterRows],
+                ['rows' => $beforeRows]
+            );
+        }
+
+        $addrAfterAuditRows = DB::table('POSTED_TO_ADDR_DATA')
+            ->where('c_personid', $_id)
+            ->where('c_posting_id', $_postingid)
+            ->get();
+
+        $beforeMap = [];
+        foreach ($addrBeforeAuditRows as $row) {
+            $rowData = $auditLog->normalizeRow($row);
+            $rowPk = $auditLog->buildRowPkFromData('POSTED_TO_ADDR_DATA', $rowData);
+            $rowPkText = $auditLog->buildRowPkText('POSTED_TO_ADDR_DATA', $rowPk);
+            $beforeMap[$rowPkText] = ['pk' => $rowPk, 'row' => $rowData];
+        }
+
+        $afterMap = [];
+        foreach ($addrAfterAuditRows as $row) {
+            $rowData = $auditLog->normalizeRow($row);
+            $rowPk = $auditLog->buildRowPkFromData('POSTED_TO_ADDR_DATA', $rowData);
+            $rowPkText = $auditLog->buildRowPkText('POSTED_TO_ADDR_DATA', $rowPk);
+            $afterMap[$rowPkText] = ['pk' => $rowPk, 'row' => $rowData];
+        }
+
+        $addrOperationId = $addrOperation ? (string) $addrOperation->id : null;
+        $allKeys = array_unique(array_merge(array_keys($beforeMap), array_keys($afterMap)));
+        foreach ($allKeys as $key) {
+            $beforeEntry = $beforeMap[$key] ?? null;
+            $afterEntry = $afterMap[$key] ?? null;
+
+            if ($beforeEntry && !$afterEntry) {
+                $auditLog->logChange(
+                    'POSTED_TO_ADDR_DATA',
+                    'DELETE',
+                    $beforeEntry['pk'],
+                    $beforeEntry['row'],
+                    null,
+                    $addrOperationId
+                );
+
+                continue;
+            }
+
+            if (!$beforeEntry && $afterEntry) {
+                $auditLog->logChange(
+                    'POSTED_TO_ADDR_DATA',
+                    'INSERT',
+                    $afterEntry['pk'],
+                    null,
+                    $afterEntry['row'],
+                    $addrOperationId
+                );
+
+                continue;
+            }
+
+            if ($beforeEntry && $afterEntry && $beforeEntry['row'] != $afterEntry['row']) {
+                $auditLog->logChange(
+                    'POSTED_TO_ADDR_DATA',
+                    'UPDATE',
+                    $afterEntry['pk'],
+                    $beforeEntry['row'],
+                    $afterEntry['row'],
+                    $addrOperationId
+                );
+            }
+        }
     }
 
     public function officeStoreById(Request $request, $id) {

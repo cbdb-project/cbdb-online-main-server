@@ -201,6 +201,9 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
                     (string) Auth::id(),
                     $operation ? (string) $operation->id : null
                 );
+
+                // 子類在同一交易內的後續處理（例如社會關係/親屬寫互逆鏡像列），保證原子性
+                $this->afterDirectInsert($personId, $actualPk, $rowData, $insertedArray, $operation);
             });
         } catch (\Illuminate\Database\QueryException $e) {
             if ($this->isUniqueConstraintViolation($e)) {
@@ -208,6 +211,32 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
             }
 
             throw $e;
+        } catch (MirrorConflictException $e) {
+            // #66：建立反向鏡像時，對面對應列已有不同內容 → 整筆交易已回滾（含正向列），回 409 + 衝突明細 + 對面鏡像 PK，
+            // 供前端彈警告 + 可點連結跳對面 edit-v2 + 提供「強制覆寫」(meta.force) 重送。
+            return $this->errorResponse($e->getMessage(), 409, [
+                'mirror_conflict' => [
+                    'table' => $e->mirrorTable,
+                    'pk' => $e->mirrorPk,
+                    'fields' => $e->conflicts,
+                ],
+            ]);
+        } catch (MirrorIntegrityException $e) {
+            // #70：鏡像同步資料完整性 fail-closed（無權威反向碼可收斂）→ 整筆已回滾，回結構化 422，
+            // 而非裸 RuntimeException 漏成 500。防禦性：現行 create 在反向碼為哨兵 0 時就走無條件 insert、不進 sync，
+            // 故 sync 內「缺權威反向碼」分支於 create 不可達；保留此 catch 以防 sync 日後演進拋出，不致漏成 500。
+            return $this->errorResponse($e->getMessage(), 422, ['mirror_integrity' => ['fail_closed']]);
+        } catch (MirrorSuspectedException $e) {
+            // #70（create 路徑）：建立反向鏡像時，對面已有疑似同一關係的漂移列（碼∉合法反向集，非嚴格命中）→ 整筆已回滾，
+            // 回 409 + 疑似列 PK 清單 + 權威反向碼，供前端彈「對面有 N 條疑似」警告 + 跳對面連結 + 強制收斂（meta.force）。
+            return $this->errorResponse($e->getMessage(), 409, [
+                'mirror_suspected' => [
+                    'table' => $e->mirrorTable,
+                    'candidates' => $e->candidates,
+                    'authoritative_code' => $e->authoritativeCode,
+                    'count' => $e->count(),
+                ],
+            ]);
         }
 
         return response()->json([
@@ -249,6 +278,12 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
             '__review_status' => 'pending',
             '__key_columns' => $this->keyColumns(),
         ]);
+
+        // 子類可附加副表/鏡像提案資料（例如社會關係的互逆配對碼），核准時據以建立鏡像列。
+        $auxiliaryPayload = $this->proposalAuxiliaryPayload();
+        if ($auxiliaryPayload !== []) {
+            $proposalData['__proposal_aux'] = $auxiliaryPayload;
+        }
 
         $operation = $this->operationRepository->store(
             Auth::id(),
@@ -300,6 +335,21 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
         DB::table($this->tableName())->insert($rowData);
     }
 
+    /**
+     * direct 新增成功後、仍在同一交易內的後續處理鉤子（預設無動作）。
+     * 子類可覆寫以在原子交易內寫入互逆鏡像列（例如 AssociationCreateHandler 寫 ASSOC_DATA 反向關係）。
+     */
+    protected function afterDirectInsert(int $personId, array $actualPk, array $rowData, array $insertedArray, ?Operation $operation): void {
+    }
+
+    /**
+     * proposal 新增時附加的副表/鏡像提案資料（預設空）。
+     * 子類可覆寫以把互逆配對碼寫入 __proposal_aux，核准時據以建立鏡像列。
+     */
+    protected function proposalAuxiliaryPayload(): array {
+        return [];
+    }
+
     /** 欄位值驗證（預設無驗證，子類可覆寫） */
     protected function validateFields(array $data): array {
         return [];
@@ -316,6 +366,27 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
     protected function normalizeSentinelValues(array $data, array $fields): array {
         foreach ($fields as $field) {
             if (array_key_exists($field, $data) && ($data[$field] === -999 || $data[$field] === '-999')) {
+                $data[$field] = '0';
+            }
+        }
+
+        return $data;
+    }
+
+    /**
+     * 把「legacy 哨兵 0=Unknown 語義」的非 PK 碼/FK 欄在 CREATE 時規範化為 '0'：null / '' / -999 / **缺鍵** 皆落 '0'。
+     *
+     * 與 update 版（AbstractPersonSubresourceMutationHandler::normalizeEmptyCodeFields）**刻意不同**：update 的
+     * 「缺鍵＝該欄不變」故只處理已送的空值；CREATE 的「缺鍵＝使用者未填＝legacy 表單恆送 0」故缺鍵也須落 0，
+     * 否則 nullable 欄會留 null、與 legacy（表單空→0）分歧，達不到 create==legacy 完全幂等（codex #71）。
+     * 限 legacy 哨兵 0=Unknown 的碼/FK 欄（如 c_source）；真正 nullable、空應留 null 的欄勿用。
+     *
+     * @param array $fields 需完全規範化（含缺鍵補 0）的碼/FK 欄名
+     */
+    protected function normalizeEmptyCodeFields(array $data, array $fields): array {
+        foreach ($fields as $field) {
+            $v = $data[$field] ?? null; // 缺鍵視為 null（CREATE：未填＝哨兵 0）
+            if ($v === null || $v === '' || (int) $v === -999) {
                 $data[$field] = '0';
             }
         }

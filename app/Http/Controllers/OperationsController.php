@@ -29,7 +29,7 @@ class OperationsController extends Controller {
         //        Operation::all();
     }
 
-    public function index(Request $request) {
+    protected function buildOperationsListing(Request $request): array {
         $proposalsOnly = filter_var($request->input('proposals_only', false), FILTER_VALIDATE_BOOLEAN);
         $historyContext = $this->resolveHistoryContext($request);
 
@@ -645,9 +645,22 @@ class OperationsController extends Controller {
             }
         }
         $this->attachAffectedPeople($lists);
-        //echo "<pre><code>";
-        //print_r($lists[0]['resource_original']); //成功
-        //echo "</code></pre>";
+
+        return [
+            'lists' => $lists,
+            'proposalsOnly' => $proposalsOnly,
+            'statusFilters' => $statusFilters,
+            'historyContext' => $historyContext,
+        ];
+    }
+
+    public function index(Request $request) {
+        $data = $this->buildOperationsListing($request);
+        $lists = $data['lists'];
+        $proposalsOnly = $data['proposalsOnly'];
+        $statusFilters = $data['statusFilters'];
+        $historyContext = $data['historyContext'];
+
         $pageTitle = $proposalsOnly ? __('nav.recent_proposals') : __('nav.recent_operations');
         $pageDescription = $proposalsOnly ? __('operations.page_desc_proposals') : __('operations.page_desc_operations');
         $pageUrl = $proposalsOnly ? '/operations?proposals_only=1' : '/operations';
@@ -663,6 +676,314 @@ class OperationsController extends Controller {
             'status_filters' => $statusFilters,
             'history_context' => $historyContext,
         ]);
+    }
+
+    public function appIndex(Request $request) {
+        $data = $this->buildOperationsListing($request);
+        $lists = $data['lists'];
+        $proposalsOnly = $data['proposalsOnly'];
+        $statusFilters = $data['statusFilters'];
+        $historyContext = $data['historyContext'];
+
+        $codeTableKeys = array_keys(config('codes.tables', []));
+        $codeTables = array_map('strtoupper', $codeTableKeys);
+
+        $rows = collect($lists->items())
+            ->map(fn ($item) => $this->serializeOperationRow($item, $codeTables))
+            ->all();
+
+        $appHistoryContext = null;
+        if ($historyContext !== null) {
+            $appHistoryContext = [
+                'person_id' => $historyContext['person_id'],
+                'page' => $historyContext['page'],
+                'label' => $historyContext['label'],
+            ];
+        }
+
+        return \Inertia\Inertia::render('Admin/Operations/Index', [
+            'lists' => $rows,
+            'pagination' => [
+                'current_page' => $lists->currentPage(),
+                'last_page' => $lists->lastPage(),
+                'per_page' => $lists->perPage(),
+                'total' => $lists->total(),
+                'from' => $lists->firstItem(),
+                'to' => $lists->lastItem(),
+            ],
+            'proposals_only' => $proposalsOnly,
+            'status_filters' => $statusFilters,
+            'history_context' => $appHistoryContext,
+            'filters' => [
+                'editor' => trim((string) $request->input('editor', '')),
+                'op_type' => array_values(array_map('intval', (array) $request->input('op_type', []))),
+            ],
+            'urls' => [
+                'index' => route('app.operations.index', [], false),
+            ],
+            'page_translations' => [
+                'operations' => __('operations'),
+                'codes' => __('codes'),
+                'common' => __('common'),
+            ],
+        ]);
+    }
+
+    /**
+     * 將單筆操作序列化為 React 列表所需的扁平結構，
+     * 完整對齊 operations/index.blade.php 每列的 @php 計算（含受影響人物、差異、提案動作閘門）。
+     */
+    protected function serializeOperationRow($item, array $codeTables): array {
+        $rawResourceId = (string) $item->resource_id;
+        $resourceName = (string) $item->resource;
+
+        $formatResourceDescription = function ($resName, $resourceId) {
+            if (!is_string($resourceId) || trim($resourceId) === '') {
+                return '';
+            }
+            $parsed = CompositePrimaryKey::parseStoredResourceId($resourceId, (string) $resName);
+            if (is_array($parsed) && !empty($parsed)) {
+                $parts = [];
+                foreach ($parsed as $column => $value) {
+                    $parts[] = $column . '：' . (($value === 'NULL' || $value === null) ? '(null)' : (string) $value);
+                }
+
+                return implode("\n", $parts);
+            }
+
+            return unionPKDef_decode_for_convert(unionPKDef($resourceId));
+        };
+
+        $resourceDescription = $formatResourceDescription($resourceName, $rawResourceId);
+
+        // resource_data 與 Blade 同樣經過 unionPKDef → unionPKDef_decode_for_convert，再 json_decode。
+        $resourceDataRaw = unionPKDef_decode_for_convert(unionPKDef($item->resource_data));
+        $resourceDataParsed = json_decode($resourceDataRaw, true);
+        if (!is_array($resourceDataParsed)) {
+            $resourceDataParsed = is_string($resourceDataRaw) ? trim($resourceDataRaw) : $resourceDataRaw;
+        }
+
+        // 受影響人物（含 Blade 的 biogmain 回退）。
+        $biogmain = $item->biogmain;
+        $affectedPeople = is_array($item->affected_people ?? null) ? $item->affected_people : [];
+        if (empty($affectedPeople)) {
+            if (!empty($biogmain) && (int) ($item->c_personid ?? 0) !== 0) {
+                $affectedPeople[] = [
+                    'id' => (int) $item->c_personid,
+                    'name_chn' => $biogmain->c_name_chn ?? '',
+                    'name' => $biogmain->c_name ?? '',
+                    'is_primary' => true,
+                ];
+            } else {
+                $affectedPeople[] = ['id' => null, 'name_chn' => '', 'name' => '', 'is_primary' => false];
+            }
+        }
+        $personRowspan = count($affectedPeople);
+
+        $opType = (int) $item->op_type;
+        $isCodeResource = in_array(strtoupper($resourceName), $codeTables, true);
+        $showPerPersonResourceButtons = in_array(strtoupper($resourceName), ['KIN_DATA', 'ASSOC_DATA'], true) && $personRowspan > 1;
+
+        // 主資源連結（非 per-person 模式）。
+        $id = $item->c_personid;
+        $resourceSpecificLink = null;
+        if ((int) $id !== 0 && $opType !== 4) {
+            $resourceSpecificLink = CompositePrimaryKey::buildResourceEditUrl($resourceName, $rawResourceId, $id);
+        }
+        $hasPersonLink = (int) $id !== 0 && !empty($biogmain);
+        $resourceLink = null;
+        if ($hasPersonLink && $resourceSpecificLink) {
+            $resourceLink = $resourceSpecificLink;
+        } elseif ($isCodeResource && $opType !== 4) {
+            $codeRouteId = CompositePrimaryKey::normalizeSingleKeyResourceIdForCodeRoute($resourceName, $rawResourceId);
+            $resourceLink = route('codes.edit', ['table_name' => $resourceName, 'id' => $codeRouteId], false);
+        }
+
+        // 每位受影響人物附上編輯連結與資源描述。
+        $people = [];
+        foreach ($affectedPeople as $p) {
+            $name = trim((string) ($p['name_chn'] ?? '') . ' ' . (string) ($p['name'] ?? ''));
+            $people[] = [
+                'id' => $p['id'] ?? null,
+                'name_chn' => $p['name_chn'] ?? '',
+                'name' => $p['name'] ?? '',
+                'display_name' => $name !== '' ? $name : (string) ($p['id'] ?? ''),
+                'is_primary' => (bool) ($p['is_primary'] ?? false),
+                'person_edit_url' => !empty($p['id']) ? person_page_url($p['id'], 'edit') : null,
+                'resource_id' => $p['resource_id'] ?? null,
+                'resource_link' => $p['resource_link'] ?? null,
+                'resource_description' => !empty($p['resource_id'])
+                    ? $formatResourceDescription($resourceName, (string) $p['resource_id'])
+                    : '',
+            ];
+        }
+
+        // 審計紀錄與差異。
+        $auditLogs = is_array($item->audit_logs ?? null) ? $item->audit_logs : [];
+        $auditTableNames = [];
+        foreach ($auditLogs as $audit) {
+            $tn = trim((string) ($audit['table_name'] ?? ''));
+            if ($tn !== '') {
+                $auditTableNames[] = $tn;
+            }
+        }
+        $auditTableNames = array_values(array_unique($auditTableNames));
+        $resourceDisplay = !empty($auditTableNames) ? implode(' / ', $auditTableNames) : $resourceName;
+
+        $diffSource = $item->resource_diff ?? $item->resource_original;
+        $hasAuditLogs = !empty($auditLogs);
+        $hasDiffContent = false;
+        if (is_array($diffSource)) {
+            if (($diffSource['type'] ?? null) === 'POSTED_TO_ADDR_DATA') {
+                $hasDiffContent = !empty($diffSource['addresses'] ?? []);
+            } else {
+                $hasDiffContent = !empty($diffSource['rows'] ?? []);
+            }
+        } elseif (is_string($diffSource) && trim($diffSource) !== '') {
+            $hasDiffContent = true;
+        }
+        $canCompare = ($hasAuditLogs || $hasDiffContent) && $opType !== 4;
+
+        // 提案中繼資料與備註。
+        $isProposal = in_array($opType, [Operation::TYPE_PROPOSAL_CREATE, Operation::TYPE_PROPOSAL_UPDATE], true);
+        $proposalMeta = is_array($resourceDataParsed) ? ($resourceDataParsed['__proposal_meta'] ?? []) : [];
+        $reviewStatus = is_array($resourceDataParsed) ? ($resourceDataParsed['__review_status'] ?? null) : null;
+        $reviewComment = is_array($resourceDataParsed) ? ($resourceDataParsed['__review_comment'] ?? null) : null;
+        $reviewedBy = is_array($resourceDataParsed) ? ($resourceDataParsed['__reviewed_by'] ?? null) : null;
+        $reviewedAt = is_array($resourceDataParsed) ? ($resourceDataParsed['__reviewed_at'] ?? null) : null;
+        $primaryNoteLabel = $isProposal ? __('operations.proposal_desc') : __('operations.modification_desc');
+
+        $operationNotes = [];
+        $directNote = is_array($resourceDataParsed) ? trim((string) ($resourceDataParsed['__note'] ?? '')) : '';
+        if ($directNote !== '') {
+            $operationNotes[] = ['label' => $primaryNoteLabel, 'content' => $directNote];
+        }
+        $proposalComment = is_array($proposalMeta) ? trim((string) ($proposalMeta['comment'] ?? '')) : '';
+        if ($proposalComment !== '') {
+            $operationNotes[] = ['label' => __('operations.proposal_desc'), 'content' => $proposalComment];
+        }
+        $reviewCommentText = trim((string) ($reviewComment ?? ''));
+        if ($reviewCommentText !== '') {
+            $operationNotes[] = ['label' => __('operations.review_notes'), 'content' => $reviewCommentText];
+        }
+        $cancelReasonText = is_array($proposalMeta) ? trim((string) ($proposalMeta['cancel_reason'] ?? '')) : '';
+        if ($cancelReasonText !== '') {
+            $operationNotes[] = ['label' => __('operations.withdrawal_reason'), 'content' => $cancelReasonText];
+        }
+        $hasOperationNotes = !empty($operationNotes);
+        $noteTooltip = implode(' ｜ ', array_map(function ($note) {
+            return ($note['label'] ?? __('operations.remarks')) . '：' . ($note['content'] ?? '');
+        }, $operationNotes));
+        $noteTooltipShort = mb_strimwidth($noteTooltip, 0, 120, '…', 'UTF-8');
+
+        // 提案時間欄位。
+        [$submittedDisplay, $submittedUtc] = $this->formatProposalTime($proposalMeta['submitted_at'] ?? null);
+        [$reviewedDisplay, $reviewedUtc] = $this->formatProposalTime($reviewedAt);
+        [$cancelledDisplay, $cancelledUtc] = $this->formatProposalTime($proposalMeta['cancelled_at'] ?? null);
+
+        $submittedById = $proposalMeta['submitted_by_id'] ?? null;
+        $isProposalOwner = Auth::check() && $submittedById !== null && (int) Auth::id() === (int) $submittedById;
+        $canEditProposal = $isProposalOwner && in_array($reviewStatus, ['pending', 'rejected'], true);
+        $canReviewProposal = $isProposal && Auth::check() && Auth::user()->canReviewProposals() && $reviewStatus === 'pending';
+        $canRestore = Auth::check() && Auth::user()->isAdmin() && in_array($opType, [3, 4], true)
+            && $resourceName !== 'POSTED_TO_ADDR_DATA' && $canCompare;
+
+        // 內容快照（過濾 __ 開頭欄位）。
+        $resourceDataDisplay = $resourceDataParsed;
+        if (is_array($resourceDataDisplay)) {
+            $resourceDataDisplay = array_filter($resourceDataDisplay, function ($value, $key) {
+                return strpos($key, '__') !== 0;
+            }, ARRAY_FILTER_USE_BOTH);
+        }
+
+        [$updatedDisplay, $updatedUtc] = $this->formatProposalTime($item->updated_at, true);
+
+        $opTypeLabels = [
+            1 => '1-' . __('operations.op_create'),
+            2 => '2-' . __('operations.op_overwrite'),
+            3 => '3-' . __('operations.op_update'),
+            4 => '4-' . __('operations.op_delete'),
+            Operation::TYPE_PROPOSAL_CREATE => '8-' . __('operations.op_proposal_create'),
+            Operation::TYPE_PROPOSAL_UPDATE => '9-' . __('operations.op_proposal_update'),
+        ];
+
+        return [
+            'id' => $item->id,
+            'people' => $people,
+            'resource' => $resourceName,
+            'resource_display' => $resourceDisplay,
+            'resource_link' => $resourceLink,
+            'resource_description' => $resourceDescription,
+            'show_per_person_resource_buttons' => $showPerPersonResourceButtons,
+            'op_type' => $opType,
+            'op_type_label' => $opTypeLabels[$opType] ?? (string) $opType,
+            'user_name' => Auth::check() ? ($item->user->name ?? ('User ' . $item->user_id)) : ('User ' . $item->user_id),
+            'updated_display' => $updatedDisplay,
+            'updated_utc' => $updatedUtc,
+            'is_proposal' => $isProposal,
+            'review_status' => $reviewStatus,
+            'review_comment' => $reviewComment,
+            'reviewed_by' => $reviewedBy,
+            'reviewed_display' => $reviewedDisplay,
+            'reviewed_utc' => $reviewedUtc,
+            'proposal_comment' => $proposalMeta['comment'] ?? null,
+            'submitted_by' => $proposalMeta['submitted_by'] ?? null,
+            'submitted_display' => $submittedDisplay,
+            'submitted_utc' => $submittedUtc,
+            'cancelled_by' => $proposalMeta['cancelled_by'] ?? null,
+            'cancelled_display' => $cancelledDisplay,
+            'cancelled_utc' => $cancelledUtc,
+            'cancel_reason' => $proposalMeta['cancel_reason'] ?? null,
+            'primary_note_label' => $primaryNoteLabel,
+            'operation_notes' => array_values($operationNotes),
+            'has_operation_notes' => $hasOperationNotes,
+            'note_tooltip_short' => $noteTooltipShort,
+            'resource_data_display' => is_array($resourceDataDisplay) ? $resourceDataDisplay : (string) $resourceDataDisplay,
+            'audit_logs' => array_map(function ($audit) {
+                return [
+                    'table_name' => $audit['table_name'] ?? null,
+                    'operation' => $audit['operation'] ?? null,
+                    'row_pk_text' => $audit['row_pk_text'] ?? null,
+                    'diff' => $audit['diff'] ?? null,
+                ];
+            }, $auditLogs),
+            'has_audit_logs' => $hasAuditLogs,
+            'diff_source' => $diffSource,
+            'has_diff_content' => $hasDiffContent,
+            'can_compare' => $canCompare,
+            'can_restore' => $canRestore,
+            'can_edit_proposal' => $canEditProposal,
+            'can_review_proposal' => $canReviewProposal,
+            'urls' => [
+                'restore' => route('operations.restore', $item->id, false),
+                'approve' => route('operations.proposals.approve', $item->id, false),
+                'reject' => route('operations.proposals.reject', $item->id, false),
+                'edit_proposal' => route('codes.proposals.edit', ['table_name' => $resourceName, 'operation' => $item->id], false),
+                'cancel_proposal' => route('codes.proposals.cancel', ['table_name' => $resourceName, 'operation' => $item->id], false),
+            ],
+        ];
+    }
+
+    /**
+     * 解析時間字串／Carbon → [顯示字串, ISO8601 UTC]，對齊 Blade 的時區處理。
+     */
+    protected function formatProposalTime($raw, bool $allowEmptyString = false): array {
+        if ($raw instanceof Carbon) {
+            return [(string) $raw, $raw->copy()->setTimezone('UTC')->toIso8601String()];
+        }
+        if (is_string($raw) && trim($raw) !== '') {
+            $display = trim($raw);
+
+            try {
+                $utc = Carbon::parse($raw, config('app.timezone', 'Asia/Shanghai'))->setTimezone('UTC')->toIso8601String();
+            } catch (\Exception $e) {
+                $utc = $display;
+            }
+
+            return [$display, $utc];
+        }
+
+        return ['', ''];
     }
 
     public function restore(Request $request, Operation $operation) {

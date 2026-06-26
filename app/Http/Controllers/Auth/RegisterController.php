@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Foundation\Auth\RegistersUsers;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Inertia\Inertia;
 use Mail;
 use Naux\Mail\SendCloudTemplate;
 
@@ -38,6 +40,9 @@ class RegisterController extends Controller {
      */
     public function __construct() {
         $this->middleware('guest');
+        // Phase 6：註冊頁 React/Inertia 變體需 HandleInertiaRequests（共用 props/根模板）。
+        // 僅作用於顯示表單的 GET 動作；POST 處理（register）不掛，授權仍由 guest middleware 控制。
+        $this->middleware('inertia')->only('showRegistrationForm');
     }
 
     /**
@@ -47,7 +52,30 @@ class RegisterController extends Controller {
      */
     public function showRegistrationForm() {
         //        return '内测阶段，暂不开放注册';
+        if (migration_flag_is_new('auth.register')) {
+            return Inertia::render('Auth/Register', [
+                'status' => session('status'),
+            ]);
+        }
+
         return view('auth.register');
+    }
+
+    /**
+     * 註冊成功後的回應。
+     *
+     * 同 LoginController：React 註冊頁以 Inertia XHR 送出，成功後導向的 dashboard
+     * 仍是 Blade 頁。對 Inertia 請求改用 Inertia::location 硬導向；非 Inertia 則回傳
+     * null，沿用 RegistersUsers trait 預設的 redirect($this->redirectPath())。
+     *
+     * @param  \App\Models\User  $user
+     */
+    protected function registered(Request $request, $user) {
+        if ($request->header('X-Inertia')) {
+            return Inertia::location($this->redirectPath());
+        }
+
+        return null;
     }
 
     /**

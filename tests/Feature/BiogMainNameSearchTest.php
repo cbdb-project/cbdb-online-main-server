@@ -187,6 +187,23 @@ class BiogMainNameSearchTest extends TestCase {
                 'c_surname_rm' => null,
                 'c_mingzi_rm' => null,
             ],
+            // #85：拼音以 v 存 ü 韻（呂=Lv），用於驗證 ü／v 搜尋互通。
+            [
+                'c_personid' => 5001,
+                'c_name_chn' => '呂溱',
+                'c_name' => 'Lv Zhen',
+                'c_surname' => '呂',
+                'c_mingzi' => '溱',
+                'c_index_year' => 1010,
+                'c_dy' => 15,
+                'c_index_addr_id' => 100,
+                'c_name_proper' => null,
+                'c_name_rm' => null,
+                'c_surname_proper' => null,
+                'c_mingzi_proper' => null,
+                'c_surname_rm' => null,
+                'c_mingzi_rm' => null,
+            ],
         ]);
 
         DB::table('DYNASTIES')->insert([
@@ -225,6 +242,9 @@ class BiogMainNameSearchTest extends TestCase {
             ['c_personid' => 2001, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '王安石', 'full_name' => '王安石', 'source' => 'biog_main', 'source_key' => 'biog_main:2001', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
             ['c_personid' => 2001, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '安石', 'full_name' => '王安石', 'source' => 'biog_main', 'source_key' => 'biog_main:2001', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
             ['c_personid' => 2001, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '石', 'full_name' => '王安石', 'source' => 'biog_main', 'source_key' => 'biog_main:2001', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
+
+            // 註：5001（呂溱）刻意「不」建倒排索引列 → 拼音查詢落到 LIKE 退路（與正式環境一致：FTS 僅索引中文、無拼音），
+            // 使 test_pinyin_umlaut_and_v_are_interchangeable 真正驗證拼音主路徑的 ü→v 規範化。
 
             // 宗氏（李白妻）的倒排記錄 - 括號已移除，內容保留為"宗氏李白妻"
             ['c_personid' => 3001, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => '宗氏李白妻', 'full_name' => '宗氏李白妻', 'source' => 'biog_main', 'source_key' => 'biog_main:3001', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
@@ -287,6 +307,33 @@ class BiogMainNameSearchTest extends TestCase {
         $this->assertContains(1001, $personIds, '搜尋「蘇」應該包含蘇軾');
         $this->assertContains(1002, $personIds, '搜尋「蘇」應該包含蘇轍');
         $this->assertContains(4001, $personIds, '搜尋「蘇」應該包含未設定朝代案例');
+    }
+
+    #[Test]
+    public function test_pinyin_umlaut_and_v_are_interchangeable(): void {
+        // #85：CBDB 拼音以 v 存 ü 韻（呂=Lv）。使用者輸入 ü（正規拼音）或 v（CBDB 慣例）皆應命中同一人。
+        $idsFor = function (string $q): array {
+            $result = BiogMainRepository::namesByQuery(new Request(['q' => $q]), 20);
+
+            return collect($result->items())->pluck('c_personid')->map(fn ($id) => (int) $id)->all();
+        };
+
+        $viaUmlaut = $idsFor('Lü Zhen'); // 使用者打正規拼音 ü
+        $viaV = $idsFor('Lv Zhen');      // 使用者打 CBDB 慣例 v
+
+        $this->assertContains(5001, $viaUmlaut, '以「Lü Zhen」搜尋應命中以 v 儲存的呂溱(5001)');
+        $this->assertContains(5001, $viaV, '以「Lv Zhen」搜尋應命中呂溱(5001)');
+        $this->assertSame($viaV, $viaUmlaut, 'ü 與 v 兩種輸入應回傳完全相同的結果集');
+    }
+
+    #[Test]
+    public function test_pinyin_normalizer_helper(): void {
+        // ü／Ü 折成 v／V；中文／無 ü 字串為 no-op；null 安全。
+        $this->assertSame('Lv Zhen', \App\Support\PinyinSearchNormalizer::umlautToV('Lü Zhen'));
+        $this->assertSame('NV', \App\Support\PinyinSearchNormalizer::umlautToV('NÜ'));
+        $this->assertSame('蘇軾', \App\Support\PinyinSearchNormalizer::umlautToV('蘇軾'));
+        $this->assertSame('Lv Zhen', \App\Support\PinyinSearchNormalizer::umlautToV('Lv Zhen'));
+        $this->assertSame('', \App\Support\PinyinSearchNormalizer::umlautToV(null));
     }
 
     #[Test]

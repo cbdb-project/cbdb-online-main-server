@@ -534,6 +534,42 @@ class OperationsProposalControllerTest extends TestCase {
     }
 
     #[Test]
+    public function testApproveUpdateProposalReKeyCollisionRejected(): void {
+        // #117：提案核准改鍵時，若變更後新主鍵已被另一列佔用 → 明確擋下（不覆寫他列、不冒未處理 500），提案維持待審。
+        DB::table('BIOG_SOURCE_DATA')->insert([
+            ['c_personid' => 200, 'c_textid' => 500, 'c_pages' => '12-15', 'c_notes' => 'orig'],
+            ['c_personid' => 200, 'c_textid' => 700, 'c_pages' => '88', 'c_notes' => 'occupier'],
+        ]);
+
+        $this->actingAs($this->makeAdmin());
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+            'resource' => 'BIOG_SOURCE_DATA',
+            'resource_id' => 'c_personid=200&c_textid=500&c_pages=12-15',
+            'resource_data' => [
+                'c_personid' => 200, 'c_textid' => 700, 'c_pages' => '88', 'c_notes' => 'orig',
+                '__key_columns' => ['c_personid', 'c_textid', 'c_pages'],
+                '__review_status' => 'pending',
+            ],
+            'resource_original' => ['c_personid' => 200, 'c_textid' => 500, 'c_pages' => '12-15', 'c_notes' => 'orig'],
+        ]);
+
+        $response = $this->post(route('operations.proposals.approve', $operation), [
+            'review_comment' => '改鍵到已佔用主鍵',
+        ]);
+        $response->assertRedirect(); // 乾淨擋下，非 500
+
+        // 兩列皆原樣保留（未覆寫、未刪除）。
+        $this->assertDatabaseHas('BIOG_SOURCE_DATA', ['c_personid' => 200, 'c_textid' => 500, 'c_pages' => '12-15', 'c_notes' => 'orig']);
+        $this->assertDatabaseHas('BIOG_SOURCE_DATA', ['c_personid' => 200, 'c_textid' => 700, 'c_pages' => '88', 'c_notes' => 'occupier']);
+        // 提案未核准（維持待審）。
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertNotSame('approved', $payload['__review_status'] ?? null);
+    }
+
+    #[Test]
     public function testApproveUpdateProposalReadbackUsesUnchangedOriginalKeyRepresentation(): void {
         DB::table('TEST_CODES')->insert([
             'code_id' => 'UP',

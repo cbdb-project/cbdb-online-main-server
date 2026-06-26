@@ -681,6 +681,17 @@ class OperationsProposalController extends Controller {
         }
 
         $updatePayload = $this->buildUpdatePayload($data, $keyColumns, $original);
+
+        // 改鍵碰撞偵測（#117，對齊 direct 路徑）：updatePayload 含任一主鍵欄即為改鍵；若變更後的新主鍵
+        // 已被另一列佔用，擋下並回明確錯誤，避免 UPDATE 撞 DB 複合主鍵約束冒成未處理的 500。
+        $reKeyedColumns = array_intersect($keyColumns, array_keys($updatePayload));
+        if (!empty($reKeyedColumns)) {
+            $newKeyRow = $this->resolveReadbackKeyRow($keyColumns, $original, $updatePayload);
+            if (DB::table($table)->where($this->buildKeyConditions($keyColumns, $newKeyRow))->exists()) {
+                throw new \RuntimeException('變更後的主鍵與現有記錄重複，無法核准此改鍵提案。');
+            }
+        }
+
         if (!empty($updatePayload)) {
             DB::table($table)->where($conditions)->update($updatePayload);
         }

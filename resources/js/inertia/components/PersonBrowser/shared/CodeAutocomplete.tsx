@@ -28,6 +28,11 @@ interface CommonProps {
     id?: string;
     'aria-invalid'?: boolean;
     'aria-describedby'?: string;
+    /**
+     * #98 opt-in：當 value 為哨兵（''/'0'/'-9999'）且無已解析 label 時，以此文字（淡灰）顯示，
+     * 讓使用者直觀知道「此欄已自動補預設值（如未詳）」。僅非主碼、可自動預設的碼欄才傳。
+     */
+    sentinelLabel?: string;
 }
 
 interface ListProps extends CommonProps {
@@ -117,7 +122,7 @@ async function fetchSearch(endpoint: string, q: string, extraQuery: Record<strin
 }
 
 export default function CodeAutocomplete(props: Props) {
-    const { value, initialLabel, onChange, placeholder, disabled, id } = props;
+    const { value, initialLabel, onChange, placeholder, disabled, id, sentinelLabel } = props;
     const ariaInvalid = props['aria-invalid'];
     const ariaDescribedBy = props['aria-describedby'];
 
@@ -225,7 +230,10 @@ export default function CodeAutocomplete(props: Props) {
         onChange('', '');
     };
 
-    const displayText = open ? query : selectedLabel;
+    // #98：value 為哨兵且無已解析 label 時，顯示 sentinelLabel（淡灰），表示「已自動補預設值」。
+    const isSentinelValue = value === '' || value === '0' || value === '-9999';
+    const showingSentinel = !open && !selectedLabel && !!sentinelLabel && isSentinelValue;
+    const displayText = open ? query : (selectedLabel || (showingSentinel ? sentinelLabel! : ''));
 
     return (
         <div ref={containerRef} style={wrapStyle}>
@@ -245,6 +253,7 @@ export default function CodeAutocomplete(props: Props) {
                 style={{
                     ...inputStyle,
                     ...(ariaInvalid ? invalidStyle : {}),
+                    ...(showingSentinel ? { color: '#94a3b8' } : {}),
                 }}
             />
             {value && !disabled ? (
@@ -332,7 +341,7 @@ const optionStyle: React.CSSProperties = {
     border: 'none',
     background: 'transparent',
     cursor: 'pointer',
-    fontSize: '0.85rem',
+    fontSize: '1rem',
     color: '#1f2937',
 };
 
@@ -343,6 +352,6 @@ const selectedOptionStyle: React.CSSProperties = {
 
 const hintStyle: React.CSSProperties = {
     padding: '8px 10px',
-    fontSize: '0.8rem',
+    fontSize: '0.9rem',
     color: '#64748b',
 };

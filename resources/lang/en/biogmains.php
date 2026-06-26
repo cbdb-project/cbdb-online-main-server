@@ -70,6 +70,10 @@ return [
     // basic_info dynasty required.
     'required_field' => 'Required',
     'dynasty_required' => 'Dynasty is required — please select a dynasty first.',
+    'mingzi_chn_required' => 'Given name (Chinese) is required',
+    'mingzi_required' => 'Pinyin given name is required',
+    'please_select_office' => 'Please select an office',
+    'please_select_text' => 'Please select a text',
     // basic_info grid redesign: derived/index read-only sub-block titles and derived full-name labels.
     'derived_auto_tag' => 'Auto-generated (read-only, merged from the names above)',
     'index_auto_tag' => 'Index year & index address (auto-computed periodically by the algorithm; read-only)',

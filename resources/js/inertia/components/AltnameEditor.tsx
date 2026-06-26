@@ -52,7 +52,7 @@ export default function AltnameEditor({
 }: Props) {
     const tr = (k: string, fb: string) => { const v = t ? t(k) : k; return v && v !== k ? v : fb; };
     // 對齊 legacy：c_sequence 不預設值（建立時必填、由使用者決定序號），避免捏造序號造成排序錯誤。
-    const base: Fields = { c_personid: String(personId), c_alt_name_chn: '', c_alt_name_type_code: '0', ...initialFields };
+    const base: Fields = { c_personid: String(personId), c_alt_name_chn: '', c_alt_name_type_code: '0', c_source: '0', ...initialFields };
     const [fields, setFields] = useState<Fields>(base);
     const [labels, setLabels] = useState<Fields>(initialLabels);
     const [savedSnapshot, setSavedSnapshot] = useState(JSON.stringify(base));

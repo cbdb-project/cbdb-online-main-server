@@ -197,6 +197,11 @@ export default function BasicInfoEditor({
 
     const save = async (mode: 'direct' | 'proposal') => {
         setSaving(true); setError(null); setMessage(null);
+        // 名（中）／拼音名必填（僅 direct：proposal 時後端會清掉這兩欄，故不擋提案）。空白即阻擋並提示。
+        if (mode === 'direct') {
+            if (!(fields.c_mingzi_chn ?? '').trim()) { setSaving(false); setError(tr('mingzi_chn_required', '「名（中）」為必填')); return; }
+            if (!(fields.c_mingzi ?? '').trim()) { setSaving(false); setError(tr('mingzi_required', '「拼音名」為必填')); return; }
+        }
         // 朝代 c_dy 必填（僅此基本資料編輯頁；其他編輯器的朝代維持非必填）。空（''/'0'）即阻擋並提示。
         if (!fields.c_dy || fields.c_dy === '0') {
             setSaving(false); setError(tr('dynasty_required', '朝代為必填欄位，請先選擇朝代')); return;
@@ -283,9 +288,9 @@ export default function BasicInfoEditor({
         <GridLabel label={label} code={code} required={required} />
     );
     // 可編輯文字欄（readonly 時灰底）。
-    const gText = (key: string, label: string, code?: string, opts: { readonly?: boolean; hint?: string; full?: boolean } = {}) => (
+    const gText = (key: string, label: string, code?: string, opts: { readonly?: boolean; hint?: string; full?: boolean; required?: boolean } = {}) => (
         <div style={opts.full ? gFull : undefined}>
-            {fLabel(label, code)}
+            {fLabel(label, code, opts.required)}
             <input type="text" value={fields[key] ?? ''} readOnly={opts.readonly} disabled={opts.readonly}
                 onChange={(e) => set(key, e.target.value)}
                 style={{ ...gInputStyle, ...(opts.readonly ? gReadonlyStyle : {}) }} />
@@ -339,14 +344,14 @@ export default function BasicInfoEditor({
                 {/* 中文姓名（生成姓名拼音的來源）。 */}
                 <div style={gGrid}>
                     {gText('c_surname_chn', tr('surname_chn', '姓（中）'), 'c_surname_chn')}
-                    {gText('c_mingzi_chn', tr('mingzi_chn', '名（中）'), 'c_mingzi_chn')}
+                    {gText('c_mingzi_chn', tr('mingzi_chn', '名（中）'), 'c_mingzi_chn', { required: true })}
                 </div>
                 {/* 按鈕作橋：取上方中文名、產出下方拼音；上下皆留白，使「作用範圍」一目了然。 */}
                 {canEdit ? <div style={pinyinRowStyle}><button type="button" style={gInfoBtn} onClick={() => void generatePinyin()}>{tr('generate_pinyin_btn', '生成姓名拼音')}</button></div> : null}
                 {/* 拼音（可手動修正）。 */}
                 <div style={gGrid}>
                     {gText('c_surname', 'Xing', 'c_surname')}
-                    {gText('c_mingzi', 'Ming', 'c_mingzi')}
+                    {gText('c_mingzi', 'Ming', 'c_mingzi', { required: true })}
                 </div>
                 {/* 外文／羅馬字（獨立，不受生成姓名拼音影響）。 */}
                 <div style={gGrid}>

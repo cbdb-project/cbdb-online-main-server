@@ -54,9 +54,10 @@ export default function AddressEditor({
     canEdit, canPropose, createEndpoint, mutateEndpoint, deleteEndpoint, indexUrl, t,
 }: Props) {
     const tr = (k: string, fb: string) => { const v = t ? t(k) : k; return v && v !== k ? v : fb; };
-    const [fields, setFields] = useState<Fields>({ c_personid: String(personId), c_sequence: '0', c_addr_type: '0', c_addr_id: '0', c_natal: '', ...initialFields });
+    const base: Fields = { c_personid: String(personId), c_sequence: '0', c_addr_type: '0', c_addr_id: '0', c_natal: '', c_source: '0', ...initialFields };
+    const [fields, setFields] = useState<Fields>(base);
     const [labels, setLabels] = useState<Fields>(initialLabels);
-    const [savedSnapshot, setSavedSnapshot] = useState(JSON.stringify({ c_personid: String(personId), c_sequence: '0', c_addr_type: '0', c_addr_id: '0', c_natal: '', ...initialFields }));
+    const [savedSnapshot, setSavedSnapshot] = useState(JSON.stringify(base));
     const msgTimer = useRef<number | null>(null);
     const originalPk = useRef<Record<string, number>>(Object.fromEntries(PK.map((k) => [k, Number(initialFields[k] ?? (k === 'c_personid' ? personId : 0))])));
     const [saving, setSaving] = useState(false);
@@ -186,7 +187,7 @@ export default function AddressEditor({
             {error ? <div style={gErrStyle}>{error}</div> : null}
 
             <div style={gGrid}>
-                {numRow('c_sequence', tr('migration_sequence', '遷移序號'), 'c_sequence', true, 4)}
+                {numRow('c_sequence', tr('migration_sequence', '遷移序號'), 'c_sequence', false, 4)}
 
                 {gridCell(tr('address_type', '地址類型'), { code: 'c_addr_type' },
                     <CodeAutocomplete mode="list" model="biogaddr" idKey="c_addr_type" labelKeys={['c_addr_desc_chn', 'c_addr_desc']}

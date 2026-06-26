@@ -98,7 +98,7 @@ export default function BasicInformationCreate() {
                         </div>
                     )}
 
-                    <FormField label={t('person_id_label')} htmlFor="c_personid" error={fieldErrors.c_personid?.[0]}>
+                    <FormField label={t('person_id_label')} htmlFor="c_personid" required error={fieldErrors.c_personid?.[0]}>
                         <Input
                             id="c_personid"
                             type="number"
@@ -108,7 +108,7 @@ export default function BasicInformationCreate() {
                         />
                     </FormField>
 
-                    <FormField label={t('name_chn_label')} htmlFor="c_name_chn" error={fieldErrors.c_name_chn?.[0] || fieldErrors.c_surname_chn?.[0] || fieldErrors.c_mingzi_chn?.[0]}>
+                    <FormField label={t('name_chn_label')} htmlFor="c_name_chn" required error={fieldErrors.c_name_chn?.[0] || fieldErrors.c_surname_chn?.[0] || fieldErrors.c_mingzi_chn?.[0]}>
                         <Input id="c_name_chn" value={nameChn} onChange={(e) => setNameChn(e.target.value)} required />
                         <p className="mt-1 text-xs text-muted-foreground">{t('name_autosplit_hint')}</p>
                     </FormField>

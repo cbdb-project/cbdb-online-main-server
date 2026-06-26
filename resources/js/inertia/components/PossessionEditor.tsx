@@ -61,7 +61,7 @@ export default function PossessionEditor({
     const tr = (k: string, fb: string) => { const v = t ? t(k) : k; return v && v !== k ? v : fb; };
     // 對齊 legacy possession/_form 的新增預設（select-vue selected="0" / c_source 預設 option 0）：
     // 新增時若使用者未動，仍須送出 '0'（未詳碼）而非省略致 DB 落 NULL。編輯模式 initialFields 會覆蓋這些預設。
-    const base: Fields = { c_personid: String(personId), c_possession_act_code: '0', c_source: '0', ...initialFields };
+    const base: Fields = { c_personid: String(personId), c_possession_act_code: '0', c_source: '0', c_measure_code: '0', ...initialFields };
     const [fields, setFields] = useState<Fields>(base);
     const [labels, setLabels] = useState<Fields>(initialLabels);
     const [addrItems, setAddrItems] = useState<AddrItem[]>(initialAddr);

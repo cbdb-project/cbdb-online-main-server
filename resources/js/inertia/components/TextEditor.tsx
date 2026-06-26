@@ -43,9 +43,11 @@ export default function TextEditor({
     canEdit, canPropose, createEndpoint, mutateEndpoint, deleteEndpoint, indexUrl, t,
 }: Props) {
     const tr = (k: string, fb: string) => { const v = t ? t(k) : k; return v && v !== k ? v : fb; };
-    const [fields, setFields] = useState<Fields>({ c_personid: String(personId), c_textid: '0', c_role_id: '0', ...initialFields });
+    const isCreate = mode === 'create';
+    const base: Fields = { c_personid: String(personId), c_textid: '0', c_role_id: '0', c_source: '0', ...initialFields };
+    const [fields, setFields] = useState<Fields>(base);
     const [labels, setLabels] = useState<Fields>(initialLabels);
-    const [savedSnapshot, setSavedSnapshot] = useState(JSON.stringify({ c_personid: String(personId), c_textid: '0', c_role_id: '0', ...initialFields }));
+    const [savedSnapshot, setSavedSnapshot] = useState(JSON.stringify(base));
     const msgTimer = useRef<number | null>(null);
     const originalPk = useRef<Record<string, number>>(Object.fromEntries(PK.map((k) => [k, Number(initialFields[k] ?? (k === 'c_personid' ? personId : 0))])));
     const [saving, setSaving] = useState(false);
@@ -72,12 +74,17 @@ export default function TextEditor({
 
     const save = async (sm: 'direct' | 'proposal') => {
         setSaving(true); setError(null); setMessage(null);
+        // 著述 c_textid 必填（拒絕 0/未詳）：僅新建時擋；編輯既有列不卡（避免舊「未詳」著述列只想改備註卻被迫補著述，
+        // 對齊出處編輯器 c_textid 的 create-only 守衛）。
+        if (isCreate && (!fields.c_textid || fields.c_textid === '0')) {
+            setSaving(false); setError(tr('please_select_text', '請選擇著述')); return;
+        }
         const pk = Object.fromEntries(PK.map((k) => [k, Number(fields[k] ?? 0)]));
         let changes: Record<string, string | null>;
         let target: Record<string, number>;
         let endpoint: string;
         let operation: string;
-        if (mode === 'create') {
+        if (isCreate) {
             endpoint = createEndpoint; operation = 'create'; target = pk;
             changes = {};
             for (const k of NON_PK) { const v = fields[k] ?? ''; if (v !== '') changes[k] = v; }
@@ -106,7 +113,7 @@ export default function TextEditor({
             if (auditRow) { for (const k of ['c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date']) { if (auditRow[k] != null) auditPatch[k] = String(auditRow[k]); } }
             if (Object.keys(auditPatch).length > 0) setFields((prev) => ({ ...prev, ...auditPatch }));
             setSavedSnapshot(JSON.stringify({ ...fields, ...auditPatch }));
-            if (mode === 'create') { window.location.assign(indexUrl); }
+            if (isCreate) { window.location.assign(indexUrl); }
             // 直接儲存若改了主鍵（著述／角色），列已改鍵；以「實際送出的 PK 變更」覆寫 originalPk，
             // 後續操作才指向新列。注意：不可用 fields 重建（清空欄位 Number('')=0 會讓 client 與 DB 失準），
             // 只套用 changes 內真正送出的 PK 欄位（清空未送出者保留原值）。
@@ -150,10 +157,10 @@ export default function TextEditor({
             {error ? <div style={gErrStyle}>{error}</div> : null}
 
             <div style={gGrid}>
-                {gridCell(tr('text_code', '著述'), { code: 'c_textid' },
+                {gridCell(tr('text_code', '著述'), { code: 'c_textid', required: isCreate },
                     <CodeAutocomplete mode="search" endpoint="/api/select/search/text"
                         value={fields.c_textid ?? '0'} initialLabel={labels.c_textid ?? ''} disabled={!editable}
-                        onChange={(v, l) => { set('c_textid', v); setLabel('c_textid', l); }} />)}
+                        onChange={(v, l) => { set('c_textid', v || '0'); setLabel('c_textid', l); }} />)}
 
                 {gridCell(tr('text_role', '角色'), { code: 'c_role_id' },
                     <CodeAutocomplete mode="list" model="role" idKey="c_role_id" labelKeys={['c_role_id', 'c_role_desc_chn', 'c_role_desc']}

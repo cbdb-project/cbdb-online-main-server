@@ -67,6 +67,7 @@ export default function OfficeEditor({
     canEdit, canPropose, createEndpoint, mutateEndpoint, deleteEndpoint, indexUrl, aiEnabled = false, aiModel, aiExtractEndpoint, t,
 }: Props) {
     const tr = (k: string, fb: string) => { const v = t ? t(k) : k; return v && v !== k ? v : fb; };
+    const isCreate = mode === 'create';
     // 新增預設對齊 legacy：c_office_id 預設 option 0、c_source 預設 0、旗標 0；編輯由 initialFields 覆蓋。
     const base: Fields = {
         c_personid: String(personId),
@@ -204,13 +205,18 @@ export default function OfficeEditor({
     // sm: direct/proposal；asNew: 編輯模式的「另存新檔」（走 create 配發新 c_posting_id）。
     const save = async (sm: 'direct' | 'proposal', asNew = false) => {
         setSaving(true); setError(null); setMessage(null);
-        const isCreate = mode === 'create' || asNew;
+        const creating = isCreate || asNew;
+        // 官名 c_office_id 必填（拒絕 0/未詳）：僅新建/另存新檔時擋；編輯既有列不卡
+        // （避免舊「未詳」資料只想改備註卻被迫補官名，亦對齊 legacy 僅 create 強制）。
+        if (creating && (!fields.c_office_id || fields.c_office_id === '0')) {
+            setSaving(false); setError(tr('please_select_office', '請選擇官名')); return;
+        }
         let changes: Record<string, string | null | number[] | number>;
         let target: Record<string, number>;
         let endpoint: string;
         let operation: string;
 
-        if (isCreate) {
+        if (creating) {
             endpoint = createEndpoint; operation = 'create'; target = {};
             changes = { c_office_id: Number(fields.c_office_id ?? 0) || 0 };
             for (const k of NON_PK) { const v = fields[k] ?? ''; if (v !== '') changes[k] = v; }
@@ -250,7 +256,7 @@ export default function OfficeEditor({
             if (auditRow) { for (const k of ['c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date']) { if (auditRow[k] != null) auditPatch[k] = String(auditRow[k]); } }
             if (Object.keys(auditPatch).length > 0) setFields((prev) => ({ ...prev, ...auditPatch }));
             setSavedSnapshot(JSON.stringify({ f: { ...fields, ...auditPatch }, a: addr }));
-            if (isCreate) { window.location.assign(indexUrl); } else if (sm === 'direct') {
+            if (creating) { window.location.assign(indexUrl); } else if (sm === 'direct') {
                 // c_office_id 可改 → 重同步 originalPk（c_posting_id 不變）。
                 originalPk.current = { c_office_id: Number(fields.c_office_id ?? 0) || 0, c_posting_id: originalPk.current.c_posting_id };
             }
@@ -305,7 +311,7 @@ export default function OfficeEditor({
 
                 {textRow('c_sequence', tr('sequence', '序號'), 'c_sequence', false, tr('sequence_same_note', '註：若有同時任命的官職，請手動填上相同的 sequence'))}
 
-                {gridCell(tr('office_name_field', '官名'), { code: 'c_office_id' },
+                {gridCell(tr('office_name_field', '官名'), { code: 'c_office_id', required: isCreate },
                     <CodeAutocomplete mode="search" endpoint="/api/select/search/office"
                         value={fields.c_office_id ?? '0'} initialLabel={labels.c_office_id ?? ''} disabled={!editable}
                         extraQuery={dynastyCode != null ? { c_dy: String(dynastyCode) } : undefined}

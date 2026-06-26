@@ -70,6 +70,10 @@ return [
     // basic_info 朝代必填。
     'required_field' => '必填',
     'dynasty_required' => '朝代為必填欄位，請先選擇朝代',
+    'mingzi_chn_required' => '「名（中）」為必填',
+    'mingzi_required' => '「拼音名」為必填',
+    'please_select_office' => '請選擇官名',
+    'please_select_text' => '請選擇著述',
     // basic_info 網格重設計：派生/指數唯讀子區塊標題與派生全名標籤。
     'derived_auto_tag' => '自動生成（唯讀，由上方姓名合併）',
     'index_auto_tag' => '指數年與指數地址（系統依算法定期自動計算，唯讀，無需手動填寫）',

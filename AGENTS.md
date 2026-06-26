@@ -37,6 +37,7 @@
 - 不要重新引入外部 CDN 的 jQuery、Bootstrap、DataTables。
 - 修改 `resources/js/**` 後，提交前需重新編譯前端。
 - React 列表不要使用 index 當 key；若資料有複合主鍵，請使用穩定 `pk`。
+- **必填欄位 create／update 一致**：若某欄位在新增（create）為必填，編輯（update）也必須維持必填——驗證邏輯與 UI 必填標記兩邊都要有，不可只擋 create。否則使用者在 update 時清空該欄仍能儲存，導致原本填好的資料被靜默清空。（驗證放在 `save()` 進入 create／update 分支之前，即可同時涵蓋兩者與 direct／proposal 四條路徑。）
 - 頁面級內聯腳本若要對 `#app` 內的伺服器渲染節點綁定事件（`addEventListener`），必須包在 `onViteReady(function(){ ... })` 內。`app.js` 會在 DOM ready 時 `createApp(...).mount('#app')`，把整個 `#app`（layout 的 `<div class="wrapper" id="app">`）重新編譯並重建所有節點，掛載前直接綁定的監聽器會隨舊節點被丟棄而失效。`onViteReady` 的回呼在 mount 之後才執行，可確保綁在最終節點上。委託到 `document`/`window` 的監聽器與內聯 `onclick` 屬性不受影響。
 
 ### 6. i18n（繁體中文 / 英文切換）

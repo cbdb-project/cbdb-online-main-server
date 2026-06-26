@@ -18,9 +18,11 @@ import {
  *    無獨立 Create handler；create/update 同走 /api/v2/create 與 /api/v2/mutate。
  * 2. 複合主鍵 3 段：c_personid, c_textid, c_pages。c_pages 為 varchar 主鍵，
  *    「未知」哨兵為 ''（空字串，非 '0'）；現行 DB 已有大量列以 '' 為慣例。
- * 3. **PK 在 update 模式為不可變**：BiogSourceRepository::validateMutation 會把任何 PK 變更
- *    判為 immutable（422）。故編輯模式中 c_textid / c_pages 唯讀，僅 c_notes / c_main_source /
- *    c_self_bio 可改；要改主鍵須刪除後重新新增（對齊 legacy 行為）。
+ * 3. **PK 在 update 模式可改鍵（#116）**：c_textid / c_pages 雖為主鍵，但編輯時可直接改鍵
+ *    （對齊 altname/address、legacy）；後端以 changes 取新值重寫主鍵、碰撞回 409。存後以
+ *    回傳 result.pk 重同步 originalPk（陷阱#5）。注意：清空 c_pages（改為空字串）會被 Laravel
+ *    ConvertEmptyStringsToNull 轉為 null，後端 `changes['c_pages'] ?? targetPk` 維持原頁碼，
+ *    故無法把頁碼「改空」，只能改為非空頁碼（此為刻意限制，非 bug）。
  * 4. 真實可寫欄位（MUTABLE_COLUMNS）= c_notes, c_main_source, c_self_bio。
  *    create 另接受 c_textid / c_pages（PK），其餘真實欄位皆在此清單內，無 phantom 欄位。
  */
@@ -116,7 +118,13 @@ export default function SourceEditor({
             endpoint = mutateEndpoint; operation = 'update'; target = originalPk.current;
             const initial: Fields = JSON.parse(savedSnapshot);
             changes = {};
-            // 僅可寫非主鍵欄位（PK 在 update 不可變）。備註空字串送 null；旗標送 0/1。
+            // 改鍵（#116）：c_textid / c_pages 為主鍵但編輯時可改鍵。c_textid 不可清空（須有效出處）。
+            const curTextid = (fields.c_textid ?? '').trim();
+            if (curTextid === '') { setSaving(false); setError(tr('please_select_source', '請選擇出處')); return; }
+            if (String(initial.c_textid ?? '') !== curTextid) changes.c_textid = curTextid;
+            const curPages = (fields.c_pages ?? '').trim();
+            if (String(initial.c_pages ?? '') !== curPages) changes.c_pages = curPages;
+            // 非主鍵欄位。備註空字串送 null；旗標送 0/1。
             const notesCur = fields.c_notes ?? '';
             if ((initial.c_notes ?? '') !== notesCur) changes.c_notes = notesCur === '' ? null : notesCur;
             for (const k of ['c_main_source', 'c_self_bio']) {
@@ -140,10 +148,23 @@ export default function SourceEditor({
             const auditRow = (sm === 'direct' && json?.result?.row && typeof json.result.row === 'object') ? json.result.row as Record<string, unknown> : null;
             const auditPatch: Fields = {};
             if (auditRow) { for (const k of ['c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date']) { if (auditRow[k] != null) auditPatch[k] = String(auditRow[k]); } }
-            if (Object.keys(auditPatch).length > 0) setFields((prev) => ({ ...prev, ...auditPatch }));
-            setSavedSnapshot(JSON.stringify({ ...fields, ...auditPatch }));
+            // 改鍵（#116）：以後端權威 result.pk 重同步 originalPk 與表單 PK 欄（含空 c_pages 被剝除而維持原值的情形），
+            // 避免 client/DB 主鍵失準（陷阱#5）；NEVER 從表單 fields 重建。
+            const pkPatch: Fields = {};
+            const rpk = (sm === 'direct' && json?.result?.pk && typeof json.result.pk === 'object') ? json.result.pk as Record<string, unknown> : null;
+            if (rpk && mode === 'edit') {
+                originalPk.current = {
+                    c_personid: Number(rpk.c_personid ?? originalPk.current.c_personid),
+                    c_textid: Number(rpk.c_textid ?? originalPk.current.c_textid),
+                    c_pages: String(rpk.c_pages ?? originalPk.current.c_pages),
+                };
+                if (rpk.c_textid != null) pkPatch.c_textid = String(rpk.c_textid);
+                if (rpk.c_pages != null) pkPatch.c_pages = String(rpk.c_pages);
+            }
+            const mergedPatch: Fields = { ...auditPatch, ...pkPatch };
+            if (Object.keys(mergedPatch).length > 0) setFields((prev) => ({ ...prev, ...mergedPatch }));
+            setSavedSnapshot(JSON.stringify({ ...fields, ...mergedPatch }));
             if (mode === 'create') { window.location.assign(indexUrl); }
-            // update 模式 PK 不可變，無需 re-sync originalPk。
         } catch (e) {
             setError(e instanceof Error ? e.message : tr('save_failed', '儲存失敗'));
         } finally { setSaving(false); }
@@ -180,18 +201,13 @@ export default function SourceEditor({
             ) : null}
 
             <div style={gGrid}>
-                {gridCell(tr('source_field', '出處'), { code: 'c_source', required: true, hint: mode === 'edit' ? tr('source_pk_immutable_hint', '出處與頁碼為主鍵，不可修改；如需更改請刪除後重新新增。') : undefined },
-                    mode === 'edit' ? (
-                        <input type="text" value={labels.c_textid ?? (fields.c_textid ?? '')} readOnly disabled
-                            style={{ ...gInputStyle, ...gReadonlyStyle }} />
-                    ) : (
-                        <CodeAutocomplete mode="search" endpoint="/api/select/search/text"
-                            value={fields.c_textid ?? ''} initialLabel={labels.c_textid ?? ''} disabled={!editable}
-                            onChange={(v, l) => { set('c_textid', v); setLabel('c_textid', l); }} />
-                    ))}
+                {gridCell(tr('source_field', '出處'), { code: 'c_source', required: true, hint: mode === 'edit' ? tr('source_pk_rekey_hint', '出處與頁碼為主鍵，可直接修改（改鍵）；若與現有出處＋頁碼重複將被擋下。') : undefined },
+                    <CodeAutocomplete mode="search" endpoint="/api/select/search/text"
+                        value={fields.c_textid ?? ''} initialLabel={labels.c_textid ?? ''} disabled={!editable}
+                        onChange={(v, l) => { set('c_textid', v); setLabel('c_textid', l); }} />)}
 
                 {gridCell(tr('pages_entries', '頁數/條目'), { code: 'c_pages' },
-                    gridInput({ value: fields.c_pages ?? '', onChange: (v) => set('c_pages', v), disabled: !editable || mode === 'edit' }))}
+                    gridInput({ value: fields.c_pages ?? '', onChange: (v) => set('c_pages', v), disabled: !editable }))}
 
                 {gridCell(tr('options', '選項'), { full: true },
                     <>

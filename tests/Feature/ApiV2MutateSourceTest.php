@@ -17,7 +17,8 @@ use Tests\TestCase;
  * 涵蓋 SourceMutationHandler（AbstractMutationHandler + BiogSourceRepository）的分歧形態：
  * - 複合主鍵 3 段 c_personid, c_textid, c_pages（c_pages 為 varchar 主鍵，哨兵 ''）。
  * - 真實可寫欄位 c_notes, c_main_source, c_self_bio（無 phantom 欄位；測試表結構對齊真實 DB）。
- * - update 模式 PK 不可變（變更 c_textid/c_pages → 422 immutable）。
+ * - update 模式可改鍵：c_textid/c_pages 為主鍵但編輯時可改鍵（對齊 altname/address、legacy；#116），
+ *   改鍵碰撞（新主鍵已存在）→ 409；c_personid 仍不可改。
  */
 class ApiV2MutateSourceTest extends TestCase {
     protected function setUp(): void {
@@ -278,8 +279,10 @@ class ApiV2MutateSourceTest extends TestCase {
     }
 
     #[Test]
-    public function testDirectSourceUpdateRejectsPkChangeAsImmutable(): void {
-        $this->actingAs($this->makeUser(email: 'src-immutable@example.com'));
+    public function testDirectSourceUpdateAllowsReKey(): void {
+        // #116：出處 c_textid / 頁碼 c_pages 為主鍵，但編輯時可改鍵（對齊 altname/address、legacy）。
+        // 場景：頁碼原不明確（12-15）→ 改成明確頁碼（20），同時改著述。
+        $this->actingAs($this->makeUser(email: 'src-rekey@example.com'));
         $this->postJson('/api/v2/create', $this->createPayload())->assertOk();
 
         $payload = [
@@ -288,14 +291,81 @@ class ApiV2MutateSourceTest extends TestCase {
             'mode' => 'direct',
             'operation' => 'update',
             'target' => ['pk' => ['c_personid' => 1000, 'c_textid' => 500, 'c_pages' => '12-15']],
-            'changes' => ['c_textid' => 700, 'c_notes' => 'x'],
+            'changes' => ['c_textid' => 700, 'c_pages' => '20', 'c_notes' => 'x'],
         ];
         $this->postJson('/api/v2/mutate', $payload)
-            ->assertStatus(422)
-            ->assertJson(['ok' => false, 'errors' => ['changes.c_textid' => ['immutable']]]);
+            ->assertOk()
+            ->assertJson(['ok' => true, 'operation' => 'update', 'result' => ['pk' => ['c_textid' => 700, 'c_pages' => '20']]]);
 
-        // 原列維持不變。
+        // 原主鍵列改鍵後消失；新主鍵列存在且帶上非主鍵變更（c_notes）。
+        $this->assertDatabaseMissing('BIOG_SOURCE_DATA', ['c_personid' => 1000, 'c_textid' => 500, 'c_pages' => '12-15']);
+        $this->assertDatabaseHas('BIOG_SOURCE_DATA', ['c_personid' => 1000, 'c_textid' => 700, 'c_pages' => '20', 'c_notes' => 'x']);
+    }
+
+    #[Test]
+    public function testDirectSourceUpdateReKeyCollisionRejected(): void {
+        // #116：改鍵碰撞——新主鍵已被另一列佔用 → 409，不覆寫他列。
+        $this->actingAs($this->makeUser(email: 'src-rekey-collide@example.com'));
+        $this->postJson('/api/v2/create', $this->createPayload())->assertOk(); // (1000,500,'12-15')
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'target' => ['pk' => ['c_personid' => 1000, 'c_textid' => 700, 'c_pages' => '88']],
+        ]))->assertOk(); // 佔住目標 (1000,700,'88')
+
+        $payload = [
+            'resource' => 'sources',
+            'person_id' => 1000,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_personid' => 1000, 'c_textid' => 500, 'c_pages' => '12-15']],
+            'changes' => ['c_textid' => 700, 'c_pages' => '88'],
+        ];
+        $this->postJson('/api/v2/mutate', $payload)
+            ->assertStatus(409)
+            ->assertJson(['ok' => false, 'errors' => ['target.pk' => ['duplicate']]]);
+
+        // 兩列皆原樣保留（未覆寫、未刪除）。
         $this->assertDatabaseHas('BIOG_SOURCE_DATA', ['c_personid' => 1000, 'c_textid' => 500, 'c_pages' => '12-15']);
+        $this->assertDatabaseHas('BIOG_SOURCE_DATA', ['c_personid' => 1000, 'c_textid' => 700, 'c_pages' => '88']);
+    }
+
+    #[Test]
+    public function testDirectSourceUpdateClearingPagesDoesNotSelfCollide(): void {
+        // #116 邊界：清空頁碼（送空字串）經 ConvertEmptyStringsToNull→null、`?? targetPk` 維持原頁碼，
+        // 應為「無變更」(422)，不可誤判改鍵撞到自己（假 409），且絕不可改動/刪除原列。
+        $this->actingAs($this->makeUser(email: 'src-clearpages@example.com'));
+        $this->postJson('/api/v2/create', $this->createPayload())->assertOk();
+
+        $payload = [
+            'resource' => 'sources', 'person_id' => 1000, 'mode' => 'direct', 'operation' => 'update',
+            'target' => ['pk' => ['c_personid' => 1000, 'c_textid' => 500, 'c_pages' => '12-15']],
+            'changes' => ['c_pages' => ''],
+        ];
+        $res = $this->postJson('/api/v2/mutate', $payload);
+        $this->assertNotSame(409, $res->getStatusCode(), '清空頁碼不可誤判為改鍵撞自己（假 409）');
+        $res->assertStatus(422);
+        // 原列維持不變（頁碼仍為 12-15）。
+        $this->assertDatabaseHas('BIOG_SOURCE_DATA', ['c_personid' => 1000, 'c_textid' => 500, 'c_pages' => '12-15']);
+    }
+
+    #[Test]
+    public function testProposalSourceUpdateReKeyReturnsNewPk(): void {
+        // #116 fix2：proposal 改鍵回傳「提案後新主鍵」（與其他可改鍵子資源契約一致），且不立即改動 DB。
+        DB::table('BIOG_SOURCE_DATA')->insert(['c_personid' => 1000, 'c_textid' => 500, 'c_pages' => '12-15', 'c_main_source' => 0, 'c_self_bio' => 0, 'c_notes' => null]);
+        $this->actingAs($this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'src-prop-rekey@example.com'));
+
+        $payload = [
+            'resource' => 'sources', 'person_id' => 1000, 'mode' => 'proposal', 'operation' => 'update',
+            'target' => ['pk' => ['c_personid' => 1000, 'c_textid' => 500, 'c_pages' => '12-15']],
+            'changes' => ['c_textid' => 700, 'c_pages' => '20'],
+            'meta' => ['comment' => '頁碼改明確'],
+        ];
+        $this->postJson('/api/v2/mutate', $payload)
+            ->assertOk()
+            ->assertJson(['ok' => true, 'mode' => 'proposal', 'operation' => 'update', 'result' => ['pk' => ['c_textid' => 700, 'c_pages' => '20']]]);
+
+        // proposal 不立即改 DB：原列仍在、新主鍵尚未產生。
+        $this->assertDatabaseHas('BIOG_SOURCE_DATA', ['c_personid' => 1000, 'c_textid' => 500, 'c_pages' => '12-15']);
+        $this->assertDatabaseMissing('BIOG_SOURCE_DATA', ['c_personid' => 1000, 'c_textid' => 700, 'c_pages' => '20']);
     }
 
     #[Test]

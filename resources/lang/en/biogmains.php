@@ -86,6 +86,7 @@ return [
     'please_select_place' => 'Please select a place',
     'please_select_role' => 'Please select a text role',
     'please_select_addr_type' => 'Please select an address type',
+    'source_pk_rekey_hint' => 'Text and pages are the primary key but can be edited directly (re-key); a duplicate of an existing text + pages will be rejected.',
     'pk_field_required' => 'Primary key fields cannot be empty',
     // Subresource delete confirmations (per type; do NOT use person.delete_confirm which deletes the person).
     'address_delete_confirm' => 'Are you sure you want to delete this address? This action cannot be undone.',

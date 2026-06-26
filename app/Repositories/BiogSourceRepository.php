@@ -61,19 +61,20 @@ class BiogSourceRepository {
             foreach (self::KEY_COLUMNS as $column) {
                 if (!array_key_exists($column, $targetPk)) {
                     $errors['target.pk.'.$column][] = 'required';
-
-                    continue;
-                }
-
-                if (
-                    array_key_exists($column, $changes)
-                    && $this->normalizeKeyColumnValue($column, $changes[$column]) !== $this->normalizeKeyColumnValue($column, $targetPk[$column])
-                ) {
-                    $errors['changes.'.$column][] = 'immutable';
                 }
             }
 
-            if ($this->extractRequestedUpdateFields($changes) === []) {
+            // c_personid 不可改鍵（不可把出處移至他人物）；c_textid / c_pages 允許改鍵（對齊
+            // altname/address 的 performUpdate）。新主鍵之有效性已於上方驗證；碰撞由 handler 偵測。
+            if (
+                array_key_exists('c_personid', $changes)
+                && $this->normalizeKeyColumnValue('c_personid', $changes['c_personid']) !== $this->normalizeKeyColumnValue('c_personid', $targetPk['c_personid'] ?? null)
+            ) {
+                $errors['changes.c_personid'][] = 'immutable';
+            }
+
+            // 至少一項實質變更：改鍵（c_textid/c_pages）或 MUTABLE 欄之一。
+            if (!$this->isReKeyed($targetPk, $changes) && $this->extractRequestedUpdateFields($changes) === []) {
                 $errors['changes'][] = 'no_supported_fields';
             }
         }
@@ -97,8 +98,9 @@ class BiogSourceRepository {
     public function buildUpdatePayload(int $personId, array $targetPk, array $changes, array $existing): array {
         return [
             'c_personid' => $personId,
-            'c_textid' => $this->normalizeTextId($targetPk['c_textid']),
-            'c_pages' => (string) $targetPk['c_pages'],
+            // c_textid / c_pages 允許改鍵：有送 changes 則取新值（落入 UPDATE 重寫主鍵），否則維持原 targetPk。
+            'c_textid' => $this->normalizeTextId($changes['c_textid'] ?? $targetPk['c_textid']),
+            'c_pages' => trim((string) ($changes['c_pages'] ?? $targetPk['c_pages'])),
             'c_notes' => array_key_exists('c_notes', $changes)
                 ? $this->normalizeNullableString($changes['c_notes'])
                 : $this->normalizeNullableString($existing['c_notes'] ?? null),
@@ -112,7 +114,8 @@ class BiogSourceRepository {
     }
 
     public function hasMeaningfulUpdate(array $existing, array $data): bool {
-        foreach (self::MUTABLE_COLUMNS as $column) {
+        // 改鍵（c_textid/c_pages 變更）亦屬實質變更；否則只比 MUTABLE 欄會把「只改頁碼/著述」誤判為無變更。
+        foreach (array_merge(['c_textid', 'c_pages'], self::MUTABLE_COLUMNS) as $column) {
             if ($this->normalizeComparableValue($existing[$column] ?? null) !== $this->normalizeComparableValue($data[$column] ?? null)) {
                 return true;
             }
@@ -149,7 +152,8 @@ class BiogSourceRepository {
         $operation = $this->storeProposalOperation(Operation::TYPE_PROPOSAL_UPDATE, $personId, $data, $existing, $comment);
 
         return [
-            'pk' => $this->extractPk($targetPk),
+            // 改鍵（#116）：回傳「提案後的新主鍵」（取自 $data），與其他可改鍵子資源 handler 契約一致（非舊 targetPk）。
+            'pk' => $this->extractPk($data),
             'operation_id' => $operation->id,
         ];
     }
@@ -365,5 +369,21 @@ class BiogSourceRepository {
             'c_textid' => (int) $data['c_textid'],
             'c_pages' => (string) $data['c_pages'],
         ];
+    }
+
+    /**
+     * 是否改鍵：c_textid 或 c_pages 的「實際寫入值」與 targetPk 不同（正規化後比較）。c_personid 不算（禁止改）。
+     * 須與 buildUpdatePayload 的 `$changes[col] ?? $targetPk[col]` 一致——例如 ConvertEmptyStringsToNull
+     * 把空字串 c_pages 變更轉為 null 時，實際仍維持 targetPk（非改鍵），避免「只清空頁碼」誤判改鍵→撞到自己→假 409。
+     */
+    public function isReKeyed(array $targetPk, array $changes): bool {
+        foreach (['c_textid', 'c_pages'] as $column) {
+            $newValue = $changes[$column] ?? ($targetPk[$column] ?? null);
+            if ($this->normalizeKeyColumnValue($column, $newValue) !== $this->normalizeKeyColumnValue($column, $targetPk[$column] ?? null)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

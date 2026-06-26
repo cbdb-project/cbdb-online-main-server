@@ -86,6 +86,7 @@ return [
     'please_select_place' => '請選擇地名',
     'please_select_role' => '請選擇著述角色',
     'please_select_addr_type' => '請選擇地址類別',
+    'source_pk_rekey_hint' => '出處與頁碼為主鍵，可直接修改（改鍵）；若與現有出處＋頁碼重複將被擋下。',
     'pk_field_required' => '主鍵欄位不可為空',
     // 子資源刪除確認（按類型，勿用刪除「人物」的 person.delete_confirm）。
     'address_delete_confirm' => '確定要刪除此地址嗎？此操作無法撤銷。',

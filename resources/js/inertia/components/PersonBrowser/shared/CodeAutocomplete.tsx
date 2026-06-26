@@ -53,8 +53,11 @@ type Props = ListProps | SearchProps;
 const listCache = new Map<string, Promise<CodeOption[]>>();
 
 async function fetchList(model: string, idKey: string, labelKeys: string[]): Promise<CodeOption[]> {
-    if (!listCache.has(model)) {
-        listCache.set(model, (async () => {
+    // 快取鍵須含 idKey/labelKeys：同一 model 在不同元件用不同 idKey/labelKeys 時，
+    // 否則先載入者的 value/label 組法會污染後者（#111）。
+    const cacheKey = `${model}|${idKey}|${labelKeys.join(',')}`;
+    if (!listCache.has(cacheKey)) {
+        listCache.set(cacheKey, (async () => {
             const response = await fetch(`/api/select/${model}`, {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
@@ -82,7 +85,7 @@ async function fetchList(model: string, idKey: string, labelKeys: string[]): Pro
                 .filter(Boolean) as CodeOption[];
         })());
     }
-    return listCache.get(model)!;
+    return listCache.get(cacheKey)!;
 }
 
 async function fetchSearch(endpoint: string, q: string, extraQuery: Record<string, string> = {}): Promise<CodeOption[]> {

@@ -167,15 +167,16 @@ export default function TextEditor({
             {error ? <div style={gErrStyle}>{error}</div> : null}
 
             <div style={gGrid}>
-                {gridCell(tr('text_code', '著述'), { code: 'c_textid', required: true },
-                    <CodeAutocomplete mode="search" endpoint="/api/select/search/text"
-                        value={fields.c_textid ?? '0'} initialLabel={labels.c_textid ?? ''} disabled={!editable}
-                        onChange={(v, l) => { set('c_textid', v || '0'); setLabel('c_textid', l); }} />)}
-
+                {/* 角色置最左（首位，使用者指定）；著述其後 */}
                 {gridCell(tr('text_role', '角色'), { code: 'c_role_id', required: true },
                     <CodeAutocomplete mode="list" model="role" idKey="c_role_id" labelKeys={['c_role_id', 'c_role_desc_chn', 'c_role_desc']}
                         value={fields.c_role_id ?? '0'} initialLabel={labels.c_role_id ?? ''} disabled={!editable}
                         onChange={(v, l) => { set('c_role_id', v); setLabel('c_role_id', l); }} />)}
+
+                {gridCell(tr('text_code', '著述'), { code: 'c_textid', required: true },
+                    <CodeAutocomplete mode="search" endpoint="/api/select/search/text"
+                        value={fields.c_textid ?? '0'} initialLabel={labels.c_textid ?? ''} disabled={!editable}
+                        onChange={(v, l) => { set('c_textid', v || '0'); setLabel('c_textid', l); }} />)}
 
                 {gridCell(tr('source_field', '出處'), { code: 'c_source' },
                     <CodeAutocomplete mode="search" endpoint="/api/select/search/text"

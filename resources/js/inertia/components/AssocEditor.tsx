@@ -471,46 +471,34 @@ export default function AssocEditor({
                 />
             ) : null}
 
-            <div style={gGrid}>
-                {textRow('c_sequence', tr('sequence', '序號'), 'c_sequence')}
+            {/* 核心社會關係：序號 + 社會關係碼 | 關聯人物 + 互逆配對碼。 */}
+            <GridSection title={tr('assoc_core_section', '社會關係')}>
+                <div style={gGrid}>
+                    {textRow('c_sequence', tr('sequence', '序號'), 'c_sequence')}
+                    {searchRow('c_assoc_code', tr('assoc_field', '社會關係'), 'c_assoc_code', '/api/select/search/assoccode', assocHighlight)}
+                    {searchRow('c_assoc_id', tr('assoc_person', '關聯人物'), 'c_assoc_id', '/api/select/search/biog')}
+                    {/* 互逆社會關係碼：依社會關係碼取候選，create 預設第一個（同 legacy）；反向有歧義故可手選。 */}
+                    {reversePairRow(
+                        tr('reverse_assoc_pair_label', '互逆社會關係碼'), 'c_assocship_pair',
+                        pairCandidates, reversePair,
+                        (v) => { setReversePair(v); setPairTouched(true); },
+                        tr('reverse_pair_assoc_hint', '對方人物身上會建立鏡像社會關係；此為其「社會關係碼」的反向碼，系統自動雙向同步。預設取建議反向碼，可手動更正（一個關係可能有多個合法反向）。'),
+                        tr('no_paired_assoc', '無對應社會關係'),
+                    )}
+                </div>
+            </GridSection>
 
-                {/* 主關係：社會關係碼 | 關聯人物（兩個並列的網格欄位）。 */}
-                {searchRow('c_assoc_code', tr('assoc_field', '社會關係'), 'c_assoc_code', '/api/select/search/assoccode', assocHighlight)}
-                {searchRow('c_assoc_id', tr('assoc_person', '關聯人物'), 'c_assoc_id', '/api/select/search/biog')}
+            {/* 時間：關係始年 / 末年。 */}
+            <GridSection title={tr('assoc_time_section', '時間')}>
+                <div style={gGrid}>
+                    {gridCell(tr('assoc_start_year', '關係始年'), { code: 'first_year', full: true },
+                        <EraTimeField values={buildEra(FY)} onChange={(p) => applyEra(FY, p)} dynastyCode={dynastyCode} showRange showLunar disabled={!editable} />)}
+                    {gridCell(tr('assoc_end_year', '關係末年'), { code: 'last_year', full: true },
+                        <EraTimeField values={buildEra(LY)} onChange={(p) => applyEra(LY, p)} dynastyCode={dynastyCode} showRange showLunar disabled={!editable} />)}
+                </div>
+            </GridSection>
 
-                {/* 互逆社會關係碼：依社會關係碼取候選，create 預設第一個（同 legacy）；反向有歧義（一碼可能有 c_assoc_pair/c_assoc_pair2）故可手選。 */}
-                {reversePairRow(
-                    tr('reverse_assoc_pair_label', '互逆社會關係碼'), 'c_assocship_pair',
-                    pairCandidates, reversePair,
-                    (v) => { setReversePair(v); setPairTouched(true); },
-                    tr('reverse_pair_assoc_hint', '對方人物身上會建立鏡像社會關係；此為其「社會關係碼」的反向碼，系統自動雙向同步。預設取建議反向碼，可手動更正（一個關係可能有多個合法反向）。'),
-                    tr('no_paired_assoc', '無對應社會關係'),
-                )}
-
-                {gridCell(tr('assoc_start_year', '關係始年'), { code: 'first_year', full: true },
-                    <EraTimeField values={buildEra(FY)} onChange={(p) => applyEra(FY, p)} dynastyCode={dynastyCode} showRange showLunar disabled={!editable} />)}
-                {gridCell(tr('assoc_end_year', '關係末年'), { code: 'last_year', full: true },
-                    <EraTimeField values={buildEra(LY)} onChange={(p) => applyEra(LY, p)} dynastyCode={dynastyCode} showRange showLunar disabled={!editable} />)}
-
-                {gridCell(tr('notes_field', '備註'), { code: 'c_notes', full: true },
-                    <textarea value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
-
-                {listRow('c_topic_code', tr('topic_field', '主題'), 'c_topic_code', 'topic', 'c_topic_code', ['c_topic_desc_chn', 'c_topic_desc'])}
-                {listRow('c_occasion_code', tr('occasion_field', '場合'), 'c_occasion_code', 'occasion', 'c_occasion_code', ['c_occasion_desc_chn', 'c_occasion_desc'])}
-
-                {textRow('c_text_title', tr('text_title_field', '作品/出處標題'), 'c_text_title')}
-                {textRow('c_assoc_count', tr('assoc_count_field', '數量'), 'c_assoc_count', false, tr('assoc_count_hint', '此欄位僅適用於書信：當無法以標題及日期區分多次信件時，則僅建「一筆」社會關係，並將信件總數填於此欄。請填阿拉伯數字'))}
-
-                {searchRow('c_tertiary_personid', tr('tertiary_person', '中介人物'), 'c_tertiary_personid', '/api/select/search/biog')}
-                {textRow('c_tertiary_type_notes', tr('tertiary_notes', '中介說明'), 'c_tertiary_type_notes')}
-                {searchRow('c_assoc_claimer_id', tr('claimer_person', '見證人物'), 'c_assoc_claimer_id', '/api/select/search/biog')}
-                {searchRow('c_addr_id', tr('place_name', '地點'), 'c_addr_id', '/api/select/search/addr')}
-
-                {gridCell(tr('socialinst_field', '社會機構'), { code: 'social_institution' },
-                    <CodeAutocomplete mode="search" endpoint="/api/select/search/socialinstcode" value={instValue} initialLabel={labels.c_inst_code ?? ''} disabled={!editable} onChange={onInstChange} />)}
-            </div>
-
-            {/* 親屬關係（選填）：與社會關係並存的親屬／關聯親屬欄，下移至此避免與主社會關係混淆；兩組各有互逆配對碼（同 legacy assoc/edit）。 */}
+            {/* 親屬關係（選填）：與社會關係並存的親屬／關聯親屬欄；兩組各有互逆配對碼（同 legacy assoc/edit）。 */}
             <GridSection title={tr('assoc_kin_section', '親屬關係（選填）')}>
                 <div style={gGrid}>
                     {searchRow('c_kin_code', tr('kinship_field', '親屬關係'), 'c_kin_code', '/api/select/search/kincode')}
@@ -534,13 +522,33 @@ export default function AssocEditor({
                 </div>
             </GridSection>
 
-            <div style={gGrid}>
-                {gridCell(tr('source_field', '出處'), { code: 'c_source' },
-                    <CodeAutocomplete mode="search" endpoint="/api/select/search/text" value={fields.c_source ?? '0'} initialLabel={labels.c_source ?? ''} disabled={!editable} onChange={(v, l) => { set('c_source', v || '0'); setLabel('c_source', l); }} />)}
-                {textRow('c_pages', tr('pages_entries', '頁碼'), 'c_pages', sourceHighlight)}
-            </div>
+            {/* 分類 / 情境 / 關係人：主題、場合、中介/見證人物、地點、社會機構。 */}
+            <GridSection title={tr('assoc_context_section', '分類 / 情境 / 關係人')}>
+                <div style={gGrid}>
+                    {listRow('c_topic_code', tr('topic_field', '主題'), 'c_topic_code', 'topic', 'c_topic_code', ['c_topic_desc_chn', 'c_topic_desc'])}
+                    {listRow('c_occasion_code', tr('occasion_field', '場合'), 'c_occasion_code', 'occasion', 'c_occasion_code', ['c_occasion_desc_chn', 'c_occasion_desc'])}
+                    {searchRow('c_tertiary_personid', tr('tertiary_person', '中介人物'), 'c_tertiary_personid', '/api/select/search/biog')}
+                    {textRow('c_tertiary_type_notes', tr('tertiary_notes', '中介說明'), 'c_tertiary_type_notes')}
+                    {searchRow('c_assoc_claimer_id', tr('claimer_person', '見證人物'), 'c_assoc_claimer_id', '/api/select/search/biog')}
+                    {searchRow('c_addr_id', tr('place_name', '地點'), 'c_addr_id', '/api/select/search/addr')}
+                    {gridCell(tr('socialinst_field', '社會機構'), { code: 'social_institution' },
+                        <CodeAutocomplete mode="search" endpoint="/api/select/search/socialinstcode" value={instValue} initialLabel={labels.c_inst_code ?? ''} disabled={!editable} onChange={onInstChange} />)}
+                </div>
+            </GridSection>
 
-            <TextpersonPair personId={personId} label={tr('candidate_source_title', '候選出處')} onPick={onPickTextperson} disabled={!editable} />
+            {/* 出處與內容：作品/出處標題、出處、頁碼、數量、備註、候選出處。 */}
+            <GridSection title={tr('assoc_source_section', '出處與內容')}>
+                <div style={gGrid}>
+                    {textRow('c_text_title', tr('text_title_field', '作品/出處標題'), 'c_text_title')}
+                    {gridCell(tr('source_field', '出處'), { code: 'c_source' },
+                        <CodeAutocomplete mode="search" endpoint="/api/select/search/text" value={fields.c_source ?? '0'} initialLabel={labels.c_source ?? ''} disabled={!editable} onChange={(v, l) => { set('c_source', v || '0'); setLabel('c_source', l); }} />)}
+                    {textRow('c_pages', tr('pages_entries', '頁碼'), 'c_pages', sourceHighlight)}
+                    {textRow('c_assoc_count', tr('assoc_count_field', '數量'), 'c_assoc_count', false, tr('assoc_count_hint', '此欄位僅適用於書信：當無法以標題及日期區分多次信件時，則僅建「一筆」社會關係，並將信件總數填於此欄。請填阿拉伯數字'))}
+                    {gridCell(tr('notes_field', '備註'), { code: 'c_notes', full: true },
+                        <textarea value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
+                </div>
+                <TextpersonPair personId={personId} label={tr('candidate_source_title', '候選出處')} onPick={onPickTextperson} disabled={!editable} />
+            </GridSection>
 
             {mode === 'edit' && (fields.c_created_by || fields.c_modified_by) ? (
                 <div style={gAuditWrapStyle}>

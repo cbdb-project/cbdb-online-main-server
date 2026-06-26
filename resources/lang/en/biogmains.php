@@ -145,6 +145,7 @@ return [
     'nth_attempt' => 'Nth Attempt',
     'arabic_numerals_hint' => 'Enter Arabic numerals (half-width)',
     'exam_subject' => 'Exam Subject',
+    'entry_exam_field' => 'Entry Subject',
     'parental_status' => 'Parental Status',
     'location' => 'Location',
     'entry_age' => 'Entry Age',
@@ -180,6 +181,11 @@ return [
     'reverse_assoc_kin_pair_label' => 'Reciprocal associated-kinship code',
     'reverse_assoc_kin_pair_hint' => 'The reverse of the associated kinship (c_assoc_kin_code); synced both ways on the mirror row. Defaults to the suggested reverse, editable.',
     'assoc_kin_section' => 'Kinship relation (optional)',
+    // assoc editor block-section titles (#91).
+    'assoc_core_section' => 'Main relation',
+    'assoc_time_section' => 'Time',
+    'assoc_context_section' => 'Category / Context / People',
+    'assoc_source_section' => 'Source & Content',
     'pair_only_proposal_hint' => 'To repair a reciprocal pairing code, use "Save Directly"; to submit a proposal, change at least one relation field.',
     // #66 bidirectional mirror sync conflict notice.
     'mirror_conflict_title' => 'The corresponding fields on the other record already differ',

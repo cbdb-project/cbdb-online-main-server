@@ -13,7 +13,7 @@ import {
 /**
  * 入仕（entries）編輯器（對齊 legacy biogmains/entries/_form.blade.php，非 person-browser）。
  * 欄位：序號 / 入仕途徑(entry 搜尋) / 入仕年(EraTimeField 無農曆，year 即主鍵 c_year) /
- * 等第 / 應試次數 / 應試領域 / 父祖狀態(parentstatus 清單) / 入仕地(addr 搜尋，朝代範圍過濾) /
+ * 等第 / 應試次數 / 入仕科目 / 父祖狀態(parentstatus 清單) / 入仕地(addr 搜尋，朝代範圍過濾) /
  * 年齡 / 任官註記 / 親屬碼·親屬人(kincode/biog 搜尋) / 社會關係碼·關係人(assoccode/biog 搜尋) /
  * 社會機構(socialinstcode 合併搜尋→拆 c_inst_code + c_inst_name_code) / 出處·頁碼·備註 / textperson_pair。
  *
@@ -229,7 +229,7 @@ export default function EntryEditor({
 
                 {textRow('c_exam_rank', tr('exam_ranking', '等第'), 'c_exam_rank')}
                 {textRow('c_attempt_count', tr('entry_attempt_count', '應試次數'), 'c_attempt_count', false, tr('arabic_numerals_hint', '請填阿拉伯數字(半形/半角)'))}
-                {textRow('c_exam_field', tr('entry_exam_field', '應試領域'), 'c_exam_field')}
+                {textRow('c_exam_field', tr('entry_exam_field', '入仕科目'), 'c_exam_field')}
 
                 {gridCell(tr('entry_parental_status', '父祖狀態'), { code: 'c_parental_status_code' },
                     <CodeAutocomplete mode="list" model="parentstatus" idKey="c_parental_status_code"

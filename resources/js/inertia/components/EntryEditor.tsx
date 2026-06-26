@@ -6,7 +6,7 @@ import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import TextpersonPair from './PersonEditorShared/TextpersonPair';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
 import {
-    gridCardStyle, gGrid, gInputStyle, gReadonlyStyle, gOkStyle, gErrStyle,
+    gridCardStyle, gGrid, gPairRow, gInputStyle, gReadonlyStyle, gOkStyle, gErrStyle,
     gSubmitRow, gBtnGroupRight, gPrimaryBtn, gInfoBtn, gDangerBtn, gCancelBtn,
     gAuditWrapStyle, gridSectionHeadStyle, GridLabel, gridCell, gridInput,
 } from './PersonEditorShared/grid';
@@ -283,12 +283,15 @@ export default function EntryEditor({
                         value={instCombined} initialLabel={labels.c_inst_code ?? ''} disabled={!editable}
                         onChange={onPickInst} />)}
 
-                {gridCell(tr('source_field', '出處'), { code: 'c_source' },
-                    <CodeAutocomplete mode="search" endpoint="/api/select/search/text"
-                        value={fields.c_source ?? ''} initialLabel={labels.c_source ?? ''} disabled={!editable}
-                        aria-invalid={sourceHighlight}
-                        onChange={(v, l) => { set('c_source', v || '0'); setLabel('c_source', l); }} />)}
-                {textRow('c_pages', tr('pages_entries', '頁碼'), 'c_pages', sourceHighlight)}
+                {/* 出處 + 頁碼 共佔一行（gPairRow：寬螢幕也並排、不被外層拆散） */}
+                <div style={gPairRow}>
+                    {gridCell(tr('source_field', '出處'), { code: 'c_source' },
+                        <CodeAutocomplete mode="search" endpoint="/api/select/search/text"
+                            value={fields.c_source ?? ''} initialLabel={labels.c_source ?? ''} disabled={!editable}
+                            aria-invalid={sourceHighlight}
+                            onChange={(v, l) => { set('c_source', v || '0'); setLabel('c_source', l); }} />)}
+                    {textRow('c_pages', tr('pages_entries', '頁碼'), 'c_pages', sourceHighlight)}
+                </div>
                 {gridCell(tr('notes_field', '備註'), { code: 'c_notes', full: true },
                     <textarea value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
             </div>

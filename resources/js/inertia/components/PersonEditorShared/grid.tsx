@@ -17,6 +17,9 @@ export const gridSectionHeadStyle: React.CSSProperties = { fontSize: '0.82rem', 
 // 響應式雙欄：寬螢幕 2 欄、窄螢幕自動降為 1 欄（min(100%,22rem) 使極窄時不溢出）。
 export const gGrid: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 22rem), 1fr))', gap: '14px 22px', marginBottom: 4 };
 export const gFull: React.CSSProperties = { gridColumn: '1 / -1' };
+// 成對欄位「共佔一行」：占滿外層整行（1/-1），內部再以響應式雙欄並排兩欄；
+// 避免外層 auto-fit 在寬螢幕變 3 欄時把本該並排的兩欄拆到不同列（窄螢幕仍自動堆疊）。
+export const gPairRow: React.CSSProperties = { gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 16rem), 1fr))', gap: '14px 22px' };
 export const gLabelStyle: React.CSSProperties = { display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: 5 };
 export const gCodeStyle: React.CSSProperties = { fontWeight: 400, color: 'var(--muted-foreground)', fontSize: '0.78rem', marginLeft: 6 };
 export const gInputStyle: React.CSSProperties = { width: '100%', height: 40, padding: '0 11px', borderRadius: 8, border: '1px solid var(--input)', fontSize: '1rem', boxSizing: 'border-box', background: 'var(--background)', color: 'var(--foreground)' };

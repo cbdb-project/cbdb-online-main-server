@@ -11,18 +11,18 @@ import RequiredMark from './RequiredMark';
  */
 
 // ─── 樣式常數（逐字對齊 BasicInfoEditor 既有值）──────────────────────────────
-export const gridCardStyle: React.CSSProperties = { background: '#fff', border: '1px solid #dee2e6', borderRadius: 8, padding: 20 };
+export const gridCardStyle: React.CSSProperties = { background: 'var(--card)', color: 'var(--card-foreground)', border: '1px solid var(--border)', borderRadius: 8, padding: 20 };
 export const gridSectionStyle: React.CSSProperties = { marginBottom: 22 };
-export const gridSectionHeadStyle: React.CSSProperties = { fontSize: '0.82rem', fontWeight: 700, color: '#255f93', letterSpacing: '0.06em', textTransform: 'uppercase', paddingBottom: 8, marginBottom: 14, borderBottom: '1px solid #e6eef6' };
+export const gridSectionHeadStyle: React.CSSProperties = { fontSize: '0.82rem', fontWeight: 700, color: 'var(--primary)', letterSpacing: '0.06em', textTransform: 'uppercase', paddingBottom: 8, marginBottom: 14, borderBottom: '1px solid var(--border)' };
 // 響應式雙欄：寬螢幕 2 欄、窄螢幕自動降為 1 欄（min(100%,22rem) 使極窄時不溢出）。
 export const gGrid: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 22rem), 1fr))', gap: '14px 22px', marginBottom: 4 };
 export const gFull: React.CSSProperties = { gridColumn: '1 / -1' };
-export const gLabelStyle: React.CSSProperties = { display: 'block', fontSize: '0.9rem', fontWeight: 600, color: '#374151', marginBottom: 5 };
-export const gCodeStyle: React.CSSProperties = { fontWeight: 400, color: '#9aa4b2', fontSize: '0.78rem', marginLeft: 6 };
-export const gInputStyle: React.CSSProperties = { width: '100%', height: 40, padding: '0 11px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '1rem', boxSizing: 'border-box', background: '#fff' };
-export const gHintStyle: React.CSSProperties = { display: 'block', marginTop: 4, fontSize: '0.8rem', color: '#6b7280' };
-export const gReadonlyStyle: React.CSSProperties = { background: '#f5f5f5', cursor: 'not-allowed' };
-export const gAuditWrapStyle: React.CSSProperties = { marginTop: 16, paddingTop: 12, borderTop: '1px solid #e5e7eb' };
+export const gLabelStyle: React.CSSProperties = { display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--foreground)', marginBottom: 5 };
+export const gCodeStyle: React.CSSProperties = { fontWeight: 400, color: 'var(--muted-foreground)', fontSize: '0.78rem', marginLeft: 6 };
+export const gInputStyle: React.CSSProperties = { width: '100%', height: 40, padding: '0 11px', borderRadius: 8, border: '1px solid var(--input)', fontSize: '1rem', boxSizing: 'border-box', background: 'var(--background)', color: 'var(--foreground)' };
+export const gHintStyle: React.CSSProperties = { display: 'block', marginTop: 4, fontSize: '0.8rem', color: 'var(--muted-foreground)' };
+export const gReadonlyStyle: React.CSSProperties = { background: 'var(--muted)', cursor: 'not-allowed' };
+export const gAuditWrapStyle: React.CSSProperties = { marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border)' };
 
 // 動作列：主要動作靠左、危險/另存靠右。
 export const gSubmitRow: React.CSSProperties = { display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap', alignItems: 'center' };
@@ -32,7 +32,7 @@ export const gPrimaryBtn: React.CSSProperties = { ...actionBtnBase, border: '1px
 export const gInfoBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid #0891b2', background: '#0891b2', color: '#fff' };
 export const gDangerBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid #dc3545', background: '#dc3545', color: '#fff' };
 export const gSuccessBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid #28a745', background: '#28a745', color: '#fff' };
-export const gCancelBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid #cbd5e1', background: '#fff', color: '#374151' };
+export const gCancelBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid var(--input)', background: 'var(--card)', color: 'var(--foreground)' };
 
 // 訊息橫幅。
 export const gOkStyle: React.CSSProperties = { background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', padding: '8px 12px', borderRadius: 6, marginBottom: 10, fontSize: '1rem' };

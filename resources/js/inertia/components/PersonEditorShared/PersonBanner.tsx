@@ -124,20 +124,20 @@ const wrapStyle: React.CSSProperties = { marginBottom: 16 };
 const historyRowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'flex-end', marginBottom: 4 };
 const historyLinkStyle: React.CSSProperties = {
     display: 'inline-flex', alignItems: 'center', padding: '4px 11px', fontSize: '0.85rem',
-    borderRadius: 4, border: '1px solid #c9d5e2', background: '#f8fafc', color: '#204467', textDecoration: 'none',
+    borderRadius: 4, border: '1px solid var(--border)', background: 'var(--secondary)', color: 'var(--secondary-foreground)', textDecoration: 'none',
 };
-const navStyle: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 2, borderBottom: '1px solid #dee2e6', paddingBottom: 0 };
+const navStyle: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 2, borderBottom: '1px solid var(--border)', paddingBottom: 0 };
 const tabStyle: React.CSSProperties = {
     display: 'inline-flex', alignItems: 'center', gap: 2, padding: '8px 12px',
     border: '1px solid transparent', borderTopLeftRadius: 6, borderTopRightRadius: 6,
-    background: 'none', color: '#255f93', fontSize: '0.95rem', cursor: 'pointer',
+    background: 'none', color: 'var(--primary)', fontSize: '0.95rem', cursor: 'pointer',
     marginBottom: -1, textDecoration: 'none',
 };
 const tabActiveStyle: React.CSSProperties = {
-    color: '#495057', background: '#fff', borderColor: '#dee2e6 #dee2e6 #fff',
+    color: 'var(--foreground)', background: 'var(--card)', borderColor: 'var(--border) var(--border) var(--card)',
     fontWeight: 700,
 };
 const badgeStyle: React.CSSProperties = {
-    marginLeft: 5, padding: '1px 7px', borderRadius: 10, background: '#e9ecef',
-    color: '#495057', fontSize: '0.78rem', fontWeight: 600,
+    marginLeft: 5, padding: '1px 7px', borderRadius: 10, background: 'var(--muted)',
+    color: 'var(--muted-foreground)', fontSize: '0.78rem', fontWeight: 600,
 };

@@ -253,7 +253,7 @@ export default function CodeAutocomplete(props: Props) {
                 style={{
                     ...inputStyle,
                     ...(ariaInvalid ? invalidStyle : {}),
-                    ...(showingSentinel ? { color: '#94a3b8' } : {}),
+                    ...(showingSentinel ? { color: 'var(--muted-foreground)' } : {}),
                 }}
             />
             {value && !disabled ? (
@@ -294,9 +294,11 @@ const inputStyle: React.CSSProperties = {
     height: 36,
     padding: '0 28px 0 10px',
     borderRadius: 6,
-    border: '1px solid #cbd5e1',
+    border: '1px solid var(--input)',
     fontSize: '1rem',
     boxSizing: 'border-box',
+    background: 'var(--background)',
+    color: 'var(--foreground)',
 };
 
 const invalidStyle: React.CSSProperties = {
@@ -312,7 +314,7 @@ const clearBtnStyle: React.CSSProperties = {
     height: 22,
     border: 'none',
     background: 'transparent',
-    color: '#94a3b8',
+    color: 'var(--muted-foreground)',
     cursor: 'pointer',
     fontSize: 16,
     lineHeight: '22px',
@@ -327,8 +329,9 @@ const dropdownStyle: React.CSSProperties = {
     marginTop: 2,
     maxHeight: 220,
     overflowY: 'auto',
-    backgroundColor: '#fff',
-    border: '1px solid #cbd5e1',
+    backgroundColor: 'var(--popover)',
+    color: 'var(--popover-foreground)',
+    border: '1px solid var(--border)',
     borderRadius: 6,
     boxShadow: '0 6px 18px rgba(15, 23, 42, 0.12)',
 };
@@ -342,16 +345,16 @@ const optionStyle: React.CSSProperties = {
     background: 'transparent',
     cursor: 'pointer',
     fontSize: '1rem',
-    color: '#1f2937',
+    color: 'var(--popover-foreground)',
 };
 
 const selectedOptionStyle: React.CSSProperties = {
-    backgroundColor: '#eef4fb',
+    backgroundColor: 'var(--accent)',
     fontWeight: 600,
 };
 
 const hintStyle: React.CSSProperties = {
     padding: '8px 10px',
     fontSize: '0.9rem',
-    color: '#64748b',
+    color: 'var(--muted-foreground)',
 };

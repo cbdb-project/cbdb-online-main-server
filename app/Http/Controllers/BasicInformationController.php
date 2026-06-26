@@ -724,6 +724,8 @@ class BasicInformationController extends Controller {
 
         $person = BiogMain::find($personId);
         $cDy = $person ? (int) $person->c_dy : 0;
+        // 地名搜尋以朝代起止「年」過濾（對齊 legacy .dynasty_start/.dynasty_end），非朝代代碼。
+        $dynasty = $cDy ? DB::table('DYNASTIES')->where('c_dy', $cDy)->first() : null;
 
         $hasPk = $request->filled('c_sequence') && $request->filled('c_event_code');
         $mode = $hasPk ? 'edit' : 'create';
@@ -770,6 +772,8 @@ class BasicInformationController extends Controller {
             'person_id' => $personId,
             'person_label' => $personLabel,
             'dynasty_code' => $cDy ?: null,
+            'dynasty_start' => (string) ($dynasty->c_start ?? ''),
+            'dynasty_end' => (string) ($dynasty->c_end ?? ''),
             'edit_mode' => $mode,
             'initial_fields' => (object) $initialFields,
             'initial_labels' => (object) $initialLabels,
@@ -1077,6 +1081,8 @@ class BasicInformationController extends Controller {
         // 人物朝代（供官名/地名搜尋過濾，對齊 legacy $biog_dy）。
         $dynastyCode = DB::table('BIOG_MAIN')->where('c_personid', $personId)->value('c_dy');
         $dynastyCode = $dynastyCode !== null ? (int) $dynastyCode : null;
+        // 地名搜尋以朝代起止「年」過濾（對齊 legacy .dynasty_start/.dynasty_end），非朝代代碼。
+        $dynasty = $dynastyCode ? DB::table('DYNASTIES')->where('c_dy', $dynastyCode)->first() : null;
 
         // 編輯模式：c_office_id 與 c_posting_id 皆存在（0 為合法 office id，故以 has() 判斷）。
         $hasPk = $request->has('c_office_id') && $request->has('c_posting_id')
@@ -1149,6 +1155,8 @@ class BasicInformationController extends Controller {
             'person_id' => $personId,
             'person_label' => $personLabel,
             'dynasty_code' => $dynastyCode,
+            'dynasty_start' => (string) ($dynasty->c_start ?? ''),
+            'dynasty_end' => (string) ($dynasty->c_end ?? ''),
             'edit_mode' => $mode,
             'initial_fields' => (object) $initialFields,
             'initial_labels' => (object) $initialLabels,
@@ -1193,6 +1201,8 @@ class BasicInformationController extends Controller {
 
         $dynastyCode = DB::table('BIOG_MAIN')->where('c_personid', $personId)->value('c_dy');
         $dynastyCode = $dynastyCode !== null ? (int) $dynastyCode : null;
+        // 地名搜尋以朝代起止「年」過濾（對齊 legacy .dynasty_start/.dynasty_end），非朝代代碼。
+        $dynasty = $dynastyCode ? DB::table('DYNASTIES')->where('c_dy', $dynastyCode)->first() : null;
 
         // 編輯模式：以 9 段複合主鍵（除 c_personid，由路由帶入）皆存在判斷。
         $pkCols = ['c_assoc_code', 'c_assoc_id', 'c_kin_code', 'c_kin_id', 'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year'];
@@ -1290,6 +1300,8 @@ class BasicInformationController extends Controller {
             'person_id' => $personId,
             'person_label' => $personLabel,
             'dynasty_code' => $dynastyCode,
+            'dynasty_start' => (string) ($dynasty->c_start ?? ''),
+            'dynasty_end' => (string) ($dynasty->c_end ?? ''),
             'edit_mode' => $mode,
             'initial_fields' => (object) $initialFields,
             'initial_labels' => (object) $initialLabels,

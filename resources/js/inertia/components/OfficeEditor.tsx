@@ -35,6 +35,8 @@ interface Props {
     personId: number;
     personLabel: string;
     dynastyCode?: number | null;
+    dynastyStart?: string;   // 人物朝代起年（addr 搜尋過濾 dy_start，非朝代代碼）
+    dynastyEnd?: string;     // 人物朝代末年（dy_end）
     mode: 'create' | 'edit';
     initialFields: Fields;
     initialLabels?: Fields;
@@ -64,7 +66,7 @@ const NON_PK = [
 ];
 
 export default function OfficeEditor({
-    personId, personLabel, dynastyCode = null, mode, initialFields, initialLabels = {}, initialAddr = [],
+    personId, personLabel, dynastyCode = null, dynastyStart, dynastyEnd, mode, initialFields, initialLabels = {}, initialAddr = [],
     canEdit, canPropose, createEndpoint, mutateEndpoint, deleteEndpoint, indexUrl, aiEnabled = false, aiModel, aiExtractEndpoint, t,
 }: Props) {
     const tr = (k: string, fb: string) => { const v = t ? t(k) : k; return v && v !== k ? v : fb; };
@@ -319,7 +321,7 @@ export default function OfficeEditor({
                     {editable ? (
                         <CodeAutocomplete key={addrKey} mode="search" endpoint="/api/select/search/addr"
                             value="" initialLabel="" placeholder={tr('add_place', '搜尋並新增地名…')}
-                            extraQuery={dynastyCode != null ? { dy_start: String(dynastyCode), dy_end: String(dynastyCode) } : undefined}
+                            extraQuery={{ dy_start: dynastyStart ?? '', dy_end: dynastyEnd ?? '' }}
                             onChange={addAddr} />
                     ) : null}
                     {addr.length ? (

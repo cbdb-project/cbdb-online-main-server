@@ -39,6 +39,8 @@ interface Props {
     personId: number;
     personLabel: string;
     dynastyCode?: number | null;
+    dynastyStart?: string;   // 人物朝代起年（addr 搜尋過濾 dy_start，非朝代代碼）
+    dynastyEnd?: string;     // 人物朝代末年（dy_end）
     mode: 'create' | 'edit';
     initialFields: Fields;
     initialLabels?: Fields;
@@ -79,7 +81,7 @@ const NON_PK = [
 ];
 
 export default function AssocEditor({
-    personId, personLabel, dynastyCode = null, mode, initialFields, initialLabels = {},
+    personId, personLabel, dynastyCode = null, dynastyStart, dynastyEnd, mode, initialFields, initialLabels = {},
     canEdit, canPropose, createEndpoint, mutateEndpoint, deleteEndpoint, indexUrl,
     aiEnabled = false, aiSuggestEndpoint, aiModel, routeName, t,
 }: Props) {
@@ -430,10 +432,10 @@ export default function AssocEditor({
     const textRow = (key: string, label: string, code: string, highlight = false, hint?: string) => (
         gridCell(label, { code, hint }, gridInput({ value: fields[key] ?? '', onChange: (v) => set(key, v), disabled: !editable, highlight }))
     );
-    const searchRow = (key: string, label: string, code: string, endpoint: string, highlight = false, sentinel = '0', required = false, sentinelLabel?: string) => (
+    const searchRow = (key: string, label: string, code: string, endpoint: string, highlight = false, sentinel = '0', required = false, sentinelLabel?: string, extraQuery?: Record<string, string>) => (
         gridCell(label, { code, required },
             <CodeAutocomplete mode="search" endpoint={endpoint} value={fields[key] ?? sentinel} initialLabel={labels[key] ?? ''}
-                disabled={!editable} aria-invalid={highlight} sentinelLabel={sentinelLabel}
+                disabled={!editable} aria-invalid={highlight} sentinelLabel={sentinelLabel} extraQuery={extraQuery}
                 onChange={(v, l) => { set(key, v || sentinel); setLabel(key, l); }} />)
     );
     const listRow = (key: string, label: string, code: string, model: string, idKey: string, labelKeys: string[]) => (
@@ -543,7 +545,7 @@ export default function AssocEditor({
                     {searchRow('c_tertiary_personid', tr('tertiary_person', '中介人物'), 'c_tertiary_personid', '/api/select/search/biog')}
                     {textRow('c_tertiary_type_notes', tr('tertiary_notes', '中介說明'), 'c_tertiary_type_notes')}
                     {searchRow('c_assoc_claimer_id', tr('claimer_person', '見證人物'), 'c_assoc_claimer_id', '/api/select/search/biog')}
-                    {searchRow('c_addr_id', tr('place_name', '地點'), 'c_addr_id', '/api/select/search/addr')}
+                    {searchRow('c_addr_id', tr('place_name', '地點'), 'c_addr_id', '/api/select/search/addr', false, '0', false, undefined, { dy_start: dynastyStart ?? '', dy_end: dynastyEnd ?? '' })}
                     {gridCell(tr('socialinst_field', '社會機構'), { code: 'social_institution' },
                         <CodeAutocomplete mode="search" endpoint="/api/select/search/socialinstcode" value={instValue} initialLabel={labels.c_inst_code ?? ''} disabled={!editable} onChange={onInstChange} />)}
                 </div>

@@ -12,6 +12,8 @@ interface PageProps extends SharedProps {
     person_id: number;
     person_label: string;
     dynasty_code: number | null;
+    dynasty_start: string;
+    dynasty_end: string;
     edit_mode: 'create' | 'edit';
     initial_fields: Fields;
     initial_labels: Fields;
@@ -50,6 +52,8 @@ export default function OfficeEditV2() {
                 personId={p.person_id}
                 personLabel={p.person_label}
                 dynastyCode={p.dynasty_code}
+                dynastyStart={p.dynasty_start}
+                dynastyEnd={p.dynasty_end}
                 mode={p.edit_mode}
                 initialFields={p.initial_fields}
                 initialLabels={p.initial_labels}

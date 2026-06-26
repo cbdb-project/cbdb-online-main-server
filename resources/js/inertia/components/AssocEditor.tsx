@@ -471,12 +471,15 @@ export default function AssocEditor({
                 />
             ) : null}
 
-            {/* 核心社會關係：序號 + 社會關係碼 | 關聯人物 + 互逆配對碼。 */}
+            {/* 核心社會關係：社會關係碼 | 關聯人物 + 關係次數（重要）+ 次序（不重要、後置）+ 互逆配對碼。 */}
             <GridSection title={tr('assoc_core_section', '社會關係')}>
                 <div style={gGrid}>
-                    {textRow('c_sequence', tr('sequence', '序號'), 'c_sequence')}
                     {searchRow('c_assoc_code', tr('assoc_field', '社會關係'), 'c_assoc_code', '/api/select/search/assoccode', assocHighlight)}
                     {searchRow('c_assoc_id', tr('assoc_person', '關聯人物'), 'c_assoc_id', '/api/select/search/biog')}
+                    {/* 關係次數（書信計次）：重要、非出處，移入核心區，置於社會關係/關聯人物之後。 */}
+                    {textRow('c_assoc_count', tr('assoc_count_field', '數量'), 'c_assoc_count', false, tr('assoc_count_hint', '此欄位僅適用於書信：當無法以標題及日期區分多次信件時，則僅建「一筆」社會關係，並將信件總數填於此欄。請填阿拉伯數字'))}
+                    {/* 次序不重要，下移至核心欄之後（去強調）。 */}
+                    {textRow('c_sequence', tr('sequence', '序號'), 'c_sequence')}
                     {/* 互逆社會關係碼：依社會關係碼取候選，create 預設第一個（同 legacy）；反向有歧義故可手選。 */}
                     {reversePairRow(
                         tr('reverse_assoc_pair_label', '互逆社會關係碼'), 'c_assocship_pair',
@@ -536,14 +539,13 @@ export default function AssocEditor({
                 </div>
             </GridSection>
 
-            {/* 出處與內容：作品/出處標題、出處、頁碼、數量、備註、候選出處。 */}
+            {/* 出處與內容：作品/出處標題、出處、頁碼、備註、候選出處（關係次數已移至核心區）。 */}
             <GridSection title={tr('assoc_source_section', '出處與內容')}>
                 <div style={gGrid}>
                     {textRow('c_text_title', tr('text_title_field', '作品/出處標題'), 'c_text_title')}
                     {gridCell(tr('source_field', '出處'), { code: 'c_source' },
                         <CodeAutocomplete mode="search" endpoint="/api/select/search/text" value={fields.c_source ?? '0'} initialLabel={labels.c_source ?? ''} disabled={!editable} onChange={(v, l) => { set('c_source', v || '0'); setLabel('c_source', l); }} />)}
                     {textRow('c_pages', tr('pages_entries', '頁碼'), 'c_pages', sourceHighlight)}
-                    {textRow('c_assoc_count', tr('assoc_count_field', '數量'), 'c_assoc_count', false, tr('assoc_count_hint', '此欄位僅適用於書信：當無法以標題及日期區分多次信件時，則僅建「一筆」社會關係，並將信件總數填於此欄。請填阿拉伯數字'))}
                     {gridCell(tr('notes_field', '備註'), { code: 'c_notes', full: true },
                         <textarea value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
                 </div>

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
+import RequiredMark from './PersonEditorShared/RequiredMark';
 import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import TextpersonPair from './PersonEditorShared/TextpersonPair';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
@@ -157,8 +158,8 @@ export default function AltnameEditor({
         } finally { setDeleting(false); }
     };
 
-    const textRow = (key: string, label: string, type = 'text', highlight = false) => (
-        <div style={rowStyle}><label style={labelStyle}>{label}</label><div style={fieldStyle}>
+    const textRow = (key: string, label: string, type = 'text', highlight = false, required = false) => (
+        <div style={rowStyle}><label style={labelStyle}>{label}{required ? <RequiredMark /> : null}</label><div style={fieldStyle}>
             <input type={type} value={fields[key] ?? ''} disabled={!editable} onChange={(e) => set(key, e.target.value)}
                 style={{ ...inputStyle, ...(highlight ? { background: '#FFFFBB' } : {}), ...(!editable ? roStyle : {}) }} /></div></div>
     );
@@ -169,8 +170,8 @@ export default function AltnameEditor({
             {message ? <div style={okStyle}>{message}</div> : null}
             {error ? <div style={errStyle}>{error}</div> : null}
 
-            {textRow('c_sequence', tr('sequence', '序號'), 'number')}
-            {textRow('c_alt_name_chn', tr('altname_chn', '別名（中）') + ' (c_alt_name_chn)')}
+            {textRow('c_sequence', tr('sequence', '序號'), 'number', false, mode === 'create')}
+            {textRow('c_alt_name_chn', tr('altname_chn', '別名（中）') + ' (c_alt_name_chn)', 'text', false, true)}
             {textRow('c_alt_name', tr('altname_pinyin_label', '別名（拼音）') + ' (c_alt_name)')}
 
             <div style={rowStyle}><label style={labelStyle}>{tr('altname_type', '類型')} (c_alt_name_type_code)</label><div style={fieldStyle}>

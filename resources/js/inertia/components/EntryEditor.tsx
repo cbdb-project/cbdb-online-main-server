@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
+import RequiredMark from './PersonEditorShared/RequiredMark';
 import EraTimeField, { EraTimeFieldValues } from './EraTimeField';
 import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import TextpersonPair from './PersonEditorShared/TextpersonPair';
@@ -212,7 +213,7 @@ export default function EntryEditor({
             {message ? <div style={okStyle}>{message}</div> : null}
             {error ? <div style={errStyle}>{error}</div> : null}
 
-            <div style={rowStyle}><label style={labelStyle}>{tr('migration_sequence', '序號')} (c_sequence)</label><div style={fieldStyle}>
+            <div style={rowStyle}><label style={labelStyle}>{tr('migration_sequence', '序號')} (c_sequence){mode === 'create' ? <RequiredMark /> : null}</label><div style={fieldStyle}>
                 <input type="number" value={fields.c_sequence ?? ''} disabled={!editable} required maxLength={4}
                     onChange={(e) => set('c_sequence', e.target.value)} style={{ ...inputStyle, ...(!editable ? roStyle : {}) }} /></div></div>
 

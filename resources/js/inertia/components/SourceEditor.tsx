@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
+import RequiredMark from './PersonEditorShared/RequiredMark';
 import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
 
@@ -174,7 +175,7 @@ export default function SourceEditor({
                 </div>
             ) : null}
 
-            <div style={rowStyle}><label style={labelStyle}>{tr('source_field', '出處')} (c_source)</label><div style={fieldStyle}>
+            <div style={rowStyle}><label style={labelStyle}>{tr('source_field', '出處')} (c_source){mode === 'create' ? <RequiredMark /> : null}</label><div style={fieldStyle}>
                 {mode === 'edit' ? (
                     <input type="text" value={labels.c_textid ?? (fields.c_textid ?? '')} readOnly disabled
                         style={{ ...inputStyle, ...roStyle }} />

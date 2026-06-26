@@ -4,6 +4,7 @@ import EraTimeField, { EraTimeFieldValues } from './EraTimeField';
 import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
 import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
+import RequiredMark from './PersonEditorShared/RequiredMark';
 
 /**
  * 基本資料編輯器（對齊 legacy /basicinformation/{id}/edit，非 person-browser）。
@@ -274,7 +275,7 @@ export default function BasicInfoEditor({
     // 統一網格欄位（上標籤 + 技術碼淡化），對齊使用者認可的設計草圖。
     // 所有 g* 與 block 皆為「回傳 JSX 的函式」而非巢狀元件，避免每次 render 重新掛載 → input 失焦。
     const fLabel = (label: string, code?: string, required = false) => (
-        <label style={gLabelStyle}>{label}{required ? <span style={gReqStyle} title={tr('required_field', '必填')}> *</span> : null}{code ? <span style={gCodeStyle}>{code}</span> : null}</label>
+        <label style={gLabelStyle}>{label}{required ? <RequiredMark /> : null}{code ? <span style={gCodeStyle}>{code}</span> : null}</label>
     );
     // 可編輯文字欄（readonly 時灰底）。
     const gText = (key: string, label: string, code?: string, opts: { readonly?: boolean; hint?: string; full?: boolean } = {}) => (
@@ -481,7 +482,6 @@ const gFull: React.CSSProperties = { gridColumn: '1 / -1' };
 // 上標籤 + 技術碼淡化（次級灰小字）。
 const gLabelStyle: React.CSSProperties = { display: 'block', fontSize: '0.9rem', fontWeight: 600, color: '#374151', marginBottom: 5 };
 const gCodeStyle: React.CSSProperties = { fontWeight: 400, color: '#9aa4b2', fontSize: '0.78rem', marginLeft: 6 };
-const gReqStyle: React.CSSProperties = { color: '#dc2626', fontWeight: 700 };
 const gInputStyle: React.CSSProperties = { width: '100%', height: 40, padding: '0 11px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '1rem', boxSizing: 'border-box', background: '#fff' };
 const gHintStyle: React.CSSProperties = { display: 'block', marginTop: 4, fontSize: '0.8rem', color: '#6b7280' };
 const readonlyStyle: React.CSSProperties = { background: '#f5f5f5', cursor: 'not-allowed' };

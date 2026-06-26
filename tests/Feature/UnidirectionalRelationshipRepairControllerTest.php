@@ -904,13 +904,15 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase {
     }
 
     #[Test]
-    public function kinship_without_repair_cannot_bidirectional_delete() {
+    public function kinship_delete_removes_reverse_mirror_regardless_of_autogen_mismatch() {
         // 創建測試人物
         $person1 = $this->createTestPerson();
         $person2 = $this->createTestPerson();
 
-        // 手動創建兩條獨立的關係（不是通過修復工具創建）
-        // 這樣它們的 c_autogen_notes 不一致，無法雙向刪除
+        // 手動創建兩條 c_autogen_notes 不一致的互逆關係。
+        // #87 後：c_autogen_notes 為描述性註記、鏡像兩側天生不對稱（自動生成側帶字串、原始側 NULL），
+        // 非身分；鏡像定位改以 (c_kin_id=本人, c_personid=對方, c_kin_code ∈ 反向碼集) 唯一決定。
+        // 故即使 autogen 不一致，刪除正向仍會連帶刪除反向鏡像（對齊 #81/#87，修漏刪孤兒）。
         DB::table('KIN_DATA')->insert([
             'c_personid' => $person1->c_personid,
             'c_kin_id' => $person2->c_personid,
@@ -943,15 +945,16 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase {
 
         $repository->kinshipDeleteById($resourceId, null);
 
-        // 驗證只有第一條記錄被刪除，第二條仍然存在（因為 c_autogen_notes 不匹配）
+        // 正向記錄被刪除。
         $this->assertDatabaseMissing('KIN_DATA', [
             'c_personid' => $person1->c_personid,
             'c_kin_id' => $person2->c_personid,
             'c_kin_code' => 2,
         ]);
 
-        // 反向關係仍然存在（單向刪除）
-        $this->assertDatabaseHas('KIN_DATA', [
+        // #87 後：反向鏡像（碼 303 ∈ legitReverses(2)）以 (c_kin_id, c_personid, 反向碼) 定位、不再比對 autogen，
+        // 故連帶刪除，反向亦不存在（雙向刪除，修漏刪孤兒；對齊 #81/#87）。
+        $this->assertDatabaseMissing('KIN_DATA', [
             'c_personid' => $person2->c_personid,
             'c_kin_id' => $person1->c_personid,
             'c_kin_code' => 303,

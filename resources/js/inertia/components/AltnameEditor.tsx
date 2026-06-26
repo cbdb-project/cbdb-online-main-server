@@ -85,6 +85,8 @@ export default function AltnameEditor({
 
     const save = async (sm: 'direct' | 'proposal') => {
         setSaving(true); setError(null); setMessage(null);
+        // 別名（拼音）c_alt_name 必填：建立與編輯皆不可為空（使用者指定，較 legacy 嚴格）。
+        if ((fields.c_alt_name ?? '') === '') { setSaving(false); setError(tr('altname_pinyin_required', '請輸入別名（拼音）')); return; }
         let changes: Record<string, string | null>;
         let target: Record<string, string | number>;
         let endpoint: string;
@@ -180,7 +182,7 @@ export default function AltnameEditor({
                         value={fields.c_alt_name_type_code ?? '0'} initialLabel={labels.c_alt_name_type_code ?? ''} disabled={!editable}
                         onChange={(v, l) => { set('c_alt_name_type_code', v); setLabel('c_alt_name_type_code', l); }} />)}
                 {textRow('c_alt_name_chn', tr('altname_chn', '別名（中）'), 'c_alt_name_chn', 'text', false, true)}
-                {textRow('c_alt_name', tr('altname_pinyin_label', '別名（拼音）'), 'c_alt_name')}
+                {textRow('c_alt_name', tr('altname_pinyin_label', '別名（拼音）'), 'c_alt_name', 'text', false, true)}
                 {textRow('c_sequence', tr('sequence', '次序'), 'c_sequence', 'number', false, mode === 'create')}
 
                 {gridCell(tr('source_field', '出處'), { code: 'c_source' },

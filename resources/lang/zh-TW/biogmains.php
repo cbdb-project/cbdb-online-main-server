@@ -433,6 +433,7 @@ return [
     'index_year_source' => '指數年來源',
     // 驗證警告。
     'altname_required' => '請輸入別名（中文）',
+    'altname_pinyin_required' => '請輸入別名（拼音）',
     'sequence_required' => '請輸入序號',
     'pk_required' => '主鍵欄位不可為空',
     'please_select_source' => '請選擇出處',

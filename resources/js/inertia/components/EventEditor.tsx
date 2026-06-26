@@ -203,7 +203,7 @@ export default function EventEditor({
 
     return (
         <div style={gridCardStyle}>
-            <h3 style={titleStyle}>{mode === 'create' ? tr('event_create', '新增事件') : tr('event_edit', '編輯事件')} — {personLabel}</h3>
+            <h3 style={titleStyle}>{mode === 'create' ? tr('event_create', '新增事件') : tr('event_edit', '編輯事件')}</h3>
             {message ? <div style={gOkStyle}>{message}</div> : null}
             {error ? <div style={gErrStyle}>{error}</div> : null}
 

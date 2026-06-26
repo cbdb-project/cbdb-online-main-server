@@ -168,7 +168,7 @@ export default function AltnameEditor({
 
     return (
         <div style={gridCardStyle}>
-            <h3 style={titleStyle}>{mode === 'create' ? tr('altname_create', '新增別名') : tr('altname_edit', '編輯別名')} — {personLabel}</h3>
+            <h3 style={titleStyle}>{mode === 'create' ? tr('altname_create', '新增別名') : tr('altname_edit', '編輯別名')}</h3>
             {message ? <div style={gOkStyle}>{message}</div> : null}
             {error ? <div style={gErrStyle}>{error}</div> : null}
 

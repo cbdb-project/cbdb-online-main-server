@@ -170,7 +170,7 @@ export default function SourceEditor({
 
     return (
         <div style={gridCardStyle}>
-            <h3 style={titleStyle}>{mode === 'create' ? tr('source_create', '新增出處') : tr('source_edit', '編輯出處')} — {personLabel}</h3>
+            <h3 style={titleStyle}>{mode === 'create' ? tr('source_create', '新增出處') : tr('source_edit', '編輯出處')}</h3>
             {message ? <div style={gOkStyle}>{message}</div> : null}
             {error ? <div style={gErrStyle}>{error}</div> : null}
             {mode === 'edit' && isWikiSource ? (

@@ -278,7 +278,7 @@ export default function KinEditor({
 
     return (
         <div style={gridCardStyle}>
-            <h3 style={titleStyle}>{mode === 'create' ? tr('kinship_create', '新增親屬關係') : tr('kinship_edit', '編輯親屬關係')} — {personLabel}</h3>
+            <h3 style={titleStyle}>{mode === 'create' ? tr('kinship_create', '新增親屬關係') : tr('kinship_edit', '編輯親屬關係')}</h3>
             {message ? <div style={gOkStyle}>{message}</div> : null}
             {error ? <div style={gErrStyle}>{error}</div> : null}
             <OppositeEdgeNotice result={oppositeEdge} reverseCodeLabel={reverseCodeLabel} tr={tr} />

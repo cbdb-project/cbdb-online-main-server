@@ -145,7 +145,7 @@ export default function TextEditor({
 
     return (
         <div style={gridCardStyle}>
-            <h3 style={titleStyle}>{mode === 'create' ? tr('text_create', '新增著述') : tr('text_edit', '編輯著述')} — {personLabel}</h3>
+            <h3 style={titleStyle}>{mode === 'create' ? tr('text_create', '新增著述') : tr('text_edit', '編輯著述')}</h3>
             {message ? <div style={gOkStyle}>{message}</div> : null}
             {error ? <div style={gErrStyle}>{error}</div> : null}
 

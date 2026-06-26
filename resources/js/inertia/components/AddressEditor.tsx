@@ -181,7 +181,7 @@ export default function AddressEditor({
 
     return (
         <div style={gridCardStyle}>
-            <h3 style={titleStyle}>{mode === 'create' ? tr('address_create', '新增地址') : tr('address_edit', '編輯地址')} — {personLabel}</h3>
+            <h3 style={titleStyle}>{mode === 'create' ? tr('address_create', '新增地址') : tr('address_edit', '編輯地址')}</h3>
             {message ? <div style={gOkStyle}>{message}</div> : null}
             {error ? <div style={gErrStyle}>{error}</div> : null}
 

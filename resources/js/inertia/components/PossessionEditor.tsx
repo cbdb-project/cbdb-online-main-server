@@ -190,7 +190,7 @@ export default function PossessionEditor({
 
     return (
         <div style={gridCardStyle}>
-            <h3 style={titleStyle}>{mode === 'create' ? tr('possession_create', '新增財產記錄') : tr('possession_edit', '編輯財產記錄')} — {personLabel}</h3>
+            <h3 style={titleStyle}>{mode === 'create' ? tr('possession_create', '新增財產記錄') : tr('possession_edit', '編輯財產記錄')}</h3>
             {message ? <div style={gOkStyle}>{message}</div> : null}
             {error ? <div style={gErrStyle}>{error}</div> : null}
 

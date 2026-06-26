@@ -290,7 +290,7 @@ export default function OfficeEditor({
 
     return (
         <div style={gridCardStyle}>
-            <h3 style={titleStyle}>{mode === 'create' ? tr('office_create', '新增任官') : tr('office_edit', '編輯任官')} — {personLabel}</h3>
+            <h3 style={titleStyle}>{mode === 'create' ? tr('office_create', '新增任官') : tr('office_edit', '編輯任官')}</h3>
             {message ? <div style={gOkStyle}>{message}</div> : null}
             {error ? <div style={gErrStyle}>{error}</div> : null}
 

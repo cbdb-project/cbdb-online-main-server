@@ -189,7 +189,7 @@ export default function SocialInstEditor({
 
     return (
         <div style={gridCardStyle}>
-            <h3 style={titleStyle}>{mode === 'create' ? tr('socialinst_create', '新增社會機構') : tr('socialinst_edit', '編輯社會機構')} — {personLabel}</h3>
+            <h3 style={titleStyle}>{mode === 'create' ? tr('socialinst_create', '新增社會機構') : tr('socialinst_edit', '編輯社會機構')}</h3>
             {message ? <div style={gOkStyle}>{message}</div> : null}
             {error ? <div style={gErrStyle}>{error}</div> : null}
 

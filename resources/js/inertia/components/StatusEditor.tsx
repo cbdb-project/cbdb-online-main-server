@@ -218,7 +218,7 @@ export default function StatusEditor({
 
     return (
         <div style={gridCardStyle}>
-            <h3 style={titleStyle}>{mode === 'create' ? tr('status_create', '新增社會區分') : tr('status_edit', '編輯社會區分')} — {personLabel}</h3>
+            <h3 style={titleStyle}>{mode === 'create' ? tr('status_create', '新增社會區分') : tr('status_edit', '編輯社會區分')}</h3>
             {message ? <div style={gOkStyle}>{message}</div> : null}
             {error ? <div style={gErrStyle}>{error}</div> : null}
 

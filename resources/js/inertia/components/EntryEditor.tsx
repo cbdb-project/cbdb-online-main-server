@@ -210,7 +210,7 @@ export default function EntryEditor({
 
     return (
         <div style={gridCardStyle}>
-            <h3 style={titleStyle}>{mode === 'create' ? tr('entry_create', '新增入仕') : tr('entry_edit', '編輯入仕')} — {personLabel}</h3>
+            <h3 style={titleStyle}>{mode === 'create' ? tr('entry_create', '新增入仕') : tr('entry_edit', '編輯入仕')}</h3>
             {message ? <div style={gOkStyle}>{message}</div> : null}
             {error ? <div style={gErrStyle}>{error}</div> : null}
 

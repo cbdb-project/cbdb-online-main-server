@@ -180,8 +180,8 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 $a = $item->resource;
                                 $id = $item->c_personid;
                                 if ((int) $id !== 0) {
-                                    // 人物链接统一指向編輯页面
-                                    $personLink = "/basicinformation/{$id}/edit";
+                                    // 人物链接统一指向編輯页面（#59：flag-aware，basicinformation.editor 翻 new 後自動指 React）
+                                    $personLink = person_page_url($id, 'edit');
 
                                     // 根据资源类型生成查詢參數模式的編輯連結
                                     if ($item->op_type != 4) {
@@ -207,7 +207,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                             @if(empty($firstPerson['id']))
                                 <span class="text-muted">{{ __('operations.no_person_involved') }}</span>
                             @else
-                                <a href="/basicinformation/{{ $firstPerson['id'] }}/edit">
+                                <a href="{{ person_page_url($firstPerson['id'], 'edit') }}">
                                     {{ trim(($firstPerson['name_chn'] ?? '').' '.($firstPerson['name'] ?? '')) !== '' ? trim(($firstPerson['name_chn'] ?? '').' '.($firstPerson['name'] ?? '')) : $firstPerson['id'] }}
                                 </a>
                                 @if($personRowspan > 1)
@@ -662,7 +662,7 @@ $item->resource_data = unionPKDef($item->resource_data);
                                         @if(empty($relatedPerson['id']))
                                             <span class="text-muted">{{ __('operations.no_person_involved') }}</span>
                                         @else
-                                            <a href="/basicinformation/{{ $relatedPerson['id'] }}/edit">
+                                            <a href="{{ person_page_url($relatedPerson['id'], 'edit') }}">
                                                 {{ trim(($relatedPerson['name_chn'] ?? '').' '.($relatedPerson['name'] ?? '')) !== '' ? trim(($relatedPerson['name_chn'] ?? '').' '.($relatedPerson['name'] ?? '')) : $relatedPerson['id'] }}
                                             </a>
                                             <span class="badge badge-secondary" style="margin-left:4px;">

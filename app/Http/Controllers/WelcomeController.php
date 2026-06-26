@@ -27,7 +27,8 @@ class WelcomeController extends Controller {
                     'login' => route('login', [], false),
                     'register' => route('register', [], false),
                     'name_api' => url('api/name'),
-                    'basicinformation' => url('basicinformation'),
+                    'person_show' => person_show_base_url(),
+                    'person_index' => person_index_base_url(),
                 ],
             ]);
         }

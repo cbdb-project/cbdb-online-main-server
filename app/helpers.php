@@ -75,6 +75,39 @@ if (!function_exists('migration_flag_is_new')) {
 
 if (!function_exists('person_page_url')) {
     /**
+     * 人物列表搜尋頁 flag-aware URL。
+     *
+     * @param array<string, scalar|null> $params
+     */
+    function person_index_url(array $params = []): string {
+        $params = array_filter($params, fn ($value) => $value !== null && $value !== '');
+
+        return (migration_flag_is_new('basicinformation.index') && \Illuminate\Support\Facades\Route::has('app.basicinformation.index'))
+            ? route('app.basicinformation.index', $params, false)
+            : route('basicinformation.index', $params, false);
+    }
+}
+
+if (!function_exists('person_show_base_url')) {
+    /** 人物詳情頁 base URL（供前端自行組 `/{id}` 用）。 */
+    function person_show_base_url(): string {
+        return (migration_flag_is_new('basicinformation.show') && \Illuminate\Support\Facades\Route::has('app.basicinformation.show'))
+            ? '/app/basicinformation'
+            : '/basicinformation';
+    }
+}
+
+if (!function_exists('person_index_base_url')) {
+    /** 人物列表頁 base URL（供前端自行組 `?q=` 用）。 */
+    function person_index_base_url(): string {
+        return (migration_flag_is_new('basicinformation.index') && \Illuminate\Support\Facades\Route::has('app.basicinformation.index'))
+            ? '/app/basicinformation'
+            : '/basicinformation';
+    }
+}
+
+if (!function_exists('person_page_url')) {
+    /**
      * 人物頁 flag-aware URL：對應 flag=new 時導向 React /app 版，否則 legacy（供頁內連結統一使用，
      * 避免各處寫死 /basicinformation/{id} 造成「新介面點人物卻開舊頁」）。
      *
@@ -85,12 +118,12 @@ if (!function_exists('person_page_url')) {
         if ($type === 'show') {
             return (migration_flag_is_new('basicinformation.show') && \Illuminate\Support\Facades\Route::has('app.basicinformation.show'))
                 ? route('app.basicinformation.show', ['id' => $id], false)
-                : '/basicinformation/' . $id;
+                : route('basicinformation.show', ['basicinformation' => $id], false);
         }
 
         return (migration_flag_is_new('basicinformation.editor') && \Illuminate\Support\Facades\Route::has('app.basicinformation.edit'))
             ? route('app.basicinformation.edit', ['id' => $id], false)
-            : '/basicinformation/' . $id . '/edit';
+            : route('basicinformation.edit', ['basicinformation' => $id], false);
     }
 }
 

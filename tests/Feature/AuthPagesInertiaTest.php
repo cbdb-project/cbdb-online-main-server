@@ -79,6 +79,10 @@ class AuthPagesInertiaTest extends TestCase {
     #[Test]
     public function welcome_renders_inertia_when_flag_new(): void {
         $this->flagNew(['welcome']);
+        config([
+            'migration_flags.pages.basicinformation.show' => 'old',
+            'migration_flags.pages.basicinformation.index' => 'old',
+        ]);
 
         $this->get('/')
             ->assertOk()
@@ -86,7 +90,22 @@ class AuthPagesInertiaTest extends TestCase {
                 ->component('Welcome')
                 ->where('is_authenticated', false)
                 ->has('urls.login')
-                ->has('urls.name_api'));
+                ->has('urls.name_api')
+                ->where('urls.person_show', '/basicinformation')
+                ->where('urls.person_index', '/basicinformation'));
+    }
+
+    #[Test]
+    public function welcome_exposes_person_show_and_index_bases_independently(): void {
+        $this->flagNew(['welcome', 'basicinformation.show']);
+        config(['migration_flags.pages.basicinformation.index' => 'old']);
+
+        $this->get('/')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Welcome')
+                ->where('urls.person_show', '/app/basicinformation')
+                ->where('urls.person_index', '/basicinformation'));
     }
 
     // ---- flag=old（預設）：維持 Blade，無 Inertia component ----

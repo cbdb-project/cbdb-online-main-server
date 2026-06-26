@@ -61,7 +61,8 @@ class HandleInertiaRequests extends Middleware {
             // 殼所需的固定連結（導覽列首頁/個人資料/登入登出等），由後端解析路由
             // 為相對 URL，React DashboardLayout 直接使用，避免前端硬編碼路徑。
             'shell' => [
-                'home_url' => route('basicinformation.index', [], false),
+                // #59：首頁連結 flag-aware（basicinformation.index 翻 new 後指 React 版，否則 legacy；無自動轉址）。
+                'home_url' => person_index_url(),
                 // profile 連結受 migration flag 控制：flag=new 且新路由存在時指向 React 版。
                 'profile_url' => $this->profileUrl(),
                 'logout_url' => route('logout', [], false),

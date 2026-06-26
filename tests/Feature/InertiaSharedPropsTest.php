@@ -40,6 +40,14 @@ class InertiaSharedPropsTest extends TestCase {
         }
     }
 
+    public function test_shell_home_url_respects_basicinformation_index_flag(): void {
+        config(['migration_flags.pages.basicinformation.index' => 'old']);
+        $this->assertSame('/basicinformation', $this->shareFor(null)['shell']['home_url']);
+
+        config(['migration_flags.pages.basicinformation.index' => 'new']);
+        $this->assertSame('/app/basicinformation', $this->shareFor(null)['shell']['home_url']);
+    }
+
     public function test_share_exposes_app_name_and_version(): void {
         config(['app.name' => 'CBDB Online']);
 

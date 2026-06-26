@@ -106,10 +106,11 @@ class AiFillLogInertiaTest extends TestCase {
                 ->has('id')
                 ->has('category')
                 ->has('source_text')
-                ->has('person_url')
+                ->where('person_url', route('basicinformation.offices.index', ['basicinformation' => 1001], false))
                 ->has('comparison_rows')
                 ->has('ai_matched_pretty')
-                ->etc()));
+                ->etc())
+            ->where('logs.data.1.person_url', route('basicinformation.assoc.index', ['basicinformation' => 1001], false)));
     }
 
     #[Test]

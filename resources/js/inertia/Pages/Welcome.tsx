@@ -17,7 +17,8 @@ interface WelcomePageProps extends SharedProps {
         login: string;
         register: string;
         name_api: string;
-        basicinformation: string;
+        person_show: string;
+        person_index: string;
     };
 }
 
@@ -31,9 +32,10 @@ export default function Welcome() {
 
     const buildUrl = (value: string) => {
         const isNumeric = /^\d+$/.test(value);
+        // 數字 → 人物詳情（show base，依 basicinformation.show flag）；其餘 → 搜尋（index base，依 .index flag）。
         return isNumeric
-            ? `${urls.basicinformation}/${encodeURIComponent(value)}`
-            : `${urls.basicinformation}?q=${encodeURIComponent(value)}`;
+            ? `${urls.person_show}/${encodeURIComponent(value)}`
+            : `${urls.person_index}?q=${encodeURIComponent(value)}`;
     };
 
     const onInput = (value: string) => {

@@ -72,7 +72,7 @@ export default function StatusEditor({
     // c_source 雖可空，legacy 仍 emptyToSentinel→0，故 create 預設 '0'（編輯模式由 initialFields 覆蓋）。
     const base: Fields = {
         c_personid: String(personId),
-        c_sequence: '0', c_status_code: '0',
+        c_sequence: '0', c_status_code: '',
         c_source: '0',
         ...initialFields,
     };
@@ -133,6 +133,10 @@ export default function StatusEditor({
         // 序號為新增必填（legacy required）。
         if (mode === 'create' && !(fields.c_sequence ?? '').trim()) {
             setError(tr('please_fill_sequence', '請填寫序號')); return;
+        }
+        // 社會區分 c_status_code 為主碼，必填（拒絕 0/未詳）：僅新增時擋；編輯既有列不卡。
+        if (mode === 'create' && (!fields.c_status_code || fields.c_status_code === '0')) {
+            setError(tr('please_select_status', '請選擇社會區分')); return;
         }
         // 編輯模式：可改鍵欄位不可被清空（清空 + skip-changes 會造成 client/DB PK 失準）。
         if (mode === 'edit') {
@@ -241,7 +245,7 @@ export default function StatusEditor({
                     <input type="number" value={fields.c_sequence ?? ''} disabled={!editable} required maxLength={4}
                         onChange={(e) => set('c_sequence', e.target.value)} style={{ ...gInputStyle, ...(!editable ? gReadonlyStyle : {}) }} />)}
 
-                {gridCell(tr('status', '社會區分'), { code: 'c_status_code' },
+                {gridCell(tr('status', '社會區分'), { code: 'c_status_code', required: mode === 'create' },
                     <div style={statusHighlight ? { background: '#FFFFBB', borderRadius: 6 } : undefined}>
                         <CodeAutocomplete mode="search" endpoint="/api/select/search/status"
                             value={fields.c_status_code ?? '0'} initialLabel={labels.c_status_code ?? ''} disabled={!editable}

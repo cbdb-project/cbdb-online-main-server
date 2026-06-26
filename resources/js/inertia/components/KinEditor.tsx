@@ -58,7 +58,7 @@ export default function KinEditor({
     const tr = (k: string, fb: string) => { const v = t ? t(k) : k; return v && v !== k ? v : fb; };
     const base: Fields = {
         c_personid: String(personId),
-        c_kin_id: '0', c_kin_code: '0', c_source: '0',
+        c_kin_id: '', c_kin_code: '', c_source: '0',
         ...initialFields,
     };
     const [fields, setFields] = useState<Fields>(base);
@@ -157,6 +157,15 @@ export default function KinEditor({
             multiAckRef.current = true;
             setError(tr('opposite_edge_multiple_confirm', '對面有多筆對應的反向關係。直接保存會一併同步這些反向列。請先確認上方列出的記錄無誤，再次點擊「直接保存」以繼續。'));
             return;
+        }
+        // 親屬關係 c_kin_code / 親屬姓名 c_kin_id 為主碼，必填（拒絕 0/未詳）：僅新增時擋；編輯既有列不卡。
+        if (mode === 'create') {
+            if (!fields.c_kin_code || fields.c_kin_code === '0') {
+                setError(tr('please_select_kin_relation', '請選擇親屬關係')); return;
+            }
+            if (!fields.c_kin_id || fields.c_kin_id === '0') {
+                setError(tr('please_select_kin_person', '請選擇親屬姓名')); return;
+            }
         }
         setSaving(true); setError(null); setMessage(null); setConflict(null); setSuspected(null);
         // PK 段空值正規化為哨兵 '0'。
@@ -269,8 +278,8 @@ export default function KinEditor({
         } finally { setDeleting(false); }
     };
 
-    const searchRow = (key: string, label: string, code: string, endpoint: string, highlight = false, sentinel = '0') => (
-        gridCell(label, { code },
+    const searchRow = (key: string, label: string, code: string, endpoint: string, highlight = false, sentinel = '0', required = false) => (
+        gridCell(label, { code, required },
             <CodeAutocomplete mode="search" endpoint={endpoint} value={fields[key] ?? sentinel} initialLabel={labels[key] ?? ''}
                 disabled={!editable} aria-invalid={highlight}
                 onChange={(v, l) => { set(key, v || sentinel); setLabel(key, l); }} />)
@@ -284,8 +293,8 @@ export default function KinEditor({
             <OppositeEdgeNotice result={oppositeEdge} reverseCodeLabel={reverseCodeLabel} tr={tr} />
 
             <div style={gGrid}>
-                {searchRow('c_kin_code', tr('kinship_relation', '親屬關係'), 'c_kin_code', '/api/select/search/kincode')}
-                {searchRow('c_kin_id', tr('relative_name', '親屬姓名'), 'c_kin_id', '/api/select/search/biog')}
+                {searchRow('c_kin_code', tr('kinship_relation', '親屬關係'), 'c_kin_code', '/api/select/search/kincode', false, '0', mode === 'create')}
+                {searchRow('c_kin_id', tr('relative_name', '親屬姓名'), 'c_kin_id', '/api/select/search/biog', false, '0', mode === 'create')}
 
                 {/* 互逆配對碼：依正向碼取候選，預設第一個（同 legacy），反向關係有歧義（父→子/女、第幾子…）故可手選。 */}
                 {gridCell(tr('reverse_pair_label', '互逆配對碼'), { code: 'c_kinship_pair', full: true }, <>

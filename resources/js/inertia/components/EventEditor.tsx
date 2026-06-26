@@ -59,7 +59,7 @@ export default function EventEditor({
     const tr = (k: string, fb: string) => { const v = t ? t(k) : k; return v && v !== k ? v : fb; };
     // 對齊 legacy 新增預設（c_sequence '0'、c_event_code 預設 option 0、c_source 預設 option 0）。
     // 編輯模式 initialFields 會覆蓋這些預設。
-    const base: Fields = { c_personid: String(personId), c_sequence: '0', c_event_code: '0', c_source: '0', ...initialFields };
+    const base: Fields = { c_personid: String(personId), c_sequence: '0', c_event_code: '', c_source: '0', ...initialFields };
     const [fields, setFields] = useState<Fields>(base);
     const [labels, setLabels] = useState<Fields>(initialLabels);
     const [addrItems, setAddrItems] = useState<AddrItem[]>(initialAddr);
@@ -123,6 +123,10 @@ export default function EventEditor({
 
     const save = async (sm: 'direct' | 'proposal') => {
         setSaving(true); setError(null); setMessage(null);
+        // 事件名 c_event_code 為主碼，必填（拒絕 0/未詳）：僅新增時擋；編輯既有列不卡。
+        if (mode === 'create' && (!fields.c_event_code || fields.c_event_code === '0')) {
+            setSaving(false); setError(tr('please_select_event', '請選擇事件名')); return;
+        }
         const pkVal = (k: string) => (k === 'c_personid' ? String(personId) : (fields[k]?.trim() ? fields[k] : '0'));
         let changes: Record<string, string | null>;
         let target: Record<string, number>;
@@ -210,7 +214,7 @@ export default function EventEditor({
             <div style={gGrid}>
                 {textRow('c_sequence', tr('sequence', '序號'), 'c_sequence')}
 
-                {gridCell(tr('event_name', '事件名'), { code: 'c_event_code' },
+                {gridCell(tr('event_name', '事件名'), { code: 'c_event_code', required: mode === 'create' },
                     <CodeAutocomplete mode="search" endpoint="/api/select/search/event"
                         value={fields.c_event_code ?? '0'} initialLabel={labels.c_event_code ?? ''} disabled={!editable}
                         onChange={(v, l) => { set('c_event_code', v); setLabel('c_event_code', l); }} />)}

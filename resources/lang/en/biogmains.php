@@ -74,6 +74,17 @@ return [
     'mingzi_required' => 'Pinyin given name is required',
     'please_select_office' => 'Please select an office',
     'please_select_text' => 'Please select a text',
+    // Primary-code required (phase 1): each editor's primary anchor code / target person is required; create rejects empty/Unknown(0).
+    'please_select_entry' => 'Please select an entry method',
+    'please_select_status' => 'Please select a social status',
+    'please_select_event' => 'Please select an event',
+    'please_select_socialinst' => 'Please select a social institution',
+    'please_select_kin_relation' => 'Please select a kinship relation',
+    'please_select_kin_person' => 'Please select a relative',
+    'please_select_assoc' => 'Please select an association',
+    'please_select_assoc_person' => 'Please select an associated person',
+    'please_select_place' => 'Please select a place',
+    'pk_field_required' => 'Primary key fields cannot be empty',
     // basic_info grid redesign: derived/index read-only sub-block titles and derived full-name labels.
     'derived_auto_tag' => 'Auto-generated (read-only, merged from the names above)',
     'index_auto_tag' => 'Index year & index address (auto-computed periodically by the algorithm; read-only)',

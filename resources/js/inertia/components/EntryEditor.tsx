@@ -65,7 +65,7 @@ export default function EntryEditor({
     // c_source / c_entry_addr_id 雖可空，legacy 仍 emptyToSentinel→0，故 create 預設 '0'（編輯模式由 initialFields 覆蓋）。
     const base: Fields = {
         c_personid: String(personId),
-        c_entry_code: '0', c_sequence: '0', c_kin_code: '0', c_assoc_code: '0', c_kin_id: '0',
+        c_entry_code: '', c_sequence: '0', c_kin_code: '0', c_assoc_code: '0', c_kin_id: '0',
         c_year: '0', c_assoc_id: '0', c_inst_code: '0', c_inst_name_code: '0',
         c_source: '0', c_entry_addr_id: '0',
         ...initialFields,
@@ -131,6 +131,10 @@ export default function EntryEditor({
         // 序號為新增必填（legacy required）。
         if (mode === 'create' && !(fields.c_sequence ?? '').trim()) {
             setError(tr('please_fill_sequence', '請填寫序號')); return;
+        }
+        // 入仕途徑 c_entry_code 為主碼，必填（拒絕 0/未詳）：僅新增時擋；編輯既有列不卡。
+        if (mode === 'create' && (!fields.c_entry_code || fields.c_entry_code === '0')) {
+            setError(tr('please_select_entry', '請選擇入仕途徑')); return;
         }
         setSaving(true); setError(null); setMessage(null);
         // 主鍵 NOT NULL：空值正規化為 '0'（未詳），對齊 legacy。
@@ -219,7 +223,7 @@ export default function EntryEditor({
                     <input type="number" value={fields.c_sequence ?? ''} disabled={!editable} required maxLength={4}
                         onChange={(e) => set('c_sequence', e.target.value)} style={{ ...gInputStyle, ...(!editable ? gReadonlyStyle : {}) }} />)}
 
-                {gridCell(tr('entry_field', '入仕途徑'), { code: 'c_entry_code' },
+                {gridCell(tr('entry_field', '入仕途徑'), { code: 'c_entry_code', required: mode === 'create' },
                     <CodeAutocomplete mode="search" endpoint="/api/select/search/entry"
                         value={fields.c_entry_code ?? '0'} initialLabel={labels.c_entry_code ?? ''} disabled={!editable}
                         onChange={(v, l) => { set('c_entry_code', v || '0'); setLabel('c_entry_code', l); }} />)}

@@ -85,7 +85,7 @@ export default function AssocEditor({
     const tr = (k: string, fb: string) => { const v = t ? t(k) : k; return v && v !== k ? v : fb; };
     const base: Fields = {
         c_personid: String(personId),
-        c_assoc_code: '0', c_assoc_id: '0', c_kin_code: '0', c_kin_id: '0',
+        c_assoc_code: '', c_assoc_id: '', c_kin_code: '0', c_kin_id: '0',
         c_assoc_kin_code: '0', c_assoc_kin_id: '0',
         c_text_title: TEXT_PK_SENTINEL, c_assoc_first_year: '',
         c_inst_code: '0', c_inst_name_code: '0', c_source: '0',
@@ -302,6 +302,15 @@ export default function AssocEditor({
             setError(tr('opposite_edge_multiple_confirm', '對面有多筆對應的反向關係。直接保存會一併同步這些反向列。請先確認上方列出的記錄無誤，再次點擊「直接保存」以繼續。'));
             return;
         }
+        // 社會關係 c_assoc_code / 關聯人物 c_assoc_id 為主碼，必填（拒絕 0/未詳）：僅新增時擋；編輯既有列不卡。
+        if (mode === 'create') {
+            if (!fields.c_assoc_code || fields.c_assoc_code === '0') {
+                setError(tr('please_select_assoc', '請選擇社會關係')); return;
+            }
+            if (!fields.c_assoc_id || fields.c_assoc_id === '0') {
+                setError(tr('please_select_assoc_person', '請選擇關聯人物')); return;
+            }
+        }
         setSaving(true); setError(null); setMessage(null); setConflict(null); setSuspected(null);
         // PK 段空值正規化：c_text_title→'[n/a]'、c_assoc_first_year→'-9999'、其餘 code 段→'0'。
         const pkVal = (k: string): number | string => {
@@ -420,8 +429,8 @@ export default function AssocEditor({
     const textRow = (key: string, label: string, code: string, highlight = false, hint?: string) => (
         gridCell(label, { code, hint }, gridInput({ value: fields[key] ?? '', onChange: (v) => set(key, v), disabled: !editable, highlight }))
     );
-    const searchRow = (key: string, label: string, code: string, endpoint: string, highlight = false, sentinel = '0') => (
-        gridCell(label, { code },
+    const searchRow = (key: string, label: string, code: string, endpoint: string, highlight = false, sentinel = '0', required = false) => (
+        gridCell(label, { code, required },
             <CodeAutocomplete mode="search" endpoint={endpoint} value={fields[key] ?? sentinel} initialLabel={labels[key] ?? ''}
                 disabled={!editable} aria-invalid={highlight}
                 onChange={(v, l) => { set(key, v || sentinel); setLabel(key, l); }} />)
@@ -474,8 +483,8 @@ export default function AssocEditor({
             {/* 核心社會關係：社會關係碼 | 關聯人物 + 關係次數（重要）+ 次序（不重要、後置）+ 互逆配對碼。 */}
             <GridSection title={tr('assoc_core_section', '社會關係')}>
                 <div style={gGrid}>
-                    {searchRow('c_assoc_code', tr('assoc_field', '社會關係'), 'c_assoc_code', '/api/select/search/assoccode', assocHighlight)}
-                    {searchRow('c_assoc_id', tr('assoc_person', '關聯人物'), 'c_assoc_id', '/api/select/search/biog')}
+                    {searchRow('c_assoc_code', tr('assoc_field', '社會關係'), 'c_assoc_code', '/api/select/search/assoccode', assocHighlight, '0', mode === 'create')}
+                    {searchRow('c_assoc_id', tr('assoc_person', '關聯人物'), 'c_assoc_id', '/api/select/search/biog', false, '0', mode === 'create')}
                     {/* 關係次數（書信計次）：重要、非出處，移入核心區，置於社會關係/關聯人物之後。 */}
                     {textRow('c_assoc_count', tr('assoc_count_field', '數量'), 'c_assoc_count', false, tr('assoc_count_hint', '此欄位僅適用於書信：當無法以標題及日期區分多次信件時，則僅建「一筆」社會關係，並將信件總數填於此欄。請填阿拉伯數字'))}
                     {/* 次序不重要，下移至核心欄之後（去強調）。 */}

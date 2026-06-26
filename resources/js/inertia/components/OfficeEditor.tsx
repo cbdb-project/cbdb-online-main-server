@@ -71,7 +71,7 @@ export default function OfficeEditor({
     // 新增預設對齊 legacy：c_office_id 預設 option 0、c_source 預設 0、旗標 0；編輯由 initialFields 覆蓋。
     const base: Fields = {
         c_personid: String(personId),
-        c_office_id: '0', c_source: '0',
+        c_office_id: '', c_source: '0',
         c_inst_code: '0', c_inst_name_code: '0',
         c_fy_intercalary: '0', c_ly_intercalary: '0',
         ...initialFields,

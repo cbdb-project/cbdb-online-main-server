@@ -44,7 +44,7 @@ export default function TextEditor({
 }: Props) {
     const tr = (k: string, fb: string) => { const v = t ? t(k) : k; return v && v !== k ? v : fb; };
     const isCreate = mode === 'create';
-    const base: Fields = { c_personid: String(personId), c_textid: '0', c_role_id: '0', c_source: '0', ...initialFields };
+    const base: Fields = { c_personid: String(personId), c_textid: '', c_role_id: '0', c_source: '0', ...initialFields };
     const [fields, setFields] = useState<Fields>(base);
     const [labels, setLabels] = useState<Fields>(initialLabels);
     const [savedSnapshot, setSavedSnapshot] = useState(JSON.stringify(base));

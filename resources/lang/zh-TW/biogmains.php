@@ -74,6 +74,17 @@ return [
     'mingzi_required' => '「拼音名」為必填',
     'please_select_office' => '請選擇官名',
     'please_select_text' => '請選擇著述',
+    // 主碼必填（階段1）：各編輯器主錨碼／對象人物必填，新增時拒絕空值/未詳(0)。
+    'please_select_entry' => '請選擇入仕途徑',
+    'please_select_status' => '請選擇社會區分',
+    'please_select_event' => '請選擇事件名',
+    'please_select_socialinst' => '請選擇社交機構',
+    'please_select_kin_relation' => '請選擇親屬關係',
+    'please_select_kin_person' => '請選擇親屬姓名',
+    'please_select_assoc' => '請選擇社會關係',
+    'please_select_assoc_person' => '請選擇關聯人物',
+    'please_select_place' => '請選擇地名',
+    'pk_field_required' => '主鍵欄位不可為空',
     // basic_info 網格重設計：派生/指數唯讀子區塊標題與派生全名標籤。
     'derived_auto_tag' => '自動生成（唯讀，由上方姓名合併）',
     'index_auto_tag' => '指數年與指數地址（系統依算法定期自動計算，唯讀，無需手動填寫）',

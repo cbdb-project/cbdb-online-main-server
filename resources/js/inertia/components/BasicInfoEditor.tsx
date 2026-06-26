@@ -4,7 +4,12 @@ import EraTimeField, { EraTimeFieldValues } from './EraTimeField';
 import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
 import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
-import RequiredMark from './PersonEditorShared/RequiredMark';
+import {
+    gridCardStyle, gGrid, gFull, gLabelStyle, gCodeStyle, gInputStyle, gHintStyle,
+    gReadonlyStyle, gOkStyle, gErrStyle, gWarnStyle, gAuditWrapStyle,
+    gSubmitRow, gBtnGroupRight, gPrimaryBtn, gInfoBtn, gDangerBtn, gSuccessBtn,
+    gridSectionHeadStyle, GridLabel, GridSection,
+} from './PersonEditorShared/grid';
 
 /**
  * 基本資料編輯器（對齊 legacy /basicinformation/{id}/edit，非 person-browser）。
@@ -275,7 +280,7 @@ export default function BasicInfoEditor({
     // 統一網格欄位（上標籤 + 技術碼淡化），對齊使用者認可的設計草圖。
     // 所有 g* 與 block 皆為「回傳 JSX 的函式」而非巢狀元件，避免每次 render 重新掛載 → input 失焦。
     const fLabel = (label: string, code?: string, required = false) => (
-        <label style={gLabelStyle}>{label}{required ? <RequiredMark /> : null}{code ? <span style={gCodeStyle}>{code}</span> : null}</label>
+        <GridLabel label={label} code={code} required={required} />
     );
     // 可編輯文字欄（readonly 時灰底）。
     const gText = (key: string, label: string, code?: string, opts: { readonly?: boolean; hint?: string; full?: boolean } = {}) => (
@@ -283,7 +288,7 @@ export default function BasicInfoEditor({
             {fLabel(label, code)}
             <input type="text" value={fields[key] ?? ''} readOnly={opts.readonly} disabled={opts.readonly}
                 onChange={(e) => set(key, e.target.value)}
-                style={{ ...gInputStyle, ...(opts.readonly ? readonlyStyle : {}) }} />
+                style={{ ...gInputStyle, ...(opts.readonly ? gReadonlyStyle : {}) }} />
             {opts.hint ? <span style={gHintStyle}>{opts.hint}</span> : null}
         </div>
     );
@@ -291,7 +296,7 @@ export default function BasicInfoEditor({
     const gRO = (key: string, label: string, code?: string, opts: { hint?: string; full?: boolean } = {}) => (
         <div style={opts.full ? gFull : undefined}>
             {fLabel(label, code)}
-            <input type="text" value={labels[key] || fields[key] || ''} readOnly disabled style={{ ...gInputStyle, ...readonlyStyle }} />
+            <input type="text" value={labels[key] || fields[key] || ''} readOnly disabled style={{ ...gInputStyle, ...gReadonlyStyle }} />
             {opts.hint ? <span style={gHintStyle}>{opts.hint}</span> : null}
         </div>
     );
@@ -313,7 +318,7 @@ export default function BasicInfoEditor({
 
     // 區塊分組：留白 + 藍系標題列（不對齊 legacy，使用者認可之更合適設計）。內部欄位走一致響應式網格。
     const block = (title: string, children: React.ReactNode) => (
-        <div style={sectionStyle}><div style={sectionHeadStyle}>{title}</div>{children}</div>
+        <GridSection title={title}>{children}</GridSection>
     );
 
     const birth: DateGroup = { year: 'c_birthyear', nhCode: 'c_by_nh_code', nhYear: 'c_by_nh_year', range: 'c_by_range', intercalary: 'c_by_intercalary', month: 'c_by_month', day: 'c_by_day', dayGz: 'c_by_day_gz' };
@@ -322,12 +327,12 @@ export default function BasicInfoEditor({
     const flLate: DateGroup = { year: 'c_fl_latest_year', nhCode: 'c_fl_ly_nh_code', nhYear: 'c_fl_ly_nh_year', notes: 'c_fl_ly_notes' };
 
     return (
-        <div style={cardStyle}>
+        <div style={gridCardStyle}>
             {/* 不再重複「人物基本資料 — {人物}」標題：詳情中樞 banner 已顯示人物、分頁標籤已示「基本資料」。 */}
-            {message ? <div style={okStyle}>{message}</div> : null}
-            {error ? <div style={errStyle}>{error}</div> : null}
-            {pinyinDone ? <div style={okStyle}>{tr('basicinfo_pinyin_alert', '「生成拼音」已完成')}</div> : null}
-            {nameWarning ? <div style={warnStyle}>{tr('name_required_warning', '請確認「名（中）」與「拼音名」是否填寫。')}</div> : null}
+            {message ? <div style={gOkStyle}>{message}</div> : null}
+            {error ? <div style={gErrStyle}>{error}</div> : null}
+            {pinyinDone ? <div style={gOkStyle}>{tr('basicinfo_pinyin_alert', '「生成拼音」已完成')}</div> : null}
+            {nameWarning ? <div style={gWarnStyle}>{tr('name_required_warning', '請確認「名（中）」與「拼音名」是否填寫。')}</div> : null}
 
             {/* 區塊一：姓名（資料流分組）。自上而下一條線、按鈕作橋：中文姓名 →〔生成姓名拼音〕→ 拼音 → 外文/羅馬字 → 自動生成框。 */}
             {block(tr('block_names', '姓名'), <>
@@ -337,7 +342,7 @@ export default function BasicInfoEditor({
                     {gText('c_mingzi_chn', tr('mingzi_chn', '名（中）'), 'c_mingzi_chn')}
                 </div>
                 {/* 按鈕作橋：取上方中文名、產出下方拼音；上下皆留白，使「作用範圍」一目了然。 */}
-                {canEdit ? <div style={pinyinRowStyle}><button type="button" style={infoBtn} onClick={() => void generatePinyin()}>{tr('generate_pinyin_btn', '生成姓名拼音')}</button></div> : null}
+                {canEdit ? <div style={pinyinRowStyle}><button type="button" style={gInfoBtn} onClick={() => void generatePinyin()}>{tr('generate_pinyin_btn', '生成姓名拼音')}</button></div> : null}
                 {/* 拼音（可手動修正）。 */}
                 <div style={gGrid}>
                     {gText('c_surname', 'Xing', 'c_surname')}
@@ -439,31 +444,31 @@ export default function BasicInfoEditor({
 
             {/* audit-fields 唯讀區：建檔者+日期、更新者+日期 各合併為一欄（兩列），對齊其餘 12 編輯器與 legacy。 */}
             {(fields.c_created_by || fields.c_created_date || fields.c_modified_by || fields.c_modified_date) ? (
-                <div style={auditWrapStyle}>
-                    <div style={sectionHeadStyle}>{tr('create_or_modify', '建檔 / 更新資訊')}</div>
+                <div style={gAuditWrapStyle}>
+                    <div style={gridSectionHeadStyle}>{tr('create_or_modify', '建檔 / 更新資訊')}</div>
                     <div style={gGrid}>
                         <div>{fLabel(tr('audit_created', '建檔'))}
-                            <input type="text" readOnly disabled style={{ ...gInputStyle, ...readonlyStyle }}
+                            <input type="text" readOnly disabled style={{ ...gInputStyle, ...gReadonlyStyle }}
                                 value={auditValue(fields.c_created_by, fields.c_created_date)} /></div>
                         <div>{fLabel(tr('audit_updated', '更新'))}
-                            <input type="text" readOnly disabled style={{ ...gInputStyle, ...readonlyStyle }}
+                            <input type="text" readOnly disabled style={{ ...gInputStyle, ...gReadonlyStyle }}
                                 value={auditValue(fields.c_modified_by, fields.c_modified_date)} /></div>
                     </div>
                 </div>
             ) : null}
 
-            <div style={submitRow}>
+            <div style={gSubmitRow}>
                 {/* 主要動作靠左 */}
-                {canEdit ? <button type="button" disabled={saving || !dirty} style={primaryBtn} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
-                {(canEdit || canPropose) ? <button type="button" disabled={saving || !dirty} style={infoBtn} onClick={() => void save('proposal')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('submit_proposal', '提交建議')}</button> : null}
+                {canEdit ? <button type="button" disabled={saving || !dirty} style={gPrimaryBtn} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
+                {(canEdit || canPropose) ? <button type="button" disabled={saving || !dirty} style={gInfoBtn} onClick={() => void save('proposal')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('submit_proposal', '提交建議')}</button> : null}
                 {/* 近按鈕即時回饋（Q3）：儲存中轉圈 / ✓ 已儲存 / ✗ 失敗，緊鄰按鈕，不必抬頭看頂部 flash。 */}
                 <ActionStatus saving={saving} deleting={deleting} message={message} error={error} t={t} />
                 {/* 危險/另存動作靠右（對齊 legacy 的 float-right 分組） */}
                 {(canEdit && deleteEndpoint) || duplicateCollateralUrl || saveasUrl ? (
-                    <div style={btnGroupRight}>
-                        {canEdit && deleteEndpoint ? <button type="button" disabled={deleting} style={dangerBtn} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
-                        {duplicateCollateralUrl ? <a href={duplicateCollateralUrl} style={successLink}>{tr('duplicate_collateral', 'Duplicate Collateral Info')}</a> : null}
-                        {saveasUrl ? <a href={saveasUrl} style={successLink}>{tr('duplicate_basic', 'Duplicate Basic Info')}</a> : null}
+                    <div style={gBtnGroupRight}>
+                        {canEdit && deleteEndpoint ? <button type="button" disabled={deleting} style={gDangerBtn} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
+                        {duplicateCollateralUrl ? <a href={duplicateCollateralUrl} style={gSuccessBtn}>{tr('duplicate_collateral', 'Duplicate Collateral Info')}</a> : null}
+                        {saveasUrl ? <a href={saveasUrl} style={gSuccessBtn}>{tr('duplicate_basic', 'Duplicate Basic Info')}</a> : null}
                     </div>
                 ) : null}
             </div>
@@ -471,35 +476,9 @@ export default function BasicInfoEditor({
     );
 }
 
-const cardStyle: React.CSSProperties = { background: '#fff', border: '1px solid #dee2e6', borderRadius: 8, padding: 20 };
-// 區塊分組：留白 + 藍系標題列（不重外框、留白驅動分組；對齊系統藍 #255f93）。使用者認可之設計方向。
-const sectionStyle: React.CSSProperties = { marginBottom: 22 };
-const sectionHeadStyle: React.CSSProperties = { fontSize: '0.82rem', fontWeight: 700, color: '#255f93', letterSpacing: '0.06em', textTransform: 'uppercase', paddingBottom: 8, marginBottom: 14, borderBottom: '1px solid #e6eef6' };
-// 一致響應式雙欄網格（所有欄位同節奏）；日期/備註整列跨欄（gFull）。
-// 響應式雙欄：寬螢幕 2 欄、窄螢幕自動降為 1 欄（min(100%,22rem) 使極窄時不溢出；卡片寬度下封頂 2 欄）。
-const gGrid: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 22rem), 1fr))', gap: '14px 22px', marginBottom: 4 };
-const gFull: React.CSSProperties = { gridColumn: '1 / -1' };
-// 上標籤 + 技術碼淡化（次級灰小字）。
-const gLabelStyle: React.CSSProperties = { display: 'block', fontSize: '0.9rem', fontWeight: 600, color: '#374151', marginBottom: 5 };
-const gCodeStyle: React.CSSProperties = { fontWeight: 400, color: '#9aa4b2', fontSize: '0.78rem', marginLeft: 6 };
-const gInputStyle: React.CSSProperties = { width: '100%', height: 40, padding: '0 11px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '1rem', boxSizing: 'border-box', background: '#fff' };
-const gHintStyle: React.CSSProperties = { display: 'block', marginTop: 4, fontSize: '0.8rem', color: '#6b7280' };
-const readonlyStyle: React.CSSProperties = { background: '#f5f5f5', cursor: 'not-allowed' };
+// BasicInfo 專屬（非版面）樣式：唯讀派生子區塊、生成拼音按鈕列。
 // 唯讀派生子區塊：虛線框 + 淡背景，明確標示「自動生成」。
 const derivedBoxStyle: React.CSSProperties = { background: '#fafbfd', border: '1px dashed #e5e7eb', borderRadius: 10, padding: '12px 14px', marginTop: 4 };
 const derivedTagStyle: React.CSSProperties = { fontSize: '0.78rem', color: '#6b7280', marginBottom: 10 };
 // 生成拼音按鈕列：與上方姓名網格、下方派生區留足間距（修正先前過緊）。
 const pinyinRowStyle: React.CSSProperties = { margin: '16px 0' };
-// 動作列：主要動作（保存/提交）靠左、危險/另存（刪除/Duplicate）靠右，對齊 legacy（非全堆左）。
-const submitRow: React.CSSProperties = { display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap', alignItems: 'center' };
-const btnGroupRight: React.CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 'auto' };
-// 所有動作按鈕/連結統一尺寸（8px 14px + inline-flex 置中），避免 button 與 a 高度不一。
-const actionBtnBase: React.CSSProperties = { padding: '8px 14px', borderRadius: 6, fontWeight: 700, cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
-const primaryBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid #255f93', background: '#255f93', color: '#fff' };
-const infoBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid #0891b2', background: '#0891b2', color: '#fff' };
-const okStyle: React.CSSProperties = { background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', padding: '8px 12px', borderRadius: 6, marginBottom: 10, fontSize: '1rem' };
-const errStyle: React.CSSProperties = { background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '8px 12px', borderRadius: 6, marginBottom: 10, fontSize: '1rem' };
-const warnStyle: React.CSSProperties = { background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '8px 12px', borderRadius: 6, marginBottom: 10, fontSize: '1rem' };
-const auditWrapStyle: React.CSSProperties = { marginTop: 16, paddingTop: 12, borderTop: '1px solid #e5e7eb' };
-const dangerBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid #dc3545', background: '#dc3545', color: '#fff' };
-const successLink: React.CSSProperties = { ...actionBtnBase, border: '1px solid #28a745', background: '#28a745', color: '#fff' };

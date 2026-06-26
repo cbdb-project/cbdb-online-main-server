@@ -1,8 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
-import RequiredMark from './PersonEditorShared/RequiredMark';
 import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
+import {
+    gridCardStyle, gGrid, gInputStyle, gReadonlyStyle, gOkStyle, gErrStyle, gWarnStyle,
+    gSubmitRow, gBtnGroupRight, gPrimaryBtn, gInfoBtn, gDangerBtn, gCancelBtn,
+    gAuditWrapStyle, gridSectionHeadStyle, GridLabel, gridCell, gridInput,
+} from './PersonEditorShared/grid';
 
 /**
  * 著述出處（sources）編輯器（對齊 legacy biogmains/sources/_form.blade.php，非 person-browser）。
@@ -165,97 +169,82 @@ export default function SourceEditor({
     };
 
     return (
-        <div style={cardStyle}>
+        <div style={gridCardStyle}>
             <h3 style={titleStyle}>{mode === 'create' ? tr('source_create', '新增出處') : tr('source_edit', '編輯出處')} — {personLabel}</h3>
-            {message ? <div style={okStyle}>{message}</div> : null}
-            {error ? <div style={errStyle}>{error}</div> : null}
+            {message ? <div style={gOkStyle}>{message}</div> : null}
+            {error ? <div style={gErrStyle}>{error}</div> : null}
             {mode === 'edit' && isWikiSource ? (
-                <div style={warnStyle}>
+                <div style={gWarnStyle}>
                     <strong>{tr('wiki_warning', '警告')}：</strong>{tr('wiki_warning_text', '此為維基資料來源，請謹慎修改。')}
                 </div>
             ) : null}
 
-            <div style={rowStyle}><label style={labelStyle}>{tr('source_field', '出處')} (c_source){mode === 'create' ? <RequiredMark /> : null}</label><div style={fieldStyle}>
-                {mode === 'edit' ? (
-                    <input type="text" value={labels.c_textid ?? (fields.c_textid ?? '')} readOnly disabled
-                        style={{ ...inputStyle, ...roStyle }} />
-                ) : (
-                    <CodeAutocomplete mode="search" endpoint="/api/select/search/text"
-                        value={fields.c_textid ?? ''} initialLabel={labels.c_textid ?? ''} disabled={!editable}
-                        onChange={(v, l) => { set('c_textid', v); setLabel('c_textid', l); }} />
-                )}
-                {mode === 'edit' ? <div style={hintStyle}>{tr('source_pk_immutable_hint', '出處與頁碼為主鍵，不可修改；如需更改請刪除後重新新增。')}</div> : null}
-            </div></div>
+            <div style={gGrid}>
+                {gridCell(tr('source_field', '出處'), { code: 'c_source', required: mode === 'create', hint: mode === 'edit' ? tr('source_pk_immutable_hint', '出處與頁碼為主鍵，不可修改；如需更改請刪除後重新新增。') : undefined },
+                    mode === 'edit' ? (
+                        <input type="text" value={labels.c_textid ?? (fields.c_textid ?? '')} readOnly disabled
+                            style={{ ...gInputStyle, ...gReadonlyStyle }} />
+                    ) : (
+                        <CodeAutocomplete mode="search" endpoint="/api/select/search/text"
+                            value={fields.c_textid ?? ''} initialLabel={labels.c_textid ?? ''} disabled={!editable}
+                            onChange={(v, l) => { set('c_textid', v); setLabel('c_textid', l); }} />
+                    ))}
 
-            <div style={rowStyle}><label style={labelStyle}>{tr('pages_entries', '頁數/條目')} (c_pages)</label><div style={fieldStyle}>
-                <input type="text" value={fields.c_pages ?? ''} disabled={!editable || mode === 'edit'}
-                    onChange={(e) => set('c_pages', e.target.value)}
-                    style={{ ...inputStyle, ...((!editable || mode === 'edit') ? roStyle : {}) }} /></div></div>
+                {gridCell(tr('pages_entries', '頁數/條目'), { code: 'c_pages' },
+                    gridInput({ value: fields.c_pages ?? '', onChange: (v) => set('c_pages', v), disabled: !editable || mode === 'edit' }))}
 
-            <div style={rowStyle}><label style={labelStyle}>{tr('options', '選項')}</label><div style={fieldStyle}>
-                <label style={checkRow}>
-                    <input type="checkbox" checked={checked('c_main_source')} disabled={!editable}
-                        onChange={(e) => set('c_main_source', e.target.checked ? '1' : '0')} />
-                    <span>{tr('primary_source', '主要出處')}</span>
-                </label>
-                <label style={checkRow}>
-                    <input type="checkbox" checked={checked('c_self_bio')} disabled={!editable}
-                        onChange={(e) => set('c_self_bio', e.target.checked ? '1' : '0')} />
-                    <span>{tr('self_biography', '本人傳記')}</span>
-                </label>
-            </div></div>
+                {gridCell(tr('options', '選項'), { full: true },
+                    <>
+                        <label style={checkRow}>
+                            <input type="checkbox" checked={checked('c_main_source')} disabled={!editable}
+                                onChange={(e) => set('c_main_source', e.target.checked ? '1' : '0')} />
+                            <span>{tr('primary_source', '主要出處')}</span>
+                        </label>
+                        <label style={checkRow}>
+                            <input type="checkbox" checked={checked('c_self_bio')} disabled={!editable}
+                                onChange={(e) => set('c_self_bio', e.target.checked ? '1' : '0')} />
+                            <span>{tr('self_biography', '本人傳記')}</span>
+                        </label>
+                    </>)}
 
-            <div style={rowStyle}><label style={labelStyle}>{tr('notes_field', '備註')} (c_notes)</label><div style={fieldStyle}>
-                <textarea value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={5}
-                    style={{ ...inputStyle, height: 'auto', ...(!editable ? roStyle : {}) }} /></div></div>
+                {gridCell(tr('notes_field', '備註'), { code: 'c_notes', full: true },
+                    <textarea value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={5}
+                        style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
+            </div>
 
             {mode === 'edit' && (fields.c_created_by || fields.c_modified_by) ? (
-                <>
-                    {fields.c_created_by ? (
-                        <div style={rowStyle}><label style={labelStyle}>{tr('audit_created', '建檔')}</label><div style={fieldStyle}>
-                            <input type="text" value={`${fields.c_created_by}${fields.c_created_date ? '/' + fields.c_created_date : ''}`} readOnly disabled style={{ ...inputStyle, ...roStyle }} /></div></div>
-                    ) : null}
-                    {fields.c_modified_by ? (
-                        <div style={rowStyle}><label style={labelStyle}>{tr('audit_updated', '更新')}</label><div style={fieldStyle}>
-                            <input type="text" value={`${fields.c_modified_by}${fields.c_modified_date ? '/' + fields.c_modified_date : ''}`} readOnly disabled style={{ ...inputStyle, ...roStyle }} /></div></div>
-                    ) : null}
-                </>
+                <div style={gAuditWrapStyle}>
+                    <div style={gridSectionHeadStyle}>{tr('create_or_modify', '建檔 / 更新資訊')}</div>
+                    <div style={gGrid}>
+                        {fields.c_created_by ? gridCell(tr('audit_created', '建檔'), {},
+                            <input type="text" value={`${fields.c_created_by}${fields.c_created_date ? '/' + fields.c_created_date : ''}`} readOnly disabled style={{ ...gInputStyle, ...gReadonlyStyle }} />) : null}
+                        {fields.c_modified_by ? gridCell(tr('audit_updated', '更新'), {},
+                            <input type="text" value={`${fields.c_modified_by}${fields.c_modified_date ? '/' + fields.c_modified_date : ''}`} readOnly disabled style={{ ...gInputStyle, ...gReadonlyStyle }} />) : null}
+                    </div>
+                </div>
             ) : null}
 
             {(canEdit || canPropose) && (
-                <div style={rowStyle}><label style={labelStyle}>{tr('modification_note_label', '修改說明')}</label><div style={fieldStyle}>
-                    <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...inputStyle, height: 'auto' }}
-                        placeholder={tr('modification_note_placeholder', '提案時請說明修改原因')} /></div></div>
+                <div style={{ marginBottom: 16 }}>
+                    <GridLabel label={tr('modification_note_label', '修改說明')} />
+                    <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...gInputStyle, height: 'auto' }}
+                        placeholder={tr('modification_note_placeholder', '提案時請說明修改原因')} />
+                </div>
             )}
 
-            <div style={{ ...rowStyle, gap: 8 }}>
-                <div style={{ width: 160, flexShrink: 0 }} />
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {canEdit ? <button type="button" style={primaryBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
-                    {(canEdit || canPropose) ? <button type="button" style={infoBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('proposal')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('submit_proposal', '提交建議')}</button> : null}
-                    <ActionStatus saving={saving} deleting={deleting} message={message} error={error} t={t} />
-                    {mode === 'edit' && canEdit && deleteEndpoint ? <button type="button" style={dangerBtn} disabled={deleting} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
-                    <a href={indexUrl} style={cancelBtn}>{tr('cancel', '取消')}</a>
+            <div style={gSubmitRow}>
+                {canEdit ? <button type="button" style={gPrimaryBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
+                {(canEdit || canPropose) ? <button type="button" style={gInfoBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('proposal')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('submit_proposal', '提交建議')}</button> : null}
+                <ActionStatus saving={saving} deleting={deleting} message={message} error={error} t={t} />
+                <div style={gBtnGroupRight}>
+                    {mode === 'edit' && canEdit && deleteEndpoint ? <button type="button" style={gDangerBtn} disabled={deleting} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
+                    <a href={indexUrl} style={gCancelBtn}>{tr('cancel', '取消')}</a>
                 </div>
             </div>
-            {dirty ? <div style={{ ...rowStyle, color: '#92400e', fontSize: '0.8rem' }}><div style={{ width: 160, flexShrink: 0 }} />{tr('unsaved_changes', '有未儲存的變更')}</div> : null}
+            {dirty ? <div style={{ marginTop: 8, color: '#92400e', fontSize: '0.8rem' }}>{tr('unsaved_changes', '有未儲存的變更')}</div> : null}
         </div>
     );
 }
 
-const cardStyle: React.CSSProperties = { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: 20, maxWidth: '100%' };
 const titleStyle: React.CSSProperties = { fontSize: '1.1rem', fontWeight: 700, marginBottom: 12 };
-const rowStyle: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' };
-const labelStyle: React.CSSProperties = { width: 160, flexShrink: 0, fontSize: '1rem', color: '#374151', paddingTop: 6 };
-const fieldStyle: React.CSSProperties = { flex: 1, minWidth: 0 };
-const inputStyle: React.CSSProperties = { width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '1rem', boxSizing: 'border-box' };
-const roStyle: React.CSSProperties = { background: '#f3f4f6', cursor: 'not-allowed' };
-const hintStyle: React.CSSProperties = { fontSize: '0.78rem', color: '#64748b', marginTop: 4 };
 const checkRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: '1rem', color: '#374151' };
-const okStyle: React.CSSProperties = { background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: '0.85rem' };
-const errStyle: React.CSSProperties = { background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: '0.85rem' };
-const warnStyle: React.CSSProperties = { background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: '0.85rem' };
-const primaryBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #255f93', background: '#255f93', color: '#fff', fontWeight: 700, cursor: 'pointer' };
-const infoBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #0e7490', background: '#0891b2', color: '#fff', fontWeight: 700, cursor: 'pointer' };
-const dangerBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #b91c1c', background: '#fff5f5', color: '#b91c1c', fontWeight: 700, cursor: 'pointer' };
-const cancelBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #cbd5e1', background: '#fff', color: '#475569', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' };

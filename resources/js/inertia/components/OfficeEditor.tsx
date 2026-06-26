@@ -5,6 +5,11 @@ import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import TextpersonPair from './PersonEditorShared/TextpersonPair';
 import PostingAiAutofill, { AiAutofillData, AiFieldEntry } from './PersonEditorShared/PostingAiAutofill';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
+import {
+    gridCardStyle, gGrid, gInputStyle, gReadonlyStyle, gOkStyle, gErrStyle,
+    gSubmitRow, gBtnGroupRight, gPrimaryBtn, gInfoBtn, gDangerBtn, gSuccessBtn, gCancelBtn,
+    gAuditWrapStyle, gridSectionHeadStyle, GridLabel, gridCell, gridInput,
+} from './PersonEditorShared/grid';
 
 /**
  * 官名／任官（offices/postings）編輯器（對齊 legacy biogmains/offices/_form.blade.php，非 person-browser）。
@@ -273,138 +278,121 @@ export default function OfficeEditor({
         } finally { setDeleting(false); }
     };
 
-    const textRow = (key: string, label: string, highlight = false, hint?: string) => (
-        <div style={rowStyle}><label style={labelStyle}>{label}</label><div style={fieldStyle}>
-            <input type="text" value={fields[key] ?? ''} disabled={!editable} onChange={(e) => set(key, e.target.value)}
-                style={{ ...inputStyle, ...(highlight ? { background: '#FFFFBB' } : {}), ...(!editable ? roStyle : {}) }} />
-            {hint ? <span style={fieldHintStyle}>{hint}</span> : null}</div></div>
+    const textRow = (key: string, label: string, code: string, highlight = false, hint?: string) => (
+        gridCell(label, { code, hint }, gridInput({ value: fields[key] ?? '', onChange: (v) => set(key, v), disabled: !editable, highlight }))
     );
-    const listRow = (key: string, label: string, model: string, idKey: string, labelKeys: string[]) => (
-        <div style={rowStyle}><label style={labelStyle}>{label}</label><div style={fieldStyle}>
+    const listRow = (key: string, label: string, code: string, model: string, idKey: string, labelKeys: string[]) => (
+        gridCell(label, { code },
             <CodeAutocomplete mode="list" model={model} idKey={idKey} labelKeys={labelKeys}
                 value={fields[key] ?? ''} initialLabel={labels[key] ?? ''} disabled={!editable}
-                onChange={(v, l) => { set(key, v); setLabel(key, l); }} /></div></div>
+                onChange={(v, l) => { set(key, v); setLabel(key, l); }} />)
     );
 
     return (
-        <div style={cardStyle}>
+        <div style={gridCardStyle}>
             <h3 style={titleStyle}>{mode === 'create' ? tr('office_create', '新增任官') : tr('office_edit', '編輯任官')} — {personLabel}</h3>
-            {message ? <div style={okStyle}>{message}</div> : null}
-            {error ? <div style={errStyle}>{error}</div> : null}
+            {message ? <div style={gOkStyle}>{message}</div> : null}
+            {error ? <div style={gErrStyle}>{error}</div> : null}
 
             {mode === 'create' && aiEnabled && aiExtractEndpoint && editable ? (
                 <PostingAiAutofill personId={personId} extractEndpoint={aiExtractEndpoint} aiModel={aiModel} disabled={!editable}
                     t={t} onApply={applyAiData} onClear={clearAi} />
             ) : null}
 
-            {mode === 'edit' ? (
-                <div style={rowStyle}><label style={labelStyle}>posting_id</label><div style={fieldStyle}>
-                    <input type="text" value={fields.c_posting_id ?? ''} readOnly disabled style={{ ...inputStyle, ...roStyle }} /></div></div>
-            ) : null}
+            <div style={gGrid}>
+                {mode === 'edit' ? gridCell('posting_id', {},
+                    <input type="text" value={fields.c_posting_id ?? ''} readOnly disabled style={{ ...gInputStyle, ...gReadonlyStyle }} />) : null}
 
-            {textRow('c_sequence', `${tr('sequence', '序號')} (c_sequence)`, false, tr('sequence_same_note', '註：若有同時任命的官職，請手動填上相同的 sequence'))}
+                {textRow('c_sequence', tr('sequence', '序號'), 'c_sequence', false, tr('sequence_same_note', '註：若有同時任命的官職，請手動填上相同的 sequence'))}
 
-            <div style={rowStyle}><label style={labelStyle}>{tr('office_name_field', '官名')} (c_office_id)</label><div style={fieldStyle}>
-                <CodeAutocomplete mode="search" endpoint="/api/select/search/office"
-                    value={fields.c_office_id ?? '0'} initialLabel={labels.c_office_id ?? ''} disabled={!editable}
-                    extraQuery={dynastyCode != null ? { c_dy: String(dynastyCode) } : undefined}
-                    onChange={(v, l) => { set('c_office_id', v || '0'); setLabel('c_office_id', l); }} /></div></div>
+                {gridCell(tr('office_name_field', '官名'), { code: 'c_office_id' },
+                    <CodeAutocomplete mode="search" endpoint="/api/select/search/office"
+                        value={fields.c_office_id ?? '0'} initialLabel={labels.c_office_id ?? ''} disabled={!editable}
+                        extraQuery={dynastyCode != null ? { c_dy: String(dynastyCode) } : undefined}
+                        onChange={(v, l) => { set('c_office_id', v || '0'); setLabel('c_office_id', l); }} />)}
 
-            <div style={rowStyle}><label style={labelStyle}>{tr('socialinst_field', '社會機構')} (social_institution)</label><div style={fieldStyle}>
-                <CodeAutocomplete mode="search" endpoint="/api/select/search/socialinstcode"
-                    value={instValue} initialLabel={labels.c_inst_code ?? ''} disabled={!editable}
-                    onChange={onInstChange} /></div></div>
+                {gridCell(tr('socialinst_field', '社會機構'), { code: 'social_institution' },
+                    <CodeAutocomplete mode="search" endpoint="/api/select/search/socialinstcode"
+                        value={instValue} initialLabel={labels.c_inst_code ?? ''} disabled={!editable}
+                        onChange={onInstChange} />)}
 
-            <div style={rowStyle}><label style={labelStyle}>{tr('place_name', '地名')}</label><div style={fieldStyle}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: addr.length ? 6 : 0 }}>
-                    {addr.map((it) => (
-                        <span key={it.id} style={chipStyle}>{it.label} #{it.id}
-                            {editable ? <button type="button" onClick={() => removeAddr(it.id)} style={chipRemoveBtn} aria-label={`${tr('remove', '移除')} ${it.id}`}>×</button> : null}
-                        </span>
-                    ))}
-                    {addr.length === 0 ? <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{tr('no_place', '（未設定地名）')}</span> : null}
-                </div>
-                {editable ? (
-                    <CodeAutocomplete key={addrKey} mode="search" endpoint="/api/select/search/addr"
-                        value="" initialLabel="" placeholder={tr('add_place', '搜尋並新增地名…')}
-                        extraQuery={dynastyCode != null ? { dy_start: String(dynastyCode), dy_end: String(dynastyCode) } : undefined}
-                        onChange={addAddr} />
-                ) : null}
-            </div></div>
+                {gridCell(tr('place_name', '地名'), { full: true }, <>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: addr.length ? 6 : 0 }}>
+                        {addr.map((it) => (
+                            <span key={it.id} style={chipStyle}>{it.label} #{it.id}
+                                {editable ? <button type="button" onClick={() => removeAddr(it.id)} style={chipRemoveBtn} aria-label={`${tr('remove', '移除')} ${it.id}`}>×</button> : null}
+                            </span>
+                        ))}
+                        {addr.length === 0 ? <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{tr('no_place', '（未設定地名）')}</span> : null}
+                    </div>
+                    {editable ? (
+                        <CodeAutocomplete key={addrKey} mode="search" endpoint="/api/select/search/addr"
+                            value="" initialLabel="" placeholder={tr('add_place', '搜尋並新增地名…')}
+                            extraQuery={dynastyCode != null ? { dy_start: String(dynastyCode), dy_end: String(dynastyCode) } : undefined}
+                            onChange={addAddr} />
+                    ) : null}
+                </>)}
 
-            <div style={rowStyle}><label style={labelStyle}>{tr('source_field', '出處')} (c_source)</label><div style={fieldStyle}>
-                <CodeAutocomplete mode="search" endpoint="/api/select/search/text"
-                    value={fields.c_source ?? '0'} initialLabel={labels.c_source ?? ''} disabled={!editable}
-                    onChange={(v, l) => { set('c_source', v || '0'); setLabel('c_source', l); }} /></div></div>
+                {gridCell(tr('source_field', '出處'), { code: 'c_source' },
+                    <CodeAutocomplete mode="search" endpoint="/api/select/search/text"
+                        value={fields.c_source ?? '0'} initialLabel={labels.c_source ?? ''} disabled={!editable}
+                        onChange={(v, l) => { set('c_source', v || '0'); setLabel('c_source', l); }} />)}
 
-            {textRow('c_pages', `${tr('pages_entries', '頁碼')} (c_pages)`, sourceHighlight)}
+                {textRow('c_pages', tr('pages_entries', '頁碼'), 'c_pages', sourceHighlight)}
 
-            <div style={rowStyle}><label style={labelStyle}>{tr('start_year', '起年')} (firstyear)</label><div style={fieldStyle}>
-                <EraTimeField values={buildEra(FY)} onChange={(p) => applyEra(FY, p)} dynastyCode={dynastyCode} showRange showLunar disabled={!editable} /></div></div>
+                {gridCell(tr('start_year', '起年'), { code: 'firstyear', full: true },
+                    <EraTimeField values={buildEra(FY)} onChange={(p) => applyEra(FY, p)} dynastyCode={dynastyCode} showRange showLunar disabled={!editable} />)}
 
-            <div style={rowStyle}><label style={labelStyle}>{tr('end_year', '訖年')} (lastyear)</label><div style={fieldStyle}>
-                <EraTimeField values={buildEra(LY)} onChange={(p) => applyEra(LY, p)} dynastyCode={dynastyCode} showRange showLunar disabled={!editable} /></div></div>
+                {gridCell(tr('end_year', '訖年'), { code: 'lastyear', full: true },
+                    <EraTimeField values={buildEra(LY)} onChange={(p) => applyEra(LY, p)} dynastyCode={dynastyCode} showRange showLunar disabled={!editable} />)}
 
-            {listRow('c_appt_code', `${tr('appt_type', '任命類型')} (c_appt_code)`, 'appttype', 'c_appt_code', ['c_appt_desc_chn', 'c_appt_desc'])}
-            {listRow('c_assume_office_code', `${tr('assume_office', '任官方式')} (c_assume_office_code)`, 'assumeoffice', 'c_assume_office_code', ['c_assume_office_desc_chn', 'c_assume_office_desc'])}
-            {listRow('c_office_category_id', `${tr('office_category', '官職分類')} (c_office_category_id)`, 'officecate', 'c_office_category_id', ['c_category_desc_chn', 'c_category_desc'])}
+                {listRow('c_appt_code', tr('appt_type', '任命類型'), 'c_appt_code', 'appttype', 'c_appt_code', ['c_appt_desc_chn', 'c_appt_desc'])}
+                {listRow('c_assume_office_code', tr('assume_office', '任官方式'), 'c_assume_office_code', 'assumeoffice', 'c_assume_office_code', ['c_assume_office_desc_chn', 'c_assume_office_desc'])}
+                {listRow('c_office_category_id', tr('office_category', '官職分類'), 'c_office_category_id', 'officecate', 'c_office_category_id', ['c_category_desc_chn', 'c_category_desc'])}
 
-            <div style={rowStyle}><label style={labelStyle}>{tr('notes_field', '備註')} (c_notes)</label><div style={fieldStyle}>
-                <textarea value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...inputStyle, height: 'auto', ...(!editable ? roStyle : {}) }} /></div></div>
+                {gridCell(tr('notes_field', '備註'), { code: 'c_notes', full: true },
+                    <textarea value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
 
-            {listRow('c_dy', `${tr('dynasty', '朝代')} (dy)`, 'dynasty', 'c_dy', ['c_dynasty_chn', 'c_dynasty'])}
+                {listRow('c_dy', tr('dynasty', '朝代'), 'dy', 'dynasty', 'c_dy', ['c_dynasty_chn', 'c_dynasty'])}
+            </div>
 
             <TextpersonPair personId={personId} label={tr('candidate_source_title', '候選出處')} onPick={onPickTextperson} disabled={!editable} />
 
             {mode === 'edit' && (fields.c_created_by || fields.c_modified_by) ? (
-                <>
-                    {fields.c_created_by ? (
-                        <div style={rowStyle}><label style={labelStyle}>{tr('audit_created', '建檔')}</label><div style={fieldStyle}>
-                            <input type="text" value={`${fields.c_created_by}${fields.c_created_date ? '/' + fields.c_created_date : ''}`} readOnly disabled style={{ ...inputStyle, ...roStyle }} /></div></div>
-                    ) : null}
-                    {fields.c_modified_by ? (
-                        <div style={rowStyle}><label style={labelStyle}>{tr('audit_updated', '更新')}</label><div style={fieldStyle}>
-                            <input type="text" value={`${fields.c_modified_by}${fields.c_modified_date ? '/' + fields.c_modified_date : ''}`} readOnly disabled style={{ ...inputStyle, ...roStyle }} /></div></div>
-                    ) : null}
-                </>
+                <div style={gAuditWrapStyle}>
+                    <div style={gridSectionHeadStyle}>{tr('create_or_modify', '建檔 / 更新資訊')}</div>
+                    <div style={gGrid}>
+                        {fields.c_created_by ? gridCell(tr('audit_created', '建檔'), {},
+                            <input type="text" value={`${fields.c_created_by}${fields.c_created_date ? '/' + fields.c_created_date : ''}`} readOnly disabled style={{ ...gInputStyle, ...gReadonlyStyle }} />) : null}
+                        {fields.c_modified_by ? gridCell(tr('audit_updated', '更新'), {},
+                            <input type="text" value={`${fields.c_modified_by}${fields.c_modified_date ? '/' + fields.c_modified_date : ''}`} readOnly disabled style={{ ...gInputStyle, ...gReadonlyStyle }} />) : null}
+                    </div>
+                </div>
             ) : null}
 
             {(canEdit || canPropose) && (
-                <div style={rowStyle}><label style={labelStyle}>{tr('modification_note_label', '修改說明')}</label><div style={fieldStyle}>
-                    <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...inputStyle, height: 'auto' }}
-                        placeholder={tr('modification_note_placeholder', '提案時請說明修改原因')} /></div></div>
+                <div style={{ marginBottom: 16 }}>
+                    <GridLabel label={tr('modification_note_label', '修改說明')} />
+                    <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...gInputStyle, height: 'auto' }}
+                        placeholder={tr('modification_note_placeholder', '提案時請說明修改原因')} />
+                </div>
             )}
 
-            <div style={{ ...rowStyle, gap: 8 }}>
-                <div style={{ width: 160, flexShrink: 0 }} />
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {canEdit ? <button type="button" style={primaryBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
-                    {mode === 'edit' && canEdit ? <button type="button" style={successBtn} disabled={saving} onClick={() => void save('direct', true)}>{tr('save_as', '另存新檔')}</button> : null}
-                    {(canEdit || canPropose) ? <button type="button" style={infoBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('proposal')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('submit_proposal', '提交建議')}</button> : null}
-                    <ActionStatus saving={saving} deleting={deleting} message={message} error={error} t={t} />
-                    {mode === 'edit' && canEdit && deleteEndpoint ? <button type="button" style={dangerBtn} disabled={deleting} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
-                    <a href={indexUrl} style={cancelBtn}>{tr('cancel', '取消')}</a>
+            <div style={gSubmitRow}>
+                {canEdit ? <button type="button" style={gPrimaryBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
+                {mode === 'edit' && canEdit ? <button type="button" style={gSuccessBtn} disabled={saving} onClick={() => void save('direct', true)}>{tr('save_as', '另存新檔')}</button> : null}
+                {(canEdit || canPropose) ? <button type="button" style={gInfoBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('proposal')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('submit_proposal', '提交建議')}</button> : null}
+                <ActionStatus saving={saving} deleting={deleting} message={message} error={error} t={t} />
+                <div style={gBtnGroupRight}>
+                    {mode === 'edit' && canEdit && deleteEndpoint ? <button type="button" style={gDangerBtn} disabled={deleting} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
+                    <a href={indexUrl} style={gCancelBtn}>{tr('cancel', '取消')}</a>
                 </div>
             </div>
-            {dirty ? <div style={{ ...rowStyle, color: '#92400e', fontSize: '0.8rem' }}><div style={{ width: 160, flexShrink: 0 }} />{tr('unsaved_changes', '有未儲存的變更')}</div> : null}
+            {dirty ? <div style={{ marginTop: 8, color: '#92400e', fontSize: '0.8rem' }}>{tr('unsaved_changes', '有未儲存的變更')}</div> : null}
         </div>
     );
 }
 
-const cardStyle: React.CSSProperties = { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: 20, maxWidth: '100%' };
 const titleStyle: React.CSSProperties = { fontSize: '1.1rem', fontWeight: 700, marginBottom: 12 };
-const rowStyle: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' };
-const labelStyle: React.CSSProperties = { width: 160, flexShrink: 0, fontSize: '1rem', color: '#374151', paddingTop: 6 };
-const fieldStyle: React.CSSProperties = { flex: 1, minWidth: 0 };
-const fieldHintStyle: React.CSSProperties = { display: 'block', marginTop: 2, fontSize: '0.78rem', color: '#6b7280' };
-const inputStyle: React.CSSProperties = { width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '1rem', boxSizing: 'border-box' };
-const roStyle: React.CSSProperties = { background: '#f3f4f6', cursor: 'not-allowed' };
 const chipStyle: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, background: '#eef4fb', border: '1px solid #c7d7ea', borderRadius: 14, padding: '2px 6px 2px 10px', fontSize: '0.8rem', color: '#1f3a5f' };
 const chipRemoveBtn: React.CSSProperties = { border: 'none', background: 'transparent', color: '#1f3a5f', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, padding: '0 2px' };
-const okStyle: React.CSSProperties = { background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: '0.85rem' };
-const errStyle: React.CSSProperties = { background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: '0.85rem' };
-const primaryBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #255f93', background: '#255f93', color: '#fff', fontWeight: 700, cursor: 'pointer' };
-const successBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #15803d', background: '#16a34a', color: '#fff', fontWeight: 700, cursor: 'pointer' };
-const infoBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #0e7490', background: '#0891b2', color: '#fff', fontWeight: 700, cursor: 'pointer' };
-const dangerBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #b91c1c', background: '#fff5f5', color: '#b91c1c', fontWeight: 700, cursor: 'pointer' };
-const cancelBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #cbd5e1', background: '#fff', color: '#475569', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' };

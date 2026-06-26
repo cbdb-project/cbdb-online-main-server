@@ -9,6 +9,11 @@ import MirrorConflictNotice, { MirrorConflict } from './PersonEditorShared/Mirro
 import MirrorSuspectedNotice, { MirrorSuspected } from './PersonEditorShared/MirrorSuspectedNotice';
 import OppositeEdgeNotice from './PersonEditorShared/OppositeEdgeNotice';
 import { useOppositeEdgeDetection } from './PersonEditorShared/useOppositeEdgeDetection';
+import {
+    gridCardStyle, gGrid, gInputStyle, gReadonlyStyle, gHintStyle, gOkStyle, gErrStyle,
+    gSubmitRow, gBtnGroupRight, gPrimaryBtn, gInfoBtn, gDangerBtn, gCancelBtn,
+    gAuditWrapStyle, gridSectionHeadStyle, GridLabel, GridSection, gridCell, gridInput,
+} from './PersonEditorShared/grid';
 
 /**
  * 社會關係（associations / ASSOC_DATA）編輯器（對齊 legacy biogmains/assoc/_form.blade.php，非 person-browser）。
@@ -412,50 +417,45 @@ export default function AssocEditor({
         } finally { setDeleting(false); }
     };
 
-    const textRow = (key: string, label: string, highlight = false, hint?: string) => (
-        <div style={rowStyle}><label style={labelStyle}>{label}</label><div style={fieldStyle}>
-            <input type="text" value={fields[key] ?? ''} disabled={!editable} onChange={(e) => set(key, e.target.value)}
-                style={{ ...inputStyle, ...(highlight ? { background: '#FFFFBB' } : {}), ...(!editable ? roStyle : {}) }} />
-            {hint ? <span style={fieldHintStyle}>{hint}</span> : null}</div></div>
+    const textRow = (key: string, label: string, code: string, highlight = false, hint?: string) => (
+        gridCell(label, { code, hint }, gridInput({ value: fields[key] ?? '', onChange: (v) => set(key, v), disabled: !editable, highlight }))
     );
-    const searchRow = (key: string, label: string, endpoint: string, highlight = false, sentinel = '0') => (
-        <div style={rowStyle}><label style={labelStyle}>{label}</label><div style={fieldStyle}>
+    const searchRow = (key: string, label: string, code: string, endpoint: string, highlight = false, sentinel = '0') => (
+        gridCell(label, { code },
             <CodeAutocomplete mode="search" endpoint={endpoint} value={fields[key] ?? sentinel} initialLabel={labels[key] ?? ''}
                 disabled={!editable} aria-invalid={highlight}
-                onChange={(v, l) => { set(key, v || sentinel); setLabel(key, l); }} /></div></div>
+                onChange={(v, l) => { set(key, v || sentinel); setLabel(key, l); }} />)
     );
-    const listRow = (key: string, label: string, model: string, idKey: string, labelKeys: string[]) => (
-        <div style={rowStyle}><label style={labelStyle}>{label}</label><div style={fieldStyle}>
+    const listRow = (key: string, label: string, code: string, model: string, idKey: string, labelKeys: string[]) => (
+        gridCell(label, { code },
             <CodeAutocomplete mode="list" model={model} idKey={idKey} labelKeys={labelKeys}
                 value={fields[key] ?? ''} initialLabel={labels[key] ?? ''} disabled={!editable}
-                onChange={(v, l) => { set(key, v); setLabel(key, l); }} /></div></div>
-    );
-    const pairRow = (left: React.ReactNode, right: React.ReactNode) => (
-        <div style={twoColStyle}><div style={colStyle}>{left}</div><div style={colStyle}>{right}</div></div>
+                onChange={(v, l) => { set(key, v); setLabel(key, l); }} />)
     );
     // 互逆配對碼選擇器（社會關係 c_assocship_pair／親屬 c_kinship_pair／關聯親屬 c_assoc_kinship_pair 共用版型）：
-    // 有候選→可手選（edit 額外提供「保持目前」空選項）；無候選→唯讀提示，系統自動處理。
+    // 有候選→可手選（edit 額外提供「保持目前」空選項）；無候選→唯讀提示，系統自動處理。整列跨欄（含 hint）。
     const reversePairRow = (
-        label: string, candidates: PairOpt[], value: string,
+        label: string, code: string, candidates: PairOpt[], value: string,
         onPick: (v: string) => void, hint: string, emptyText: string,
     ) => (
-        <div style={rowStyle}><label style={labelStyle}>{label}</label><div style={fieldStyle}>
+        gridCell(label, { code, full: true }, <>
             {candidates.length ? (
-                <select value={value} disabled={!editable} onChange={(e) => onPick(e.target.value)} style={{ ...inputStyle }}>
+                <select value={value} disabled={!editable} onChange={(e) => onPick(e.target.value)} style={{ ...gInputStyle }}>
                     {mode === 'edit' ? <option value="">{tr('keep_current_pair', '（保持目前反向碼）')}</option> : null}
                     {candidates.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
                 </select>
             ) : (
-                <input type="text" value={emptyText} readOnly disabled style={{ ...inputStyle, ...roStyle }} />
+                <input type="text" value={emptyText} readOnly disabled style={{ ...gInputStyle, ...gReadonlyStyle }} />
             )}
-            <span style={fieldHintStyle}>{hint}</span></div></div>
+            <span style={gHintStyle}>{hint}</span>
+        </>)
     );
 
     return (
-        <div style={cardStyle}>
+        <div style={gridCardStyle}>
             <h3 style={titleStyle}>{mode === 'create' ? tr('assoc_create', '新增社會關係') : tr('assoc_edit', '編輯社會關係')} — {personLabel}</h3>
-            {message ? <div style={okStyle}>{message}</div> : null}
-            {error ? <div style={errStyle}>{error}</div> : null}
+            {message ? <div style={gOkStyle}>{message}</div> : null}
+            {error ? <div style={gErrStyle}>{error}</div> : null}
             <OppositeEdgeNotice result={oppositeEdge} reverseCodeLabel={reverseCodeLabel} tr={tr} />
 
             {aiEnabled && aiSuggestEndpoint && editable ? (
@@ -471,94 +471,94 @@ export default function AssocEditor({
                 />
             ) : null}
 
-            {textRow('c_sequence', `${tr('sequence', '序號')} (c_sequence)`)}
+            <div style={gGrid}>
+                {textRow('c_sequence', tr('sequence', '序號'), 'c_sequence')}
 
-            {/* 主關係：社會關係碼 | 關聯人物（對齊 legacy assoc/_form 一行兩欄）。親屬關係相關欄位下移至社會機構之後。 */}
-            {pairRow(
-                searchRow('c_assoc_code', `${tr('assoc_field', '社會關係')} (c_assoc_code)`, '/api/select/search/assoccode', assocHighlight),
-                searchRow('c_assoc_id', `${tr('assoc_person', '關聯人物')} (c_assoc_id)`, '/api/select/search/biog'),
-            )}
+                {/* 主關係：社會關係碼 | 關聯人物（兩個並列的網格欄位）。 */}
+                {searchRow('c_assoc_code', tr('assoc_field', '社會關係'), 'c_assoc_code', '/api/select/search/assoccode', assocHighlight)}
+                {searchRow('c_assoc_id', tr('assoc_person', '關聯人物'), 'c_assoc_id', '/api/select/search/biog')}
 
-            {/* 互逆社會關係碼：依社會關係碼取候選，create 預設第一個（同 legacy）；反向有歧義（一碼可能有 c_assoc_pair/c_assoc_pair2）故可手選。 */}
-            {reversePairRow(
-                `${tr('reverse_assoc_pair_label', '互逆社會關係碼')} (c_assocship_pair)`,
-                pairCandidates, reversePair,
-                (v) => { setReversePair(v); setPairTouched(true); },
-                tr('reverse_pair_assoc_hint', '對方人物身上會建立鏡像社會關係；此為其「社會關係碼」的反向碼，系統自動雙向同步。預設取建議反向碼，可手動更正（一個關係可能有多個合法反向）。'),
-                tr('no_paired_assoc', '無對應社會關係'),
-            )}
+                {/* 互逆社會關係碼：依社會關係碼取候選，create 預設第一個（同 legacy）；反向有歧義（一碼可能有 c_assoc_pair/c_assoc_pair2）故可手選。 */}
+                {reversePairRow(
+                    tr('reverse_assoc_pair_label', '互逆社會關係碼'), 'c_assocship_pair',
+                    pairCandidates, reversePair,
+                    (v) => { setReversePair(v); setPairTouched(true); },
+                    tr('reverse_pair_assoc_hint', '對方人物身上會建立鏡像社會關係；此為其「社會關係碼」的反向碼，系統自動雙向同步。預設取建議反向碼，可手動更正（一個關係可能有多個合法反向）。'),
+                    tr('no_paired_assoc', '無對應社會關係'),
+                )}
 
-            <div style={rowStyle}><label style={labelStyle}>{tr('assoc_start_year', '關係始年')} (first_year)</label><div style={fieldStyle}>
-                <EraTimeField values={buildEra(FY)} onChange={(p) => applyEra(FY, p)} dynastyCode={dynastyCode} showRange showLunar disabled={!editable} /></div></div>
-            <div style={rowStyle}><label style={labelStyle}>{tr('assoc_end_year', '關係末年')} (last_year)</label><div style={fieldStyle}>
-                <EraTimeField values={buildEra(LY)} onChange={(p) => applyEra(LY, p)} dynastyCode={dynastyCode} showRange showLunar disabled={!editable} /></div></div>
+                {gridCell(tr('assoc_start_year', '關係始年'), { code: 'first_year', full: true },
+                    <EraTimeField values={buildEra(FY)} onChange={(p) => applyEra(FY, p)} dynastyCode={dynastyCode} showRange showLunar disabled={!editable} />)}
+                {gridCell(tr('assoc_end_year', '關係末年'), { code: 'last_year', full: true },
+                    <EraTimeField values={buildEra(LY)} onChange={(p) => applyEra(LY, p)} dynastyCode={dynastyCode} showRange showLunar disabled={!editable} />)}
 
-            <div style={rowStyle}><label style={labelStyle}>{tr('notes_field', '備註')} (c_notes)</label><div style={fieldStyle}>
-                <textarea value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...inputStyle, height: 'auto', ...(!editable ? roStyle : {}) }} /></div></div>
+                {gridCell(tr('notes_field', '備註'), { code: 'c_notes', full: true },
+                    <textarea value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
 
-            {listRow('c_topic_code', `${tr('topic_field', '主題')} (c_topic_code)`, 'topic', 'c_topic_code', ['c_topic_desc_chn', 'c_topic_desc'])}
-            {listRow('c_occasion_code', `${tr('occasion_field', '場合')} (c_occasion_code)`, 'occasion', 'c_occasion_code', ['c_occasion_desc_chn', 'c_occasion_desc'])}
+                {listRow('c_topic_code', tr('topic_field', '主題'), 'c_topic_code', 'topic', 'c_topic_code', ['c_topic_desc_chn', 'c_topic_desc'])}
+                {listRow('c_occasion_code', tr('occasion_field', '場合'), 'c_occasion_code', 'occasion', 'c_occasion_code', ['c_occasion_desc_chn', 'c_occasion_desc'])}
 
-            {textRow('c_text_title', `${tr('text_title_field', '作品/出處標題')} (c_text_title)`)}
-            {textRow('c_assoc_count', `${tr('assoc_count_field', '數量')} (c_assoc_count)`, false, tr('assoc_count_hint', '此欄位僅適用於書信：當無法以標題及日期區分多次信件時，則僅建「一筆」社會關係，並將信件總數填於此欄。請填阿拉伯數字'))}
+                {textRow('c_text_title', tr('text_title_field', '作品/出處標題'), 'c_text_title')}
+                {textRow('c_assoc_count', tr('assoc_count_field', '數量'), 'c_assoc_count', false, tr('assoc_count_hint', '此欄位僅適用於書信：當無法以標題及日期區分多次信件時，則僅建「一筆」社會關係，並將信件總數填於此欄。請填阿拉伯數字'))}
 
-            {searchRow('c_tertiary_personid', `${tr('tertiary_person', '中介人物')} (c_tertiary_personid)`, '/api/select/search/biog')}
-            {textRow('c_tertiary_type_notes', `${tr('tertiary_notes', '中介說明')} (c_tertiary_type_notes)`)}
-            {searchRow('c_assoc_claimer_id', `${tr('claimer_person', '見證人物')} (c_assoc_claimer_id)`, '/api/select/search/biog')}
-            {searchRow('c_addr_id', `${tr('place_name', '地點')} (c_addr_id)`, '/api/select/search/addr')}
+                {searchRow('c_tertiary_personid', tr('tertiary_person', '中介人物'), 'c_tertiary_personid', '/api/select/search/biog')}
+                {textRow('c_tertiary_type_notes', tr('tertiary_notes', '中介說明'), 'c_tertiary_type_notes')}
+                {searchRow('c_assoc_claimer_id', tr('claimer_person', '見證人物'), 'c_assoc_claimer_id', '/api/select/search/biog')}
+                {searchRow('c_addr_id', tr('place_name', '地點'), 'c_addr_id', '/api/select/search/addr')}
 
-            <div style={rowStyle}><label style={labelStyle}>{tr('socialinst_field', '社會機構')} (social_institution)</label><div style={fieldStyle}>
-                <CodeAutocomplete mode="search" endpoint="/api/select/search/socialinstcode" value={instValue} initialLabel={labels.c_inst_code ?? ''} disabled={!editable} onChange={onInstChange} /></div></div>
+                {gridCell(tr('socialinst_field', '社會機構'), { code: 'social_institution' },
+                    <CodeAutocomplete mode="search" endpoint="/api/select/search/socialinstcode" value={instValue} initialLabel={labels.c_inst_code ?? ''} disabled={!editable} onChange={onInstChange} />)}
+            </div>
 
             {/* 親屬關係（選填）：與社會關係並存的親屬／關聯親屬欄，下移至此避免與主社會關係混淆；兩組各有互逆配對碼（同 legacy assoc/edit）。 */}
-            <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#255f93', margin: '16px 0 8px', paddingBottom: 6, borderBottom: '1px solid #e6eef6' }}>
-                {tr('assoc_kin_section', '親屬關係（選填）')}
-            </div>
-            {pairRow(
-                searchRow('c_kin_code', `${tr('kinship_field', '親屬關係')} (c_kin_code)`, '/api/select/search/kincode'),
-                searchRow('c_kin_id', `${tr('kin_person', '親屬人物')} (c_kin_id)`, '/api/select/search/biog'),
-            )}
-            {reversePairRow(
-                `${tr('reverse_kin_pair_label', '互逆親屬關係碼')} (c_kinship_pair)`,
-                kinPairCandidates, kinReversePair,
-                (v) => { setKinReversePair(v); setKinPairTouched(true); },
-                tr('reverse_kin_pair_hint', '對方人物身上會建立鏡像親屬關係；此為「親屬關係」(c_kin_code) 的反向碼，系統自動雙向同步。預設取建議反向碼，可手動更正。'),
-                tr('no_paired_kinship', '無對應親屬關係'),
-            )}
-            {pairRow(
-                searchRow('c_assoc_kin_code', `${tr('assoc_kin_field', '關聯親屬關係')} (c_assoc_kin_code)`, '/api/select/search/kincode'),
-                searchRow('c_assoc_kin_id', `${tr('assoc_kin_person', '關聯親屬人物')} (c_assoc_kin_id)`, '/api/select/search/biog'),
-            )}
-            {reversePairRow(
-                `${tr('reverse_assoc_kin_pair_label', '互逆關聯親屬關係碼')} (c_assoc_kinship_pair)`,
-                assocKinPairCandidates, assocKinReversePair,
-                (v) => { setAssocKinReversePair(v); setAssocKinPairTouched(true); },
-                tr('reverse_assoc_kin_pair_hint', '此為「關聯親屬關係」(c_assoc_kin_code) 的反向碼，系統依此於鏡像列雙向同步。預設取建議反向碼，可手動更正。'),
-                tr('no_paired_kinship', '無對應親屬關係'),
-            )}
+            <GridSection title={tr('assoc_kin_section', '親屬關係（選填）')}>
+                <div style={gGrid}>
+                    {searchRow('c_kin_code', tr('kinship_field', '親屬關係'), 'c_kin_code', '/api/select/search/kincode')}
+                    {searchRow('c_kin_id', tr('kin_person', '親屬人物'), 'c_kin_id', '/api/select/search/biog')}
+                    {reversePairRow(
+                        tr('reverse_kin_pair_label', '互逆親屬關係碼'), 'c_kinship_pair',
+                        kinPairCandidates, kinReversePair,
+                        (v) => { setKinReversePair(v); setKinPairTouched(true); },
+                        tr('reverse_kin_pair_hint', '對方人物身上會建立鏡像親屬關係；此為「親屬關係」(c_kin_code) 的反向碼，系統自動雙向同步。預設取建議反向碼，可手動更正。'),
+                        tr('no_paired_kinship', '無對應親屬關係'),
+                    )}
+                    {searchRow('c_assoc_kin_code', tr('assoc_kin_field', '關聯親屬關係'), 'c_assoc_kin_code', '/api/select/search/kincode')}
+                    {searchRow('c_assoc_kin_id', tr('assoc_kin_person', '關聯親屬人物'), 'c_assoc_kin_id', '/api/select/search/biog')}
+                    {reversePairRow(
+                        tr('reverse_assoc_kin_pair_label', '互逆關聯親屬關係碼'), 'c_assoc_kinship_pair',
+                        assocKinPairCandidates, assocKinReversePair,
+                        (v) => { setAssocKinReversePair(v); setAssocKinPairTouched(true); },
+                        tr('reverse_assoc_kin_pair_hint', '此為「關聯親屬關係」(c_assoc_kin_code) 的反向碼，系統依此於鏡像列雙向同步。預設取建議反向碼，可手動更正。'),
+                        tr('no_paired_kinship', '無對應親屬關係'),
+                    )}
+                </div>
+            </GridSection>
 
-            <div style={rowStyle}><label style={labelStyle}>{tr('source_field', '出處')} (c_source)</label><div style={fieldStyle}>
-                <CodeAutocomplete mode="search" endpoint="/api/select/search/text" value={fields.c_source ?? '0'} initialLabel={labels.c_source ?? ''} disabled={!editable} onChange={(v, l) => { set('c_source', v || '0'); setLabel('c_source', l); }} /></div></div>
-            {textRow('c_pages', `${tr('pages_entries', '頁碼')} (c_pages)`, sourceHighlight)}
+            <div style={gGrid}>
+                {gridCell(tr('source_field', '出處'), { code: 'c_source' },
+                    <CodeAutocomplete mode="search" endpoint="/api/select/search/text" value={fields.c_source ?? '0'} initialLabel={labels.c_source ?? ''} disabled={!editable} onChange={(v, l) => { set('c_source', v || '0'); setLabel('c_source', l); }} />)}
+                {textRow('c_pages', tr('pages_entries', '頁碼'), 'c_pages', sourceHighlight)}
+            </div>
 
             <TextpersonPair personId={personId} label={tr('candidate_source_title', '候選出處')} onPick={onPickTextperson} disabled={!editable} />
 
             {mode === 'edit' && (fields.c_created_by || fields.c_modified_by) ? (
-                <>
-                    {fields.c_created_by ? (
-                        <div style={rowStyle}><label style={labelStyle}>{tr('audit_created', '建檔')}</label><div style={fieldStyle}>
-                            <input type="text" value={`${fields.c_created_by}${fields.c_created_date ? '/' + fields.c_created_date : ''}`} readOnly disabled style={{ ...inputStyle, ...roStyle }} /></div></div>
-                    ) : null}
-                    {fields.c_modified_by ? (
-                        <div style={rowStyle}><label style={labelStyle}>{tr('audit_updated', '更新')}</label><div style={fieldStyle}>
-                            <input type="text" value={`${fields.c_modified_by}${fields.c_modified_date ? '/' + fields.c_modified_date : ''}`} readOnly disabled style={{ ...inputStyle, ...roStyle }} /></div></div>
-                    ) : null}
-                </>
+                <div style={gAuditWrapStyle}>
+                    <div style={gridSectionHeadStyle}>{tr('create_or_modify', '建檔 / 更新資訊')}</div>
+                    <div style={gGrid}>
+                        {fields.c_created_by ? gridCell(tr('audit_created', '建檔'), {},
+                            <input type="text" value={`${fields.c_created_by}${fields.c_created_date ? '/' + fields.c_created_date : ''}`} readOnly disabled style={{ ...gInputStyle, ...gReadonlyStyle }} />) : null}
+                        {fields.c_modified_by ? gridCell(tr('audit_updated', '更新'), {},
+                            <input type="text" value={`${fields.c_modified_by}${fields.c_modified_date ? '/' + fields.c_modified_date : ''}`} readOnly disabled style={{ ...gInputStyle, ...gReadonlyStyle }} />) : null}
+                    </div>
+                </div>
             ) : null}
 
             {(canEdit || canPropose) && (
-                <div style={rowStyle}><label style={labelStyle}>{tr('modification_note_label', '修改說明')}</label><div style={fieldStyle}>
-                    <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...inputStyle, height: 'auto' }} placeholder={tr('modification_note_placeholder', '提案時請說明修改原因')} /></div></div>
+                <div style={{ marginBottom: 16 }}>
+                    <GridLabel label={tr('modification_note_label', '修改說明')} />
+                    <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...gInputStyle, height: 'auto' }} placeholder={tr('modification_note_placeholder', '提案時請說明修改原因')} />
+                </div>
             )}
 
             {conflict ? (
@@ -583,35 +583,18 @@ export default function AssocEditor({
                 />
             ) : null}
 
-            <div style={{ ...rowStyle, gap: 8 }}>
-                <div style={{ width: 160, flexShrink: 0 }} />
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {canEdit ? <button type="button" style={primaryBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
-                    {(canEdit || canPropose) ? <button type="button" style={infoBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('proposal')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('submit_proposal', '提交建議')}</button> : null}
-                    <ActionStatus saving={saving} deleting={deleting} message={message} error={error} t={t} />
-                    {mode === 'edit' && canEdit && deleteEndpoint ? <button type="button" style={dangerBtn} disabled={deleting} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
-                    <a href={indexUrl} style={cancelBtn}>{tr('cancel', '取消')}</a>
+            <div style={gSubmitRow}>
+                {canEdit ? <button type="button" style={gPrimaryBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
+                {(canEdit || canPropose) ? <button type="button" style={gInfoBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('proposal')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('submit_proposal', '提交建議')}</button> : null}
+                <ActionStatus saving={saving} deleting={deleting} message={message} error={error} t={t} />
+                <div style={gBtnGroupRight}>
+                    {mode === 'edit' && canEdit && deleteEndpoint ? <button type="button" style={gDangerBtn} disabled={deleting} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
+                    <a href={indexUrl} style={gCancelBtn}>{tr('cancel', '取消')}</a>
                 </div>
             </div>
-            {dirty ? <div style={{ ...rowStyle, color: '#92400e', fontSize: '0.8rem' }}><div style={{ width: 160, flexShrink: 0 }} />{tr('unsaved_changes', '有未儲存的變更')}</div> : null}
+            {dirty ? <div style={{ marginTop: 8, color: '#92400e', fontSize: '0.8rem' }}>{tr('unsaved_changes', '有未儲存的變更')}</div> : null}
         </div>
     );
 }
 
-const cardStyle: React.CSSProperties = { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: 20, maxWidth: '100%' };
 const titleStyle: React.CSSProperties = { fontSize: '1.1rem', fontWeight: 700, marginBottom: 12 };
-const rowStyle: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' };
-const labelStyle: React.CSSProperties = { width: 160, flexShrink: 0, fontSize: '1rem', color: '#374151', paddingTop: 6 };
-const fieldStyle: React.CSSProperties = { flex: 1, minWidth: 0 };
-const fieldHintStyle: React.CSSProperties = { display: 'block', marginTop: 2, fontSize: '0.78rem', color: '#6b7280' };
-// 雙欄並排（對齊 legacy col-sm-6 × col-sm-6）：窄屏自動換行。
-const twoColStyle: React.CSSProperties = { display: 'flex', gap: 24, flexWrap: 'wrap' };
-const colStyle: React.CSSProperties = { flex: '1 1 320px', minWidth: 0 };
-const inputStyle: React.CSSProperties = { width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '1rem', boxSizing: 'border-box' };
-const roStyle: React.CSSProperties = { background: '#f3f4f6', cursor: 'not-allowed' };
-const okStyle: React.CSSProperties = { background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: '0.85rem' };
-const errStyle: React.CSSProperties = { background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: '0.85rem' };
-const primaryBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #255f93', background: '#255f93', color: '#fff', fontWeight: 700, cursor: 'pointer' };
-const infoBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #0e7490', background: '#0891b2', color: '#fff', fontWeight: 700, cursor: 'pointer' };
-const dangerBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #b91c1c', background: '#fff5f5', color: '#b91c1c', fontWeight: 700, cursor: 'pointer' };
-const cancelBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #cbd5e1', background: '#fff', color: '#475569', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' };

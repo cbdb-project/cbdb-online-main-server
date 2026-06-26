@@ -516,8 +516,8 @@ export default function AssocEditor({
             {/* 親屬關係（選填）：與社會關係並存的親屬／關聯親屬欄；兩組各有互逆配對碼（同 legacy assoc/edit）。 */}
             <GridSection title={tr('assoc_kin_section', '親屬關係（選填）')}>
                 <div style={gGrid}>
-                    {searchRow('c_kin_code', tr('kinship_field', '親屬關係'), 'c_kin_code', '/api/select/search/kincode', false, '0', false, tr('not_specified', '未詳'))}
-                    {searchRow('c_kin_id', tr('kin_person', '親屬人物'), 'c_kin_id', '/api/select/search/biog', false, '0', false, tr('not_specified', '未詳'))}
+                    {searchRow('c_kin_code', tr('assoc_kin_relation', '本人之親屬關係'), 'c_kin_code', '/api/select/search/kincode', false, '0', false, tr('not_specified', '未詳'))}
+                    {searchRow('c_kin_id', tr('assoc_kin_person', '本人之親屬'), 'c_kin_id', '/api/select/search/biog', false, '0', false, tr('not_specified', '未詳'))}
                     {reversePairRow(
                         tr('reverse_kin_pair_label', '互逆親屬關係碼'), 'c_kinship_pair',
                         kinPairCandidates, kinReversePair,
@@ -525,8 +525,8 @@ export default function AssocEditor({
                         tr('reverse_kin_pair_hint', '對方人物身上會建立鏡像親屬關係；此為「親屬關係」(c_kin_code) 的反向碼，系統自動雙向同步。預設取建議反向碼，可手動更正。'),
                         tr('no_paired_kinship', '無對應親屬關係'),
                     )}
-                    {searchRow('c_assoc_kin_code', tr('assoc_kin_field', '關聯親屬關係'), 'c_assoc_kin_code', '/api/select/search/kincode', false, '0', false, tr('not_specified', '未詳'))}
-                    {searchRow('c_assoc_kin_id', tr('assoc_kin_person', '關聯親屬人物'), 'c_assoc_kin_id', '/api/select/search/biog', false, '0', false, tr('not_specified', '未詳'))}
+                    {searchRow('c_assoc_kin_code', tr('assoc_assoc_kin_relation', '對象之親屬關係'), 'c_assoc_kin_code', '/api/select/search/kincode', false, '0', false, tr('not_specified', '未詳'))}
+                    {searchRow('c_assoc_kin_id', tr('assoc_assoc_kin_person', '對象之親屬'), 'c_assoc_kin_id', '/api/select/search/biog', false, '0', false, tr('not_specified', '未詳'))}
                     {reversePairRow(
                         tr('reverse_assoc_kin_pair_label', '互逆關聯親屬關係碼'), 'c_assoc_kinship_pair',
                         assocKinPairCandidates, assocKinReversePair,

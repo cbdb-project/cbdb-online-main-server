@@ -433,6 +433,7 @@ return [
     'index_year_source' => 'Index Year Source',
     // Validation warnings.
     'altname_required' => 'Please enter the alternative name (Chinese)',
+    'altname_pinyin_required' => 'Please enter the alternative name (Pinyin)',
     'sequence_required' => 'Please enter a sequence number',
     'pk_required' => 'Primary key fields cannot be empty',
     'please_select_source' => 'Please select a source',

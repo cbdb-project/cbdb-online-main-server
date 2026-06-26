@@ -396,7 +396,7 @@ export default function BasicInfoEditor({
                     <div style={gFull}>{fLabel(tr('death_year', '卒年'), 'c_deathyear')}
                         <EraTimeField values={buildEra(death)} onChange={(p) => applyEra(death, p)} dynastyCode={dynastyCode} showRange showLunar /></div>
                     {gText('c_death_age', tr('age_at_death', '享年'), 'c_death_age')}
-                    {gCode('c_death_age_range', tr('range_label', '範圍'), 'c_death_age_range', 'range', 'c_range_code', ['c_range_code', 'c_approx', 'c_approx_chn'])}
+                    {gCode('c_death_age_range', tr('range_label', '範圍'), 'c_death_age_range', 'range', 'c_range_code', ['c_range_code', 'c_range_chn', 'c_range'])}
                 </div>
                 <div style={derivedBoxStyle}>
                     <div style={derivedTagStyle}>{tr('index_auto_tag', '指數年與指數地址（系統依算法定期自動計算，唯讀，無需手動填寫）')}</div>

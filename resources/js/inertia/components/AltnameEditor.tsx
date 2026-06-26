@@ -179,7 +179,7 @@ export default function AltnameEditor({
 
                 {/* 類型+次序 同行（#100）：次序非重點，置於類型右側 */}
                 {gridCell(tr('altname_type', '類型'), { code: 'c_alt_name_type_code' },
-                    <CodeAutocomplete mode="list" model="altcode" idKey="c_alt_name_type_code" labelKeys={['c_alt_name_type_code', 'c_alt_name_type_desc_chn', 'c_alt_name_type_desc']}
+                    <CodeAutocomplete mode="list" model="altcode" idKey="c_name_type_code" labelKeys={['c_name_type_code', 'c_name_type_desc_chn', 'c_name_type_desc']}
                         value={fields.c_alt_name_type_code ?? '0'} initialLabel={labels.c_alt_name_type_code ?? ''} disabled={!editable}
                         onChange={(v, l) => { set('c_alt_name_type_code', v); setLabel('c_alt_name_type_code', l); }} />)}
                 {textRow('c_sequence', tr('sequence', '次序'), 'c_sequence', 'number', false, mode === 'create')}

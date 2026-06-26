@@ -34,68 +34,62 @@ return [
         // 無點號的 key 維持扁平。env() 對應一律保持原樣，僅搬到巢狀位置。
 
         // Phase 1 — 唯讀葉節點
-        'dashboard' => env('MIGRATION_FLAG_DASHBOARD', 'old'),
-        'profile' => env('MIGRATION_FLAG_PROFILE', 'old'),
+        'dashboard' => env('MIGRATION_FLAG_DASHBOARD', 'new'),
+        'profile' => env('MIGRATION_FLAG_PROFILE', 'new'),
 
         // Phase 2 — Codes 代碼表 CRUD
-        'codes' => env('MIGRATION_FLAG_CODES', 'old'),
+        'codes' => env('MIGRATION_FLAG_CODES', 'new'),
 
         // Phase 3/4 — 人物列表、檢視與編輯器（含 PersonBrowser 各分頁增量編輯器）
         'basicinformation' => [
-            'index' => env('MIGRATION_FLAG_BASICINFO_INDEX', 'old'),
-            // ⚠️⚠️ 2026-06-22 全部翻回 old（重大設計修正）：先前 React 人物編輯器（PersonEditor + 各分頁/
-            // 編輯器 modal）誤用 app/person-browser 組件拼成——但 person-browser 是「唯讀瀏覽器」，
-            // 使用者明確要求不要用它。對齊對象應是 legacy 編輯頁：/basicinformation/{id}/edit（基本資料）、
-            // /basicinformation/{id}/{子資源}。因此 React 版丟失了 legacy 編輯頁的關鍵功能：
-            //   (1) 年號轉換（西元↔年號，shared components/inline-time-fields.blade.php）——所有日期欄皆缺；
-            //   (2) 地址 CHGIS 地圖底圖（_chgis_map_assets/_place_link）；
-            //   (3) 整體版面/互動未對齊 legacy edit 頁。
-            // 須把 React 人物編輯器「重新對齊 legacy 編輯頁」（建年號轉換 React 元件、補地圖、對齊版面），
-            // 而非沿用 person-browser。重做並逐頁過閘後才可再翻 new。欄位補齊等既有代碼保留。
-            // （另：assoc/kinship 另有 v2 互逆鏡像 bug，見 memory v2-mutation-no-mirror-bug，亦維持 old。）
-            'show' => env('MIGRATION_FLAG_BASICINFO_SHOW', 'old'),
-            'editor' => env('MIGRATION_FLAG_BASICINFO_EDITOR', 'old'),
-            'altname' => env('MIGRATION_FLAG_BASICINFO_ALTNAME', 'old'),
-            'addresses' => env('MIGRATION_FLAG_BASICINFO_ADDRESSES', 'old'),
-            'texts' => env('MIGRATION_FLAG_BASICINFO_TEXTS', 'old'),
-            'sources' => env('MIGRATION_FLAG_BASICINFO_SOURCES', 'old'),
-            'offices' => env('MIGRATION_FLAG_BASICINFO_OFFICES', 'old'),
-            'assoc' => env('MIGRATION_FLAG_BASICINFO_ASSOC', 'old'),
-            'kinship' => env('MIGRATION_FLAG_BASICINFO_KINSHIP', 'old'),
-            'events' => env('MIGRATION_FLAG_BASICINFO_EVENTS', 'old'),
-            'entries' => env('MIGRATION_FLAG_BASICINFO_ENTRIES', 'old'),
-            'statuses' => env('MIGRATION_FLAG_BASICINFO_STATUSES', 'old'),
-            'possession' => env('MIGRATION_FLAG_BASICINFO_POSSESSION', 'old'),
-            'socialinst' => env('MIGRATION_FLAG_BASICINFO_SOCIALINST', 'old'),
+            'index' => env('MIGRATION_FLAG_BASICINFO_INDEX', 'new'),
+            // ✅ 2026-06-26 全部翻 new 上線（使用者人工逐頁驗收通過）：React 人物編輯器已「重新對齊 legacy
+            // 編輯頁」——重建年號轉換 React 元件（EraTimeField）、補 CHGIS 地圖 place-link、對齊版面/互動、
+            // 補齊 v2 互逆鏡像（assoc/kinship 雙向同步 + #66/#70 衝突/疑似偵測）、必填/改鍵等 parity 缺口。
+            // 全量 1977 測試綠、build 綠、review agent + codex 雙閘逐環節通過。如需回退改回 'old' 即可（可逆）。
+            'show' => env('MIGRATION_FLAG_BASICINFO_SHOW', 'new'),
+            'editor' => env('MIGRATION_FLAG_BASICINFO_EDITOR', 'new'),
+            'altname' => env('MIGRATION_FLAG_BASICINFO_ALTNAME', 'new'),
+            'addresses' => env('MIGRATION_FLAG_BASICINFO_ADDRESSES', 'new'),
+            'texts' => env('MIGRATION_FLAG_BASICINFO_TEXTS', 'new'),
+            'sources' => env('MIGRATION_FLAG_BASICINFO_SOURCES', 'new'),
+            'offices' => env('MIGRATION_FLAG_BASICINFO_OFFICES', 'new'),
+            'assoc' => env('MIGRATION_FLAG_BASICINFO_ASSOC', 'new'),
+            'kinship' => env('MIGRATION_FLAG_BASICINFO_KINSHIP', 'new'),
+            'events' => env('MIGRATION_FLAG_BASICINFO_EVENTS', 'new'),
+            'entries' => env('MIGRATION_FLAG_BASICINFO_ENTRIES', 'new'),
+            'statuses' => env('MIGRATION_FLAG_BASICINFO_STATUSES', 'new'),
+            'possession' => env('MIGRATION_FLAG_BASICINFO_POSSESSION', 'new'),
+            'socialinst' => env('MIGRATION_FLAG_BASICINFO_SOCIALINST', 'new'),
         ],
 
         // Phase 5 — 管理與營運工具
-        'operations' => env('MIGRATION_FLAG_OPERATIONS', 'old'),
-        'manage' => env('MIGRATION_FLAG_MANAGE', 'old'),
-        'merge-preview' => env('MIGRATION_FLAG_MERGE_PREVIEW', 'old'),
-        'crowdsourcing' => env('MIGRATION_FLAG_CROWDSOURCING', 'old'),
+        'operations' => env('MIGRATION_FLAG_OPERATIONS', 'new'),
+        'manage' => env('MIGRATION_FLAG_MANAGE', 'new'),
+        'merge-preview' => env('MIGRATION_FLAG_MERGE_PREVIEW', 'new'),
+        'crowdsourcing' => env('MIGRATION_FLAG_CROWDSOURCING', 'new'),
 
         // admin.* 子頁（含點號，巢狀）：唯讀日誌、批次匯入與維護工具
         'admin' => [
-            'audit-logs' => env('MIGRATION_FLAG_ADMIN_AUDIT_LOGS', 'old'),
-            'ai-fill-logs' => env('MIGRATION_FLAG_ADMIN_AI_FILL_LOGS', 'old'),
-            'explain-sql' => env('MIGRATION_FLAG_ADMIN_EXPLAIN_SQL', 'old'),
-            'batch-load-book-titles' => env('MIGRATION_FLAG_BATCH_BOOKS', 'old'),
-            'batch-load-offices' => env('MIGRATION_FLAG_BATCH_OFFICES', 'old'),
-            'batch-load-social-institutes' => env('MIGRATION_FLAG_BATCH_SOCIAL', 'old'),
-            'wiki-maintenance' => env('MIGRATION_FLAG_WIKI_MAINTENANCE', 'old'),
-            'cbdb-table-maintenance' => env('MIGRATION_FLAG_TABLE_MAINTENANCE', 'old'),
-            'unidirectional-relationship-repair' => env('MIGRATION_FLAG_UNIDIRECTIONAL_REPAIR', 'old'),
+            'audit-logs' => env('MIGRATION_FLAG_ADMIN_AUDIT_LOGS', 'new'),
+            'ai-fill-logs' => env('MIGRATION_FLAG_ADMIN_AI_FILL_LOGS', 'new'),
+            'explain-sql' => env('MIGRATION_FLAG_ADMIN_EXPLAIN_SQL', 'new'),
+            'batch-load-book-titles' => env('MIGRATION_FLAG_BATCH_BOOKS', 'new'),
+            'batch-load-offices' => env('MIGRATION_FLAG_BATCH_OFFICES', 'new'),
+            'batch-load-social-institutes' => env('MIGRATION_FLAG_BATCH_SOCIAL', 'new'),
+            'wiki-maintenance' => env('MIGRATION_FLAG_WIKI_MAINTENANCE', 'new'),
+            'cbdb-table-maintenance' => env('MIGRATION_FLAG_TABLE_MAINTENANCE', 'new'),
+            'unidirectional-relationship-repair' => env('MIGRATION_FLAG_UNIDIRECTIONAL_REPAIR', 'new'),
         ],
 
         // query-playground.* 子頁（query-playground 含 hyphen 無 dot，是扁平 key，
         // 其下 nl-query-logs 才以巢狀對應 "query-playground.nl-query-logs"）
         'query-playground' => [
-            'nl-query-logs' => env('MIGRATION_FLAG_NL_QUERY_LOGS', 'old'),
+            'nl-query-logs' => env('MIGRATION_FLAG_NL_QUERY_LOGS', 'new'),
         ],
 
         // View Tables（React 版已上線，待 flip）
-        'view' => env('MIGRATION_FLAG_VIEW', 'old'),
+        'view' => env('MIGRATION_FLAG_VIEW', 'new'),
 
         // Phase 6 — 認證頁與入口（flag 可逆、預設 old、不自動上線）
         // 三個認證頁 flag 可獨立或整體回退：login / register / passwords（含忘記密碼與重設密碼）。

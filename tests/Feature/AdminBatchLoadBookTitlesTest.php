@@ -471,6 +471,76 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
     }
 
     #[Test]
+    public function test_pinyin_dict_now_covers_tai_and_jing_additions(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 290, 'c_dy' => '6']);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 790, 'c_title_chn' => '來源']);
+
+        // 臺→tai、淨→jing 已加入 Pinyin::$dic，含這兩個字的書名應能通過拼音檢查並轉出。
+        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "290\t臺灣府志\t790\n290\t淨土錄\t790",
+        ]);
+
+        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $this->assertEmpty($response->getSession()->get('batch_errors', []));
+
+        $rows = DB::table('TEXT_CODES')->where('c_textid', '>', 790)->orderBy('c_textid')->get();
+        $this->assertSame('tai wan fu zhi', $rows[0]->c_title);
+        $this->assertSame('jing tu lu', $rows[1]->c_title);
+    }
+
+    #[Test]
+    public function test_variant_glyph_feng_is_standardized_in_stored_title(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 291, 'c_dy' => '6']);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 791, 'c_title_chn' => '來源']);
+
+        // 峯（U+5CEF）一律標準化為標準字形峰（U+5CF0）。標準化發生在 parseEntries，
+        // 因此「存入的中文書名」本身就被改寫，拼音也據此轉為 feng，不會被無拼音檢查擋下。
+        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "291\t東坡集峯卷一\t791",
+        ]);
+
+        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $this->assertEmpty($response->getSession()->get('batch_errors', []));
+
+        $record = DB::table('TEXT_CODES')->where('c_textid', '>', 791)->orderByDesc('c_textid')->first();
+        $this->assertNotNull($record);
+        // 存入的書名本身已標準化：峯 → 峰
+        $this->assertSame('東坡集峰卷一', $record->c_title_chn);
+        $this->assertStringNotContainsString('峯', $record->c_title_chn);
+        $this->assertSame('dong po ji feng juan yi', $record->c_title);
+    }
+
+    #[Test]
+    public function test_simplified_jing_is_still_rejected(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 292, 'c_dy' => '6']);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 792, 'c_title_chn' => '來源']);
+
+        // 我們刻意只加入繁體淨→jing，未加入簡體净（U+51C0）。簡體字轉不出來，
+        // 正是用來攔截「簡體字混入」的訊號，因此含净的書名應被拒絕、不得匯入。
+        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "292\t净土錄\t792",
+        ]);
+
+        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $errors = $response->getSession()->get('batch_errors', []);
+        $this->assertNotEmpty($errors);
+        $this->assertStringContainsString('無拼音對應', implode("\n", $errors));
+        $this->assertStringContainsString('净', implode("\n", $errors));
+        // 只有預先插入的來源列，未新增任何資料。
+        $this->assertSame(1, DB::table('TEXT_CODES')->count());
+        $this->assertSame(0, DB::table('operations')->count());
+    }
+
+    #[Test]
     public function test_unpinyinable_han_after_volume_separator_is_ignored(): void {
         $user = $this->makeUser();
         $this->actingAs($user);

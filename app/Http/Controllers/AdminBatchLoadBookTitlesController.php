@@ -16,6 +16,17 @@ use Inertia\Inertia;
 
 class AdminBatchLoadBookTitlesController extends Controller {
     /**
+     * 書名字形標準化對照表（異體字 → 標準字）。
+     *
+     * 與 VariantCharNormalizer 的差異：此對照表會「改寫存入 TEXT_CODES.c_title_chn
+     * 的書名本身」，而非僅用於拼音轉換。只放確定要把原始書名一併標準化的字形，
+     * 例如「峯」一律正規化為「峰」（兩者皆為繁體，屬同字異形，非繁簡轉換）。
+     */
+    private const TITLE_VARIANT_MAP = [
+        '峯' => '峰',
+    ];
+
+    /**
      * @var OperationRepository
      */
     protected $operationRepository;
@@ -373,7 +384,10 @@ class AdminBatchLoadBookTitlesController extends Controller {
             $rows[] = [
                 'line' => $lineNumber,
                 'author_id' => (int) $authorId,
-                'title' => $title,
+                // 在書名「誕生處」一次性標準化字形（峯→峰），讓後續所有
+                // 消費端（c_title_chn、拼音、無拼音檢查）都只看到標準化後的書名，
+                // 避免任一路徑漏做而三者不一致。
+                'title' => $this->standardizeTitleVariants($title),
                 'source' => $source,
             ];
         }
@@ -478,6 +492,19 @@ class AdminBatchLoadBookTitlesController extends Controller {
         }
 
         return array_keys($unmapped);
+    }
+
+    /**
+     * Standardize variant glyphs in the title (峯→峰). Unlike VariantCharNormalizer
+     * (which only affects the pinyin lookup and leaves the title untouched), this
+     * rewrites the stored 中文書名 itself. It is applied ONCE in parseEntries() when
+     * the row's title is first built, so every downstream consumer — c_title_chn,
+     * the pinyin (c_title) and the unpinyinable check — receives an already
+     * standardized title and the three can never disagree on which character the
+     * title contains.
+     */
+    protected function standardizeTitleVariants(string $title): string {
+        return strtr($title, self::TITLE_VARIANT_MAP);
     }
 
     /**

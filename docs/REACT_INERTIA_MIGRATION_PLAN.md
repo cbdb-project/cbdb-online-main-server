@@ -1,17 +1,19 @@
 # 以 React + Inertia 重寫全站 AdminLTE 頁面：遷移計畫
 
-> 狀態：**規劃草案（待人工審核）**　·　方向：**漸進式 strangler，逐頁取代，非一次性重寫**
+> 狀態：**Phase 0–6 全部完成並已翻 flag 上線（2026-06-26）**　·　方向：**漸進式 strangler，逐頁取代，非一次性重寫**
 > 本文件只描述「做什麼、為何、依何順序」，不含實作程式碼。每個階段落地時請遵循專案的「小環節 → review → codex → 推進」節奏。
 
+> ✅ **2026-06-26 上線里程碑**：全站可遷移頁面 feature flag 已全翻 `new`（使用者人工逐頁驗收通過），React/Inertia 為線上預設。**剩餘人類待辦**：Phase 7（AdminLTE/Blade 實體下架——目前舊視圖/路由仍保留供回退）、P6-C1/C2 死碼清理。舊版「下線」指下線為線上預設、未實體刪除。
+
 > 📍 **狀態與接手指引（活頁，每次迭代更新）** —— 接手的 AI 從這裡開始：
-> - **目前進度**：**Phase 0（F1–F6）、Phase 1（P1-1…P1-6）、Phase 2（P2-1…P2-5）全部完成**；Phase 3 **P3-1 完成、P3-2 blocked**（需人決策）；**Phase 5 全部可遷移頁完成（P5-1…P5-11，P5-12 排除）**。全部 commit 於 `feat/phase0-f1-tailwind-tokens`，逐項過 review agent + codex gate；flag 一律預設 old，待人切換。write-path（codes/manage 的 store/update/destroy/proposal，operations restore/proposal、crowdsourcing confirm/reject、wiki/table-maintenance rebuild/import、unidirectional repair）一律未改或採 perform*/listRouteName 單一來源抽取，舊 Blade byte-equivalent。全測試 1533 綠。
+> - **目前進度**：**Phase 0（F1–F6）、Phase 1（P1-1…P1-6）、Phase 2（P2-1…P2-5）全部完成**；Phase 3 **P3-1 完成、P3-2 blocked**（需人決策）；**Phase 5 全部可遷移頁完成（P5-1…P5-11，P5-12 排除）**。全部 commit 於 `feat/phase0-f1-tailwind-tokens`，逐項過 review agent + codex gate（按：當時 flag 預設 old；**已於 2026-06-26 全翻 new 上線**，見頂部里程碑）。write-path（codes/manage 的 store/update/destroy/proposal，operations restore/proposal、crowdsourcing confirm/reject、wiki/table-maintenance rebuild/import、unidirectional repair）一律未改或採 perform*/listRouteName 單一來源抽取，舊 Blade byte-equivalent。全測試 1533 綠。
 > - **人類關卡（agent 不可跨越）**：① ~~**F7**~~ **done（2026-06-22）**；② ~~**P3-2**~~ **done（2026-06-22，P4-0-B 建獨立 BasicInformation/Show React 頁取代 editor-readonly；使用者選「另做獨立編輯頁」）**。
-> - **Phase 4 現況（2026-06-22 完整完成、全套 1729 綠、flag 一律 old 未上線）**：
+> - **Phase 4 現況（2026-06-22 完整完成、全套 1729 綠；flag 當時 old，已於 2026-06-26 翻 new 上線）**：
 >   - **P4-1…P4-12**：12 個複合主鍵子資源 React 編輯器（PersonBrowser 分頁內 create/edit/delete，走 API v2）。
 >   - **P4-0**：人物主檔獨立 React 編輯頁（Edit/Show/Create + appEdit/appCreate/appShow 路由 + BiogMainCreate/DeleteHandler 軟刪除），解 P3-2。
 >   - **P4-P**：提案流程補齊——後端 proposal DELETE（提交+審核，含 offices/possession 副表）、offices/possession proposal CREATE、12 編輯器加提案模式 UI（眾包 mode:proposal；後端 authorizeDirect/authorizeProposal 強制無權限升級）。
 >   - 期間 codex/review 抓出並修多個既有 latent 生產 bug：EVENTS/ENTRY/POSSESSION/BIOG_INST handler allowedFields 假欄名（正式庫會 Unknown column）、offices/entries 隱藏 PK 編輯漂移、assoc 哨兵 update 漂移、possession surrogate id 併發競態與單位 clobber。
-> - **下一步（剩餘，待人/決策）**：各頁 flag 仍 old，待人逐一驗收後翻 flag 上線；**Phase 6（認證頁/入口）** 屬 ⚠️ 決策（React 化 vs 保留 Blade，§二.6）；死碼清理（P6-C1/C2）/ view 退役 / Phase 7 下架 AdminLTE 為 **agent 禁止項（必由人）**。
+> - **下一步（剩餘）**：~~各頁 flag 待切換~~ **已於 2026-06-26 全翻 new 上線（使用者逐頁驗收通過）**；~~Phase 6 決策~~ **已完成（認證頁/入口 React 化）**；剩死碼清理（P6-C1/C2）／ view Blade 實體退役 ／ Phase 7 下架 AdminLTE 為 **agent 禁止項（必由人）**。
 > - **執行順序**：F1→F4→F5→F2→F3→F6（依賴調整，見附錄 D.1）。
 > - **最近心得/坑**：見附錄 D。
 > - **執行規則**：見附錄 C（自主執行協定）。

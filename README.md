@@ -60,9 +60,10 @@
 - **Node.js**: 22.x（建議搭配 npm 10）
 
 ### 前端構建現況
-- 全站已完成 **AdminLTE 3** (Bootstrap 4) 升級，使用 **Vite** 構建系統。
-- 主要入口：`resources/js/app.js`（UI 組件）、`resources/js/datatables.js`（DataTables）。
-- `resources/js/jquery-global.js` 將 jQuery 暴露到全局；Bootstrap 4、AdminLTE 3、Select2 等在 `app.js` 中實現。
+- 主要互動頁面已遷移至 **React/Inertia 並翻 flag 上線**（人物列表/檢視/詳情中樞、13 個編輯器、Codes、營運管理工具、認證頁、Query Playground 等），React 元件在 `resources/js/inertia/**`，feature flag 見 `config/migration_flags.php`（多為 `new`）。
+- **AdminLTE 3** (Bootstrap 4) + Blade 仍實體保留作回退相容期：flag-gated 頁面把對應 flag 改回 `old` 即可回退（可逆）；Query Playground 例外（無主頁 flag、硬導向 React，不走 flag 回退）。尚未實體下架（Phase 7 未執行）。新功能一律只做在 React/Inertia 路徑。
+- 構建系統為 **Vite**；主要入口：`resources/js/app.js`（AdminLTE/jQuery UI 組件）、`resources/js/datatables.js`、`resources/js/inertia/**`（React/Inertia）。
+- `resources/js/jquery-global.js` 將 jQuery 暴露到全局（供保留中的 Blade 頁使用）。
 - 所有頁面均使用 `@vite` 載入前端資源，**請勿引入外部 CDN 的 jQuery/Bootstrap**，以免版本衝突。
 
 ⚠️ **重要**：本專案現已升級到 Laravel 12.x 並要求 PHP 8.2+。**建議使用 PHP 8.4** 以獲得最佳性能和安全性。Laravel 12 已完全支持 PHP 8.4。
@@ -109,12 +110,11 @@ php artisan cbdb:rebuild-person-change-index   # 部署後須跑一次：回填�
 > 部署提醒：`person_change_index`（供 `/api/v2/persons` 的 `c_created_date` / `c_modified_date`）的 migration 只建表不回填。部署到任何環境後須**手動執行一次** `php artisan cbdb:rebuild-person-change-index` 做初始全量回填；之後日常由系統即時維護，並可定期以 `--since` 增量校正。詳見 [docs/PERSON_CHANGE_INDEX_DESIGN.md](docs/PERSON_CHANGE_INDEX_DESIGN.md)。
 
 ### 前端
-- React/Inertia 版 Query Playground 是現行主路徑：`/app/query-playground`
-- 舊版 Blade Playground 僅保留相容性，不再新增功能
+- 主要 React/Inertia 線上路徑：`/app/basicinformation`（人物列表 / 詳情中樞 / 13 個編輯器）、`/app/query-playground`、`/app/codes`、`/app/operations` 等。
+- 舊版 Blade 路由多數保留作回退（flag-gated 頁面改 flag 回 `old`）；Query Playground 例外（硬導向 React，無 flag 回退）。皆不再新增功能；新功能一律做在 React/Inertia。
 - 前端入口：
-  - `resources/js/app.js`
-  - `resources/js/datatables.js`
-  - `resources/js/inertia/**`
+  - `resources/js/inertia/**`（React/Inertia，主要互動頁）
+  - `resources/js/app.js`、`resources/js/datatables.js`（保留中的 AdminLTE/Blade 頁）
 
 ### 後端
 - 主要路由定義：`routes/web.php`

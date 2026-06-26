@@ -88,10 +88,10 @@ return [
             'nl-query-logs' => env('MIGRATION_FLAG_NL_QUERY_LOGS', 'new'),
         ],
 
-        // View Tables（React 版已上線，待 flip）
+        // View Tables（React 版已翻 new 上線，2026-06-26；flag 可逆回 old）
         'view' => env('MIGRATION_FLAG_VIEW', 'new'),
 
-        // Phase 6 — 認證頁與入口（flag 可逆、預設 old、不自動上線）
+        // Phase 6 — 認證頁與入口（已翻 new 上線；flag 可逆回 old）
         // 三個認證頁 flag 可獨立或整體回退：login / register / passwords（含忘記密碼與重設密碼）。
         // 維持上線（new）。Inertia 重導 bug 已修（Login/Register/ResetPassword 改用 Inertia::location）。
         // Task 27 須補做認證頁逐項內容對比（label/提示/連結/欄位），缺漏即補齊。

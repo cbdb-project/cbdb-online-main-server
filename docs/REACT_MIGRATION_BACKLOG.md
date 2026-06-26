@@ -3,8 +3,12 @@
 > 本檔是遷移執行的**單一真實來源**：列舉全部待遷移頁面與狀態。策略與規則見 [REACT_INERTIA_MIGRATION_PLAN.md](./REACT_INERTIA_MIGRATION_PLAN.md)（recipe、保真度原則、自主執行協定）。
 > **本檔可頻繁更新**（每完成一頁就改狀態）；設計文件保持穩定。
 
+> ✅ **2026-06-26 全頁翻 new 上線**：Phase 1–6 所有可遷移頁（含 basicinformation 全套、view/index）已 `live`（flag `new`，使用者人工逐頁驗收通過）。仍為 `todo` 的只剩 **Phase 7（P7-1/2/3，AdminLTE 實體下架）** 與 **P6-C1/C2（死碼清理）**——舊視圖/路由目前保留供回退，尚未實體刪除。
+
 ## 狀態圖例
 - `todo` 未開始　·　`in-progress` 進行中　·　`in-review` 已實作、走 gate 中　·　`done` 已合併（flag 仍指舊頁，待人切換）　·　`live` 已切換上線　·　`blocked` 卡住待人決定　·　`retired` 舊頁已退役刪除
+
+> 📌 **2026-06-26 對帳（重要）**：下方各 phase 表中標 `done`（多附「flag old」）的列，**均已於 2026-06-26 翻 `new`＝實質 `live`**（使用者逐頁驗收通過）；表內 `done`/`flag old`/未來式上線指令為**當時合併狀態的歷史紀錄，未逐列回填**。**實際 flag 狀態一律以 `config/migration_flags.php` 為準**（已列頁面多為 `new`）。仍未做的只有 **Phase 7（AdminLTE/Blade 實體下架，P7-1/2/3）** 與 **P6-C1/C2（死碼清理）**，且翻 flag 與實體下架皆為**人類關卡，agent 不可自行執行**。
 
 **認領慣例（並發安全）**：標 `in-progress` 時寫成 `in-progress (iter-id, 起 ISO8601)`。同一時間只有一個 executor、序列執行。開機先 **`git fetch --prune origin`**（失敗即 infra 故障停機）再對帳（見設計文件附錄 C 步驟 0）：孤兒 `in-progress`（無對應 PR 且逾時）標回 `todo`/`blocked`；**帳本與（已刷新的）git/PR 不一致時以 git 為準**。
 **挑選順序**：依賴就緒 → phase 編號 → **同 phase 內由上而下嚴格表序**。無可挑（全 `blocked`/`done`）→ 停機回報。
@@ -154,7 +158,7 @@
 - **詳情中樞**（`/app/basicinformation/{id}`，`PersonEditor.tsx`）改用 legacy 風格 `PersonBanner`（人物頭 + 13 子資源分頁導航），脫離 person-browser 的 `BrowserTabs/PersonSummaryPanel`；`basic_info` 分頁內嵌 `BasicInfoEditor`（含年號轉換）；其餘 12 分頁為 legacy 表格樣式（`SubresourceTable`），「新增/編輯」導向獨立 `…/edit-v2` 編輯器頁。
 - **版面 pass**（#39）：身份標題置中、麵包屑靠左且末段隨分頁切換、頁碼置中、表格密度對齊 `table-sm`、地圖點地名以該座標居中、親屬/社會關係人連結另開新分頁。
 - **已修 bug**：i18n 中英切換（biogmains 共享 translations）、AI SSL（環境）、`person_records` 誤譯、各列序號/雙語/i18n 欄頭 parity（review+codex gate）。
-- **上線閘門（gate-before-flip，見 REACT_MIGRATION_SIMULATION_TEST_PLAN.md §0.1）**：`basicinformation.*` 全 `old`；須先以模擬測試計畫做**全面新舊機器對比**（內容/結構 + 互動 + L 欄位/說明文字 + I 字體 + J 導流 + K 視覺），差異清單清空 + review + codex 無嚴重 issue 後，才由 AI agent 翻 `new`。
+- **上線閘門（gate-before-flip，見 REACT_MIGRATION_SIMULATION_TEST_PLAN.md §0.1）**〔歷史，已於 2026-06-26 完成〕：當時 `basicinformation.*` 全 `old`；先以模擬測試計畫做**全面新舊機器對比**（內容/結構 + 互動 + L 欄位/說明文字 + I 字體 + J 導流 + K 視覺），差異清單清空 + review + codex 無嚴重 issue + **使用者人工逐頁驗收**後翻 `new`。**現況：已全翻 `new` 上線。**
 
 ## Phase 5 — 管理與營運工具（依賴：F*，部分依賴 P4 樣板）
 | # | 頁面 | 路由（舊） | 狀態 | 備註 |
@@ -193,8 +197,8 @@
 ## 已具 React 版、僅待切換 + 退役（非重寫）
 | 頁面 | React 路由 | 狀態 | 備註 |
 |---|---|---|---|
-| view/index、view/list | `app.view.index`/`app.view.show` | todo | React 版已上線；待 flip flag + 退役 Blade `view.index`/`view.show` |
-| Query Playground UI | `/app/query-playground` | live | 已是 React（僅 nl_query_logs 日誌頁待遷，見 P1-6） |
+| view/index、view/list | `app.view.index`/`app.view.show` | live | flag `view`=new 已上線；Blade `view.index`/`view.show` 實體退役待 Phase 7 |
+| Query Playground UI | `/app/query-playground` | live | 已是 React（含 nl-query-logs，flag `query-playground.nl-query-logs`=new）；主頁無 flag、`/query-playground` 硬導向 React |
 | Person Browser | `/app/*` | live | 已是 React（唯讀） |
 | Search-by-Entry | `/app/*` | live | 已是 React |
 

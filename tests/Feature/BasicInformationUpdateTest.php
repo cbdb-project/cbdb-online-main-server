@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -467,93 +466,5 @@ class BasicInformationUpdateTest extends TestCase {
         $auditLog = DB::table('audit_log')->latest('id')->first();
         $this->assertNotNull($auditLog);
         $this->assertNull(json_decode($auditLog->new_data, true)['c_female']);
-    }
-
-    // ── #56 M 寫入等價（basic_info / BIOG_MAIN，含派生姓名重算）──────
-
-    #[Test]
-    #[Group('legacy-parity')] // 旧版下线時連同 legacy update（PUT /basicinformation/{id}）一併移除
-    public function testBasicInfoUpdateWriteEquivalenceLegacyVsV2WithDerivedNames(): void {
-        // #56 M（update，主檔派生欄）——復原-重做實驗：同一初始狀態下 ① 旧版 PUT 全表單改「中文名組件 c_mingzi_chn
-        // 安石→雱」+「羅馬字名組件 c_mingzi Anshi→Pang」+ c_notes →記錄 → ② 復原初始 → ③ 新版 /api/v2/mutate 只送該三
-        // 欄改動 → 對比 BIOG_MAIN 落庫列等價。核心：basic_info 的派生姓名（c_name_chn / c_name 等）由 updateById 從姓名
-        // 組件「即時重算」（#61）；legacy 與 v2 direct 皆匯入同一 BiogMainRepository::updateById，本測試端到端鎖住「v2 以
-        // changes 合併 original 後重算」與「legacy 全表單重算」落庫等價——c_name_chn 重算為「王雱」、c_name 重算為新值
-        // 「Wang Pang」（同改一個羅馬字組件，使該斷言非恆等 seed；review S1），而未改的 *_proper/_rm 組件維持「Anshi Wang」
-        // （鎖 v2 把未送組件由 original 合併保留）。
-        $user = User::create([
-            'name' => 'Test User', 'email' => 'biog-mupd@example.com', 'password' => Hash::make('x'),
-            'confirmation_token' => 'tok', 'is_active' => 1, 'is_admin' => 1,
-        ]);
-        $this->actingAs($user);
-
-        $personId = 2000;
-        $seedInitial = function () use ($personId): void {
-            DB::table('BIOG_MAIN')->where('c_personid', $personId)->delete();
-            DB::table('BIOG_MAIN')->insert([
-                'c_personid' => $personId,
-                'c_name_chn' => '王安石', 'c_name' => 'Wang Anshi',
-                'c_surname_chn' => '王', 'c_surname' => 'Wang',
-                'c_mingzi_chn' => '安石', 'c_mingzi' => 'Anshi',
-                'c_name_proper' => 'Anshi Wang', 'c_name_rm' => 'Anshi Wang',
-                'c_surname_proper' => 'Wang', 'c_mingzi_proper' => 'Anshi',
-                'c_surname_rm' => 'Wang', 'c_mingzi_rm' => 'Anshi',
-                'c_notes' => '初始備註', 'c_female' => 0, 'c_by_intercalary' => 0, 'c_dy_intercalary' => 0,
-                'c_created_by' => 'seed', 'c_created_date' => '2024-01-01 00:00:00',
-                'c_modified_by' => null, 'c_modified_date' => null,
-            ]);
-        };
-        // 比對 BIOG_MAIN 全欄，僅排除「必不同」的修改稽核欄（兩版各自寫入當下時間/當前 actor）。
-        // c_created_by/c_created_date 不排除——update 不得篡改建檔欄（updateById 已 array_diff_key 掉），
-        // 兩版皆應維持 seed 值，納入比對可順帶鎖住此不變量。
-        $auditCols = ['c_modified_by', 'c_modified_date'];
-        $pick = function ($row) use ($auditCols): ?array {
-            if (!$row) {
-                return null;
-            }
-            $a = array_diff_key((array) $row, array_flip($auditCols));
-            ksort($a);
-
-            return $a;
-        };
-
-        // ① 旧版 PUT 全表單（FormRequest 要求 c_mingzi_chn + c_mingzi）：改中文名組件 c_mingzi_chn 安石→雱、
-        //    羅馬字名組件 c_mingzi Anshi→Pang、c_notes→改後。同改一個羅馬字組件，使 c_name 重算為「新值」Wang Pang，
-        //    讓羅馬字派生側也走「真重算」而非恰好等於 seed（避免恆真斷言；review S1）。
-        $seedInitial();
-        $this->put('/basicinformation/' . $personId, [
-            'action' => 'save',
-            'c_surname_chn' => '王', 'c_surname' => 'Wang',
-            'c_mingzi_chn' => '雱', 'c_mingzi' => 'Pang',
-            'c_surname_proper' => 'Wang', 'c_mingzi_proper' => 'Anshi',
-            'c_surname_rm' => 'Wang', 'c_mingzi_rm' => 'Anshi',
-            'c_notes' => '改後備註', 'c_female' => '0', 'c_by_intercalary' => '0', 'c_dy_intercalary' => '0',
-        ])->assertStatus(302); // legacy 成功後 redirect（真正的鎖在下方落庫斷言）
-        $legacyRow = $pick(DB::table('BIOG_MAIN')->where('c_personid', $personId)->first());
-
-        // ② 復原初始 → ③ 新版只送改動三欄（buildMergedPayload 會把未送組件由 original 合併後交同一 updateById 重算）。
-        $seedInitial();
-        $this->postJson('/api/v2/mutate', [
-            'resource' => 'basicinformation', 'person_id' => $personId, 'mode' => 'direct', 'operation' => 'update',
-            'target' => ['pk' => ['c_personid' => $personId]],
-            'changes' => ['c_mingzi_chn' => '雱', 'c_mingzi' => 'Pang', 'c_notes' => '改後備註'],
-        ])->assertOk()->assertJson(['ok' => true]);
-        $v2Row = $pick(DB::table('BIOG_MAIN')->where('c_personid', $personId)->first());
-
-        // 落庫列等價（排除修改稽核欄）；先確認兩版各自的派生欄都「真的重算到新值」，再比兩版一致。
-        $this->assertNotNull($legacyRow, 'legacy 更新後主檔列不存在');
-        $this->assertNotNull($v2Row, 'v2 更新後主檔列不存在');
-        // 中文名派生：c_surname_chn 由 original 合併（未送）、c_mingzi_chn 為改動 → 重算「王雱」（鎖 v2 合併正確 + 重算）。
-        $this->assertSame('王雱', $v2Row['c_name_chn'], 'v2 派生中文名 c_name_chn 應由組件重算為「王雱」');
-        $this->assertSame('王雱', $legacyRow['c_name_chn'], 'legacy 派生中文名 c_name_chn 應重算為「王雱」（鎖 legacy 確有寫入，非對稱靜默失敗）');
-        // 羅馬字名派生：c_surname 由 original 合併（未送）、c_mingzi 為改動 → 重算「Wang Pang」（新值，非恆等 seed）。
-        $this->assertSame('Wang Pang', $v2Row['c_name'], 'v2 派生羅馬字 c_name 應由組件重算為「Wang Pang」');
-        $this->assertSame('Wang Pang', $legacyRow['c_name'], 'legacy 派生羅馬字 c_name 應重算為「Wang Pang」');
-        // proper/rm 組件皆未改 → 維持 seed「Anshi Wang」（鎖 v2 把未送的 *_proper/_rm 組件由 original 合併保留）。
-        $this->assertSame('Anshi Wang', $v2Row['c_name_proper'], 'v2 c_name_proper 組件未變應維持「Anshi Wang」（未送組件由 original 合併）');
-        $this->assertSame('改後備註', $v2Row['c_notes'], 'v2 c_notes 應更新為改後備註');
-        $this->assertSame('改後備註', $legacyRow['c_notes'], 'legacy c_notes 應更新為改後備註（鎖 legacy 確有寫入）');
-        $this->assertSame('雱', $v2Row['c_mingzi_chn'], 'v2 c_mingzi_chn 應更新為雱');
-        $this->assertSame($legacyRow, $v2Row, 'BIOG_MAIN 落庫列 legacy vs v2 更新結果不等價（含派生姓名重算 + 未送組件合併）');
     }
 }

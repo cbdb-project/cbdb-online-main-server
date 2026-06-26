@@ -7,7 +7,6 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -454,51 +453,6 @@ class ApiV2MutateAltnameTest extends TestCase {
     }
 
     // ── #56 M 寫入等價（update 路徑，純單表；altname 無鏡像/副表）──────
-
-    #[Test]
-    #[Group('legacy-parity')] // 旧版下线時連同 legacy update 路徑一併移除
-    public function testAltnameUpdateWriteEquivalenceLegacyVsV2(): void {
-        // #56 M（update，純單表）——復原-重做實驗：改 c_notes+c_sequence（避開受括號正規化影響的名字欄與改鍵）。
-        // legacy 整包 update vs v2 partial；只送 v2 會改的欄即等價。
-        $this->actingAs($this->makeUser(email: 'altname-mupd@example.com'));
-
-        $pk = ['c_personid' => 1000, 'c_alt_name_chn' => '子美', 'c_alt_name_type_code' => 4];
-        $seedInitial = function (): void {
-            DB::table('ALTNAME_DATA')->delete();
-            $this->seedAltname(['c_notes' => '初始備註', 'c_sequence' => 1, 'c_source' => 10, 'c_alt_name' => 'Zimei']);
-        };
-        $cols = ['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code', 'c_alt_name', 'c_source', 'c_pages', 'c_notes', 'c_sequence'];
-        $pick = function ($row) use ($cols): ?array {
-            if (!$row) {
-                return null;
-            }
-            $a = array_intersect_key((array) $row, array_flip($cols));
-            ksort($a);
-
-            return $a;
-        };
-
-        // ① 旧版 PUT（PK 走 query）。
-        $seedInitial();
-        $this->put('/basicinformation/1000/altnames/update?' . http_build_query($pk), [
-            'c_notes' => '改後備註', 'c_sequence' => 3, 'action' => 'save',
-        ])->assertStatus(302);
-        $legacy = $pick(DB::table('ALTNAME_DATA')->where($pk)->first());
-
-        // ② 復原初始 → ③ 新版改同一筆。
-        $seedInitial();
-        $this->postJson('/api/v2/mutate', $this->altnamePayload([
-            'changes' => ['c_notes' => '改後備註', 'c_sequence' => 3],
-        ]))->assertOk()->assertJson(['ok' => true]);
-        $v2 = $pick(DB::table('ALTNAME_DATA')->where($pk)->first());
-
-        $this->assertNotNull($legacy, 'legacy 更新後列不存在');
-        $this->assertNotNull($v2, 'v2 更新後列不存在');
-        $this->assertSame('改後備註', $v2['c_notes'], 'v2 c_notes 應更新');
-        $this->assertSame('改後備註', $legacy['c_notes'], 'legacy c_notes 應更新（鎖 legacy 確有寫入）');
-        $this->assertSame(3, (int) $v2['c_sequence'], 'v2 c_sequence 應更新為 3');
-        $this->assertSame($legacy, $v2, 'ALTNAME_DATA 落庫列 legacy vs v2 不等價');
-    }
 
     #[Test]
     public function testAltnameCodeFieldSentinelFullyIdempotent(): void {

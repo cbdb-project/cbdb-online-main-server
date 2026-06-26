@@ -7,7 +7,6 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -433,63 +432,5 @@ class ApiV2MutateSourceTest extends TestCase {
         ])->assertOk()->assertJson(['ok' => true]);
 
         $this->assertDatabaseMissing('BIOG_SOURCE_DATA', ['c_personid' => 1000, 'c_textid' => 700]);
-    }
-
-    // ── #56 M 寫入等價（update 路徑，純單表；sources 無鏡像/副表）──────
-
-    #[Test]
-    #[Group('legacy-parity')] // 旧版下线時連同 legacy update 路徑一併移除
-    public function testSourceUpdateWriteEquivalenceLegacyVsV2(): void {
-        // #56 M（update，純單表）——復原-重做實驗：改 c_notes+c_self_bio（c_main_source 不送，應保留原值=1）。
-        // legacy sourceUpdateById 無條件讀 c_textid/c_main_source/c_self_bio（缺了會 warning 且寫 0/(int)null），
-        // 故 legacy body 必送此三欄（c_main_source 送原值 1 以保留、c_self_bio 送新值）；v2 為 partial、未送 c_main_source
-        // 由 buildUpdatePayload 以 existing 補回。兩版皆應 c_main_source=1 保留。
-        // c_pages 刻意用含連字號的 '12-15'（真實常見頁碼）：legacy 以 buildLegacySourceId→unionPKDef 編碼後再 explode/decode
-        // 定位（BiogMainRepository::sourceUpdateById），此為 legacy 最脆弱解析路徑；若分歧會定位失敗 →abort 404→PUT 非 302 而暴露。
-        $this->actingAs($this->makeUser(email: 'src-mupd@example.com'));
-
-        $pk = ['c_personid' => 1000, 'c_textid' => 500, 'c_pages' => '12-15'];
-        $seedInitial = function () use ($pk): void {
-            DB::table('BIOG_SOURCE_DATA')->delete();
-            DB::table('BIOG_SOURCE_DATA')->insert(array_merge($pk, [
-                'c_notes' => '初始備註', 'c_main_source' => 1, 'c_self_bio' => 0,
-                'c_created_by' => 'seed', 'c_created_date' => '2024-01-01 00:00:00',
-            ]));
-        };
-        // 比對 PK + 可寫欄；排除稽核欄（兩版各自寫當下時間/actor）。
-        $cols = ['c_personid', 'c_textid', 'c_pages', 'c_notes', 'c_main_source', 'c_self_bio'];
-        $pick = function ($row) use ($cols): ?array {
-            if (!$row) {
-                return null;
-            }
-            $a = array_intersect_key((array) $row, array_flip($cols));
-            ksort($a);
-
-            return $a;
-        };
-
-        // ① 旧版 PUT（PK 走 query；body 送 c_textid + c_main_source 原值 + c_self_bio 新值 + c_notes）。
-        $seedInitial();
-        $this->put('/basicinformation/1000/sources/update?' . http_build_query($pk), [
-            'c_textid' => 500, 'c_notes' => '改後備註', 'c_main_source' => 1, 'c_self_bio' => 1, 'action' => 'save',
-        ])->assertStatus(302);
-        $legacy = $pick(DB::table('BIOG_SOURCE_DATA')->where($pk)->first());
-
-        // ② 復原初始 → ③ 新版只送 c_notes + c_self_bio（不送 c_main_source，應保留=1）。
-        $seedInitial();
-        $this->postJson('/api/v2/mutate', [
-            'resource' => 'sources', 'person_id' => 1000, 'mode' => 'direct', 'operation' => 'update',
-            'target' => ['pk' => $pk],
-            'changes' => ['c_notes' => '改後備註', 'c_self_bio' => 1],
-        ])->assertOk()->assertJson(['ok' => true]);
-        $v2 = $pick(DB::table('BIOG_SOURCE_DATA')->where($pk)->first());
-
-        $this->assertNotNull($legacy, 'legacy 更新後列不存在');
-        $this->assertNotNull($v2, 'v2 更新後列不存在');
-        $this->assertSame('改後備註', $v2['c_notes'], 'v2 c_notes 應更新');
-        $this->assertSame('改後備註', $legacy['c_notes'], 'legacy c_notes 應更新（鎖 legacy 確有寫入）');
-        $this->assertSame(1, (int) $v2['c_self_bio'], 'v2 c_self_bio 應更新為 1');
-        $this->assertSame(1, (int) $v2['c_main_source'], 'v2 未送 c_main_source 應保留=1（buildUpdatePayload 由 existing 補回）');
-        $this->assertSame($legacy, $v2, 'BIOG_SOURCE_DATA 落庫列 legacy vs v2 不等價');
     }
 }

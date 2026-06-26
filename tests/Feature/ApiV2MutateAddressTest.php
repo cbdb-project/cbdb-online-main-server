@@ -7,7 +7,6 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -498,70 +497,6 @@ class ApiV2MutateAddressTest extends TestCase {
     }
 
     // ── #56 M 寫入等價（update 路徑，純單表；addresses 無鏡像/副表）──────
-
-    #[Test]
-    #[Group('legacy-parity')] // 旧版下线時連同 legacy update 路徑一併移除
-    public function testAddressUpdateWriteEquivalenceLegacyVsV2(): void {
-        // #56 M（update，純單表，4 段 PK）——復原-重做實驗：改 c_firstyear+c_notes。legacy body 僅送 v2 會改的兩欄；
-        // PK 定位走 query，但 controller updateQuery 的 $request->merge(emptyToSentinel) 會把 PK 三欄注入 body 後一併
-        // 寫回（值不變，故不漂移；$cols 含 4 段 PK 可抓漂移）。
-        //
-        // 已知 legacy↔v2 行為分歧（顯式化，非 v2 bug；與 possession c_measure_code 同類）：legacy addrUpdateById
-        // 永遠 (int) 寫 c_fy_intercalary/c_ly_intercalary（?? 0），即未送也清成 0（旧版資料流失）；v2 為 partial update，
-        // 未送即保留 seed。v2 保留才正確。故 seed 此二欄為 1，把它們移出等價 $cols、改以獨立斷言鎖住預期差異
-        // （legacy=0 清掉 / v2=1 保留），避免 seed=0 遮掩此分歧（codex 回饋）。
-        $this->actingAs($this->makeUser(email: 'addr-mupd@example.com'));
-
-        $pk = ['c_personid' => 1000, 'c_addr_id' => 100, 'c_addr_type' => 1, 'c_sequence' => 1];
-        $seedInitial = function (): void {
-            DB::table('BIOG_ADDR_DATA')->delete();
-            $this->seedAddress([
-                'c_firstyear' => 1050, 'c_lastyear' => 1100, 'c_notes' => '初始備註', 'c_source' => 10,
-                'c_fy_intercalary' => 1, 'c_ly_intercalary' => 1,
-            ]);
-        };
-        // 「應等價」欄（排除稽核欄與上述已知分歧的兩個 intercalary 欄）。
-        $cols = ['c_personid', 'c_addr_id', 'c_addr_type', 'c_sequence', 'c_firstyear', 'c_lastyear', 'c_notes', 'c_source'];
-        $pick = function ($row) use ($cols): ?array {
-            if (!$row) {
-                return null;
-            }
-            $a = array_intersect_key((array) $row, array_flip($cols));
-            ksort($a);
-
-            return $a;
-        };
-
-        // ① 旧版 PUT（PK 走 query；body 僅送 v2 會改的兩欄）。
-        $seedInitial();
-        $this->put('/basicinformation/1000/addresses/update?' . http_build_query($pk), [
-            'c_firstyear' => 1060, 'c_notes' => '改後備註', 'action' => 'save',
-        ])->assertStatus(302);
-        $legacyRow = (array) DB::table('BIOG_ADDR_DATA')->where($pk)->first();
-        $legacy = $pick($legacyRow);
-
-        // ② 復原初始 → ③ 新版改同一筆。
-        $seedInitial();
-        $this->postJson('/api/v2/mutate', $this->addressPayload([
-            'changes' => ['c_firstyear' => 1060, 'c_notes' => '改後備註'],
-        ]))->assertOk()->assertJson(['ok' => true]);
-        $v2Row = (array) DB::table('BIOG_ADDR_DATA')->where($pk)->first();
-        $v2 = $pick($v2Row);
-
-        $this->assertNotEmpty($legacyRow, 'legacy 更新後列不存在');
-        $this->assertNotEmpty($v2Row, 'v2 更新後列不存在');
-        $this->assertSame('改後備註', $v2['c_notes'], 'v2 c_notes 應更新');
-        $this->assertSame('改後備註', $legacy['c_notes'], 'legacy c_notes 應更新（鎖 legacy 確有寫入）');
-        $this->assertSame(1060, (int) $v2['c_firstyear'], 'v2 c_firstyear 應更新為 1060');
-        $this->assertSame(1100, (int) $v2['c_lastyear'], 'v2 未送 c_lastyear 應保留=1100（partial update）');
-        $this->assertSame($legacy, $v2, 'BIOG_ADDR_DATA 應等價欄 legacy vs v2 不等價');
-
-        // 已知分歧（顯式化，非 bug）：未送的 intercalary 欄——legacy 永遠清 0（資料流失）、v2 partial 保留 seed=1。
-        $this->assertSame(0, (int) $legacyRow['c_fy_intercalary'], 'legacy 應把未送的 c_fy_intercalary 清成 0（旧版資料流失行為）');
-        $this->assertSame(0, (int) $legacyRow['c_ly_intercalary'], 'legacy 應把未送的 c_ly_intercalary 清成 0');
-        $this->assertSame(1, (int) $v2Row['c_fy_intercalary'], 'v2 應保留未送的 c_fy_intercalary=1（partial update 不清空）');
-        $this->assertSame(1, (int) $v2Row['c_ly_intercalary'], 'v2 應保留未送的 c_ly_intercalary=1');
-    }
 
     #[Test]
     public function testAddressCodeFieldSentinelFullyIdempotent(): void {

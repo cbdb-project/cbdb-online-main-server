@@ -7,7 +7,6 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -431,46 +430,6 @@ class ApiV2CreateKinshipTest extends TestCase {
     }
 
     // ── #56 M 寫入等價（legacy Blade vs v2）+ 幂等 ──────────────────
-
-    #[Test]
-    #[Group('legacy-parity')] // 旧版下线时連同 legacy 路徑一併移除（v2 行為另有 v2-only 測試覆蓋）
-    public function testKinshipCreateWriteEquivalenceLegacyVsV2(): void {
-        // #56（M 維度）：同一語義輸入分別經 ① legacy Blade store（BasicInformationKinshipController@store→kinshipStoreById）
-        // ② v2 /api/v2/create 寫入兩個獨立合成對象，斷言正向內容欄 + 反向鏡像親屬碼落庫等價（排除差異 PK 段與稽核欄）。
-        // 關鍵：legacy 依表單送 c_kinship_pair=81，v2 **刻意不送**→逼走 KINSHIP_CODES.c_kin_pair1 權威 backfill，
-        // 驗兩側鏡像 c_kin_code 皆=81（非哨兵 0）。若 v2 backfill 壞掉寫 0，本測試 FAIL。
-        $this->actingAs($this->makeUser(email: 'kin-mwrite@example.com'));
-
-        // ① legacy：1000 → 對象 301，code 80，顯式送反向碼 c_kinship_pair=81（對齊 legacy 表單行為）。
-        $this->post('/basicinformation/1000/kinship', [
-            'action' => 'save',
-            'c_kin_id' => 301, 'c_kin_code' => 80,
-            'c_source' => 20, 'c_pages' => '7', 'c_notes' => 'M 等價', 'c_autogen_notes' => '',
-            'c_kinship_pair' => 81,
-        ]);
-
-        // ② v2：1000 → 對象 302，code 80，同內容；**刻意不送 pair**，逼 v2 走權威 backfill。
-        $this->postJson('/api/v2/create', $this->createPayload([
-            'target' => ['pk' => ['c_personid' => 1000, 'c_kin_id' => 302, 'c_kin_code' => 80]],
-            'changes' => ['c_source' => 20, 'c_pages' => '7', 'c_notes' => 'M 等價'],
-        ]))->assertOk()->assertJson(['ok' => true, 'operation' => 'create']);
-
-        $legacyFwd = (array) DB::table('KIN_DATA')->where(['c_personid' => 1000, 'c_kin_id' => 301, 'c_kin_code' => 80])->first();
-        $v2Fwd = (array) DB::table('KIN_DATA')->where(['c_personid' => 1000, 'c_kin_id' => 302, 'c_kin_code' => 80])->first();
-        $legacyMir = DB::table('KIN_DATA')->where(['c_personid' => 301, 'c_kin_id' => 1000, 'c_kin_code' => 81])->first();
-        $v2Mir = DB::table('KIN_DATA')->where(['c_personid' => 302, 'c_kin_id' => 1000, 'c_kin_code' => 81])->first();
-
-        foreach (['c_source', 'c_pages', 'c_notes', 'c_kin_code'] as $col) {
-            $this->assertSame((string) $legacyFwd[$col], (string) $v2Fwd[$col], "正向欄 {$col} 新舊不等價");
-        }
-        $this->assertNotNull($legacyMir, 'legacy 未寫反向鏡像');
-        $this->assertNotNull($v2Mir, 'v2 未寫反向鏡像');
-        $this->assertSame(81, (int) $legacyMir->c_kin_code);
-        $this->assertSame(81, (int) $v2Mir->c_kin_code);
-        foreach (['c_source', 'c_pages', 'c_notes'] as $col) {
-            $this->assertSame((string) ((array) $legacyMir)[$col], (string) ((array) $v2Mir)[$col], "鏡像欄 {$col} 新舊不等價");
-        }
-    }
 
     #[Test]
     public function testKinshipCreateCodeFieldSentinelFullyIdempotent(): void {

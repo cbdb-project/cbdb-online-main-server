@@ -7,7 +7,6 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -569,85 +568,6 @@ class ApiV2MutatePossessionTest extends TestCase {
     }
 
     // ── #56 M 寫入等價（update 路徑，地址副表 POSSESSION_ADDR；possession 無鏡像）──────
-
-    #[Test]
-    #[Group('legacy-parity')] // 旧版下线時連同 legacy update 路徑一併移除
-    public function testPossessionUpdateWriteEquivalenceLegacyVsV2WithAddressResync(): void {
-        // #56 M（update，副表）——復原-重做實驗：同一初始狀態下 ① 旧版改一筆（notes→改後、c_source 10→20、地址 130→200）→記錄 →
-        // ② 復原初始 → ③ 新版改同一筆 → 對比主列 POSSESSION_DATA 內容 + 地址副表 POSSESSION_ADDR「重同步」結果（130 移除、200 新增）等價。
-        // possession 無互逆鏡像、不經 #66 衝突閘，故此 update-M 與 #66 決策無關。核心探針：副表「靜默不落庫 / 漏刪舊地址」分歧。
-        // 注意「等價」範圍：本測試主張「主列內容欄（$mainCols）+ 地址副表」兩版等價，但 c_measure_code /
-        // c_possession_act_code 兩個未送代碼欄「刻意不主張等價」——它們是已知的 legacy↔v2 行為分歧（見文末獨立斷言），非全欄 parity。
-        $this->actingAs($this->makeUser(email: 'poss-mupd@example.com'));
-
-        $recordId = 500;
-        // seed 兩個未送出的代碼欄為非 0，以「顯式化」一個已知的 legacy↔v2 行為分歧（見下方斷言）：
-        // legacy updateQuery 的 $request->merge() 會把未送的 c_measure_code/c_possession_act_code 補成 '0'，
-        // 接著 update($request->all()) 把它們清成 0（資料流失）；v2 為 partial update，未送即保留。
-        // v2 保留才是正確行為（對齊本檔「只改備註不得清空 c_measure_code」回歸測試）。故這兩欄「不主張等價」、
-        // 不納入 $mainCols；改以獨立斷言鎖住「legacy 清 0 / v2 保留」這個預期差異，避免日後 seed 變動使盲區無聲回歸。
-        $seedInitial = function (): void {
-            DB::table('POSSESSION_DATA')->delete();
-            DB::table('POSSESSION_ADDR')->delete();
-            $this->seedPossession(['c_notes' => '初始備註', 'c_source' => 10, 'c_sequence' => 1, 'c_measure_code' => 7, 'c_possession_act_code' => 9]);
-            $this->seedPossessionAddr(130);
-        };
-        // 主列「應等價」的內容欄（含 PK / c_personid / c_sequence；排除稽核時間欄與上述已知分歧的兩個代碼欄）。
-        $mainCols = ['c_possession_record_id', 'c_personid', 'c_sequence', 'c_source', 'c_notes'];
-        $pickMain = function ($row) use ($mainCols): ?array {
-            if (!$row) {
-                return null;
-            }
-            $a = array_intersect_key((array) $row, array_flip($mainCols));
-            ksort($a);
-
-            return $a;
-        };
-        $addrIds = fn (): array => DB::table('POSSESSION_ADDR')
-            ->where('c_possession_record_id', $recordId)->orderBy('c_addr_id')->pluck('c_addr_id')->map(fn ($v) => (int) $v)->all();
-
-        // ① 旧版改一筆：notes→改後、c_source 10→20、地址 130→200（PK 不變）。c_addr_id 為陣列才 resync POSSESSION_ADDR。
-        $seedInitial();
-        $this->put('/basicinformation/1000/possession/update?' . http_build_query(['c_possession_record_id' => $recordId]), [
-            'c_possession_record_id' => $recordId,
-            'c_source' => 20, 'c_notes' => '改後', 'c_addr_id' => [200], 'action' => 'save',
-        ])->assertStatus(302); // legacy 成功後 redirect（非寫入成功充分證明；真正的鎖在下方內容/副表斷言）
-        $this->assertSame(1, DB::table('POSSESSION_DATA')->count(), 'legacy 更新後主列應仍為一筆');
-        $this->assertSame(1, DB::table('POSSESSION_ADDR')->count(), 'legacy 更新後地址副表應僅剩新地址一筆（舊地址須刪、無孤兒）');
-        $legacyRow = (array) DB::table('POSSESSION_DATA')->where('c_possession_record_id', $recordId)->first();
-        $legacyMain = $pickMain($legacyRow);
-        $legacyAddr = $addrIds();
-
-        // ② 復原初始 → ③ 新版改同一筆。
-        $seedInitial();
-        $this->postJson('/api/v2/mutate', $this->possessionPayload([
-            'changes' => ['c_notes' => '改後', 'c_source' => 20, 'c_addr_id' => [200]],
-        ]))->assertOk()->assertJson(['ok' => true]);
-        $this->assertSame(1, DB::table('POSSESSION_DATA')->count(), 'v2 更新後主列應仍為一筆');
-        $this->assertSame(1, DB::table('POSSESSION_ADDR')->count(), 'v2 更新後地址副表應僅剩新地址一筆（舊地址須刪、無孤兒）');
-        $v2Row = (array) DB::table('POSSESSION_DATA')->where('c_possession_record_id', $recordId)->first();
-        $v2Main = $pickMain($v2Row);
-        $v2Addr = $addrIds();
-
-        // 主列內容等價（排除稽核時間欄）；先確認改動真的落庫，再比兩版一致。
-        $this->assertNotNull($legacyMain, 'legacy 更新後主列不存在');
-        $this->assertNotNull($v2Main, 'v2 更新後主列不存在');
-        $this->assertSame('改後', $v2Main['c_notes'], 'v2 主列 notes 應更新為改後');
-        $this->assertSame(20, (int) $v2Main['c_source'], 'v2 主列 c_source 應更新為 20（partial update 確有落庫）');
-        $this->assertSame($legacyMain, $v2Main, '主列 legacy vs v2 更新結果不等價');
-
-        // 已知分歧（顯式化，非 bug）：未送出的代碼欄——legacy merge 清成 0（資料流失）、v2 partial update 保留 seed（7/9）。
-        // v2 保留才是正確行為（對齊本檔「只改備註不得清空 c_measure_code」回歸測試）。各自於更新後即時取值斷言預期值，
-        // 把這個盲區顯式鎖住：日後任一版行為改變（例如 v2 退化成也清 0、或 legacy 不再清）皆會失敗示警。
-        $this->assertSame(0, (int) $legacyRow['c_measure_code'], 'legacy 應把未送出的 c_measure_code 清成 0（旧版資料流失行為）');
-        $this->assertSame(0, (int) $legacyRow['c_possession_act_code'], 'legacy 應把未送出的 c_possession_act_code 清成 0');
-        $this->assertSame(7, (int) $v2Row['c_measure_code'], 'v2 應保留未送出的 c_measure_code=7（partial update 不清空）');
-        $this->assertSame(9, (int) $v2Row['c_possession_act_code'], 'v2 應保留未送出的 c_possession_act_code=9');
-
-        // 地址副表重同步等價（兩版皆應為 [200]：舊地址 130 移除、新地址 200 新增）。
-        $this->assertSame([200], $legacyAddr, 'legacy 地址重同步結果應為 [200]');
-        $this->assertSame($legacyAddr, $v2Addr, '地址副表重同步 legacy vs v2 不等價');
-    }
 
     #[Test]
     public function testPossessionUpdateAcceptsAlias(): void {

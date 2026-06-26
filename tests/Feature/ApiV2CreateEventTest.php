@@ -7,7 +7,6 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -418,45 +417,5 @@ class ApiV2CreateEventTest extends TestCase {
         $this->actingAs($user);
 
         $this->postJson('/api/v2/create', $this->createPayload(['mode' => 'direct']))->assertStatus(403);
-    }
-
-    // ── #56 M 寫入等價（legacy Blade vs v2）——主列 + 地址副表 EVENTS_ADDR ──────
-
-    #[Test]
-    #[Group('legacy-parity')] // 旧版下线时連同 legacy 路徑一併移除（v2 行為另有 v2-only 測試覆蓋）
-    public function testEventCreateWriteEquivalenceLegacyVsV2WithAddressSubtable(): void {
-        // #56（M 維度，副表）：事件同語義輸入分別經 ① legacy Blade store（EventStatusRepository::eventStoreById）
-        // ② v2 /api/v2/create 寫入兩筆不同 c_sequence，斷言主列 EVENTS_DATA 內容欄等價，
-        // 且**地址副表 EVENTS_ADDR 兩路都落庫**（addr 123）——「副表靜默不落庫」探針。
-        // legacy 與 v2 皆以 c_addr_id=>[陣列] 送地址（eventStoreById 與 v2 handler 同鍵）。
-        $this->actingAs($this->makeUser(email: 'event-mwrite@example.com'));
-
-        // ① legacy：1000 事件 code 50、seq 2、地址 123。c_intercalary 須送（legacy eventStoreById 直接 (int) 取值，未送會 undefined key）。
-        $this->post('/basicinformation/1000/events', [
-            'action' => 'save',
-            'c_event_code' => 50, 'c_sequence' => 2,
-            'c_source' => 20, 'c_notes' => 'M 等價',
-            'c_intercalary' => 0,
-            'c_addr_id' => [123],
-        ]);
-
-        // ② v2：同語義輸入，seq 3（避免與 legacy PK 衝突）。
-        $this->postJson('/api/v2/create', $this->createPayload([
-            'target' => ['pk' => ['c_personid' => 1000, 'c_sequence' => 3, 'c_event_code' => 50]],
-            'changes' => ['c_source' => 20, 'c_notes' => 'M 等價', 'c_addr_id' => [123]],
-        ]))->assertOk()->assertJson(['ok' => true, 'operation' => 'create']);
-
-        // 主列內容欄等價（差異僅 c_sequence；稽核欄不比；c_addr_id 純量欄兩側皆 null）。
-        $legacyMain = (array) DB::table('EVENTS_DATA')->where(['c_personid' => 1000, 'c_sequence' => 2, 'c_event_code' => 50])->first();
-        $v2Main = (array) DB::table('EVENTS_DATA')->where(['c_personid' => 1000, 'c_sequence' => 3, 'c_event_code' => 50])->first();
-        foreach (['c_event_code', 'c_source', 'c_notes'] as $col) {
-            $this->assertSame((string) $legacyMain[$col], (string) $v2Main[$col], "主列欄 {$col} 新舊不等價");
-        }
-
-        // 地址副表：兩路都寫了 addr 123（核心斷言——副表不得靜默不落庫）。
-        $legacyAddr = DB::table('EVENTS_ADDR')->where(['c_personid' => 1000, 'c_sequence' => 2, 'c_event_code' => 50, 'c_addr_id' => 123])->first();
-        $v2Addr = DB::table('EVENTS_ADDR')->where(['c_personid' => 1000, 'c_sequence' => 3, 'c_event_code' => 50, 'c_addr_id' => 123])->first();
-        $this->assertNotNull($legacyAddr, 'legacy 未寫地址副表 EVENTS_ADDR');
-        $this->assertNotNull($v2Addr, 'v2 未寫地址副表 EVENTS_ADDR（副表靜默不落庫）');
     }
 }

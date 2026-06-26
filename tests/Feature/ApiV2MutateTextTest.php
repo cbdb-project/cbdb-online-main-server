@@ -7,7 +7,6 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -473,54 +472,6 @@ class ApiV2MutateTextTest extends TestCase {
     }
 
     // ── #56 M 寫入等價（update 路徑，純單表；texts 無鏡像/副表）──────
-
-    #[Test]
-    #[Group('legacy-parity')] // 旧版下线時連同 legacy update 路徑一併移除
-    public function testTextUpdateWriteEquivalenceLegacyVsV2(): void {
-        // #56 M（update，純單表）——復原-重做實驗：同一初始狀態下 ① 旧版 PUT 改 c_notes+c_pages →記錄 →
-        // ② 復原初始 → ③ 新版 /api/v2/mutate 改同一筆 → 對比 BIOG_TEXT_DATA 落庫列等價。texts 無鏡像/副表，
-        // 純單表整包 update（legacy）vs partial update（v2）；只送 v2 會改的欄即等價（多送欄會被 legacy 寫入而 v2 沒寫）。
-        $this->actingAs($this->makeUser(email: 'text-mupd@example.com'));
-
-        $pk = ['c_personid' => 1000, 'c_textid' => 200, 'c_role_id' => 1];
-        $seedInitial = function (): void {
-            DB::table('BIOG_TEXT_DATA')->delete();
-            $this->seedText(['c_notes' => '初始備註', 'c_pages' => '1-5', 'c_source' => 10]);
-        };
-        $cols = ['c_personid', 'c_textid', 'c_role_id', 'c_source', 'c_pages', 'c_notes'];
-        $pick = function ($row) use ($cols): ?array {
-            if (!$row) {
-                return null;
-            }
-            $a = array_intersect_key((array) $row, array_flip($cols));
-            ksort($a);
-
-            return $a;
-        };
-
-        // ① 旧版 PUT（PK 走 query；body 僅送 v2 會改的兩欄，避免整包多寫）。
-        // 註：legacy 對 c_textid/c_role_id 做 emptyToSentinel，但靠 query string 餵 $request->input 取回原 PK 值，
-        // 故 PK 不漂移、assertNotNull($legacy) 成立——此為隱性依賴（若改純 path PK 會悄悄退化）。
-        $seedInitial();
-        $this->put('/basicinformation/1000/texts/update?' . http_build_query($pk), [
-            'c_notes' => '改後備註', 'c_pages' => '10-20', 'action' => 'save',
-        ])->assertStatus(302);
-        $legacy = $pick(DB::table('BIOG_TEXT_DATA')->where($pk)->first());
-
-        // ② 復原初始 → ③ 新版改同一筆。
-        $seedInitial();
-        $this->postJson('/api/v2/mutate', $this->textPayload([
-            'changes' => ['c_notes' => '改後備註', 'c_pages' => '10-20'],
-        ]))->assertOk()->assertJson(['ok' => true]);
-        $v2 = $pick(DB::table('BIOG_TEXT_DATA')->where($pk)->first());
-
-        $this->assertNotNull($legacy, 'legacy 更新後列不存在');
-        $this->assertNotNull($v2, 'v2 更新後列不存在');
-        $this->assertSame('改後備註', $v2['c_notes'], 'v2 c_notes 應更新');
-        $this->assertSame('改後備註', $legacy['c_notes'], 'legacy c_notes 應更新（鎖 legacy 確有寫入）');
-        $this->assertSame('10-20', $v2['c_pages'], 'v2 c_pages 應更新');
-        $this->assertSame($legacy, $v2, 'BIOG_TEXT_DATA 落庫列 legacy vs v2 不等價');
-    }
 
     #[Test]
     public function testTextUpdateAcceptsAlias(): void {

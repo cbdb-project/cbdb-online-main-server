@@ -48,7 +48,8 @@ export default function AiPrivacyNotice({ aiModel }: { aiModel?: string }) {
                     <p style={{ margin: '0 0 6px', fontWeight: 600 }}>{t('ai_consent_intro')}</p>
                     <ul style={{ margin: 0, paddingLeft: 18 }}>
                         <li>{t('ai_consent_record')}</li>
-                        <li>{t('ai_consent_third_party')}</li>
+                        {/* #27：用具名第三方服務版本（Google Gemini／OpenAI 等），對齊 legacy 官名自動填的隱私揭露、不遺漏舊頁內容。 */}
+                        <li>{t('ai_consent_fill_third_party')}</li>
                         <li>{t('ai_consent_verify')}</li>
                     </ul>
                     {aiModel ? <p style={{ margin: '6px 0 0' }}>{t('ai_current_model')}<code>{aiModel}</code></p> : null}

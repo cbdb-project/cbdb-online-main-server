@@ -195,12 +195,13 @@ export default function PossessionEditor({
             {error ? <div style={gErrStyle}>{error}</div> : null}
 
             <div style={gGrid}>
-                {textRow('c_sequence', tr('sequence', '序號'), 'entry_sequence')}
-
                 {gridCell(tr('possession_action_field', '占有行為'), { code: 'c_possession_act_code' },
                     <CodeAutocomplete mode="list" model="possact" idKey="c_possession_act_code" labelKeys={['c_possession_act_desc_chn', 'c_possession_act_desc']}
                         value={fields.c_possession_act_code ?? '0'} initialLabel={labels.c_possession_act_code ?? ''} disabled={!editable}
                         onChange={(v, l) => { set('c_possession_act_code', v); setLabel('c_possession_act_code', l); }} />)}
+
+                {/* 次序移到該行最右（與 address/status/entry 一致，#123） */}
+                {textRow('c_sequence', tr('sequence', '序號'), 'entry_sequence')}
 
                 {textRow('c_possession_desc', tr('possession_english', '英文描述'), 'possession_desc')}
                 {textRow('c_possession_desc_chn', tr('possession_chinese', '中文描述'), 'possession_desc_chn')}

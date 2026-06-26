@@ -551,7 +551,9 @@ export default function AssocEditor({
             {/* 出處與內容：作品/出處標題、出處、頁碼、備註、候選出處（關係次數已移至核心區）。 */}
             <GridSection title={tr('assoc_source_section', '出處與內容')}>
                 <div style={gGrid}>
-                    {textRow('c_text_title', tr('text_title_field', '作品/出處標題'), 'c_text_title')}
+                    {/* 作品標題自成一行（與「出處＋頁碼」非同類）；出處與頁碼成對同行（#121） */}
+                    {gridCell(tr('text_title_field', '作品標題'), { code: 'c_text_title', full: true },
+                        gridInput({ value: fields.c_text_title ?? '', onChange: (v) => set('c_text_title', v), disabled: !editable }))}
                     {gridCell(tr('source_field', '出處'), { code: 'c_source' },
                         <CodeAutocomplete mode="search" endpoint="/api/select/search/text" value={fields.c_source ?? '0'} initialLabel={labels.c_source ?? ''} disabled={!editable} onChange={(v, l) => { set('c_source', v || '0'); setLabel('c_source', l); }} />)}
                     {textRow('c_pages', tr('pages_entries', '頁碼'), 'c_pages', sourceHighlight)}

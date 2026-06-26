@@ -204,15 +204,16 @@ export default function SocialInstEditor({
             {error ? <div style={gErrStyle}>{error}</div> : null}
 
             <div style={gGrid}>
-                {gridCell(tr('socialinst_field', '社交機構'), { code: 'social_institution', required: true },
-                    <CodeAutocomplete mode="search" endpoint="/api/select/search/socialinstcode"
-                        value={instCombined} initialLabel={labels.c_inst_code ?? ''} disabled={!editable}
-                        onChange={onPickInst} />)}
-
+                {/* 角色置最左（首位，使用者指定）；社交機構其後 */}
                 {gridCell(tr('socialinst_role', '社交機構角色'), { code: 'c_bi_role_code' },
                     <CodeAutocomplete mode="list" model="birole" idKey="c_bi_role_code" labelKeys={['c_bi_role_chn', 'c_bi_role_desc']}
                         value={fields.c_bi_role_code ?? '0'} initialLabel={labels.c_bi_role_code ?? ''} disabled={!editable}
                         onChange={(v, l) => { set('c_bi_role_code', v); setLabel('c_bi_role_code', l); }} />)}
+
+                {gridCell(tr('socialinst_field', '社交機構'), { code: 'social_institution', required: true },
+                    <CodeAutocomplete mode="search" endpoint="/api/select/search/socialinstcode"
+                        value={instCombined} initialLabel={labels.c_inst_code ?? ''} disabled={!editable}
+                        onChange={onPickInst} />)}
 
                 {gridCell(tr('start_year', '起年'), { code: 'c_bi_begin_year', full: true },
                     <EraTimeField values={buildEra(BY)} onChange={(p) => applyEra(BY, p)} dynastyCode={dynastyCode} showRange disabled={!editable} />)}

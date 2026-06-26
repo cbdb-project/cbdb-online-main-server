@@ -218,14 +218,15 @@ export default function EventEditor({
             {error ? <div style={gErrStyle}>{error}</div> : null}
 
             <div style={gGrid}>
-                {textRow('c_sequence', tr('sequence', '序號'), 'c_sequence')}
-
                 {gridCell(tr('event_name', '事件名'), { code: 'c_event_code', required: true },
                     <CodeAutocomplete mode="search" endpoint="/api/select/search/event"
                         value={fields.c_event_code ?? '0'} initialLabel={labels.c_event_code ?? ''} disabled={!editable}
                         onChange={(v, l) => { set('c_event_code', v); setLabel('c_event_code', l); }} />)}
 
                 {textRow('c_role', tr('event_role', '事件角色'), 'c_role')}
+
+                {/* 次序移到該行最右（與 address/status/entry 一致，#123） */}
+                {textRow('c_sequence', tr('sequence', '序號'), 'c_sequence')}
 
                 {gridCell(tr('event_year_field', '事件年份'), { code: 'c_year', full: true },
                     <EraTimeField values={buildEra(YR)} onChange={(p) => applyEra(YR, p)} dynastyCode={dynastyCode} showRange showLunar disabled={!editable} />)}

@@ -442,7 +442,7 @@ function CompareBody({ row, t }: { row: OpRow; t: (k: string) => string }) {
                 <div className="text-xs text-muted-foreground">{t('audit_log_count_item').replace(':count', String(row.audit_logs.length))}</div>
                 {row.audit_logs.map((a, i) => (
                     <div key={i} className="rounded border border-border p-2">
-                        <div className="mb-1.5 text-xs">
+                        <div className="mb-1.5 break-all text-xs">
                             <strong>{a.table_name ?? t('unknown_table')}</strong> · {(a.operation ?? 'UNKNOWN').toUpperCase()} · <span className="font-mono">{a.row_pk_text}</span>
                         </div>
                         <DiffTable diff={a.diff} t={t} />

@@ -109,6 +109,7 @@ return [
     'qa_show_details'          => '▶ Show Details (SQL, Evidence)',
 
     // NL Query Logs page
+    'log_page_title'         => 'NL Query Logs',
     'log_back_link'          => '← Back to Query Playground',
     'log_keyword_search'     => 'Keyword Search',
     'log_search_placeholder' => 'Search question, SQL, username or email',

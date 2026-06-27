@@ -109,6 +109,7 @@ return [
     'qa_show_details'          => '▶ 顯示詳細資訊（SQL、證據來源）',
 
     // NL Query Logs page
+    'log_page_title'         => '自然語言查詢日誌',
     'log_back_link'          => '← 返回查詢練習場',
     'log_keyword_search'     => '關鍵字搜尋',
     'log_search_placeholder' => '搜尋問題、SQL、用戶名稱或郵箱',

@@ -10,6 +10,8 @@ import { useDataTableQuery } from '../../../components/data-table/useDataTableQu
 import { useTranslation } from '../../../hooks/useTranslation';
 import type { SharedProps } from '../../../types/page';
 import { cn } from '../../../lib/utils';
+import { LOG_TONE, LOG_CARD_BASE, LOG_HEADER_BASE, LOG_PILL_BASE } from '../logCardStyles';
+import { LogCollapsible } from '../LogCollapsible';
 
 interface LlmSummary {
     model: string | null;
@@ -47,15 +49,6 @@ interface NlQueryLogsPageProps extends SharedProps {
 
 const nf = new Intl.NumberFormat();
 
-function Collapsible({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-        <details className="rounded border border-border">
-            <summary className="cursor-pointer px-3 py-1.5 text-sm font-medium hover:bg-muted">{label}</summary>
-            <div className="border-t border-border p-2">{children}</div>
-        </details>
-    );
-}
-
 export default function NlQueryLogsIndex() {
     const props = usePage<NlQueryLogsPageProps>().props;
     const { logs, users, filters, playground_url } = props;
@@ -84,8 +77,8 @@ export default function NlQueryLogsIndex() {
 
     return (
         <DashboardLayout
-            title="NL Query Logs"
-            breadcrumbs={[{ label: 'NL Query Logs' }]}
+            title={t('log_page_title')}
+            breadcrumbs={[{ label: t('log_page_title') }]}
         >
             <div className="mb-3">
                 <a
@@ -142,7 +135,7 @@ export default function NlQueryLogsIndex() {
                 </div>
             </form>
 
-            <div className="mb-3 rounded border border-blue-300 bg-blue-50 px-4 py-2 text-sm text-blue-800">
+            <div className="mb-3 rounded border border-blue-300 bg-blue-50 px-4 py-2 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200">
                 <i className="fas fa-info-circle mr-1" aria-hidden />
                 {t('log_record_count', {
                     total: String(logs.meta.total),
@@ -152,18 +145,20 @@ export default function NlQueryLogsIndex() {
             </div>
 
             {logs.data.length === 0 ? (
-                <div className="rounded border border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+                <div className="rounded border border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-800 dark:border-yellow-900 dark:bg-yellow-950/40 dark:text-yellow-200">
                     <i className="fas fa-exclamation-triangle mr-1" aria-hidden /> {t('log_no_records')}
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {logs.data.map((log) => (
-                        <div key={log.id} className={cn('rounded-lg border bg-card', log.success ? 'border-green-400' : 'border-red-400')}>
-                            <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2 text-sm">
-                                <strong>#{log.id}</strong>
+                    {logs.data.map((log) => {
+                        const tone = LOG_TONE[log.success ? 'success' : 'danger'];
+                        return (
+                        <article key={log.id} className={cn(LOG_CARD_BASE, tone.card)}>
+                            <header className={cn(LOG_HEADER_BASE, tone.header)}>
+                                <span className="font-mono font-semibold text-muted-foreground">#{log.id}</span>
                                 <span>
-                                    <i className="fas fa-user mr-1" aria-hidden />
-                                    {log.user_name ?? tc('unknown')}
+                                    <i className="fas fa-user mr-1 text-muted-foreground" aria-hidden />
+                                    <span className="font-medium text-foreground">{log.user_name ?? tc('unknown')}</span>
                                     {log.user_email && <small className="ml-1 text-muted-foreground">({log.user_email})</small>}
                                 </span>
                                 <span className="text-muted-foreground">
@@ -176,10 +171,11 @@ export default function NlQueryLogsIndex() {
                                         {log.execution_time_ms}ms
                                     </span>
                                 )}
-                                <span className={cn('ml-auto rounded px-2 py-0.5 text-xs font-semibold', log.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800')}>
+                                <span className={cn(LOG_PILL_BASE, tone.pill)}>
+                                    <i className={cn('fas', log.success ? 'fa-check-circle' : 'fa-times-circle')} aria-hidden />
                                     {log.success ? t('log_status_success') : t('log_status_failure')}
                                 </span>
-                            </div>
+                            </header>
 
                             <div className="space-y-3 p-4">
                                 <div>
@@ -194,7 +190,7 @@ export default function NlQueryLogsIndex() {
                                         {log.generated_sql && (
                                             <div>
                                                 <h6 className="mb-1 font-medium">
-                                                    <i className="fas fa-code mr-1 text-green-600" aria-hidden /> {t('log_generated_sql')}
+                                                    <i className="fas fa-code mr-1 text-emerald-600" aria-hidden /> {t('log_generated_sql')}
                                                 </h6>
                                                 <pre className="max-h-52 overflow-auto rounded bg-muted/40 p-2 text-xs">{log.generated_sql}</pre>
                                             </div>
@@ -212,9 +208,9 @@ export default function NlQueryLogsIndex() {
                                     log.error_message && (
                                         <div>
                                             <h6 className="mb-1 font-medium">
-                                                <i className="fas fa-exclamation-triangle mr-1 text-red-600" aria-hidden /> {t('log_error_message')}
+                                                <i className="fas fa-exclamation-triangle mr-1 text-destructive" aria-hidden /> {t('log_error_message')}
                                             </h6>
-                                            <div className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">{log.error_message}</div>
+                                            <div className="rounded border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{log.error_message}</div>
                                         </div>
                                     )
                                 )}
@@ -234,18 +230,19 @@ export default function NlQueryLogsIndex() {
                                 )}
 
                                 {log.llm_prompt && (
-                                    <Collapsible label={t('log_llm_prompt')}>
+                                    <LogCollapsible label={t('log_llm_prompt')}>
                                         <pre className="max-h-96 overflow-auto bg-muted/40 p-2 text-xs">{log.llm_prompt}</pre>
-                                    </Collapsible>
+                                    </LogCollapsible>
                                 )}
                                 {log.llm_response && (
-                                    <Collapsible label={t('log_llm_response')}>
+                                    <LogCollapsible label={t('log_llm_response')}>
                                         <pre className="max-h-[32rem] overflow-auto bg-muted/40 p-2 text-xs">{log.llm_response}</pre>
-                                    </Collapsible>
+                                    </LogCollapsible>
                                 )}
                             </div>
-                        </div>
-                    ))}
+                        </article>
+                        );
+                    })}
 
                     <Pagination
                         meta={logs.meta}

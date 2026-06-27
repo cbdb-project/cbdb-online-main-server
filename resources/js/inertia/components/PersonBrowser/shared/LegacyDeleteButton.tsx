@@ -61,9 +61,9 @@ const buttonStyle: React.CSSProperties = {
     width: 30,
     height: 30,
     borderRadius: 6,
-    border: '1px solid #dc3545',
-    color: '#dc3545',
-    backgroundColor: '#fff',
+    border: '1px solid var(--destructive)',
+    color: 'var(--destructive)',
+    backgroundColor: 'var(--card)',
     fontSize: '0.85rem',
     cursor: 'pointer',
 };

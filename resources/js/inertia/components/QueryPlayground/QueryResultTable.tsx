@@ -15,7 +15,7 @@ export default function QueryResultTable({ columns, rows, page, hasMore, loading
 
     if (columns.length === 0 && rows.length === 0) {
         return (
-            <div style={{ padding: 24, textAlign: 'center', color: '#6c757d', fontSize: '0.9rem' }}>
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted-foreground)', fontSize: '0.9rem' }}>
                 {t('results_empty_hint')}
             </div>
         );
@@ -37,13 +37,13 @@ export default function QueryResultTable({ columns, rows, page, hasMore, loading
                                     key={col}
                                     style={{
                                         padding: '8px 10px',
-                                        borderBottom: '2px solid #dee2e6',
-                                        backgroundColor: '#f8f9fa',
+                                        borderBottom: '2px solid var(--border)',
+                                        backgroundColor: 'var(--muted)',
                                         textAlign: 'left',
                                         whiteSpace: 'nowrap',
                                         fontWeight: 600,
                                         fontSize: '0.8rem',
-                                        color: '#495057',
+                                        color: 'var(--muted-foreground)',
                                     }}
                                 >
                                     {col}
@@ -56,7 +56,7 @@ export default function QueryResultTable({ columns, rows, page, hasMore, loading
                             <tr>
                                 <td
                                     colSpan={columns.length}
-                                    style={{ padding: '24px 10px', textAlign: 'center', color: '#6c757d', borderBottom: '1px solid #dee2e6' }}
+                                    style={{ padding: '24px 10px', textAlign: 'center', color: 'var(--muted-foreground)', borderBottom: '1px solid var(--border)' }}
                                 >
                                     {t('empty_results')}
                                 </td>
@@ -68,13 +68,13 @@ export default function QueryResultTable({ columns, rows, page, hasMore, loading
                                     ? `${String(row[columns[0]] ?? '')}_${rowIndex}`
                                     : String(rowIndex);
                                 return (
-                                <tr key={rowKey} style={{ backgroundColor: rowIndex % 2 === 0 ? '#fff' : '#f8f9fa' }}>
+                                <tr key={rowKey} style={{ backgroundColor: rowIndex % 2 === 0 ? 'var(--card)' : 'var(--surface-sunken)' }}>
                                     {columns.map((col) => (
                                         <td
                                             key={col}
                                             style={{
                                                 padding: '6px 10px',
-                                                borderBottom: '1px solid #dee2e6',
+                                                borderBottom: '1px solid var(--border)',
                                                 maxWidth: 300,
                                                 overflow: 'hidden',
                                                 textOverflow: 'ellipsis',
@@ -99,7 +99,7 @@ export default function QueryResultTable({ columns, rows, page, hasMore, loading
                 marginTop: 12,
                 padding: '8px 0',
                 fontSize: '0.85rem',
-                color: '#495057',
+                color: 'var(--muted-foreground)',
             }}>
                 <span>
                     {hasMore
@@ -130,10 +130,10 @@ export default function QueryResultTable({ columns, rows, page, hasMore, loading
 function paginationBtnStyle(disabled: boolean): React.CSSProperties {
     return {
         padding: '4px 12px',
-        border: '1px solid #dee2e6',
+        border: '1px solid var(--border)',
         borderRadius: 3,
         backgroundColor: 'transparent',
-        color: disabled ? '#adb5bd' : '#007bff',
+        color: disabled ? 'var(--muted-foreground)' : 'var(--primary)',
         cursor: disabled ? 'default' : 'pointer',
         fontSize: '0.85rem',
     };

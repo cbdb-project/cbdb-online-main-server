@@ -31,15 +31,15 @@ export default function PaginationControls({ pagination, onPageChange }: Props) 
             </button>
             {getPageNumbers(pagination.current_page, pagination.last_page).map((page, index) =>
                 page === null ? (
-                    <span key={`ellipsis-${index}`} style={{ padding: '4px 6px', color: '#6c757d' }}>…</span>
+                    <span key={`ellipsis-${index}`} style={{ padding: '4px 6px', color: 'var(--muted-foreground)' }}>…</span>
                 ) : (
                     <button
                         key={page}
                         onClick={() => onPageChange(page)}
                         style={{
                             ...paginationBtnStyle(false),
-                            backgroundColor: page === pagination.current_page ? '#007bff' : 'transparent',
-                            color: page === pagination.current_page ? '#fff' : '#007bff',
+                            backgroundColor: page === pagination.current_page ? 'var(--primary)' : 'transparent',
+                            color: page === pagination.current_page ? 'var(--primary-foreground)' : 'var(--primary)',
                         }}
                     >
                         {page}
@@ -60,10 +60,10 @@ export default function PaginationControls({ pagination, onPageChange }: Props) 
 function paginationBtnStyle(disabled: boolean): React.CSSProperties {
     return {
         padding: '4px 10px',
-        border: '1px solid #dee2e6',
+        border: '1px solid var(--border)',
         borderRadius: 3,
         backgroundColor: 'transparent',
-        color: disabled ? '#adb5bd' : '#007bff',
+        color: disabled ? 'var(--muted-foreground)' : 'var(--primary)',
         cursor: disabled ? 'default' : 'pointer',
         fontSize: '0.85rem',
     };

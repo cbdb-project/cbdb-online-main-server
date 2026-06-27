@@ -42,7 +42,7 @@ const linkStyle: React.CSSProperties = {
     borderRadius: 4,
     border: `1px solid ${APP_THEME.brandBorder}`,
     color: APP_THEME.brandText,
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--card)',
     textDecoration: 'none',
     fontSize: '0.875rem',
     fontWeight: 600,

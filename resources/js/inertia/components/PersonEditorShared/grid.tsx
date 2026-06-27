@@ -31,16 +31,16 @@ export const gAuditWrapStyle: React.CSSProperties = { marginTop: 16, paddingTop:
 export const gSubmitRow: React.CSSProperties = { display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap', alignItems: 'center' };
 export const gBtnGroupRight: React.CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 'auto' };
 const actionBtnBase: React.CSSProperties = { padding: '8px 16px', borderRadius: 6, fontSize: '0.95rem', fontWeight: 700, cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid transparent' };
-export const gPrimaryBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid #255f93', background: '#255f93', color: '#fff' };
-export const gInfoBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid #0891b2', background: '#0891b2', color: '#fff' };
-export const gDangerBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid #dc3545', background: '#dc3545', color: '#fff' };
-export const gSuccessBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid #28a745', background: '#28a745', color: '#fff' };
+export const gPrimaryBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid var(--primary)', background: 'var(--primary)', color: 'var(--primary-foreground)' };
+export const gInfoBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid var(--info)', background: 'var(--info)', color: 'var(--info-foreground)' };
+export const gDangerBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid var(--destructive)', background: 'var(--destructive)', color: 'var(--destructive-foreground)' };
+export const gSuccessBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid var(--success)', background: 'var(--success)', color: 'var(--success-foreground)' };
 export const gCancelBtn: React.CSSProperties = { ...actionBtnBase, border: '1px solid var(--input)', background: 'var(--card)', color: 'var(--foreground)' };
 
 // 訊息橫幅。
-export const gOkStyle: React.CSSProperties = { background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', padding: '8px 12px', borderRadius: 6, marginBottom: 10, fontSize: '1rem' };
-export const gErrStyle: React.CSSProperties = { background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '8px 12px', borderRadius: 6, marginBottom: 10, fontSize: '1rem' };
-export const gWarnStyle: React.CSSProperties = { background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '8px 12px', borderRadius: 6, marginBottom: 10, fontSize: '1rem' };
+export const gOkStyle: React.CSSProperties = { background: 'var(--success-subtle)', border: '1px solid var(--success-border)', color: 'var(--success-subtle-foreground)', padding: '8px 12px', borderRadius: 6, marginBottom: 10, fontSize: '1rem' };
+export const gErrStyle: React.CSSProperties = { background: 'var(--danger-subtle)', border: '1px solid var(--danger-border)', color: 'var(--danger-subtle-foreground)', padding: '8px 12px', borderRadius: 6, marginBottom: 10, fontSize: '1rem' };
+export const gWarnStyle: React.CSSProperties = { background: 'var(--warning-subtle)', border: '1px solid var(--warning-border)', color: 'var(--warning-subtle-foreground)', padding: '8px 12px', borderRadius: 6, marginBottom: 10, fontSize: '1rem' };
 
 // ─── 標籤 / 欄位輔助（模組層級、穩定身分；安全不致 input 失焦）──────────────
 /** 上標籤：label + 可選紅 *（必填）+ 可選淡化技術碼後綴。 */
@@ -98,7 +98,7 @@ export function gridInput(o: GridInputOpts): React.ReactElement {
             placeholder={o.placeholder}
             maxLength={o.maxLength}
             onChange={(e) => o.onChange(e.target.value)}
-            style={{ ...gInputStyle, ...(o.readonly || o.disabled ? gReadonlyStyle : {}), ...(o.highlight ? { background: '#FFFFBB' } : {}) }}
+            style={{ ...gInputStyle, ...(o.readonly || o.disabled ? gReadonlyStyle : {}), ...(o.highlight ? { background: 'var(--highlight)', color: 'var(--highlight-foreground)' } : {}) }}
         />
     );
 }

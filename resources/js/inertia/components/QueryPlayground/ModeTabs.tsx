@@ -26,7 +26,7 @@ export default function ModeTabs({ activeMode, onModeChange }: Props) {
     ], [t]);
 
     return (
-        <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid #dee2e6' }}>
+        <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--border)' }}>
             {modes.map(({ key, label, icon }) => {
                 const isActive = activeMode === key;
                 return (
@@ -37,10 +37,10 @@ export default function ModeTabs({ activeMode, onModeChange }: Props) {
                             padding: '10px 20px',
                             fontSize: '0.9rem',
                             fontWeight: isActive ? 600 : 400,
-                            color: isActive ? '#007bff' : '#495057',
-                            backgroundColor: isActive ? '#fff' : 'transparent',
-                            border: isActive ? '2px solid #dee2e6' : '2px solid transparent',
-                            borderBottom: isActive ? '2px solid #fff' : '2px solid transparent',
+                            color: isActive ? 'var(--primary)' : 'var(--muted-foreground)',
+                            backgroundColor: isActive ? 'var(--card)' : 'transparent',
+                            border: isActive ? '2px solid var(--border)' : '2px solid transparent',
+                            borderBottom: isActive ? '2px solid var(--card)' : '2px solid transparent',
                             marginBottom: isActive ? '-2px' : 0,
                             borderRadius: '6px 6px 0 0',
                             cursor: 'pointer',

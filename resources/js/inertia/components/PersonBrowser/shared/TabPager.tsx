@@ -113,30 +113,31 @@ const btnStyle: React.CSSProperties = {
     borderRadius: 3,
     textAlign: 'center',
     minWidth: 28,
-    color: '#495057',
+    color: 'var(--muted-foreground)',
 };
 
 const activeStyle: React.CSSProperties = {
     backgroundColor: APP_THEME.brand,
-    color: '#fff',
+    color: 'var(--primary-foreground)',
     fontWeight: 600,
 };
 
 const disabledStyle: React.CSSProperties = {
-    color: '#adb5bd',
+    color: 'var(--muted-foreground)',
+    opacity: 0.45,
     cursor: 'default',
 };
 
 const ellipsisStyle: React.CSSProperties = {
     padding: '2px 4px',
-    color: '#6c757d',
+    color: 'var(--muted-foreground)',
     fontSize: '0.8125rem',
 };
 
 const infoStyle: React.CSSProperties = {
     marginLeft: 8,
     fontSize: '0.75rem',
-    color: '#6c757d',
+    color: 'var(--muted-foreground)',
 };
 
 const showAllBtnStyle: React.CSSProperties = {
@@ -146,8 +147,8 @@ const showAllBtnStyle: React.CSSProperties = {
     fontSize: '0.78rem',
     cursor: 'pointer',
     borderRadius: 4,
-    border: '1px solid #c9d5e2',
-    backgroundColor: '#f8fafc',
-    color: '#204467',
+    border: '1px solid var(--info-border)',
+    backgroundColor: 'var(--surface-sunken)',
+    color: 'var(--info-subtle-foreground)',
     fontWeight: 600,
 };

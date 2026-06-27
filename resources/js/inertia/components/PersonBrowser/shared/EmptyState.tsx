@@ -16,7 +16,7 @@ export default function EmptyState({ message }: Props) {
 const style: React.CSSProperties = {
     padding: 32,
     textAlign: 'center',
-    color: '#6c757d',
+    color: 'var(--muted-foreground)',
     fontSize: '0.875rem',
     display: 'flex',
     flexDirection: 'column',

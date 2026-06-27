@@ -201,10 +201,10 @@ export default function Index() {
             <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px' }}>
                 {/* Header */}
                 <div style={{ marginBottom: 20 }}>
-                    <h2 style={{ margin: '0 0 4px', fontSize: '1.4rem', fontWeight: 700, color: '#212529' }}>
+                    <h2 style={{ margin: '0 0 4px', fontSize: '1.4rem', fontWeight: 700, color: 'var(--foreground)' }}>
                         {t('page_title')}
                     </h2>
-                    <p style={{ margin: 0, color: '#6c757d', fontSize: '0.85rem' }}>
+                    <p style={{ margin: 0, color: 'var(--muted-foreground)', fontSize: '0.85rem' }}>
                         {t('beta_notice')}
                     </p>
                 </div>
@@ -214,8 +214,8 @@ export default function Index() {
 
                 {/* Mode content */}
                 <div style={{
-                    backgroundColor: '#fff',
-                    border: '1px solid #dee2e6',
+                    backgroundColor: 'var(--card)',
+                    border: '1px solid var(--border)',
                     borderTop: 'none',
                     borderRadius: '0 0 6px 6px',
                     padding: 20,
@@ -262,8 +262,8 @@ export default function Index() {
                         position: 'fixed',
                         bottom: 24,
                         right: 24,
-                        backgroundColor: '#28a745',
-                        color: '#fff',
+                        backgroundColor: 'var(--success)',
+                        color: 'var(--success-foreground)',
                         padding: '10px 20px',
                         borderRadius: 6,
                         fontSize: '0.85rem',
@@ -279,12 +279,12 @@ export default function Index() {
                 {error && (
                     <div style={{
                         marginTop: 16,
-                        backgroundColor: '#f8d7da',
-                        border: '1px solid #f5c6cb',
+                        backgroundColor: 'var(--danger-subtle)',
+                        border: '1px solid var(--danger-border)',
                         borderRadius: 6,
                         padding: 12,
                         fontSize: '0.85rem',
-                        color: '#721c24',
+                        color: 'var(--danger-subtle-foreground)',
                     }}>
                         <strong>{t('error_prefix')}</strong>{error}
                     </div>
@@ -294,8 +294,8 @@ export default function Index() {
                 <div ref={resultRef} style={{ marginTop: 20 }}>
                     {(result || loading) && (
                         <div style={{
-                            backgroundColor: '#fff',
-                            border: '1px solid #dee2e6',
+                            backgroundColor: 'var(--card)',
+                            border: '1px solid var(--border)',
                             borderRadius: 6,
                             padding: 16,
                         }}>
@@ -305,18 +305,18 @@ export default function Index() {
                                 alignItems: 'center',
                                 marginBottom: 12,
                             }}>
-                                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#212529' }}>
+                                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--foreground)' }}>
                                     {t('query_results_title')}
                                 </h3>
                                 {result && (
-                                    <span style={{ fontSize: '0.8rem', color: '#6c757d' }}>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
                                         {result.rows.length} {t('results_count_suffix')}
                                     </span>
                                 )}
                             </div>
 
                             {loading ? (
-                                <div style={{ padding: 24, textAlign: 'center', color: '#6c757d' }}>
+                                <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted-foreground)' }}>
                                     <div style={{ fontSize: '1.5rem', marginBottom: 8 }}>⏳</div>
                                     {t('query_executing')}
                                 </div>

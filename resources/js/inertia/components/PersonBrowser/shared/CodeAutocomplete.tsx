@@ -264,7 +264,7 @@ export default function CodeAutocomplete(props: Props) {
             {open ? (
                 <div style={dropdownStyle}>
                     {loading ? <div style={hintStyle}>載入中…</div> : null}
-                    {error ? <div style={{ ...hintStyle, color: '#dc3545' }}>{error}</div> : null}
+                    {error ? <div style={{ ...hintStyle, color: 'var(--destructive)' }}>{error}</div> : null}
                     {!loading && !error && filtered.length === 0 ? (
                         <div style={hintStyle}>{props.mode === 'search' && !query.trim() ? '請輸入關鍵字' : '無符合項目'}</div>
                     ) : null}
@@ -302,8 +302,8 @@ const inputStyle: React.CSSProperties = {
 };
 
 const invalidStyle: React.CSSProperties = {
-    borderColor: '#dc3545',
-    boxShadow: '0 0 0 1px #dc3545',
+    borderColor: 'var(--destructive)',
+    boxShadow: '0 0 0 1px var(--destructive)',
 };
 
 const clearBtnStyle: React.CSSProperties = {

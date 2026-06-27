@@ -200,7 +200,7 @@ const iconStyle: React.CSSProperties = {
 };
 
 const frameWrapStyle: React.CSSProperties = {
-    backgroundColor: '#e2e8f0',
+    backgroundColor: 'var(--border)',
     borderRadius: 4,
     overflow: 'hidden',
 };
@@ -210,7 +210,7 @@ const iframeStyle: React.CSSProperties = {
     height: 'min(72vh, 760px)',
     border: 'none',
     display: 'block',
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--card)',
 };
 
 const secondaryLinkStyle: React.CSSProperties = {
@@ -220,9 +220,9 @@ const secondaryLinkStyle: React.CSSProperties = {
     height: 36,
     padding: '0 14px',
     borderRadius: 4,
-    border: '1px solid #d0d8e2',
-    backgroundColor: '#fff',
-    color: '#334155',
+    border: '1px solid var(--border)',
+    backgroundColor: 'var(--card)',
+    color: 'var(--muted-foreground)',
     textDecoration: 'none',
     fontSize: '0.9rem',
 };
@@ -233,7 +233,7 @@ const closeButtonStyle: React.CSSProperties = {
     borderRadius: 4,
     border: `1px solid ${APP_THEME.brand}`,
     backgroundColor: APP_THEME.brand,
-    color: '#fff',
+    color: 'var(--primary-foreground)',
     cursor: 'pointer',
     fontSize: '0.9rem',
 };

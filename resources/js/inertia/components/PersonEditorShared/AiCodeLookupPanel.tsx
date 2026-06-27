@@ -36,10 +36,10 @@ interface Props {
 
 export function relevanceColor(relevance?: string): string {
     const r = (relevance ?? '').toLowerCase();
-    if (r.includes('high') || r.includes('高')) return '#16a34a';
-    if (r.includes('medium') || r.includes('中')) return '#d97706';
-    if (r.includes('low') || r.includes('低')) return '#94a3b8';
-    return '#c7d2fe';
+    if (r.includes('high') || r.includes('高')) return 'var(--success-subtle-foreground)';
+    if (r.includes('medium') || r.includes('中')) return 'var(--warning-subtle-foreground)';
+    if (r.includes('low') || r.includes('低')) return 'var(--muted-foreground)';
+    return 'var(--info-border)';
 }
 
 export default function AiCodeLookupPanel({
@@ -99,7 +99,7 @@ export default function AiCodeLookupPanel({
                     <button type="button" style={runBtnStyle} disabled={busy || disabled} onClick={() => void run()}>
                         {busy ? t('ai_processing') : t('ai_recognize_btn')}
                     </button>
-                    {error ? <span style={{ color: '#b91c1c', fontSize: '0.82rem' }}>{error}</span> : null}
+                    {error ? <span style={{ color: 'var(--danger-subtle-foreground)', fontSize: '0.82rem' }}>{error}</span> : null}
                 </div>
                 {candidates ? (
                     <div style={{ marginTop: 12 }}>
@@ -110,14 +110,14 @@ export default function AiCodeLookupPanel({
                                     <button key={String(c.code_id)} type="button" title={c.reason}
                                         style={{ ...candidateBtnStyle, borderColor: relevanceColor(c.relevance) }}
                                         onClick={() => onApply(c)}>
-                                        <strong>{c.code_id}</strong> {c.desc_chn ?? ''} {c.desc_en ? <small style={{ color: '#64748b' }}>({c.desc_en})</small> : null}
+                                        <strong>{c.code_id}</strong> {c.desc_chn ?? ''} {c.desc_en ? <small style={{ color: 'var(--muted-foreground)' }}>({c.desc_en})</small> : null}
                                     </button>
                                 ))}
                             </div>
-                        ) : <span style={{ color: '#64748b', fontSize: '0.82rem' }}>{t('ai_no_match')}</span>}
+                        ) : <span style={{ color: 'var(--muted-foreground)', fontSize: '0.82rem' }}>{t('ai_no_match')}</span>}
                         {notFound.length ? (
                             <div style={{ marginTop: 8 }}>
-                                <div style={{ color: '#d97706', fontSize: '0.82rem' }}>{t('ai_no_match')}</div>
+                                <div style={{ color: 'var(--warning-subtle-foreground)', fontSize: '0.82rem' }}>{t('ai_no_match')}</div>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
                                     {notFound.map((n, i) => <span key={`${n}-${i}`} style={badgeStyle}>{n}</span>)}
                                 </div>
@@ -133,12 +133,12 @@ export default function AiCodeLookupPanel({
 
 // 統一 AI 面板樣式：留在系統藍色系（與整站一致），以較飽和的藍底 + 魔杖圖示標示「智能/AI」功能，
 // 主按鈕用品牌藍 #255f93；「未找到」徽章維持琥珀（警示語意）。
-const cardStyle: React.CSSProperties = { background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, marginBottom: 14, overflow: 'hidden' };
-const headerStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '10px 14px', background: '#dbeafe', borderBottom: '1px solid #bfdbfe' };
-const titleStyle: React.CSSProperties = { color: '#1e3a8a', fontSize: '0.95rem' };
-const textareaStyle: React.CSSProperties = { width: '100%', minHeight: 64, padding: '8px 10px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '1rem', boxSizing: 'border-box', resize: 'vertical' };
-const hintStyle: React.CSSProperties = { fontSize: '0.78rem', color: '#64748b', marginTop: 4 };
-const runBtnStyle: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, border: '1px solid #1d4d77', background: '#255f93', color: '#fff', fontWeight: 700, cursor: 'pointer' };
-const candidateBtnStyle: React.CSSProperties = { border: '1px solid #bfdbfe', background: '#fff', borderRadius: 999, padding: '4px 12px', fontSize: '0.82rem', cursor: 'pointer' };
-const badgeStyle: React.CSSProperties = { background: '#fef3c7', color: '#92400e', borderRadius: 4, padding: '1px 7px', fontSize: '0.75rem' };
-const summaryStyle: React.CSSProperties = { marginTop: 8, padding: '8px 10px', background: '#fff', border: '1px solid #dbeafe', borderRadius: 6, fontSize: '0.82rem', color: '#334155' };
+const cardStyle: React.CSSProperties = { background: 'var(--info-subtle)', border: '1px solid var(--info-border)', borderRadius: 10, marginBottom: 14, overflow: 'hidden' };
+const headerStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'var(--info-subtle)', borderBottom: '1px solid var(--info-border)' };
+const titleStyle: React.CSSProperties = { color: 'var(--info-subtle-foreground)', fontSize: '0.95rem' };
+const textareaStyle: React.CSSProperties = { width: '100%', minHeight: 64, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--input)', fontSize: '1rem', boxSizing: 'border-box', resize: 'vertical' };
+const hintStyle: React.CSSProperties = { fontSize: '0.78rem', color: 'var(--muted-foreground)', marginTop: 4 };
+const runBtnStyle: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, border: '1px solid var(--primary)', background: 'var(--primary)', color: 'var(--primary-foreground)', fontWeight: 700, cursor: 'pointer' };
+const candidateBtnStyle: React.CSSProperties = { border: '1px solid var(--info-border)', background: 'var(--card)', borderRadius: 999, padding: '4px 12px', fontSize: '0.82rem', cursor: 'pointer' };
+const badgeStyle: React.CSSProperties = { background: 'var(--warning-subtle)', color: 'var(--warning-subtle-foreground)', borderRadius: 4, padding: '1px 7px', fontSize: '0.75rem' };
+const summaryStyle: React.CSSProperties = { marginTop: 8, padding: '8px 10px', background: 'var(--card)', border: '1px solid var(--info-border)', borderRadius: 6, fontSize: '0.82rem', color: 'var(--muted-foreground)' };

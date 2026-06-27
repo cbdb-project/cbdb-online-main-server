@@ -20,19 +20,19 @@ interface Props {
 }
 
 const boxStyle: React.CSSProperties = {
-    border: '1px solid #dc2626', background: '#fef2f2', borderRadius: 8,
-    padding: '12px 14px', margin: '8px 0', fontSize: '0.9rem', color: '#991b1b',
+    border: '1px solid var(--danger-border)', background: 'var(--danger-subtle)', borderRadius: 8,
+    padding: '12px 14px', margin: '8px 0', fontSize: '0.9rem', color: 'var(--danger-subtle-foreground)',
 };
 const titleStyle: React.CSSProperties = { fontWeight: 600, marginBottom: 6 };
 const listStyle: React.CSSProperties = { margin: '6px 0', paddingLeft: 18 };
-const linkStyle: React.CSSProperties = { color: '#1d4ed8', textDecoration: 'underline', fontWeight: 600 };
+const linkStyle: React.CSSProperties = { color: 'var(--info-subtle-foreground)', textDecoration: 'underline', fontWeight: 600 };
 const btnRow: React.CSSProperties = { display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' };
 const confirmBtn: React.CSSProperties = {
-    padding: '4px 12px', border: '1px solid #b91c1c', background: '#b91c1c', color: '#fff',
+    padding: '4px 12px', border: '1px solid var(--destructive)', background: 'var(--destructive)', color: 'var(--destructive-foreground)',
     borderRadius: 6, cursor: 'pointer', fontSize: '0.85rem',
 };
 const dismissBtn: React.CSSProperties = {
-    padding: '4px 12px', border: '1px solid #d1d5db', background: '#fff', color: '#374151',
+    padding: '4px 12px', border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--muted-foreground)',
     borderRadius: 6, cursor: 'pointer', fontSize: '0.85rem',
 };
 
@@ -59,7 +59,7 @@ export default function MirrorDeleteMultipleNotice({ info, urlFor, onConfirm, on
                         <a href={urlFor(row)} target="_blank" rel="noopener noreferrer" style={linkStyle}>
                             {tr('mirror_suspected_goto', '前往核對（另開分頁）')}
                         </a>
-                        <span style={{ marginLeft: 8, color: '#7f1d1d' }}>（{fmt(row, tr)}）</span>
+                        <span style={{ marginLeft: 8, color: 'var(--danger-subtle-foreground)' }}>（{fmt(row, tr)}）</span>
                     </li>
                 ))}
             </ul>

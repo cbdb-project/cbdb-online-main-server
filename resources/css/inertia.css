@@ -64,6 +64,44 @@
     --sidebar-accent: hsl(210 10% 28%);
     --sidebar-accent-foreground: hsl(0 0% 100%);
     --sidebar-border: hsl(210 10% 18%);
+
+    /*
+     * 狀態語意色（success / warning / info；danger 沿用 --destructive）。
+     * 每組三層：-（實心，用於有色按鈕，文字配 -foreground）／-subtle（淺色橫幅背景）／
+     * -subtle-foreground（橫幅文字）／-border（橫幅邊框）。深色模式於 .dark 覆蓋為「深底亮字」，
+     * 取代舊版內聯硬編碼 hex（淺底深字在深色頁面會殘留白塊）。React 內聯樣式以 var(--token) 取用即自動隨深色模式翻轉。
+     */
+    --success: hsl(152 58% 32%);
+    --success-foreground: hsl(0 0% 100%);
+    --success-subtle: hsl(152 64% 96%);            /* #ecfdf5 */
+    --success-subtle-foreground: hsl(153 64% 20%); /* #065f46 */
+    --success-border: hsl(152 57% 81%);            /* #a7f3d0 */
+
+    --warning: hsl(35 92% 45%);
+    --warning-foreground: hsl(28 78% 15%);         /* 琥珀實心上用深色字（白字對比不足） */
+    --warning-subtle: hsl(48 100% 96%);            /* #fffbeb */
+    --warning-subtle-foreground: hsl(25 84% 31%);  /* #92400e */
+    --warning-border: hsl(46 96% 76%);             /* #fde68a */
+
+    --info: hsl(192 91% 34%);                      /* #0891b2 略加深以承載白字 */
+    --info-foreground: hsl(0 0% 100%);
+    --info-subtle: hsl(214 100% 97%);              /* #eff6ff */
+    --info-subtle-foreground: hsl(224 71% 40%);    /* #1d4ed8 */
+    --info-border: hsl(213 97% 87%);               /* #bfdbfe */
+
+    /* danger 淺色橫幅（實心紅沿用 --destructive / --destructive-foreground） */
+    --danger-subtle: hsl(0 86% 97%);               /* #fef2f2 */
+    --danger-subtle-foreground: hsl(0 70% 35%);    /* #991b1b */
+    --danger-border: hsl(0 93% 89%);               /* #fecaca */
+
+    /* 頁面內凹底（比 card 略深的承載面，舊值 #f4f6f9 / #f8f9fa）與命中高亮（舊值 #FFFFBB） */
+    --surface-sunken: hsl(210 17% 96%);
+    --highlight: hsl(60 100% 86%);
+    --highlight-foreground: hsl(45 90% 18%);
+
+    /* APP_THEME（theme.ts）飽和品牌面/邊框專屬 token：淺色維持原值（#95B5DF / #93A1AD）零退化，深色加深。 */
+    --brand-surface-strong: hsl(214 47% 73%);  /* #95B5DF */
+    --brand-border: hsl(206 13% 63%);          /* #93A1AD */
 }
 
 .dark {
@@ -94,6 +132,37 @@
     --sidebar-accent: hsl(210 10% 20%);
     --sidebar-accent-foreground: hsl(0 0% 100%);
     --sidebar-border: hsl(210 10% 8%);
+
+    /* 狀態語意色（深色模式）：深底 + 亮字，取代淺底深字，避免深色頁面殘留白塊。
+       實心 success/info 維持夠深，使其上的白字（按鈕）達 WCAG AA；warning 用深色字。 */
+    --success: hsl(152 55% 33%);
+    --success-foreground: hsl(0 0% 100%);
+    --success-subtle: hsl(152 38% 15%);
+    --success-subtle-foreground: hsl(150 52% 75%);
+    --success-border: hsl(152 28% 30%);
+
+    --warning: hsl(35 80% 50%);
+    --warning-foreground: hsl(30 82% 12%);
+    --warning-subtle: hsl(35 48% 15%);
+    --warning-subtle-foreground: hsl(40 85% 72%);
+    --warning-border: hsl(35 38% 32%);
+
+    --info: hsl(192 80% 32%);
+    --info-foreground: hsl(0 0% 100%);
+    --info-subtle: hsl(214 48% 17%);
+    --info-subtle-foreground: hsl(213 90% 80%);
+    --info-border: hsl(213 38% 34%);
+
+    --danger-subtle: hsl(0 48% 17%);
+    --danger-subtle-foreground: hsl(0 82% 82%);
+    --danger-border: hsl(0 38% 34%);
+
+    --surface-sunken: hsl(210 10% 13%);
+    --highlight: hsl(48 65% 28%);
+    --highlight-foreground: hsl(48 90% 85%);
+
+    --brand-surface-strong: hsl(214 32% 34%);
+    --brand-border: hsl(210 8% 42%);
 }
 
 /* 把語意變數對映成 Tailwind v4 的 color/radius token，
@@ -126,6 +195,29 @@
     --color-sidebar-accent: var(--sidebar-accent);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
     --color-sidebar-border: var(--sidebar-border);
+
+    /* 狀態語意色（讓 bg-success-subtle / text-warning-subtle-foreground 等 class 可用） */
+    --color-success: var(--success);
+    --color-success-foreground: var(--success-foreground);
+    --color-success-subtle: var(--success-subtle);
+    --color-success-subtle-foreground: var(--success-subtle-foreground);
+    --color-success-border: var(--success-border);
+    --color-warning: var(--warning);
+    --color-warning-foreground: var(--warning-foreground);
+    --color-warning-subtle: var(--warning-subtle);
+    --color-warning-subtle-foreground: var(--warning-subtle-foreground);
+    --color-warning-border: var(--warning-border);
+    --color-info: var(--info);
+    --color-info-foreground: var(--info-foreground);
+    --color-info-subtle: var(--info-subtle);
+    --color-info-subtle-foreground: var(--info-subtle-foreground);
+    --color-info-border: var(--info-border);
+    --color-danger-subtle: var(--danger-subtle);
+    --color-danger-subtle-foreground: var(--danger-subtle-foreground);
+    --color-danger-border: var(--danger-border);
+    --color-surface-sunken: var(--surface-sunken);
+    --color-highlight: var(--highlight);
+    --color-highlight-foreground: var(--highlight-foreground);
 
     --radius-sm: calc(var(--radius) - 2px);
     --radius-md: var(--radius);

@@ -31,6 +31,6 @@ export function BtnSpinner() {
     return <i className="fas fa-spinner fa-spin" aria-hidden="true" style={{ marginRight: 6 }} />;
 }
 
-const busyStyle: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', color: '#255f93', fontSize: '0.9rem', fontWeight: 600 };
-const okStyle: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', color: '#065f46', fontSize: '0.9rem', fontWeight: 600 };
-const errStyle: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', color: '#991b1b', fontSize: '0.9rem', fontWeight: 600 };
+const busyStyle: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', color: 'var(--primary)', fontSize: '0.9rem', fontWeight: 600 };
+const okStyle: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', color: 'var(--success-subtle-foreground)', fontSize: '0.9rem', fontWeight: 600 };
+const errStyle: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', color: 'var(--danger-subtle-foreground)', fontSize: '0.9rem', fontWeight: 600 };

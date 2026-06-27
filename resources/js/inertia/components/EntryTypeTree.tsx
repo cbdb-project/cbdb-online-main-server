@@ -58,14 +58,14 @@ function TreeNodeItem({ node, level, selectedTypeId, onSelect }: {
                     paddingBottom: 6,
                     paddingRight: 8,
                     cursor: 'pointer',
-                    borderBottom: '1px solid #f0f0f0',
-                    backgroundColor: isSelected ? '#007bff' : 'transparent',
-                    color: isSelected ? '#fff' : '#333',
+                    borderBottom: '1px solid var(--border)',
+                    backgroundColor: isSelected ? 'var(--primary)' : 'transparent',
+                    color: isSelected ? 'var(--primary-foreground)' : 'var(--foreground)',
                     fontSize: '0.875rem',
                     transition: 'background-color 0.15s',
                 }}
                 onMouseEnter={(e) => {
-                    if (!isSelected) (e.currentTarget as HTMLDivElement).style.backgroundColor = '#f8f9fa';
+                    if (!isSelected) (e.currentTarget as HTMLDivElement).style.backgroundColor = 'var(--muted)';
                 }}
                 onMouseLeave={(e) => {
                     if (!isSelected) (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
@@ -90,19 +90,19 @@ export default function EntryTypeTree({ types, selectedTypeId, loading, error, o
     const tree = useMemo(() => buildTree(types), [types]);
 
     return (
-        <div style={{ border: '1px solid #dee2e6', borderRadius: 4, backgroundColor: '#fff', overflow: 'hidden' }}>
-            <div style={{ padding: '10px 14px', borderBottom: '1px solid #dee2e6', fontWeight: 600, fontSize: '0.95rem' }}>
+        <div style={{ border: '1px solid var(--border)', borderRadius: 4, backgroundColor: 'var(--card)', overflow: 'hidden' }}>
+            <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', fontWeight: 600, fontSize: '0.95rem' }}>
                 入仕類型
             </div>
             <div style={{ height: 400, overflowY: 'auto' }}>
                 {loading && (
-                    <div style={{ padding: 16, textAlign: 'center', color: '#6c757d' }}>載入中...</div>
+                    <div style={{ padding: 16, textAlign: 'center', color: 'var(--muted-foreground)' }}>載入中...</div>
                 )}
                 {error && (
-                    <div style={{ padding: 16, color: '#dc3545' }}>{error}</div>
+                    <div style={{ padding: 16, color: 'var(--destructive)' }}>{error}</div>
                 )}
                 {!loading && !error && tree.length === 0 && (
-                    <div style={{ padding: 16, color: '#6c757d' }}>無資料</div>
+                    <div style={{ padding: 16, color: 'var(--muted-foreground)' }}>無資料</div>
                 )}
                 {!loading && !error && tree.map((node) => (
                     <TreeNodeItem

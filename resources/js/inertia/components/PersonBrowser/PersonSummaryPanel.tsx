@@ -41,7 +41,7 @@ export default function PersonSummaryPanel({ summary, loading, error }: Props) {
         return <div style={boxStyle}><div style={msgStyle}>載入摘要中…</div></div>;
     }
     if (error) {
-        return <div style={boxStyle}><div style={{ ...msgStyle, color: '#dc3545' }}>{error}</div></div>;
+        return <div style={boxStyle}><div style={{ ...msgStyle, color: 'var(--destructive)' }}>{error}</div></div>;
     }
     if (!summary) {
         return (
@@ -110,10 +110,10 @@ function Tag({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 const boxStyle: React.CSSProperties = {
-    borderBottom: '1px solid #dee2e6',
+    borderBottom: '1px solid var(--border)',
     padding: '16px 18px 14px',
     minHeight: 72,
-    backgroundColor: '#fcfdff',
+    backgroundColor: 'var(--card)',
 };
 
 const headerStyle: React.CSSProperties = {
@@ -130,7 +130,7 @@ const nameRowStyle: React.CSSProperties = {
 const mainNameStyle: React.CSSProperties = {
     fontSize: '1.65rem',
     fontWeight: 700,
-    color: '#17293b',
+    color: 'var(--foreground)',
     lineHeight: 1.2,
 };
 
@@ -143,7 +143,7 @@ const secondaryNameBlockStyle: React.CSSProperties = {
 
 const secondaryNameStyle: React.CSSProperties = {
     fontSize: '1.65rem',
-    color: '#667788',
+    color: 'var(--muted-foreground)',
     lineHeight: 1.2,
 };
 
@@ -177,7 +177,7 @@ const tagValueStyle: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
     padding: '6px 11px',
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--card)',
     color: APP_THEME.brandTextStrong,
     fontWeight: 700,
     whiteSpace: 'nowrap',
@@ -185,7 +185,7 @@ const tagValueStyle: React.CSSProperties = {
 
 const msgStyle: React.CSSProperties = {
     padding: 12,
-    color: '#6c757d',
+    color: 'var(--muted-foreground)',
     fontSize: '0.875rem',
     textAlign: 'center',
 };

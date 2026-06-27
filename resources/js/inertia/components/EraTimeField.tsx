@@ -312,19 +312,19 @@ export default function EraTimeField({
 }
 
 const wrapStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, position: 'relative' };
-const inputStyle: React.CSSProperties = { height: 34, padding: '0 8px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '1rem', boxSizing: 'border-box' };
-const invalidStyle: React.CSSProperties = { borderColor: '#dc3545', boxShadow: '0 0 0 1px #dc3545' };
+const inputStyle: React.CSSProperties = { height: 34, padding: '0 8px', borderRadius: 6, border: '1px solid var(--input)', fontSize: '1rem', boxSizing: 'border-box' };
+const invalidStyle: React.CSSProperties = { borderColor: 'var(--destructive)', boxShadow: '0 0 0 1px var(--destructive)' };
 const btnGroupStyle: React.CSSProperties = { display: 'flex', gap: 4 };
-const convBtnStyle: React.CSSProperties = { height: 34, minWidth: 32, borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontSize: '1rem' };
+const convBtnStyle: React.CSSProperties = { height: 34, minWidth: 32, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', cursor: 'pointer', fontSize: '1rem' };
 const fieldGroupStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 };
-const labelStyle: React.CSSProperties = { fontSize: '0.85rem', color: '#374151', whiteSpace: 'nowrap' };
-const unitStyle: React.CSSProperties = { fontSize: '0.85rem', color: '#374151' };
+const labelStyle: React.CSSProperties = { fontSize: '0.85rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' };
+const unitStyle: React.CSSProperties = { fontSize: '0.85rem', color: 'var(--muted-foreground)' };
 // 農曆月/日合法範圍的常駐可見提示（對齊 legacy month_range_hint / day_range_hint，但常顯而非僅 invalid）。
-const rangeHintStyle: React.CSSProperties = { fontSize: '0.78rem', color: '#94a3b8', marginLeft: -2 };
-const invalidHintStyle: React.CSSProperties = { color: '#dc3545' };
-const checkboxLabelStyle: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.85rem', color: '#374151' };
+const rangeHintStyle: React.CSSProperties = { fontSize: '0.78rem', color: 'var(--muted-foreground)', marginLeft: -2 };
+const invalidHintStyle: React.CSSProperties = { color: 'var(--destructive)' };
+const checkboxLabelStyle: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.85rem', color: 'var(--muted-foreground)' };
 const dialogBackdrop: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.3)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' };
-const dialogBox: React.CSSProperties = { background: '#fff', borderRadius: 10, padding: 16, minWidth: 320, maxHeight: '70vh', overflowY: 'auto', boxShadow: '0 12px 32px rgba(0,0,0,0.2)' };
+const dialogBox: React.CSSProperties = { background: 'var(--card)', borderRadius: 10, padding: 16, minWidth: 320, maxHeight: '70vh', overflowY: 'auto', boxShadow: '0 12px 32px rgba(0,0,0,0.2)' };
 const dialogTitle: React.CSSProperties = { fontWeight: 700, marginBottom: 10 };
-const dialogOption: React.CSSProperties = { display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 6, background: '#fff', cursor: 'pointer', marginBottom: 6 };
-const dialogCancel: React.CSSProperties = { display: 'block', width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', borderRadius: 6, background: '#f8fafc', cursor: 'pointer', marginTop: 4 };
+const dialogOption: React.CSSProperties = { display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--card)', cursor: 'pointer', marginBottom: 6 };
+const dialogCancel: React.CSSProperties = { display: 'block', width: '100%', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--surface-sunken)', cursor: 'pointer', marginTop: 4 };

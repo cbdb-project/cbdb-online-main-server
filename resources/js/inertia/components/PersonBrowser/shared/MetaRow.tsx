@@ -26,7 +26,7 @@ const rowStyle: React.CSSProperties = {
     padding: '4px 0',
     fontSize: '0.9rem',
     lineHeight: 1.4,
-    borderBottom: '1px solid #f5f5f5',
+    borderBottom: '1px solid var(--border)',
 };
 
 const labelStyle: React.CSSProperties = {
@@ -37,6 +37,6 @@ const labelStyle: React.CSSProperties = {
 };
 
 const valueStyle: React.CSSProperties = {
-    color: '#212529',
+    color: 'var(--foreground)',
     wordBreak: 'break-word',
 };

@@ -132,12 +132,12 @@ export default function Show({
         <DashboardLayout disableContentPadding>
             <div style={{ padding: '24px 24px 48px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-                    <Link href={listUrl} style={{ color: '#007bff', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 500 }}>
+                    <Link href={listUrl} style={{ color: 'var(--primary)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 500 }}>
                         {t('back_to_overview')}
                     </Link>
 
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <label style={{ fontSize: '0.82rem', color: '#6c757d' }}>
+                        <label style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)' }}>
                             {t('quick_switch')}
                         </label>
                         <select
@@ -157,10 +157,10 @@ export default function Show({
                 <div style={sectionStyle}>
                     <div style={sectionHeaderStyle}>{t('view_info')}</div>
                     <div style={sectionBodyStyle}>
-                        <h2 style={{ margin: 0, fontSize: '1.55rem', fontWeight: 700, color: '#212529' }}>
+                        <h2 style={{ margin: 0, fontSize: '1.55rem', fontWeight: 700, color: 'var(--foreground)' }}>
                             {title}
                         </h2>
-                        <div style={{ marginTop: 8, color: '#6c757d', fontSize: '0.85rem', lineHeight: 1.7 }}>
+                        <div style={{ marginTop: 8, color: 'var(--muted-foreground)', fontSize: '0.85rem', lineHeight: 1.7 }}>
                             <div>{t('view_name_label')}<code>{primary_alias}</code></div>
                             <div>key：<code>{key}</code></div>
                             {alternateAliases.length > 0 && (
@@ -168,7 +168,7 @@ export default function Show({
                             )}
                         </div>
                         {description && (
-                            <div style={{ marginTop: 10, color: '#495057', fontSize: '0.9rem' }}>
+                            <div style={{ marginTop: 10, color: 'var(--muted-foreground)', fontSize: '0.9rem' }}>
                                 {description}
                             </div>
                         )}
@@ -200,7 +200,7 @@ export default function Show({
                         />
 
                         {pagination.total > 0 && (
-                            <div style={{ fontSize: '0.8rem', color: '#6c757d', marginBottom: 8 }}>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', marginBottom: 8 }}>
                                 {t('total_records', { total: String(pagination.total), from: String(pagination.from), to: String(pagination.to) })}
                             </div>
                         )}
@@ -245,8 +245,8 @@ function buildUrl(baseUrl: string, params: Record<string, string | number | unde
 }
 
 const sectionStyle: React.CSSProperties = {
-    backgroundColor: '#fff',
-    border: '1px solid #dee2e6',
+    backgroundColor: 'var(--card)',
+    border: '1px solid var(--border)',
     borderRadius: 4,
     overflow: 'hidden',
     marginBottom: 16,
@@ -254,9 +254,9 @@ const sectionStyle: React.CSSProperties = {
 
 const sectionHeaderStyle: React.CSSProperties = {
     padding: '10px 14px',
-    borderBottom: '1px solid #dee2e6',
-    backgroundColor: '#f8f9fa',
-    color: '#495057',
+    borderBottom: '1px solid var(--border)',
+    backgroundColor: 'var(--muted)',
+    color: 'var(--muted-foreground)',
     fontSize: '0.9rem',
     fontWeight: 600,
 };
@@ -275,22 +275,22 @@ const summaryGridStyle: React.CSSProperties = {
 const summaryItemStyle: React.CSSProperties = {
     flex: '1 1 180px',
     minWidth: 180,
-    backgroundColor: '#f8f9fa',
-    border: '1px solid #e9ecef',
+    backgroundColor: 'var(--surface-sunken)',
+    border: '1px solid var(--border)',
     borderRadius: 4,
     padding: '14px 16px',
 };
 
 const summaryLabelStyle: React.CSSProperties = {
     fontSize: '0.78rem',
-    color: '#6c757d',
+    color: 'var(--muted-foreground)',
     marginBottom: 6,
 };
 
 const summaryValueStyle: React.CSSProperties = {
     fontSize: '1.1rem',
     fontWeight: 600,
-    color: '#212529',
+    color: 'var(--foreground)',
     lineHeight: 1.4,
     wordBreak: 'break-word',
 };
@@ -298,15 +298,15 @@ const summaryValueStyle: React.CSSProperties = {
 const summaryHelpStyle: React.CSSProperties = {
     marginTop: 6,
     fontSize: '0.76rem',
-    color: '#6c757d',
+    color: 'var(--muted-foreground)',
 };
 
 const selectStyle: React.CSSProperties = {
     minWidth: 240,
     maxWidth: '100%',
     padding: '8px 12px',
-    border: '1px solid #ced4da',
+    border: '1px solid var(--input)',
     borderRadius: 4,
     fontSize: '0.9rem',
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--card)',
 };

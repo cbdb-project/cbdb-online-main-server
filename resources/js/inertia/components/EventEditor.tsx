@@ -248,7 +248,7 @@ export default function EventEditor({
                                 {editable ? <button type="button" onClick={() => removeAddr(it.id)} style={chipRemoveStyle} aria-label="remove">×</button> : null}
                             </span>
                         ))}
-                        {addrItems.length === 0 ? <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{tr('no_place', '（未設定地名）')}</span> : null}
+                        {addrItems.length === 0 ? <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>{tr('no_place', '（未設定地名）')}</span> : null}
                     </div>
                 </>)}
 
@@ -298,11 +298,11 @@ export default function EventEditor({
                     <a href={indexUrl} style={gCancelBtn}>{tr('cancel', '取消')}</a>
                 </div>
             </div>
-            {dirty ? <div style={{ marginTop: 8, color: '#92400e', fontSize: '0.8rem' }}>{tr('unsaved_changes', '有未儲存的變更')}</div> : null}
+            {dirty ? <div style={{ marginTop: 8, color: 'var(--warning-subtle-foreground)', fontSize: '0.8rem' }}>{tr('unsaved_changes', '有未儲存的變更')}</div> : null}
         </div>
     );
 }
 
 const titleStyle: React.CSSProperties = { fontSize: '1.1rem', fontWeight: 700, marginBottom: 12 };
-const chipStyle: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, background: '#eef4fb', border: '1px solid #c7d7ea', borderRadius: 14, padding: '2px 6px 2px 10px', fontSize: '0.8rem', color: '#1f3a5f' };
-const chipRemoveStyle: React.CSSProperties = { border: 'none', background: 'transparent', color: '#1f3a5f', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, padding: '0 2px' };
+const chipStyle: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--info-subtle)', border: '1px solid var(--info-border)', borderRadius: 14, padding: '2px 6px 2px 10px', fontSize: '0.8rem', color: 'var(--info-subtle-foreground)' };
+const chipRemoveStyle: React.CSSProperties = { border: 'none', background: 'transparent', color: 'var(--info-subtle-foreground)', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, padding: '0 2px' };

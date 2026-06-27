@@ -243,7 +243,7 @@ export default function StatusEditor({
 
             <div style={gGrid}>
                 {gridCell(tr('status', '社會區分'), { code: 'c_status_code', required: true },
-                    <div style={statusHighlight ? { background: '#FFFFBB', borderRadius: 6 } : undefined}>
+                    <div style={statusHighlight ? { background: 'var(--highlight)', color: 'var(--highlight-foreground)', borderRadius: 6 } : undefined}>
                         <CodeAutocomplete mode="search" endpoint="/api/select/search/status"
                             value={fields.c_status_code ?? '0'} initialLabel={labels.c_status_code ?? ''} disabled={!editable}
                             onChange={(v, l) => { set('c_status_code', v || '0'); setLabel('c_status_code', l); }} /></div>)}
@@ -302,7 +302,7 @@ export default function StatusEditor({
                     <a href={indexUrl} style={gCancelBtn}>{tr('cancel', '取消')}</a>
                 </div>
             </div>
-            {dirty ? <div style={{ marginTop: 8, color: '#92400e', fontSize: '0.8rem' }}>{tr('unsaved_changes', '有未儲存的變更')}</div> : null}
+            {dirty ? <div style={{ marginTop: 8, color: 'var(--warning-subtle-foreground)', fontSize: '0.8rem' }}>{tr('unsaved_changes', '有未儲存的變更')}</div> : null}
         </div>
     );
 }

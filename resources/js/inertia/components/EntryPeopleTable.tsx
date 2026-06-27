@@ -29,7 +29,7 @@ interface Props {
 export default function EntryPeopleTable({ rows, pagination, onPageChange }: Props) {
     if (rows.length === 0) {
         return (
-            <div style={{ padding: 24, textAlign: 'center', color: '#6c757d' }}>
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted-foreground)' }}>
                 無符合條件的人物摘要
             </div>
         );
@@ -37,7 +37,7 @@ export default function EntryPeopleTable({ rows, pagination, onPageChange }: Pro
 
     return (
         <div>
-            <div style={{ marginBottom: 12, color: '#6c757d', fontSize: '0.875rem' }}>
+            <div style={{ marginBottom: 12, color: 'var(--muted-foreground)', fontSize: '0.875rem' }}>
                 共找到 <strong>{pagination.total}</strong> 位人物
                 （顯示第 {pagination.from ?? 0} - {pagination.to ?? 0} 筆）
             </div>
@@ -45,7 +45,7 @@ export default function EntryPeopleTable({ rows, pagination, onPageChange }: Pro
             <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '58vh' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                     <thead>
-                        <tr style={{ backgroundColor: '#f8f9fa' }}>
+                        <tr style={{ backgroundColor: 'var(--muted)' }}>
                             {['人物 ID', '姓名', '朝代', '指數年', '指數年類型', '性別', '索引地址', '入仕地址', '入仕筆數', '操作'].map((heading) => (
                                 <th key={heading} style={headerCellStyle}>{heading}</th>
                             ))}
@@ -53,7 +53,7 @@ export default function EntryPeopleTable({ rows, pagination, onPageChange }: Pro
                     </thead>
                     <tbody>
                         {rows.map((row) => (
-                            <tr key={row.c_personid} style={{ borderBottom: '1px solid #dee2e6' }}>
+                            <tr key={row.c_personid} style={{ borderBottom: '1px solid var(--border)' }}>
                                 <td style={cellStyle}>{row.c_personid}</td>
                                 <td style={cellStyle}>
                                     <div>{row.c_name_chn || '—'}</div>
@@ -89,12 +89,12 @@ export default function EntryPeopleTable({ rows, pagination, onPageChange }: Pro
 
 const headerCellStyle: React.CSSProperties = {
     padding: '8px 10px',
-    borderBottom: '2px solid #dee2e6',
+    borderBottom: '2px solid var(--border)',
     whiteSpace: 'nowrap',
     textAlign: 'left',
     position: 'sticky',
     top: 0,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: 'var(--muted)',
     zIndex: 1,
 };
 
@@ -104,14 +104,14 @@ const cellStyle: React.CSSProperties = {
 };
 
 const subTextStyle: React.CSSProperties = {
-    color: '#6c757d',
+    color: 'var(--muted-foreground)',
     fontSize: '0.78rem',
 };
 
 const actionLinkStyle: React.CSSProperties = {
     padding: '2px 10px',
-    backgroundColor: '#17a2b8',
-    color: '#fff',
+    backgroundColor: 'var(--info)',
+    color: 'var(--info-foreground)',
     borderRadius: 4,
     textDecoration: 'none',
     fontSize: '0.8rem',

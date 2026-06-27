@@ -64,9 +64,9 @@ interface AuditLogsPageProps extends SharedProps {
 }
 
 const OPERATION_BADGE: Record<string, string> = {
-    DELETE: 'bg-red-100 text-red-800',
-    INSERT: 'bg-green-100 text-green-800',
-    UPDATE: 'bg-yellow-100 text-yellow-800',
+    DELETE: 'bg-danger-subtle text-danger-subtle-foreground',
+    INSERT: 'bg-success-subtle text-success-subtle-foreground',
+    UPDATE: 'bg-warning-subtle text-warning-subtle-foreground',
 };
 
 /** 以本地時區顯示時間；解析失敗則回退顯示字串。 */
@@ -161,7 +161,7 @@ export default function AuditLogsIndex() {
                     <span
                         className={cn(
                             'rounded px-2 py-0.5 text-xs font-semibold',
-                            OPERATION_BADGE[row.original.operation] ?? 'bg-gray-100 text-gray-800'
+                            OPERATION_BADGE[row.original.operation] ?? 'bg-muted text-foreground'
                         )}
                     >
                         {row.original.operation}
@@ -241,7 +241,7 @@ export default function AuditLogsIndex() {
     return (
         <DashboardLayout title={t('audit_logs')} breadcrumbs={[{ label: t('audit_logs') }]}>
             {history_context && (
-                <div className="mb-3 rounded border border-blue-300 bg-blue-50 px-4 py-2 text-sm text-blue-800">
+                <div className="mb-3 rounded border border-info-border bg-info-subtle px-4 py-2 text-sm text-info-subtle-foreground">
                     <i className="fas fa-info-circle mr-1" aria-hidden />
                     {t('audit_history_context', {
                         person_id: String(history_context.person_id),
@@ -327,7 +327,7 @@ export default function AuditLogsIndex() {
                 </div>
             </form>
 
-            <div className="mb-3 rounded border border-blue-300 bg-blue-50 px-4 py-2 text-sm text-blue-800">
+            <div className="mb-3 rounded border border-info-border bg-info-subtle px-4 py-2 text-sm text-info-subtle-foreground">
                 <i className="fas fa-info-circle mr-1" aria-hidden />
                 {t('audit_summary', {
                     total: String(logs.meta.total),

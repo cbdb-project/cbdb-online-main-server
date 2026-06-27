@@ -25,7 +25,7 @@ export default function SearchToolbar({ search, onSearchChange, onSubmit, onClea
                     placeholder={placeholder}
                     style={{
                         padding: '6px 12px',
-                        border: '1px solid #ced4da',
+                        border: '1px solid var(--input)',
                         borderRadius: 4,
                         fontSize: '0.9rem',
                         width: 240,
@@ -36,8 +36,8 @@ export default function SearchToolbar({ search, onSearchChange, onSubmit, onClea
                     type="submit"
                     style={{
                         padding: '6px 16px',
-                        backgroundColor: '#007bff',
-                        color: '#fff',
+                        backgroundColor: 'var(--primary)',
+                        color: 'var(--primary-foreground)',
                         border: 'none',
                         borderRadius: 4,
                         cursor: 'pointer',
@@ -52,8 +52,8 @@ export default function SearchToolbar({ search, onSearchChange, onSubmit, onClea
                         onClick={onClear}
                         style={{
                             padding: '6px 14px',
-                            backgroundColor: '#6c757d',
-                            color: '#fff',
+                            backgroundColor: 'var(--muted-foreground)',
+                            color: 'var(--card)',
                             border: 'none',
                             borderRadius: 4,
                             cursor: 'pointer',

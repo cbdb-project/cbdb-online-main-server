@@ -9,8 +9,8 @@ import { OppositeEdgeResult } from './useOppositeEdgeDetection';
 const baseBox: React.CSSProperties = {
     margin: '8px 0', padding: '10px 12px', borderRadius: 8, fontSize: '0.86rem', lineHeight: 1.5,
 };
-const missingBox: React.CSSProperties = { ...baseBox, border: '1px solid #f0c674', background: '#fffaf0', color: '#8a5a00' };
-const multipleBox: React.CSSProperties = { ...baseBox, border: '1px solid #93c5fd', background: '#eff6ff', color: '#1e40af' };
+const missingBox: React.CSSProperties = { ...baseBox, border: '1px solid var(--warning-border)', background: 'var(--warning-subtle)', color: 'var(--warning-subtle-foreground)' };
+const multipleBox: React.CSSProperties = { ...baseBox, border: '1px solid var(--info-border)', background: 'var(--info-subtle)', color: 'var(--info-subtle-foreground)' };
 
 export default function OppositeEdgeNotice({ result, reverseCodeLabel, tr }: {
     result: OppositeEdgeResult | null;

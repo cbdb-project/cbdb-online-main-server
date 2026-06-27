@@ -95,12 +95,12 @@ const formStyle: React.CSSProperties = {
     flexDirection: 'column',
     gap: 6,
     padding: '10px 12px',
-    borderBottom: '1px solid #dee2e6',
+    borderBottom: '1px solid var(--border)',
 };
 
 const inputStyle: React.CSSProperties = {
     padding: '6px 10px',
-    border: '1px solid #ced4da',
+    border: '1px solid var(--input)',
     borderRadius: 4,
     fontSize: '0.875rem',
     outline: 'none',
@@ -110,14 +110,14 @@ const inputStyle: React.CSSProperties = {
 
 const selectStyle: React.CSSProperties = {
     padding: '6px 10px',
-    border: '1px solid #ced4da',
+    border: '1px solid var(--input)',
     borderRadius: 4,
     fontSize: '0.8125rem',
     outline: 'none',
     width: '100%',
     boxSizing: 'border-box',
-    backgroundColor: '#fff',
-    color: '#495057',
+    backgroundColor: 'var(--card)',
+    color: 'var(--muted-foreground)',
     cursor: 'pointer',
 };
 
@@ -133,16 +133,16 @@ const searchBtnStyle: React.CSSProperties = {
     border: 'none',
     borderRadius: 4,
     backgroundColor: APP_THEME.brand,
-    color: '#fff',
+    color: 'var(--primary-foreground)',
     cursor: 'pointer',
 };
 
 const clearBtnStyle: React.CSSProperties = {
     padding: '5px 12px',
     fontSize: '0.8125rem',
-    border: '1px solid #ced4da',
+    border: '1px solid var(--border)',
     borderRadius: 4,
-    backgroundColor: '#fff',
-    color: '#495057',
+    backgroundColor: 'var(--card)',
+    color: 'var(--muted-foreground)',
     cursor: 'pointer',
 };

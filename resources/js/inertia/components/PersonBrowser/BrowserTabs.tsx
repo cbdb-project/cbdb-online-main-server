@@ -61,8 +61,8 @@ export default function BrowserTabs({ tabs, activeTab, counts, onTabChange }: Pr
 const barStyle: React.CSSProperties = {
     display: 'flex',
     flexWrap: 'wrap',
-    backgroundColor: '#f8f9fa',
-    borderBottom: '2px solid #e0e0e0',
+    backgroundColor: 'var(--surface-sunken)',
+    borderBottom: '2px solid var(--border)',
     padding: '6px 10px 0',
     gap: 4,
 };
@@ -77,7 +77,7 @@ const tabStyle: React.CSSProperties = {
     borderBottom: 'none',
     marginBottom: -2,
     cursor: 'pointer',
-    color: '#555',
+    color: 'var(--muted-foreground)',
     whiteSpace: 'nowrap',
     display: 'flex',
     alignItems: 'center',
@@ -91,11 +91,11 @@ const tabStyle: React.CSSProperties = {
 };
 
 const activeTabStyle: React.CSSProperties = {
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--card)',
     color: APP_THEME.brandText,
     fontWeight: 700,
-    border: '1px solid #e0e0e0',
-    borderBottom: '2px solid #fff',
+    border: '1px solid var(--border)',
+    borderBottom: '2px solid var(--card)',
 };
 
 const badgeStyle: React.CSSProperties = {

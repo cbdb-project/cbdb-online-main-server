@@ -17,11 +17,11 @@ interface PageProps extends SharedProps {
 
 const boxStyle: React.CSSProperties = {
     maxWidth: 640, margin: '24px auto', padding: '20px 22px', textAlign: 'center',
-    border: '1px solid #e5e7eb', borderRadius: 10, background: '#fff', color: '#374151',
+    border: '1px solid var(--border)', borderRadius: 10, background: 'var(--card)', color: 'var(--muted-foreground)',
 };
 const linkStyle: React.CSSProperties = {
     display: 'inline-block', marginTop: 14, padding: '6px 16px',
-    border: '1px solid #1d4ed8', borderRadius: 6, color: '#1d4ed8', textDecoration: 'none', fontWeight: 600,
+    border: '1px solid var(--primary)', borderRadius: 6, color: 'var(--primary)', textDecoration: 'none', fontWeight: 600,
 };
 
 export default function SubresourceNotFound() {

@@ -90,6 +90,6 @@ export default function TextpersonPair({ personId, label, hint, onPick, disabled
 }
 
 const rowStyle: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'flex-start', padding: '6px 0' };
-const labelStyle: React.CSSProperties = { width: 160, flexShrink: 0, fontSize: '1rem', color: '#374151', paddingTop: 6 };
+const labelStyle: React.CSSProperties = { width: 160, flexShrink: 0, fontSize: '1rem', color: 'var(--muted-foreground)', paddingTop: 6 };
 const fieldStyle: React.CSSProperties = { flex: 1, minWidth: 0 };
-const selectStyle: React.CSSProperties = { width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '1rem' };
+const selectStyle: React.CSSProperties = { width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid var(--input)', fontSize: '1rem' };

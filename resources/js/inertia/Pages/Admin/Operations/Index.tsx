@@ -175,7 +175,7 @@ export default function OperationsIndex() {
         >
             <div className="rounded-lg border border-border bg-card p-4">
                 {history_context && (
-                    <div className="mb-3 rounded border border-blue-300 bg-blue-50 px-4 py-2 text-sm text-blue-800">
+                    <div className="mb-3 rounded border border-info-border bg-info-subtle px-4 py-2 text-sm text-info-subtle-foreground">
                         {t('history_label')} {history_context.person_id}「{history_context.label}」
                     </div>
                 )}
@@ -372,11 +372,11 @@ function ValueCell({ row, t, setModal, post, del, openReject }: {
     const badge = (() => {
         if (!row.is_proposal) return null;
         const map: Record<string, [string, string]> = {
-            approved: ['bg-green-100 text-green-800', t('status_approved')],
-            rejected: ['bg-red-100 text-red-800', t('status_rejected')],
-            cancelled: ['bg-gray-100 text-gray-800', t('status_withdrawn')],
+            approved: ['bg-success-subtle text-success-subtle-foreground', t('status_approved')],
+            rejected: ['bg-danger-subtle text-danger-subtle-foreground', t('status_rejected')],
+            cancelled: ['bg-muted text-foreground', t('status_withdrawn')],
         };
-        const [cls, label] = map[row.review_status ?? ''] ?? ['bg-yellow-100 text-yellow-800', t('status_pending')];
+        const [cls, label] = map[row.review_status ?? ''] ?? ['bg-warning-subtle text-warning-subtle-foreground', t('status_pending')];
         return <span className={`rounded px-2 py-0.5 text-xs font-semibold ${cls}`}>{label}</span>;
     })();
 
@@ -477,8 +477,8 @@ function DiffTable({ diff, t }: { diff: DiffPayload | string | null; t: (k: stri
                 {rows.map((d, i) => (
                     <tr key={`${d.field}-${i}`} className="border-t border-border align-top">
                         <td className="px-2 py-1 font-mono text-xs">{d.field}</td>
-                        <td className={`px-2 py-1 break-all ${d.matches_before ? 'bg-sky-50' : ''}`}>{d.before}</td>
-                        <td className={`px-2 py-1 break-all ${d.matches_current ? 'bg-green-50' : ''}`}>{d.after}</td>
+                        <td className={`px-2 py-1 break-all ${d.matches_before ? 'bg-info-subtle' : ''}`}>{d.before}</td>
+                        <td className={`px-2 py-1 break-all ${d.matches_current ? 'bg-success-subtle' : ''}`}>{d.after}</td>
                         <td className="px-2 py-1 break-all">{d.current ?? t('not_retrieved')}</td>
                     </tr>
                 ))}

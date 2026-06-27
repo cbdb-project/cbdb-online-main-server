@@ -31,10 +31,10 @@ export default function SqlEditorPanel({ sql, onSqlChange, onExecute, onShare, l
     return (
         <div>
             <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#343a40' }}>
+                <label style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--muted-foreground)' }}>
                     {t('sql_label')}
                 </label>
-                <span style={{ fontSize: '0.75rem', color: '#6c757d' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
                     {t('sql_shortcut')}
                 </span>
             </div>
@@ -48,14 +48,14 @@ export default function SqlEditorPanel({ sql, onSqlChange, onExecute, onShare, l
                 style={{
                     width: '100%',
                     padding: 12,
-                    border: '1px solid #ced4da',
+                    border: '1px solid var(--input)',
                     borderRadius: 6,
                     fontFamily: 'SFMono-Regular, Menlo, Monaco, Consolas, monospace',
                     fontSize: '0.85rem',
                     lineHeight: 1.5,
                     resize: 'vertical',
-                    backgroundColor: disabled ? '#e9ecef' : '#fff',
-                    color: '#212529',
+                    backgroundColor: disabled ? 'var(--muted)' : 'var(--card)',
+                    color: 'var(--foreground)',
                     boxSizing: 'border-box',
                 }}
             />
@@ -93,8 +93,8 @@ function primaryBtnStyle(disabled: boolean): React.CSSProperties {
         fontWeight: 600,
         border: 'none',
         borderRadius: 5,
-        backgroundColor: disabled ? '#adb5bd' : '#007bff',
-        color: '#fff',
+        backgroundColor: disabled ? 'var(--muted-foreground)' : 'var(--primary)',
+        color: 'var(--primary-foreground)',
         cursor: disabled ? 'default' : 'pointer',
     };
 }
@@ -103,10 +103,10 @@ function secondaryBtnStyle(disabled: boolean): React.CSSProperties {
     return {
         padding: '8px 14px',
         fontSize: '0.85rem',
-        border: '1px solid #ced4da',
+        border: '1px solid var(--border)',
         borderRadius: 5,
-        backgroundColor: disabled ? '#e9ecef' : '#fff',
-        color: disabled ? '#adb5bd' : '#495057',
+        backgroundColor: disabled ? 'var(--muted)' : 'var(--card)',
+        color: disabled ? 'var(--muted-foreground)' : 'var(--muted-foreground)',
         cursor: disabled ? 'default' : 'pointer',
     };
 }

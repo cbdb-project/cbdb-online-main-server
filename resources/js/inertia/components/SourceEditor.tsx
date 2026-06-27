@@ -258,10 +258,10 @@ export default function SourceEditor({
                     <a href={indexUrl} style={gCancelBtn}>{tr('cancel', '取消')}</a>
                 </div>
             </div>
-            {dirty ? <div style={{ marginTop: 8, color: '#92400e', fontSize: '0.8rem' }}>{tr('unsaved_changes', '有未儲存的變更')}</div> : null}
+            {dirty ? <div style={{ marginTop: 8, color: 'var(--warning-subtle-foreground)', fontSize: '0.8rem' }}>{tr('unsaved_changes', '有未儲存的變更')}</div> : null}
         </div>
     );
 }
 
 const titleStyle: React.CSSProperties = { fontSize: '1.1rem', fontWeight: 700, marginBottom: 12 };
-const checkRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: '1rem', color: '#374151' };
+const checkRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: '1rem', color: 'var(--muted-foreground)' };

@@ -24,13 +24,13 @@ export default function DataTable({ columns, rows, emptyMessage = '無資料' }:
                                 key={key}
                                 style={{
                                     padding: '8px 10px',
-                                    borderBottom: '2px solid #dee2e6',
-                                    backgroundColor: '#f8f9fa',
+                                    borderBottom: '2px solid var(--border)',
+                                    backgroundColor: 'var(--muted)',
                                     textAlign: 'left',
                                     whiteSpace: 'nowrap',
                                     fontWeight: 600,
                                     fontSize: '0.8rem',
-                                    color: '#495057',
+                                    color: 'var(--muted-foreground)',
                                 }}
                             >
                                 {label}
@@ -46,8 +46,8 @@ export default function DataTable({ columns, rows, emptyMessage = '無資料' }:
                                 style={{
                                     padding: '24px 10px',
                                     textAlign: 'center',
-                                    color: '#6c757d',
-                                    borderBottom: '1px solid #dee2e6',
+                                    color: 'var(--muted-foreground)',
+                                    borderBottom: '1px solid var(--border)',
                                 }}
                             >
                                 {emptyMessage}
@@ -57,14 +57,14 @@ export default function DataTable({ columns, rows, emptyMessage = '無資料' }:
                         rows.map((row, rowIndex) => (
                             <tr
                                 key={rowIndex}
-                                style={{ backgroundColor: rowIndex % 2 === 0 ? '#fff' : '#f8f9fa' }}
+                                style={{ backgroundColor: rowIndex % 2 === 0 ? 'var(--card)' : 'var(--surface-sunken)' }}
                             >
                                 {columnEntries.map(([key]) => (
                                     <td
                                         key={key}
                                         style={{
                                             padding: '6px 10px',
-                                            borderBottom: '1px solid #dee2e6',
+                                            borderBottom: '1px solid var(--border)',
                                             maxWidth: 300,
                                             overflow: 'hidden',
                                             textOverflow: 'ellipsis',

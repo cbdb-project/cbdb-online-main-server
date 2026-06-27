@@ -631,8 +631,8 @@ const sidebarStyle: React.CSSProperties = {
     width: 320,
     minWidth: 240,
     maxWidth: 400,
-    borderRight: '1px solid #dee2e6',
-    backgroundColor: '#fff',
+    borderRight: '1px solid var(--border)',
+    backgroundColor: 'var(--card)',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
@@ -648,7 +648,7 @@ const mobileSidebarStyle: React.CSSProperties = {
     maxWidth: '86vw',
     minWidth: 'unset',
     zIndex: 35,
-    borderRight: '1px solid #d6dde6',
+    borderRight: '1px solid var(--border)',
     boxShadow: '0 18px 48px rgba(15, 23, 42, 0.22)',
     transition: 'transform 0.22s ease, box-shadow 0.22s ease',
 };
@@ -675,20 +675,20 @@ const mobileSidebarHeaderStyle: React.CSSProperties = {
     justifyContent: 'space-between',
     gap: 12,
     padding: '12px 14px',
-    borderBottom: '1px solid #dee2e6',
-    backgroundColor: '#f8fafc',
+    borderBottom: '1px solid var(--border)',
+    backgroundColor: 'var(--surface-sunken)',
 };
 
 const mobileSidebarTitleStyle: React.CSSProperties = {
     fontSize: '0.95rem',
     fontWeight: 700,
-    color: '#203548',
+    color: 'var(--foreground)',
 };
 
 const mobileSidebarCloseButtonStyle: React.CSSProperties = {
-    border: '1px solid #cdd6df',
-    backgroundColor: '#fff',
-    color: '#445566',
+    border: '1px solid var(--border)',
+    backgroundColor: 'var(--card)',
+    color: 'var(--muted-foreground)',
     borderRadius: 8,
     padding: '6px 10px',
     fontSize: '0.82rem',
@@ -701,7 +701,7 @@ const mainStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
-    backgroundColor: '#f4f6f9',
+    backgroundColor: 'var(--surface-sunken)',
 };
 
 const mobileToolbarStyle: React.CSSProperties = {
@@ -714,9 +714,9 @@ const mobileToolbarStyle: React.CSSProperties = {
 };
 
 const mobileSidebarToggleButtonStyle: React.CSSProperties = {
-    border: '1px solid #c9d5e2',
-    backgroundColor: '#fff',
-    color: '#204467',
+    border: '1px solid var(--border)',
+    backgroundColor: 'var(--card)',
+    color: 'var(--foreground)',
     borderRadius: 999,
     padding: '7px 12px',
     fontSize: '0.83rem',
@@ -725,7 +725,7 @@ const mobileSidebarToggleButtonStyle: React.CSSProperties = {
 };
 
 const mobileToolbarMetaStyle: React.CSSProperties = {
-    color: '#5f7081',
+    color: 'var(--muted-foreground)',
     fontSize: '0.82rem',
     fontWeight: 600,
 };
@@ -737,16 +737,16 @@ const tabContentStyle: React.CSSProperties = {
 };
 
 const dialogBodyTextStyle: React.CSSProperties = {
-    color: '#475569',
+    color: 'var(--muted-foreground)',
     lineHeight: 1.7,
 };
 
 const dialogPrimaryButtonStyle: React.CSSProperties = {
     borderRadius: 8,
     padding: '8px 14px',
-    border: '1px solid #255f93',
-    backgroundColor: '#255f93',
-    color: '#fff',
+    border: '1px solid var(--primary)',
+    backgroundColor: 'var(--primary)',
+    color: 'var(--primary-foreground)',
     fontWeight: 700,
     cursor: 'pointer',
 };
@@ -754,9 +754,9 @@ const dialogPrimaryButtonStyle: React.CSSProperties = {
 const dialogSecondaryButtonStyle: React.CSSProperties = {
     borderRadius: 8,
     padding: '8px 14px',
-    border: '1px solid #cbd5e1',
-    backgroundColor: '#fff',
-    color: '#475569',
+    border: '1px solid var(--border)',
+    backgroundColor: 'var(--card)',
+    color: 'var(--muted-foreground)',
     fontWeight: 700,
     cursor: 'pointer',
 };
@@ -764,9 +764,9 @@ const dialogSecondaryButtonStyle: React.CSSProperties = {
 const dialogNeutralButtonStyle: React.CSSProperties = {
     borderRadius: 8,
     padding: '8px 14px',
-    border: '1px solid #d7c3c3',
-    backgroundColor: '#fff7f7',
-    color: '#9f2f2f',
+    border: '1px solid var(--danger-border)',
+    backgroundColor: 'var(--danger-subtle)',
+    color: 'var(--danger-subtle-foreground)',
     fontWeight: 700,
     cursor: 'pointer',
 };

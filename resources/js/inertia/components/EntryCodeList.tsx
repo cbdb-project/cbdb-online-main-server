@@ -20,8 +20,8 @@ export default function EntryCodeList({ codes, selectedCodes, loading, error, on
     const selectedSet = new Set(selectedCodes);
 
     return (
-        <div style={{ border: '1px solid #dee2e6', borderRadius: 4, backgroundColor: '#fff', overflow: 'hidden' }}>
-            <div style={{ padding: '10px 14px', borderBottom: '1px solid #dee2e6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ border: '1px solid var(--border)', borderRadius: 4, backgroundColor: 'var(--card)', overflow: 'hidden' }}>
+            <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>入仕代碼</span>
                 <div>
                     <button
@@ -30,7 +30,7 @@ export default function EntryCodeList({ codes, selectedCodes, loading, error, on
                         disabled={codes.length === 0}
                         style={{
                             padding: '2px 10px', marginRight: 4, fontSize: '0.8rem', cursor: 'pointer',
-                            border: '1px solid #007bff', borderRadius: 4, backgroundColor: 'transparent', color: '#007bff',
+                            border: '1px solid var(--primary)', borderRadius: 4, backgroundColor: 'transparent', color: 'var(--primary)',
                         }}
                     >
                         全選
@@ -41,7 +41,7 @@ export default function EntryCodeList({ codes, selectedCodes, loading, error, on
                         disabled={codes.length === 0}
                         style={{
                             padding: '2px 10px', fontSize: '0.8rem', cursor: 'pointer',
-                            border: '1px solid #6c757d', borderRadius: 4, backgroundColor: 'transparent', color: '#6c757d',
+                            border: '1px solid var(--muted-foreground)', borderRadius: 4, backgroundColor: 'transparent', color: 'var(--muted-foreground)',
                         }}
                     >
                         取消全選
@@ -50,13 +50,13 @@ export default function EntryCodeList({ codes, selectedCodes, loading, error, on
             </div>
             <div style={{ height: 400, overflowY: 'auto' }}>
                 {loading && (
-                    <div style={{ padding: 16, textAlign: 'center', color: '#6c757d' }}>載入中...</div>
+                    <div style={{ padding: 16, textAlign: 'center', color: 'var(--muted-foreground)' }}>載入中...</div>
                 )}
                 {error && (
-                    <div style={{ padding: 16, color: '#dc3545' }}>{error}</div>
+                    <div style={{ padding: 16, color: 'var(--destructive)' }}>{error}</div>
                 )}
                 {!loading && !error && codes.length === 0 && (
-                    <div style={{ padding: 16, color: '#6c757d' }}>請先選擇入仕類型</div>
+                    <div style={{ padding: 16, color: 'var(--muted-foreground)' }}>請先選擇入仕類型</div>
                 )}
                 {!loading && !error && codes.map((code) => {
                     const isChecked = selectedSet.has(code.c_entry_code);
@@ -67,12 +67,12 @@ export default function EntryCodeList({ codes, selectedCodes, loading, error, on
                                 display: 'flex',
                                 alignItems: 'center',
                                 padding: '6px 12px',
-                                borderBottom: '1px solid #f0f0f0',
+                                borderBottom: '1px solid var(--border)',
                                 cursor: 'pointer',
                                 margin: 0,
                                 fontSize: '0.875rem',
                             }}
-                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8f9fa')}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--muted)')}
                             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '')}
                         >
                             <input

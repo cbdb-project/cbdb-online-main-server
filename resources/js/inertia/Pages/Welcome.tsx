@@ -73,21 +73,21 @@ export default function Welcome() {
     };
 
     return (
-        <div className="relative flex min-h-screen flex-col items-center justify-center bg-white px-4 text-[#636b6f]">
+        <div className="relative flex min-h-screen flex-col items-center justify-center bg-card px-4 text-muted-foreground">
             <div className="absolute right-3 top-4 flex gap-1 text-xs font-semibold uppercase tracking-wider">
                 {is_authenticated ? (
-                    <a href={urls.home} className="px-3 text-[#636b6f] no-underline hover:underline">
+                    <a href={urls.home} className="px-3 text-muted-foreground no-underline hover:underline">
                         Home
                     </a>
                 ) : (
                     <>
-                        <a href={urls.home} className="px-3 text-[#636b6f] no-underline hover:underline">
+                        <a href={urls.home} className="px-3 text-muted-foreground no-underline hover:underline">
                             Guest
                         </a>
-                        <a href={urls.login} className="px-3 text-[#636b6f] no-underline hover:underline">
+                        <a href={urls.login} className="px-3 text-muted-foreground no-underline hover:underline">
                             Login
                         </a>
-                        <a href={urls.register} className="px-3 text-[#636b6f] no-underline hover:underline">
+                        <a href={urls.register} className="px-3 text-muted-foreground no-underline hover:underline">
                             Register
                         </a>
                     </>
@@ -107,7 +107,7 @@ export default function Welcome() {
                         router.visit(buildUrl(value));
                     }}
                 >
-                    <label htmlFor="person-search" className="mb-1.5 block text-sm text-[#888]">
+                    <label htmlFor="person-search" className="mb-1.5 block text-sm text-muted-foreground">
                         {t('welcome_search_label')}
                     </label>
                     <div className="grid grid-cols-[1fr_auto] gap-2">
@@ -119,11 +119,11 @@ export default function Welcome() {
                             placeholder={t('welcome_search_placeholder')}
                             value={term}
                             onChange={(e) => onInput(e.target.value)}
-                            className="w-full rounded-md border border-[#dcdcdc] px-3.5 py-3 text-base"
+                            className="w-full rounded-md border border-border px-3.5 py-3 text-base"
                         />
                         <button
                             type="submit"
-                            className="cursor-pointer whitespace-nowrap rounded-md border border-[#dcdcdc] bg-white px-4 py-2.5 text-[15px] hover:bg-[#f5f5f5]"
+                            className="cursor-pointer whitespace-nowrap rounded-md border border-border bg-card px-4 py-2.5 text-[15px] hover:bg-muted"
                         >
                             {t('welcome_search_btn')}
                         </button>
@@ -131,13 +131,13 @@ export default function Welcome() {
                 </form>
 
                 {suggestions.length > 0 && (
-                    <div className="absolute left-0 right-0 top-full z-10 mt-1.5 max-h-60 overflow-y-auto rounded-md border border-[#dcdcdc] bg-white shadow-lg">
+                    <div className="absolute left-0 right-0 top-full z-10 mt-1.5 max-h-60 overflow-y-auto rounded-md border border-border bg-card shadow-lg">
                         {/* #67：改用真實 <a href>，使 Ctrl/⌘/Shift+點擊與中鍵可原生開新分頁；一般點擊與原 window.location 導航等價。 */}
                         {suggestions.map((item, i) => (
                             <a
                                 key={item.c_personid != null ? String(item.c_personid) : `s-${i}`}
                                 href={item.c_personid != null ? buildUrl(String(item.c_personid)) : undefined}
-                                className="block w-full border-b border-[#f0f0f0] bg-white px-3 py-2.5 text-left text-sm text-inherit no-underline last:border-b-0 hover:bg-[#f5f5f5] focus:bg-[#f5f5f5] focus:outline-none"
+                                className="block w-full border-b border-border bg-card px-3 py-2.5 text-left text-sm text-inherit no-underline last:border-b-0 hover:bg-muted focus:bg-muted focus:outline-none"
                             >
                                 {label(item)}
                             </a>

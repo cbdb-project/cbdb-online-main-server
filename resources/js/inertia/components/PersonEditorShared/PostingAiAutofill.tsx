@@ -94,13 +94,13 @@ export default function PostingAiAutofill({ personId, extractEndpoint, aiModel, 
 }
 
 // 與 AiCodeLookupPanel 同一藍色系（系統藍）：卡片 #eff6ff、頭部 #dbeafe、主按鈕品牌藍 #255f93。
-const cardStyle: React.CSSProperties = { background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, marginBottom: 14, overflow: 'hidden' };
-const headerStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: '#dbeafe', borderBottom: '1px solid #bfdbfe' };
-const titleStyle: React.CSSProperties = { color: '#1e3a8a', fontSize: '0.95rem' };
-const textareaStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: '1rem', boxSizing: 'border-box', resize: 'vertical' };
-const aiBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 16px', border: '1px solid #1d4d77', background: '#255f93', color: '#fff', fontWeight: 700, cursor: 'pointer' };
-const clearBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid #cbd5e1', background: '#fff', color: '#475569', fontWeight: 600, cursor: 'pointer' };
-const infoTextStyle: React.CSSProperties = { fontSize: '0.82rem', color: '#0369a1' };
-const okTextStyle: React.CSSProperties = { fontSize: '0.82rem', color: '#065f46' };
-const errTextStyle: React.CSSProperties = { fontSize: '0.82rem', color: '#991b1b' };
-const summaryStyle: React.CSSProperties = { margin: '8px 0 0', paddingLeft: 18, fontSize: '0.82rem', color: '#334155' };
+const cardStyle: React.CSSProperties = { background: 'var(--info-subtle)', border: '1px solid var(--info-border)', borderRadius: 10, marginBottom: 14, overflow: 'hidden' };
+const headerStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'var(--info-subtle)', borderBottom: '1px solid var(--info-border)' };
+const titleStyle: React.CSSProperties = { color: 'var(--info-subtle-foreground)', fontSize: '0.95rem' };
+const textareaStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--input)', fontSize: '1rem', boxSizing: 'border-box', resize: 'vertical' };
+const aiBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 16px', border: '1px solid var(--primary)', background: 'var(--primary)', color: 'var(--primary-foreground)', fontWeight: 700, cursor: 'pointer' };
+const clearBtn: React.CSSProperties = { borderRadius: 8, padding: '8px 14px', border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--muted-foreground)', fontWeight: 600, cursor: 'pointer' };
+const infoTextStyle: React.CSSProperties = { fontSize: '0.82rem', color: 'var(--info-subtle-foreground)' };
+const okTextStyle: React.CSSProperties = { fontSize: '0.82rem', color: 'var(--success-subtle-foreground)' };
+const errTextStyle: React.CSSProperties = { fontSize: '0.82rem', color: 'var(--danger-subtle-foreground)' };
+const summaryStyle: React.CSSProperties = { margin: '8px 0 0', paddingLeft: 18, fontSize: '0.82rem', color: 'var(--muted-foreground)' };

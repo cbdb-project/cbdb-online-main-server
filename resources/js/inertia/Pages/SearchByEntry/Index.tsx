@@ -472,14 +472,14 @@ export default function Index() {
                     <div style={{ ...panelHeaderStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                         <span>{t('results_workspace')}</span>
                         {results && (
-                            <span style={{ color: '#6c757d', fontSize: '0.82rem', fontWeight: 500 }}>
+                            <span style={{ color: 'var(--muted-foreground)', fontSize: '0.82rem', fontWeight: 500 }}>
                                 {t('results_record_summary', { record_count: String(results.summary.record_count), person_count: String(results.summary.person_count) })}
                             </span>
                         )}
                     </div>
                     <div style={{ padding: 16, display: 'grid', gap: 14 }}>
                         {!results && !resultsError && (
-                            <div style={{ color: '#6c757d', fontSize: '0.92rem' }}>
+                            <div style={{ color: 'var(--muted-foreground)', fontSize: '0.92rem' }}>
                                     {t('results_empty_hint')}
                             </div>
                         )}
@@ -864,7 +864,7 @@ function SelectorCard({
             <div style={selectorCardHeaderStyle}>
                 <div>
                     <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>{title}</div>
-                    <div style={{ marginTop: 4, color: '#6c757d', fontSize: '0.82rem' }}>{summary}</div>
+                    <div style={{ marginTop: 4, color: 'var(--muted-foreground)', fontSize: '0.82rem' }}>{summary}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     {onClear && clearLabel && (
@@ -891,7 +891,7 @@ function SelectedPlaceChips({
 }) {
     const tPlace = useTranslation('person');
     if (places.length === 0) {
-        return <span style={{ color: '#6c757d', fontSize: '0.85rem' }}>{tPlace('not_selected')}</span>;
+        return <span style={{ color: 'var(--muted-foreground)', fontSize: '0.85rem' }}>{tPlace('not_selected')}</span>;
     }
 
     return (
@@ -1126,9 +1126,9 @@ const sidebarCardStyle = (isCompactLayout: boolean, isSidebarOpen: boolean): Rea
     flexDirection: 'column',
     gap: 14,
     minHeight: isCompactLayout ? 'auto' : (isSidebarOpen ? 'calc(100vh - 120px)' : 'auto'),
-    border: '1px solid #d7dee6',
+    border: '1px solid var(--border)',
     borderRadius: 4,
-    backgroundColor: '#f8fafc',
+    backgroundColor: 'var(--surface-sunken)',
     boxShadow: '0 12px 36px rgba(15, 23, 42, 0.08)',
     overflow: 'hidden',
 });
@@ -1139,8 +1139,8 @@ const sidebarHeaderStyle: React.CSSProperties = {
     alignItems: 'flex-start',
     gap: 12,
     padding: '16px 18px',
-    borderBottom: '1px solid #dee2e6',
-    backgroundColor: '#fff',
+    borderBottom: '1px solid var(--border)',
+    backgroundColor: 'var(--card)',
 };
 
 const sidebarBodyStyle: React.CSSProperties = {
@@ -1158,9 +1158,9 @@ const sidebarRailStyle: React.CSSProperties = {
 const collapseButtonStyle: React.CSSProperties = {
     padding: '7px 12px',
     borderRadius: 4,
-    border: '1px solid #d0d8e2',
-    backgroundColor: '#fff',
-    color: '#334155',
+    border: '1px solid var(--border)',
+    backgroundColor: 'var(--card)',
+    color: 'var(--muted-foreground)',
     cursor: 'pointer',
     fontSize: '0.82rem',
     fontWeight: 600,
@@ -1170,18 +1170,18 @@ const expandRailButtonStyle: React.CSSProperties = {
     width: '100%',
     padding: '8px 10px',
     borderRadius: 4,
-    border: '1px solid #d0d8e2',
-    backgroundColor: '#fff',
-    color: '#334155',
+    border: '1px solid var(--border)',
+    backgroundColor: 'var(--card)',
+    color: 'var(--muted-foreground)',
     cursor: 'pointer',
     fontSize: '0.82rem',
     fontWeight: 700,
 };
 
 const panelStyle: React.CSSProperties = {
-    border: '1px solid #dee2e6',
+    border: '1px solid var(--border)',
     borderRadius: 4,
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--card)',
     overflow: 'hidden',
 };
 
@@ -1191,7 +1191,7 @@ const selectorCardHeaderStyle: React.CSSProperties = {
     alignItems: 'flex-start',
     gap: 10,
     padding: '14px 16px',
-    borderBottom: '1px solid #eef2f6',
+    borderBottom: '1px solid var(--border)',
 };
 
 function selectorPrimaryButtonStyle(disabled: boolean): React.CSSProperties {
@@ -1199,8 +1199,8 @@ function selectorPrimaryButtonStyle(disabled: boolean): React.CSSProperties {
         padding: '6px 12px',
         borderRadius: 4,
         border: 'none',
-        backgroundColor: disabled ? '#cbd5e1' : '#0d6efd',
-        color: '#fff',
+        backgroundColor: disabled ? 'var(--muted)' : 'var(--primary)',
+        color: 'var(--primary-foreground)',
         cursor: disabled ? 'not-allowed' : 'pointer',
         fontSize: '0.82rem',
         fontWeight: 700,
@@ -1210,9 +1210,9 @@ function selectorPrimaryButtonStyle(disabled: boolean): React.CSSProperties {
 const selectorSecondaryButtonStyle: React.CSSProperties = {
     padding: '6px 10px',
     borderRadius: 4,
-    border: '1px solid #cbd5e1',
-    backgroundColor: '#fff',
-    color: '#475569',
+    border: '1px solid var(--border)',
+    backgroundColor: 'var(--card)',
+    color: 'var(--muted-foreground)',
     cursor: 'pointer',
     fontSize: '0.82rem',
     fontWeight: 600,
@@ -1221,14 +1221,14 @@ const selectorSecondaryButtonStyle: React.CSSProperties = {
 const selectionCaptionStyle: React.CSSProperties = {
     marginBottom: 6,
     fontSize: '0.74rem',
-    color: '#6b7280',
+    color: 'var(--muted-foreground)',
     textTransform: 'uppercase',
     letterSpacing: '0.02em',
 };
 
 const selectionValueStyle: React.CSSProperties = {
     fontSize: '0.92rem',
-    color: '#0f172a',
+    color: 'var(--foreground)',
     fontWeight: 600,
 };
 
@@ -1238,9 +1238,9 @@ function railButtonStyle(disabled: boolean, primary: boolean): React.CSSProperti
         minHeight: 48,
         padding: '10px 8px',
         borderRadius: 4,
-        border: primary ? 'none' : '1px solid #d0d8e2',
-        backgroundColor: primary ? '#0d6efd' : '#fff',
-        color: primary ? '#fff' : '#334155',
+        border: primary ? 'none' : '1px solid var(--border)',
+        backgroundColor: primary ? 'var(--primary)' : 'var(--card)',
+        color: primary ? 'var(--primary-foreground)' : 'var(--muted-foreground)',
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.55 : 1,
         fontSize: '0.82rem',
@@ -1261,9 +1261,9 @@ const workspaceErrorStackStyle: React.CSSProperties = {
 };
 
 const workspaceSummaryCardStyle: React.CSSProperties = {
-    border: '1px solid #d8e0e8',
+    border: '1px solid var(--border)',
     borderRadius: 4,
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--card)',
     padding: 16,
     boxShadow: '0 10px 28px rgba(15, 23, 42, 0.05)',
 };
@@ -1277,8 +1277,8 @@ const summaryGridStyle: React.CSSProperties = {
 const summaryItemStyle: React.CSSProperties = {
     padding: '10px 12px',
     borderRadius: 4,
-    backgroundColor: '#f8fafc',
-    border: '1px solid #e4ebf2',
+    backgroundColor: 'var(--surface-sunken)',
+    border: '1px solid var(--border)',
 };
 
 function filterSummaryTileStyle(size: 'normal' | 'large'): React.CSSProperties {
@@ -1303,14 +1303,14 @@ const summaryLabelStyle: React.CSSProperties = {
     lineHeight: 1.2,
     fontSize: '0.72rem',
     letterSpacing: '0.02em',
-    color: '#6b7280',
+    color: 'var(--muted-foreground)',
     textTransform: 'uppercase',
 };
 
 const summaryValueStyle: React.CSSProperties = {
     marginTop: 4,
     fontSize: '0.92rem',
-    color: '#111827',
+    color: 'var(--foreground)',
     fontWeight: 600,
     overflowWrap: 'anywhere',
     alignSelf: 'start',
@@ -1319,7 +1319,7 @@ const summaryValueStyle: React.CSSProperties = {
 const filterSummaryDetailStyle: React.CSSProperties = {
     marginTop: 6,
     fontSize: '0.78rem',
-    color: '#6b7280',
+    color: 'var(--muted-foreground)',
     lineHeight: 1.4,
     overflowWrap: 'anywhere',
     minHeight: '2.8em',
@@ -1329,9 +1329,9 @@ const filterSummaryDetailStyle: React.CSSProperties = {
 const summaryActionButtonStyle: React.CSSProperties = {
     padding: '7px 12px',
     borderRadius: 4,
-    border: '1px solid #cfd6de',
-    backgroundColor: '#f8fafc',
-    color: '#334155',
+    border: '1px solid var(--border)',
+    backgroundColor: 'var(--surface-sunken)',
+    color: 'var(--muted-foreground)',
     cursor: 'pointer',
     fontSize: '0.83rem',
     fontWeight: 600,
@@ -1347,14 +1347,14 @@ const resultsViewportStyle: React.CSSProperties = {
     minHeight: '56vh',
     maxHeight: '72vh',
     overflow: 'auto',
-    border: '1px solid #e3e8ee',
+    border: '1px solid var(--border)',
     borderRadius: 4,
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--card)',
 };
 
 const panelHeaderStyle: React.CSSProperties = {
     padding: '12px 16px',
-    borderBottom: '1px solid #dee2e6',
+    borderBottom: '1px solid var(--border)',
     fontWeight: 700,
     fontSize: '0.96rem',
 };
@@ -1388,22 +1388,22 @@ const checkboxListItemStyle: React.CSSProperties = {
     alignItems: 'flex-start',
     gap: 8,
     padding: '8px 10px',
-    border: '1px solid #dbe2ea',
+    border: '1px solid var(--border)',
     borderRadius: 4,
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--card)',
     fontSize: '0.85rem',
     cursor: 'pointer',
 };
 
 const hintStyle: React.CSSProperties = {
     fontSize: '0.75rem',
-    color: '#6c757d',
+    color: 'var(--muted-foreground)',
     marginTop: 4,
 };
 
 const dividerStyle: React.CSSProperties = {
     border: 'none',
-    borderTop: '1px solid #e9ecef',
+    borderTop: '1px solid var(--border)',
     margin: '14px 0',
 };
 
@@ -1412,7 +1412,7 @@ const textInputStyle: React.CSSProperties = {
     maxWidth: '100%',
     boxSizing: 'border-box',
     padding: '7px 10px',
-    border: '1px solid #ced4da',
+    border: '1px solid var(--input)',
     borderRadius: 4,
     fontSize: '0.875rem',
 };
@@ -1420,7 +1420,7 @@ const textInputStyle: React.CSSProperties = {
 const numberInputStyle: React.CSSProperties = {
     flex: 1,
     padding: '7px 10px',
-    border: '1px solid #ced4da',
+    border: '1px solid var(--input)',
     borderRadius: 4,
     fontSize: '0.875rem',
 };
@@ -1428,18 +1428,18 @@ const numberInputStyle: React.CSSProperties = {
 const selectStyle: React.CSSProperties = {
     flex: 1,
     padding: '7px 10px',
-    border: '1px solid #ced4da',
+    border: '1px solid var(--input)',
     borderRadius: 4,
     fontSize: '0.875rem',
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--card)',
 };
 
 function primaryButtonStyle(disabled: boolean): React.CSSProperties {
     return {
         flex: 1,
         padding: '9px 14px',
-        backgroundColor: '#0d6efd',
-        color: '#fff',
+        backgroundColor: 'var(--primary)',
+        color: 'var(--primary-foreground)',
         border: 'none',
         borderRadius: 4,
         cursor: disabled ? 'wait' : 'pointer',
@@ -1458,8 +1458,8 @@ function toolbarPrimaryButtonStyle(disabled: boolean): React.CSSProperties {
 
 const secondaryButtonStyle: React.CSSProperties = {
     padding: '9px 14px',
-    backgroundColor: '#6c757d',
-    color: '#fff',
+    backgroundColor: 'var(--muted-foreground)',
+    color: 'var(--card)',
     border: 'none',
     borderRadius: 4,
     cursor: 'pointer',
@@ -1475,8 +1475,8 @@ const toolbarSecondaryButtonStyle: React.CSSProperties = {
 const errorBoxStyle: React.CSSProperties = {
     padding: '10px 12px',
     borderRadius: 4,
-    backgroundColor: '#f8d7da',
-    color: '#842029',
+    backgroundColor: 'var(--danger-subtle)',
+    color: 'var(--danger-subtle-foreground)',
     fontSize: '0.85rem',
 };
 
@@ -1484,10 +1484,10 @@ function tabButtonStyle(active: boolean): React.CSSProperties {
     return {
         padding: '9px 16px',
         borderRadius: '4px 4px 0 0',
-        border: '1px solid #cfd8e3',
-        borderBottomColor: active ? '#fff' : '#cfd8e3',
-        backgroundColor: active ? '#fff' : '#eef3f8',
-        color: active ? '#0f172a' : '#526071',
+        border: '1px solid var(--border)',
+        borderBottomColor: active ? 'var(--card)' : 'var(--border)',
+        backgroundColor: active ? 'var(--card)' : 'var(--muted)',
+        color: active ? 'var(--foreground)' : 'var(--muted-foreground)',
         cursor: 'pointer',
         fontSize: '0.85rem',
         fontWeight: 600,
@@ -1499,7 +1499,7 @@ const tabStripStyle: React.CSSProperties = {
     display: 'flex',
     gap: 6,
     alignItems: 'flex-end',
-    borderBottom: '1px solid #cfd8e3',
+    borderBottom: '1px solid var(--border)',
     paddingBottom: 0,
 };
 
@@ -1507,8 +1507,8 @@ const placeChipStyle: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
     padding: '4px 9px',
-    backgroundColor: '#198754',
-    color: '#fff',
+    backgroundColor: 'var(--success)',
+    color: 'var(--success-foreground)',
     borderRadius: 4,
     fontSize: '0.75rem',
 };
@@ -1517,7 +1517,7 @@ const chipRemoveButtonStyle: React.CSSProperties = {
     marginLeft: 4,
     background: 'none',
     border: 'none',
-    color: '#fff',
+    color: 'var(--success-foreground)',
     cursor: 'pointer',
     padding: '0 2px',
     fontSize: '0.85rem',
@@ -1535,8 +1535,8 @@ const dialogPrimaryButtonStyle: React.CSSProperties = {
     padding: '8px 14px',
     borderRadius: 4,
     border: 'none',
-    backgroundColor: '#0d6efd',
-    color: '#fff',
+    backgroundColor: 'var(--primary)',
+    color: 'var(--primary-foreground)',
     cursor: 'pointer',
     fontSize: '0.85rem',
     fontWeight: 700,
@@ -1545,9 +1545,9 @@ const dialogPrimaryButtonStyle: React.CSSProperties = {
 const dialogSecondaryButtonStyle: React.CSSProperties = {
     padding: '8px 14px',
     borderRadius: 4,
-    border: '1px solid #cbd5e1',
-    backgroundColor: '#fff',
-    color: '#475569',
+    border: '1px solid var(--border)',
+    backgroundColor: 'var(--card)',
+    color: 'var(--muted-foreground)',
     cursor: 'pointer',
     fontSize: '0.85rem',
     fontWeight: 600,
@@ -1568,9 +1568,9 @@ const entrySelectionSummaryPanelStyle: React.CSSProperties = {
 const modalHintBoxStyle: React.CSSProperties = {
     padding: '12px 14px',
     borderRadius: 0,
-    backgroundColor: '#eff6ff',
-    border: '1px solid #dbeafe',
-    color: '#1d4ed8',
+    backgroundColor: 'var(--info-subtle)',
+    border: '1px solid var(--info-border)',
+    color: 'var(--info-subtle-foreground)',
     fontSize: '0.85rem',
     lineHeight: 1.5,
 };

@@ -9,7 +9,7 @@ interface Props {
 
 export default function SelectedCodeChips({ selectedCodes, allCodes, onRemove }: Props) {
     if (selectedCodes.length === 0) {
-        return <span style={{ color: '#6c757d', fontSize: '0.85rem' }}>尚未選擇</span>;
+        return <span style={{ color: 'var(--muted-foreground)', fontSize: '0.85rem' }}>尚未選擇</span>;
     }
 
     const codeMap = new Map(allCodes.map((c) => [c.c_entry_code, c]));
@@ -26,8 +26,8 @@ export default function SelectedCodeChips({ selectedCodes, allCodes, onRemove }:
                             display: 'inline-flex',
                             alignItems: 'center',
                             padding: '2px 8px',
-                            backgroundColor: '#007bff',
-                            color: '#fff',
+                            backgroundColor: 'var(--primary)',
+                            color: 'var(--primary-foreground)',
                             borderRadius: 4,
                             fontSize: '0.75rem',
                         }}
@@ -40,7 +40,7 @@ export default function SelectedCodeChips({ selectedCodes, allCodes, onRemove }:
                                 marginLeft: 4,
                                 background: 'none',
                                 border: 'none',
-                                color: '#fff',
+                                color: 'var(--primary-foreground)',
                                 cursor: 'pointer',
                                 padding: '0 2px',
                                 fontSize: '0.85rem',

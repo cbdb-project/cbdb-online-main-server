@@ -188,7 +188,7 @@ export default function TabContentLoader({
 
     if (state.error) {
         return (
-            <div style={{ ...msgStyle, color: '#dc3545' }}>
+            <div style={{ ...msgStyle, color: 'var(--destructive)' }}>
                 <div>載入失敗：{state.error}</div>
                 <button type="button" style={retryButtonStyle} onClick={retryActiveTab}>
                     重新載入
@@ -485,16 +485,16 @@ export default function TabContentLoader({
 const msgStyle: React.CSSProperties = {
     padding: 24,
     textAlign: 'center',
-    color: '#6c757d',
+    color: 'var(--muted-foreground)',
     fontSize: '0.875rem',
 };
 
 const retryButtonStyle: React.CSSProperties = {
     marginTop: 12,
     padding: '6px 12px',
-    border: '1px solid #dc3545',
+    border: '1px solid var(--destructive)',
     borderRadius: 4,
-    backgroundColor: '#fff',
-    color: '#dc3545',
+    backgroundColor: 'var(--card)',
+    color: 'var(--destructive)',
     cursor: 'pointer',
 };

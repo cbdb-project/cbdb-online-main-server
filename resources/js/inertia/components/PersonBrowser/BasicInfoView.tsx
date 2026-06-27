@@ -1623,15 +1623,15 @@ const modelIdKeyMap: Record<string, string> = {
 };
 
 const panelStyle: React.CSSProperties = {
-    backgroundColor: '#fff',
-    border: '1px solid #d3dae3',
+    backgroundColor: 'var(--card)',
+    border: '1px solid var(--border)',
     borderRadius: 10,
     boxShadow: '0 1px 3px rgba(15, 23, 42, 0.05)',
     overflow: 'hidden',
 };
 
 const editingPanelStyle: React.CSSProperties = {
-    borderColor: '#7ea8cc',
+    borderColor: 'var(--primary)',
     boxShadow: '0 0 0 3px rgba(53, 111, 161, 0.08), 0 4px 16px rgba(15, 23, 42, 0.08)',
 };
 
@@ -1642,20 +1642,20 @@ const toolbarStyle: React.CSSProperties = {
     gap: 12,
     flexWrap: 'wrap',
     padding: '16px 20px',
-    borderBottom: '1px solid #e8edf3',
-    backgroundColor: '#fbfcfe',
+    borderBottom: '1px solid var(--border)',
+    backgroundColor: 'var(--surface-sunken)',
 };
 
 const toolbarTitleStyle: React.CSSProperties = {
     fontSize: '1rem',
     fontWeight: 700,
-    color: '#213445',
+    color: 'var(--foreground)',
 };
 
 const editingHintStyle: React.CSSProperties = {
     marginTop: 4,
     fontSize: '0.82rem',
-    color: '#5f7891',
+    color: 'var(--muted-foreground)',
 };
 
 const toolbarButtonGroupStyle: React.CSSProperties = {
@@ -1676,21 +1676,21 @@ const buttonBaseStyle: React.CSSProperties = {
 const primaryButtonStyle: React.CSSProperties = {
     ...buttonBaseStyle,
     backgroundColor: APP_THEME.brand,
-    color: '#fff',
+    color: 'var(--primary-foreground)',
 };
 
 const secondaryButtonStyle: React.CSSProperties = {
     ...buttonBaseStyle,
-    backgroundColor: '#f0f6fb',
-    color: '#1f527c',
-    borderColor: '#b9cfe2',
+    backgroundColor: 'var(--info-subtle)',
+    color: 'var(--info-subtle-foreground)',
+    borderColor: 'var(--info-border)',
 };
 
 const neutralButtonStyle: React.CSSProperties = {
     ...buttonBaseStyle,
-    backgroundColor: '#fff',
-    color: '#4f6274',
-    borderColor: '#cdd7e1',
+    backgroundColor: 'var(--card)',
+    color: 'var(--muted-foreground)',
+    borderColor: 'var(--border)',
 };
 
 const dangerActionWrapStyle: React.CSSProperties = {
@@ -1701,18 +1701,18 @@ const dangerActionWrapStyle: React.CSSProperties = {
 
 const dangerButtonStyle: React.CSSProperties = {
     ...buttonBaseStyle,
-    backgroundColor: '#fff',
-    color: '#dc3545',
-    borderColor: '#dc3545',
+    backgroundColor: 'var(--card)',
+    color: 'var(--destructive)',
+    borderColor: 'var(--destructive)',
 };
 
 const successMessageStyle: React.CSSProperties = {
     margin: '16px 20px 0',
     padding: '10px 12px',
     borderRadius: 8,
-    backgroundColor: '#ecf8ef',
-    border: '1px solid #bedfca',
-    color: '#25603a',
+    backgroundColor: 'var(--success-subtle)',
+    border: '1px solid var(--success-border)',
+    color: 'var(--success-subtle-foreground)',
     fontSize: '0.88rem',
 };
 
@@ -1720,17 +1720,17 @@ const errorMessageStyle: React.CSSProperties = {
     margin: '16px 20px 0',
     padding: '10px 12px',
     borderRadius: 8,
-    backgroundColor: '#fff1f1',
-    border: '1px solid #e3bcbc',
-    color: '#a03131',
+    backgroundColor: 'var(--danger-subtle)',
+    border: '1px solid var(--danger-border)',
+    color: 'var(--danger-subtle-foreground)',
     fontSize: '0.88rem',
 };
 
 const sectionStyle: React.CSSProperties = {
     margin: '16px 16px 0',
     padding: '20px 20px 24px',
-    backgroundColor: '#f8fafc',
-    border: '1px solid #dfe6ee',
+    backgroundColor: 'var(--surface-sunken)',
+    border: '1px solid var(--border)',
     borderRadius: 10,
 };
 
@@ -1783,22 +1783,22 @@ const editorNameGroupGridStyle: React.CSSProperties = {
 
 const nameGroupCardStyle: React.CSSProperties = {
     padding: '14px 14px 16px',
-    border: '1px solid #dfe6ee',
+    border: '1px solid var(--border)',
     borderRadius: 8,
-    backgroundColor: '#fdfdfe',
+    backgroundColor: 'var(--card)',
 };
 
 const editorNameGroupStyle: React.CSSProperties = {
     padding: '14px 14px 16px',
-    border: '1px solid #c9d9e8',
+    border: '1px solid var(--border)',
     borderRadius: 10,
-    backgroundColor: '#f7fbff',
+    backgroundColor: 'var(--card)',
 };
 
 const nameGroupTitleStyle: React.CSSProperties = {
     fontSize: '0.88rem',
     fontWeight: 700,
-    color: '#6b2533',
+    color: 'var(--destructive)',
     marginBottom: 12,
     textAlign: 'center',
 };
@@ -1848,15 +1848,15 @@ const timelineGridStyle: React.CSSProperties = {
 
 const timelineCardStyle: React.CSSProperties = {
     padding: 16,
-    border: '1px solid #dfe6ee',
+    border: '1px solid var(--border)',
     borderRadius: 8,
-    backgroundColor: '#fdfdfe',
+    backgroundColor: 'var(--card)',
 };
 
 const timelineTitleStyle: React.CSSProperties = {
     fontSize: '0.94rem',
     fontWeight: 700,
-    color: '#6b2533',
+    color: 'var(--destructive)',
     marginBottom: 12,
     textAlign: 'center',
 };
@@ -1884,7 +1884,7 @@ const fullWidthStyle: React.CSSProperties = {
 const fieldLabelStyle: React.CSSProperties = {
     fontSize: '0.84rem',
     fontWeight: 600,
-    color: '#556677',
+    color: 'var(--muted-foreground)',
     marginBottom: 6,
     textAlign: 'left',
     whiteSpace: 'nowrap',
@@ -1893,7 +1893,7 @@ const fieldLabelStyle: React.CSSProperties = {
 };
 
 const dirtyFieldLabelStyle: React.CSSProperties = {
-    color: '#8a5a15',
+    color: 'var(--warning-subtle-foreground)',
 };
 
 const fieldValueBoxStyle: React.CSSProperties = {
@@ -1901,9 +1901,9 @@ const fieldValueBoxStyle: React.CSSProperties = {
     padding: '0 12px',
     boxSizing: 'border-box',
     borderRadius: 8,
-    border: '1px solid #cfd7e2',
-    backgroundColor: '#fff',
-    color: '#1f2d3d',
+    border: '1px solid var(--border)',
+    backgroundColor: 'var(--card)',
+    color: 'var(--foreground)',
     fontSize: '0.92rem',
     display: 'flex',
     alignItems: 'center',
@@ -1920,9 +1920,9 @@ const inputStyle: React.CSSProperties = {
     padding: '0 12px',
     boxSizing: 'border-box',
     borderRadius: 8,
-    border: '1px solid #92b2d1',
-    backgroundColor: '#fffdf4',
-    color: '#163049',
+    border: '1px solid var(--input)',
+    backgroundColor: 'var(--card)',
+    color: 'var(--foreground)',
     textAlign: 'center',
     boxShadow: 'inset 0 1px 2px rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(146, 178, 209, 0.08)',
 };
@@ -1932,9 +1932,9 @@ const textareaStyle: React.CSSProperties = {
     padding: '10px 12px',
     boxSizing: 'border-box',
     borderRadius: 8,
-    border: '1px solid #92b2d1',
-    backgroundColor: '#fffdf4',
-    color: '#163049',
+    border: '1px solid var(--input)',
+    backgroundColor: 'var(--card)',
+    color: 'var(--foreground)',
     textAlign: 'left',
     lineHeight: 1.6,
     boxShadow: 'inset 0 1px 2px rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(146, 178, 209, 0.08)',
@@ -1954,9 +1954,9 @@ const dropdownStyle: React.CSSProperties = {
     zIndex: 20,
     maxHeight: 240,
     overflowY: 'auto',
-    border: '1px solid #cfd7e2',
+    border: '1px solid var(--border)',
     borderRadius: 8,
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--card)',
     boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
 };
 
@@ -1964,8 +1964,8 @@ const dropdownItemStyle: React.CSSProperties = {
     width: '100%',
     padding: '9px 12px',
     border: 'none',
-    backgroundColor: '#fff',
-    color: '#1f2d3d',
+    backgroundColor: 'var(--card)',
+    color: 'var(--foreground)',
     textAlign: 'left',
     cursor: 'pointer',
 };
@@ -1979,8 +1979,8 @@ const checkboxWrapStyle: React.CSSProperties = {
     padding: '0 12px',
     boxSizing: 'border-box',
     borderRadius: 8,
-    border: '1px solid #92b2d1',
-    backgroundColor: '#fffdf4',
+    border: '1px solid var(--input)',
+    backgroundColor: 'var(--card)',
     boxShadow: 'inset 0 1px 2px rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(146, 178, 209, 0.08)',
     cursor: 'pointer',
 };
@@ -1994,7 +1994,7 @@ const checkboxInputStyle: React.CSSProperties = {
 const checkboxLabelStyle: React.CSSProperties = {
     fontSize: '0.9rem',
     fontWeight: 600,
-    color: '#163049',
+    color: 'var(--foreground)',
 };
 
 const inlineActionWrapStyle: React.CSSProperties = {
@@ -2010,8 +2010,8 @@ const editorBottomBarStyle: React.CSSProperties = {
     gap: 12,
     flexWrap: 'wrap',
     padding: '16px 20px 20px',
-    borderTop: '1px solid #dbe7f2',
-    backgroundColor: '#f9fbfe',
+    borderTop: '1px solid var(--border)',
+    backgroundColor: 'var(--surface-sunken)',
 };
 
 const editorBottomBarButtonsStyle: React.CSSProperties = {
@@ -2021,13 +2021,13 @@ const editorBottomBarButtonsStyle: React.CSSProperties = {
 
 const editorBottomBarHintStyle: React.CSSProperties = {
     fontSize: '0.82rem',
-    color: '#62798f',
+    color: 'var(--muted-foreground)',
 };
 
 const fieldErrorStyle: React.CSSProperties = {
     marginTop: 6,
     fontSize: '0.77rem',
-    color: '#b23a3a',
+    color: 'var(--destructive)',
 };
 
 // 逐欄位說明文字（對齊舊頁 <small class="text-muted">）；用 <small> 標籤確保被擷取工具的 hints 選擇器涵蓋。
@@ -2035,53 +2035,53 @@ const fieldHintStyle: React.CSSProperties = {
     display: 'block',
     marginTop: 6,
     fontSize: '0.77rem',
-    color: '#6c757d',
+    color: 'var(--muted-foreground)',
     lineHeight: 1.5,
     whiteSpace: 'normal',
 };
 
 const mutedValueBoxStyle: React.CSSProperties = {
-    backgroundColor: '#f8fafc',
-    borderColor: '#d5dee8',
+    backgroundColor: 'var(--surface-sunken)',
+    borderColor: 'var(--border)',
 };
 
 const subtleValueBoxStyle: React.CSSProperties = {
-    backgroundColor: '#fffdf7',
-    borderColor: '#ddd3aa',
+    backgroundColor: 'var(--warning-subtle)',
+    borderColor: 'var(--warning-border)',
 };
 
 const emphasisValueBoxStyle: React.CSSProperties = {
-    backgroundColor: '#f1f6fb',
-    borderColor: '#c7d8ea',
+    backgroundColor: 'var(--info-subtle)',
+    borderColor: 'var(--info-border)',
     fontSize: '1rem',
     fontWeight: 700,
 };
 
 const derivedValueBoxStyle: React.CSSProperties = {
-    backgroundColor: '#f4f8fb',
-    borderColor: '#bfcfdf',
-    color: '#18344d',
+    backgroundColor: 'var(--info-subtle)',
+    borderColor: 'var(--info-border)',
+    color: 'var(--info-subtle-foreground)',
     fontWeight: 700,
 };
 
 const dirtyValueBoxStyle: React.CSSProperties = {
-    backgroundColor: '#fff5db',
-    borderColor: '#d3a342',
+    backgroundColor: 'var(--warning-subtle)',
+    borderColor: 'var(--warning-border)',
     boxShadow: 'inset 0 1px 2px rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(211, 163, 66, 0.16)',
 };
 
 const dirtyInputStyle: React.CSSProperties = {
-    backgroundColor: '#fff7e4',
-    borderColor: '#d3a342',
+    backgroundColor: 'var(--warning-subtle)',
+    borderColor: 'var(--warning-border)',
     boxShadow: 'inset 0 1px 2px rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(211, 163, 66, 0.18)',
 };
 
 const notesBoxStyle: React.CSSProperties = {
     padding: '14px 16px',
     borderRadius: 8,
-    border: '1px solid #cfd7e2',
-    backgroundColor: '#fff',
-    color: '#2a3642',
+    border: '1px solid var(--border)',
+    backgroundColor: 'var(--card)',
+    color: 'var(--foreground)',
     lineHeight: 1.7,
     whiteSpace: 'pre-wrap',
     wordBreak: 'break-word',
@@ -2091,7 +2091,7 @@ const notesBoxStyle: React.CSSProperties = {
 const notesLabelStyle: React.CSSProperties = {
     fontSize: '0.84rem',
     fontWeight: 600,
-    color: '#556677',
+    color: 'var(--muted-foreground)',
     marginBottom: 6,
     textAlign: 'left',
 };
@@ -2104,5 +2104,5 @@ const clickableFieldStyle: React.CSSProperties = {
 const emptyStyle: React.CSSProperties = {
     padding: 24,
     textAlign: 'center',
-    color: '#6c757d',
+    color: 'var(--muted-foreground)',
 };

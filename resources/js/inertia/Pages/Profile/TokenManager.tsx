@@ -144,10 +144,10 @@ export default function TokenManager({ urls, className }: { urls: ApiTokenUrls; 
                 <p className="text-sm text-muted-foreground">{t('api_token_description')}</p>
 
                 {newToken && (
-                    <div className="rounded border border-green-400 bg-green-50 p-3 text-sm">
-                        <div className="font-semibold text-green-800">{t('token_created_success')}</div>
-                        <div className="text-red-700">{t('token_save_warning')}</div>
-                        <code className="mt-1 block break-all rounded bg-white p-2 text-xs">{newToken}</code>
+                    <div className="rounded border border-success-border bg-success-subtle p-3 text-sm">
+                        <div className="font-semibold text-success-subtle-foreground">{t('token_created_success')}</div>
+                        <div className="text-danger-subtle-foreground">{t('token_save_warning')}</div>
+                        <code className="mt-1 block break-all rounded bg-card p-2 text-xs">{newToken}</code>
                     </div>
                 )}
 

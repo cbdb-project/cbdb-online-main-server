@@ -41,11 +41,11 @@ export default function PlaceMultiSelect({
                 placeholder="輸入地址名稱或 ID"
                 style={inputStyle}
             />
-            <div style={{ fontSize: '0.75rem', color: '#6c757d', marginTop: 4 }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: 4 }}>
                 可多選，會比對 `ENTRY_DATA.c_entry_addr_id`
             </div>
 
-            <div style={{ marginTop: 8, border: '1px solid #e3e7eb', borderRadius: 4, maxHeight: 260, overflowY: 'auto', backgroundColor: '#fff' }}>
+            <div style={{ marginTop: 8, border: '1px solid var(--border)', borderRadius: 4, maxHeight: 260, overflowY: 'auto', backgroundColor: 'var(--card)' }}>
                 {loading && <div style={emptyStateStyle}>搜尋中...</div>}
                 {!loading && query.trim() === '' && <div style={emptyStateStyle}>輸入關鍵字後顯示候選地點</div>}
                 {!loading && query.trim() !== '' && searchResults.length === 0 && <div style={emptyStateStyle}>查無符合地點</div>}
@@ -57,13 +57,13 @@ export default function PlaceMultiSelect({
                         style={resultButtonStyle}
                     >
                         <span>{place.c_name_chn || place.c_name || `ADDR ${place.c_addr_id}`}</span>
-                        <span style={{ color: '#6c757d', fontSize: '0.78rem' }}>#{place.c_addr_id}</span>
+                        <span style={{ color: 'var(--muted-foreground)', fontSize: '0.78rem' }}>#{place.c_addr_id}</span>
                     </button>
                 ))}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: '#495057' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
                     <input
                         type="checkbox"
                         checked={includeSubUnits}
@@ -82,7 +82,7 @@ export default function PlaceMultiSelect({
             </div>
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                {selectedPlaces.length === 0 && <span style={{ color: '#6c757d', fontSize: '0.85rem' }}>不限地點</span>}
+                {selectedPlaces.length === 0 && <span style={{ color: 'var(--muted-foreground)', fontSize: '0.85rem' }}>不限地點</span>}
                 {selectedPlaces.map((place) => (
                     <span key={place.c_addr_id} style={chipStyle}>
                         {(place.c_name_chn || place.c_name || `ADDR ${place.c_addr_id}`)} #{place.c_addr_id}
@@ -106,14 +106,14 @@ const inputStyle: React.CSSProperties = {
     maxWidth: '100%',
     boxSizing: 'border-box',
     padding: '6px 10px',
-    border: '1px solid #ced4da',
+    border: '1px solid var(--input)',
     borderRadius: 4,
     fontSize: '0.875rem',
 };
 
 const emptyStateStyle: React.CSSProperties = {
     padding: '12px 14px',
-    color: '#6c757d',
+    color: 'var(--muted-foreground)',
     fontSize: '0.85rem',
 };
 
@@ -125,17 +125,17 @@ const resultButtonStyle: React.CSSProperties = {
     padding: '8px 10px',
     backgroundColor: 'transparent',
     border: 'none',
-    borderBottom: '1px solid #f0f0f0',
+    borderBottom: '1px solid var(--border)',
     cursor: 'pointer',
     textAlign: 'left',
 };
 
 const smallButtonStyle: React.CSSProperties = {
     padding: '4px 10px',
-    border: '1px solid #6c757d',
+    border: '1px solid var(--muted-foreground)',
     borderRadius: 4,
     backgroundColor: 'transparent',
-    color: '#6c757d',
+    color: 'var(--muted-foreground)',
     cursor: 'pointer',
     fontSize: '0.8rem',
 };
@@ -144,8 +144,8 @@ const chipStyle: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
     padding: '3px 8px',
-    backgroundColor: '#198754',
-    color: '#fff',
+    backgroundColor: 'var(--success)',
+    color: 'var(--success-foreground)',
     borderRadius: 4,
     fontSize: '0.75rem',
 };
@@ -154,7 +154,7 @@ const chipRemoveStyle: React.CSSProperties = {
     marginLeft: 4,
     background: 'none',
     border: 'none',
-    color: '#fff',
+    color: 'var(--success-foreground)',
     cursor: 'pointer',
     padding: '0 2px',
     fontSize: '0.85rem',

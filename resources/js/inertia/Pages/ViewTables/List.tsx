@@ -53,7 +53,7 @@ export default function List({ views }: Props) {
                 <div style={sectionStyle}>
                     <div style={sectionBodyStyle}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-                            <div style={{ color: '#6c757d', fontSize: '0.85rem' }}>
+                            <div style={{ color: 'var(--muted-foreground)', fontSize: '0.85rem' }}>
                                 {t('views_count_summary', { total: String(views.length), shown: String(filteredViews.length) })}
                             </div>
                             <div style={filterBarStyle}>
@@ -84,7 +84,7 @@ export default function List({ views }: Props) {
                             minWidth: 860,
                         }}>
                             <thead>
-                                <tr style={{ backgroundColor: '#f8f9fa' }}>
+                                <tr style={{ backgroundColor: 'var(--muted)' }}>
                                     <th style={thStyle}>{t('view_name_en')}</th>
                                     <th style={thStyle}>{t('view_name_zh')}</th>
                                     <th style={thStyle}>{t('description')}</th>
@@ -94,7 +94,7 @@ export default function List({ views }: Props) {
                             <tbody>
                                 {filteredViews.length === 0 && (
                                     <tr>
-                                        <td colSpan={4} style={{ ...tdStyle, textAlign: 'center', color: '#6c757d', padding: '28px 12px' }}>
+                                        <td colSpan={4} style={{ ...tdStyle, textAlign: 'center', color: 'var(--muted-foreground)', padding: '28px 12px' }}>
                                             {t('no_views_found')}
                                         </td>
                                     </tr>
@@ -102,23 +102,23 @@ export default function List({ views }: Props) {
                                 {filteredViews.map((view, index) => (
                                     <tr
                                         key={view.key}
-                                        style={{ backgroundColor: index % 2 === 0 ? '#fff' : '#f8f9fa' }}
+                                        style={{ backgroundColor: index % 2 === 0 ? 'var(--card)' : 'var(--surface-sunken)' }}
                                     >
                                         <td style={tdStyle}>
                                             <Link
                                                 href={view.app_url}
-                                                style={{ color: '#007bff', textDecoration: 'none', fontFamily: 'monospace', fontSize: '0.85rem', fontWeight: 600 }}
+                                                style={{ color: 'var(--primary)', textDecoration: 'none', fontFamily: 'monospace', fontSize: '0.85rem', fontWeight: 600 }}
                                             >
                                                 {view.primary_alias}
                                             </Link>
-                                            <div style={{ color: '#444', fontSize: '0.8rem', marginTop: 3 }}>
+                                            <div style={{ color: 'var(--muted-foreground)', fontSize: '0.8rem', marginTop: 3 }}>
                                                 {view.title_en}
                                             </div>
-                                            <div style={{ color: '#6c757d', fontSize: '0.78rem', marginTop: 2 }}>
+                                            <div style={{ color: 'var(--muted-foreground)', fontSize: '0.78rem', marginTop: 2 }}>
                                                 key: <code>{view.key}</code>
                                             </div>
                                             {view.aliases.length > 1 && (
-                                                <div style={{ color: '#6c757d', fontSize: '0.8rem', marginTop: 6, lineHeight: 1.5 }}>
+                                                <div style={{ color: 'var(--muted-foreground)', fontSize: '0.8rem', marginTop: 6, lineHeight: 1.5 }}>
                                                     {view.aliases.slice(1).join(', ')}
                                                 </div>
                                             )}
@@ -142,20 +142,20 @@ const thStyle: React.CSSProperties = {
     textAlign: 'left',
     fontWeight: 600,
     fontSize: '0.85rem',
-    color: '#495057',
-    borderBottom: '2px solid #dee2e6',
+    color: 'var(--muted-foreground)',
+    borderBottom: '2px solid var(--border)',
     whiteSpace: 'nowrap',
 };
 
 const tdStyle: React.CSSProperties = {
     padding: '8px 12px',
-    borderBottom: '1px solid #dee2e6',
+    borderBottom: '1px solid var(--border)',
     verticalAlign: 'top',
 };
 
 const sectionStyle: React.CSSProperties = {
-    backgroundColor: '#fff',
-    border: '1px solid #dee2e6',
+    backgroundColor: 'var(--card)',
+    border: '1px solid var(--border)',
     borderRadius: 4,
     overflow: 'hidden',
     marginBottom: 16,
@@ -163,9 +163,9 @@ const sectionStyle: React.CSSProperties = {
 
 const sectionHeaderStyle: React.CSSProperties = {
     padding: '10px 14px',
-    borderBottom: '1px solid #dee2e6',
-    backgroundColor: '#f8f9fa',
-    color: '#495057',
+    borderBottom: '1px solid var(--border)',
+    backgroundColor: 'var(--muted)',
+    color: 'var(--muted-foreground)',
     fontSize: '0.9rem',
     fontWeight: 600,
 };
@@ -185,17 +185,17 @@ const searchInputStyle: React.CSSProperties = {
     width: 320,
     maxWidth: '100%',
     padding: '8px 12px',
-    border: '1px solid #ced4da',
+    border: '1px solid var(--input)',
     borderRadius: 4,
     fontSize: '0.9rem',
 };
 
 const clearButtonStyle: React.CSSProperties = {
     padding: '8px 14px',
-    border: '1px solid #ced4da',
+    border: '1px solid var(--border)',
     borderRadius: 4,
-    backgroundColor: '#fff',
-    color: '#495057',
+    backgroundColor: 'var(--card)',
+    color: 'var(--muted-foreground)',
     cursor: 'pointer',
     fontSize: '0.9rem',
 };

@@ -228,20 +228,20 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
         <div>
             {/* Privacy notice */}
             <div style={{
-                backgroundColor: '#fff3cd',
-                border: '1px solid #ffc107',
+                backgroundColor: 'var(--warning-subtle)',
+                border: '1px solid var(--warning-border)',
                 borderRadius: 6,
                 padding: 12,
                 marginBottom: 16,
                 fontSize: '0.85rem',
-                color: '#856404',
+                color: 'var(--warning-subtle-foreground)',
             }}>
                 <strong>{t('qa_privacy_label')}</strong>{' '}{t('qa_privacy_body', { model: nlModel })}
             </div>
 
             {/* Question input */}
             <div style={{ marginBottom: 12 }}>
-                <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#343a40', display: 'block', marginBottom: 4 }}>
+                <label style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--muted-foreground)', display: 'block', marginBottom: 4 }}>
                     {t('qa_placeholder')}
                 </label>
                 <textarea
@@ -254,14 +254,14 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                     style={{
                         width: '100%',
                         padding: 12,
-                        border: '1px solid #ced4da',
+                        border: '1px solid var(--input)',
                         borderRadius: 6,
                         fontSize: '0.9rem',
                         resize: 'vertical',
                         boxSizing: 'border-box',
                     }}
                 />
-                <div style={{ textAlign: 'right', fontSize: '0.75rem', color: '#6c757d', marginTop: 2 }}>
+                <div style={{ textAlign: 'right', fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: 2 }}>
                     {question.length}/1000
                 </div>
             </div>
@@ -293,8 +293,8 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                         fontWeight: 600,
                         border: 'none',
                         borderRadius: 5,
-                        backgroundColor: loading || !question.trim() || !consent ? '#adb5bd' : '#28a745',
-                        color: '#fff',
+                        backgroundColor: loading || !question.trim() || !consent ? 'var(--muted-foreground)' : 'var(--success)',
+                        color: 'var(--success-foreground)',
                         cursor: loading || !question.trim() || !consent ? 'default' : 'pointer',
                     }}
                 >
@@ -306,10 +306,10 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                         style={{
                             padding: '8px 14px',
                             fontSize: '0.85rem',
-                            border: '1px solid #dc3545',
+                            border: '1px solid var(--destructive)',
                             borderRadius: 5,
                             backgroundColor: 'transparent',
-                            color: '#dc3545',
+                            color: 'var(--destructive)',
                             cursor: 'pointer',
                         }}
                     >
@@ -321,13 +321,13 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
             {/* Error */}
             {error && (
                 <div style={{
-                    backgroundColor: '#f8d7da',
-                    border: '1px solid #f5c6cb',
+                    backgroundColor: 'var(--danger-subtle)',
+                    border: '1px solid var(--danger-border)',
                     borderRadius: 6,
                     padding: 12,
                     marginBottom: 12,
                     fontSize: '0.85rem',
-                    color: '#721c24',
+                    color: 'var(--danger-subtle-foreground)',
                 }}>
                     ⚠ {error}
                 </div>
@@ -338,7 +338,7 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
 
             {/* Loading indicator */}
             {loading && !answerMarkdown && toolCalls.length === 0 && (
-                <div style={{ padding: 24, textAlign: 'center', color: '#6c757d' }}>
+                <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted-foreground)' }}>
                     <div style={{ fontSize: '1.5rem', marginBottom: 8 }}>⏳</div>
                     {t('qa_querying')}
                 </div>
@@ -347,20 +347,20 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
             {/* Answer display */}
             {answerMarkdown && (
                 <div style={{
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid #dee2e6',
+                    backgroundColor: 'var(--surface-sunken)',
+                    border: '1px solid var(--border)',
                     borderRadius: 6,
                     padding: 20,
                     marginBottom: 16,
                 }}>
-                    <h4 style={{ margin: '0 0 12px', fontSize: '1rem', fontWeight: 600, color: '#212529' }}>
+                    <h4 style={{ margin: '0 0 12px', fontSize: '1rem', fontWeight: 600, color: 'var(--foreground)' }}>
                         {t('qa_answer')}
                     </h4>
                     <div
                         style={{
                             fontSize: '0.9rem',
                             lineHeight: 1.7,
-                            color: '#212529',
+                            color: 'var(--foreground)',
                         }}
                         dangerouslySetInnerHTML={{ __html: renderMarkdown(answerMarkdown) }}
                     />
@@ -370,13 +370,13 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
             {/* Caveat */}
             {caveat && answerMarkdown && (
                 <div style={{
-                    backgroundColor: '#e2e3e5',
-                    border: '1px solid #d6d8db',
+                    backgroundColor: 'var(--muted)',
+                    border: '1px solid var(--border)',
                     borderRadius: 6,
                     padding: 10,
                     marginBottom: 12,
                     fontSize: '0.8rem',
-                    color: '#383d41',
+                    color: 'var(--muted-foreground)',
                 }}>
                     ⚠ {caveat}
                 </div>
@@ -390,10 +390,10 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                         style={{
                             padding: '6px 12px',
                             fontSize: '0.8rem',
-                            border: '1px solid #6c757d',
+                            border: '1px solid var(--muted-foreground)',
                             borderRadius: 4,
                             backgroundColor: 'transparent',
-                            color: '#6c757d',
+                            color: 'var(--muted-foreground)',
                             cursor: 'pointer',
                         }}
                     >
@@ -403,23 +403,23 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                     {showDetails && (
                         <div style={{
                             marginTop: 8,
-                            border: '1px solid #dee2e6',
+                            border: '1px solid var(--border)',
                             borderRadius: 6,
                             padding: 16,
-                            backgroundColor: '#fff',
+                            backgroundColor: 'var(--card)',
                         }}>
                             {/* SQL used */}
                             {sqlUsed.length > 0 && (
                                 <div style={{ marginBottom: 12 }}>
-                                    <label style={{ fontWeight: 600, fontSize: '0.85rem', color: '#343a40', display: 'block', marginBottom: 6 }}>
+                                    <label style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--muted-foreground)', display: 'block', marginBottom: 6 }}>
                                         {t('qa_sql_used')}
                                     </label>
                                     {sqlUsed.map((sql, i) => (
                                         <pre key={i} style={{
                                             whiteSpace: 'pre-wrap',
                                             wordBreak: 'break-all',
-                                            backgroundColor: '#f8f9fa',
-                                            border: '1px solid #dee2e6',
+                                            backgroundColor: 'var(--surface-sunken)',
+                                            border: '1px solid var(--border)',
                                             borderRadius: 4,
                                             padding: 8,
                                             fontSize: '0.8rem',
@@ -435,7 +435,7 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                             {/* Evidence */}
                             {evidence.length > 0 && (
                                 <div>
-                                    <label style={{ fontWeight: 600, fontSize: '0.85rem', color: '#343a40', display: 'block', marginBottom: 6 }}>
+                                    <label style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--muted-foreground)', display: 'block', marginBottom: 6 }}>
                                         {t('qa_sources')}
                                     </label>
                                     {evidence.map((ev, i) => (
@@ -452,13 +452,13 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                                                 borderRadius: 3,
                                                 fontSize: '0.7rem',
                                                 fontWeight: 600,
-                                                backgroundColor: ev.type === 'database' ? '#d4edda' : '#cce5ff',
-                                                color: ev.type === 'database' ? '#155724' : '#004085',
+                                                backgroundColor: ev.type === 'database' ? 'var(--success-subtle)' : 'var(--info-subtle)',
+                                                color: ev.type === 'database' ? 'var(--success-subtle-foreground)' : 'var(--info-subtle-foreground)',
                                             }}>
                                                 {ev.type === 'database' ? t('qa_db') : t('qa_model')}
                                             </span>
                                             <strong>{ev.label}</strong>
-                                            <span style={{ color: '#6c757d' }}>— {ev.detail}</span>
+                                            <span style={{ color: 'var(--muted-foreground)' }}>— {ev.detail}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -484,11 +484,11 @@ function renderMarkdown(md: string): string {
 
     // Code blocks (``` ... ```)
     html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_match, _lang, code) => {
-        return `<pre style="background:#f8f9fa;border:1px solid #dee2e6;border-radius:4px;padding:10px;font-size:0.85rem;overflow-x:auto;"><code>${code.trim()}</code></pre>`;
+        return `<pre style="background:var(--surface-sunken);border:1px solid var(--border);border-radius:4px;padding:10px;font-size:0.85rem;overflow-x:auto;"><code>${code.trim()}</code></pre>`;
     });
 
     // Inline code
-    html = html.replace(/`([^`]+)`/g, '<code style="background:#f0f0f0;padding:1px 4px;border-radius:3px;font-size:0.85em;">$1</code>');
+    html = html.replace(/`([^`]+)`/g, '<code style="background:var(--muted);padding:1px 4px;border-radius:3px;font-size:0.85em;">$1</code>');
 
     // Headings
     html = html.replace(/^#### (.+)$/gm, '<h6 style="margin:12px 0 4px;font-size:0.85rem;font-weight:600;">$1</h6>');
@@ -502,7 +502,7 @@ function renderMarkdown(md: string): string {
     html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
 
     // Blockquotes
-    html = html.replace(/^&gt; (.+)$/gm, '<blockquote style="border-left:3px solid #dee2e6;padding-left:12px;margin:8px 0;color:#6c757d;">$1</blockquote>');
+    html = html.replace(/^&gt; (.+)$/gm, '<blockquote style="border-left:3px solid var(--border);padding-left:12px;margin:8px 0;color:var(--muted-foreground);">$1</blockquote>');
 
     // Unordered lists
     html = html.replace(/^[-*] (.+)$/gm, '<li style="margin-left:16px;">$1</li>');
@@ -533,7 +533,7 @@ function renderMarkdown(md: string): string {
             let table = '<div style="overflow-x:auto;margin:10px 0;"><table style="border-collapse:collapse;width:100%;font-size:0.85rem;">';
             table += '<thead><tr>';
             headers.forEach((h, i) => {
-                table += `<th style="border:1px solid #dee2e6;padding:6px 10px;background:#f8f9fa;text-align:${aligns[i] || 'left'};">${h}</th>`;
+                table += `<th style="border:1px solid var(--border);padding:6px 10px;background:var(--surface-sunken);text-align:${aligns[i] || 'left'};">${h}</th>`;
             });
             table += '</tr></thead><tbody>';
 
@@ -542,7 +542,7 @@ function renderMarkdown(md: string): string {
                 const cells = parseRow(lines[i]);
                 table += '<tr>';
                 cells.forEach((c, j) => {
-                    table += `<td style="border:1px solid #dee2e6;padding:6px 10px;text-align:${aligns[j] || 'left'};">${c}</td>`;
+                    table += `<td style="border:1px solid var(--border);padding:6px 10px;text-align:${aligns[j] || 'left'};">${c}</td>`;
                 });
                 table += '</tr>';
             }
@@ -553,7 +553,7 @@ function renderMarkdown(md: string): string {
     );
 
     // Horizontal rule
-    html = html.replace(/^---$/gm, '<hr style="border:none;border-top:1px solid #dee2e6;margin:12px 0;" />');
+    html = html.replace(/^---$/gm, '<hr style="border:none;border-top:1px solid var(--border);margin:12px 0;" />');
 
     // Paragraphs: convert double newlines to paragraph breaks
     html = html.replace(/\n\n/g, '</p><p style="margin:8px 0;">');

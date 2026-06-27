@@ -42,9 +42,15 @@ export interface ToolCallTrace {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_COLORS: Record<ToolCallTrace['status'], string> = {
-    running: '#ffc107',
-    completed: '#28a745',
-    error: '#dc3545',
+    running: 'var(--warning)',
+    completed: 'var(--success)',
+    error: 'var(--destructive)',
+};
+
+const STATUS_FOREGROUNDS: Record<ToolCallTrace['status'], string> = {
+    running: 'var(--warning-foreground)',
+    completed: 'var(--success-foreground)',
+    error: 'var(--destructive-foreground)',
 };
 
 const STATUS_LABELS: Record<ToolCallTrace['status'], string> = {
@@ -62,7 +68,7 @@ function statusBadge(status: ToolCallTrace['status']) {
             fontSize: '0.7rem',
             fontWeight: 600,
             backgroundColor: STATUS_COLORS[status],
-            color: '#fff',
+            color: STATUS_FOREGROUNDS[status],
             marginLeft: 6,
             verticalAlign: 'middle',
         }}>
@@ -88,9 +94,9 @@ function ToolTraceItem({ tc }: { tc: ToolCallTrace }) {
     return (
         <div style={{
             marginBottom: 6,
-            border: '1px solid #dee2e6',
+            border: '1px solid var(--border)',
             borderRadius: 4,
-            backgroundColor: '#fff',
+            backgroundColor: 'var(--card)',
             fontSize: '0.8rem',
         }}>
             {/* Header row */}
@@ -125,14 +131,14 @@ function ToolTraceItem({ tc }: { tc: ToolCallTrace }) {
 
                 {/* One-liner summary */}
                 {tc.status !== 'running' && (
-                    <span style={{ marginLeft: 10, color: '#6c757d', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ marginLeft: 10, color: 'var(--muted-foreground)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {getOneLiner(tc)}
                     </span>
                 )}
 
                 {/* Expand chevron */}
                 {hasDetails && tc.status !== 'running' && (
-                    <span style={{ marginLeft: 8, color: '#6c757d', flexShrink: 0 }}>
+                    <span style={{ marginLeft: 8, color: 'var(--muted-foreground)', flexShrink: 0 }}>
                         {expanded ? '▼' : '▶'}
                     </span>
                 )}
@@ -141,14 +147,14 @@ function ToolTraceItem({ tc }: { tc: ToolCallTrace }) {
             {/* Expanded details */}
             {expanded && (
                 <div style={{
-                    borderTop: '1px solid #f0f0f0',
+                    borderTop: '1px solid var(--border)',
                     padding: '10px 12px',
-                    backgroundColor: '#fafafa',
+                    backgroundColor: 'var(--surface-sunken)',
                 }}>
                     {/* Arguments */}
                     {tc.arguments && Object.keys(tc.arguments).length > 0 && (
                         <div style={{ marginBottom: 10 }}>
-                            <div style={{ fontWeight: 600, color: '#495057', marginBottom: 4 }}>
+                            <div style={{ fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 4 }}>
                                 📥 呼叫參數
                             </div>
                             {tc.name === 'query_read_only_sql' && typeof tc.arguments.sql === 'string' ? (
@@ -157,7 +163,7 @@ function ToolTraceItem({ tc }: { tc: ToolCallTrace }) {
                                         {tc.arguments.sql}
                                     </pre>
                                     {Object.keys(tc.arguments).filter(k => k !== 'sql').map(k => (
-                                        <div key={k} style={{ fontSize: '0.75rem', color: '#6c757d' }}>
+                                        <div key={k} style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
                                             <strong>{k}:</strong> {JSON.stringify(tc.arguments![k])}
                                         </div>
                                     ))}
@@ -185,9 +191,9 @@ function ToolTraceItem({ tc }: { tc: ToolCallTrace }) {
 function ResultSummaryView({ summary, toolName }: { summary: ToolResultSummary; toolName: string }) {
     if (summary.status === 'error') {
         return (
-            <div style={{ color: '#721c24' }}>
+            <div style={{ color: 'var(--danger-subtle-foreground)' }}>
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>❌ 錯誤</div>
-                <pre style={{ ...codeBlockStyle, borderColor: '#f5c6cb', backgroundColor: '#f8d7da', color: '#721c24' }}>
+                <pre style={{ ...codeBlockStyle, borderColor: 'var(--danger-border)', backgroundColor: 'var(--danger-subtle)', color: 'var(--danger-subtle-foreground)' }}>
                     {summary.error}
                 </pre>
             </div>
@@ -196,14 +202,14 @@ function ResultSummaryView({ summary, toolName }: { summary: ToolResultSummary; 
 
     return (
         <div>
-            <div style={{ fontWeight: 600, color: '#495057', marginBottom: 6 }}>
+            <div style={{ fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 6 }}>
                 📤 執行結果
             </div>
 
             {/* For SQL tool: show SQL + table results */}
             {toolName === 'query_read_only_sql' && summary.sql && (
                 <div style={{ marginBottom: 8 }}>
-                    <div style={{ fontSize: '0.75rem', color: '#6c757d', marginBottom: 2 }}>SQL：</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginBottom: 2 }}>SQL：</div>
                     <pre style={codeBlockStyle}>{summary.sql}</pre>
                 </div>
             )}
@@ -214,7 +220,7 @@ function ResultSummaryView({ summary, toolName }: { summary: ToolResultSummary; 
                     <span style={labelStyle}>筆數：</span>
                     {summary.row_count}
                     {summary.total_matching !== undefined && summary.total_matching !== summary.row_count && (
-                        <span style={{ color: '#6c757d' }}> （共 {summary.total_matching} 筆匹配）</span>
+                        <span style={{ color: 'var(--muted-foreground)' }}> （共 {summary.total_matching} 筆匹配）</span>
                     )}
                 </div>
             )}
@@ -265,7 +271,7 @@ function ResultSummaryView({ summary, toolName }: { summary: ToolResultSummary; 
                         <span>{(summary.names as string[]).join('、')}</span>
                     )}
                     {summary.person_ids.length > 0 && (
-                        <span style={{ color: '#6c757d', marginLeft: 4 }}>
+                        <span style={{ color: 'var(--muted-foreground)', marginLeft: 4 }}>
                             (ID: {(summary.person_ids as unknown[]).join(', ')})
                         </span>
                     )}
@@ -277,7 +283,7 @@ function ResultSummaryView({ summary, toolName }: { summary: ToolResultSummary; 
                 <div style={{ marginBottom: 4 }}>
                     <span style={labelStyle}>記錄預覽：</span>
                     {!summary.found ? (
-                        <span style={{ color: '#6c757d' }}>未找到</span>
+                        <span style={{ color: 'var(--muted-foreground)' }}>未找到</span>
                     ) : (
                         <pre style={codeBlockStyle}>
                             {JSON.stringify(summary.row_preview, null, 2)}
@@ -293,7 +299,7 @@ function ResultSummaryView({ summary, toolName }: { summary: ToolResultSummary; 
                     <span style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
                         {summary.column_names.join(', ')}
                         {summary.columns_count !== undefined && summary.columns_count > summary.column_names.length && (
-                            <span style={{ color: '#6c757d' }}> …共 {summary.columns_count} 個</span>
+                            <span style={{ color: 'var(--muted-foreground)' }}> …共 {summary.columns_count} 個</span>
                         )}
                     </span>
                 </div>
@@ -319,7 +325,7 @@ function ResultSummaryView({ summary, toolName }: { summary: ToolResultSummary; 
                     <span style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
                         {summary.tables.join(', ')}
                         {summary.count !== undefined && summary.count > summary.tables.length && (
-                            <span style={{ color: '#6c757d' }}> …共 {summary.count} 個</span>
+                            <span style={{ color: 'var(--muted-foreground)' }}> …共 {summary.count} 個</span>
                         )}
                     </span>
                 </div>
@@ -333,8 +339,8 @@ function ResultSummaryView({ summary, toolName }: { summary: ToolResultSummary; 
 const codeBlockStyle: React.CSSProperties = {
     whiteSpace: 'pre-wrap',
     wordBreak: 'break-all',
-    backgroundColor: '#f0f3f5',
-    border: '1px solid #dee2e6',
+    backgroundColor: 'var(--surface-sunken)',
+    border: '1px solid var(--border)',
     borderRadius: 3,
     padding: '6px 8px',
     fontSize: '0.75rem',
@@ -346,20 +352,20 @@ const codeBlockStyle: React.CSSProperties = {
 
 const labelStyle: React.CSSProperties = {
     fontWeight: 600,
-    color: '#495057',
+    color: 'var(--muted-foreground)',
     marginRight: 4,
 };
 
 const thStyle: React.CSSProperties = {
-    border: '1px solid #dee2e6',
+    border: '1px solid var(--border)',
     padding: '2px 6px',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: 'var(--surface-sunken)',
     fontWeight: 600,
     whiteSpace: 'nowrap',
 };
 
 const tdStyle: React.CSSProperties = {
-    border: '1px solid #dee2e6',
+    border: '1px solid var(--border)',
     padding: '2px 6px',
     maxWidth: 200,
     overflow: 'hidden',
@@ -378,9 +384,9 @@ export default function ToolTracePanel({ toolCalls }: ToolTracePanelProps) {
 
     return (
         <div style={{ marginBottom: 16 }}>
-            <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#343a40', marginBottom: 6 }}>
+            <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--muted-foreground)', marginBottom: 6 }}>
                 🔧 工具調用過程
-                <span style={{ fontWeight: 400, color: '#6c757d', marginLeft: 6 }}>
+                <span style={{ fontWeight: 400, color: 'var(--muted-foreground)', marginLeft: 6 }}>
                     （{toolCalls.length} 次，點擊可展開詳情）
                 </span>
             </div>

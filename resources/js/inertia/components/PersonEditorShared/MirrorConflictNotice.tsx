@@ -27,19 +27,19 @@ interface Props {
 }
 
 const boxStyle: React.CSSProperties = {
-    border: '1px solid #f59e0b', background: '#fffbeb', borderRadius: 8,
-    padding: '12px 14px', margin: '8px 0', fontSize: '0.9rem', color: '#92400e',
+    border: '1px solid var(--warning-border)', background: 'var(--warning-subtle)', borderRadius: 8,
+    padding: '12px 14px', margin: '8px 0', fontSize: '0.9rem', color: 'var(--warning-subtle-foreground)',
 };
 const titleStyle: React.CSSProperties = { fontWeight: 600, marginBottom: 6 };
 const listStyle: React.CSSProperties = { margin: '6px 0', paddingLeft: 18 };
-const linkStyle: React.CSSProperties = { color: '#1d4ed8', textDecoration: 'underline', fontWeight: 600 };
+const linkStyle: React.CSSProperties = { color: 'var(--info-subtle-foreground)', textDecoration: 'underline', fontWeight: 600 };
 const btnRow: React.CSSProperties = { display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' };
 const forceBtn: React.CSSProperties = {
-    padding: '4px 12px', border: '1px solid #b45309', background: '#b45309', color: '#fff',
+    padding: '4px 12px', border: '1px solid var(--warning)', background: 'var(--warning)', color: 'var(--warning-foreground)',
     borderRadius: 6, cursor: 'pointer', fontSize: '0.85rem',
 };
 const dismissBtn: React.CSSProperties = {
-    padding: '4px 12px', border: '1px solid #d1d5db', background: '#fff', color: '#374151',
+    padding: '4px 12px', border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--muted-foreground)',
     borderRadius: 6, cursor: 'pointer', fontSize: '0.85rem',
 };
 

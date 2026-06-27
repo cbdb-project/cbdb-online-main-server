@@ -483,7 +483,7 @@ export default function BasicInfoEditor({
 
 // BasicInfo 專屬（非版面）樣式：唯讀派生子區塊、生成拼音按鈕列。
 // 唯讀派生子區塊：虛線框 + 淡背景，明確標示「自動生成」。
-const derivedBoxStyle: React.CSSProperties = { background: '#fafbfd', border: '1px dashed #e5e7eb', borderRadius: 10, padding: '12px 14px', marginTop: 4 };
-const derivedTagStyle: React.CSSProperties = { fontSize: '0.78rem', color: '#6b7280', marginBottom: 10 };
+const derivedBoxStyle: React.CSSProperties = { background: 'var(--surface-sunken)', border: '1px dashed var(--border)', borderRadius: 10, padding: '12px 14px', marginTop: 4 };
+const derivedTagStyle: React.CSSProperties = { fontSize: '0.78rem', color: 'var(--muted-foreground)', marginBottom: 10 };
 // 生成拼音按鈕列：與上方姓名網格、下方派生區留足間距（修正先前過緊）。
 const pinyinRowStyle: React.CSSProperties = { margin: '16px 0' };

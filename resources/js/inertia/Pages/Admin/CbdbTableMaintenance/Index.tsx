@@ -212,7 +212,7 @@ function TableCard({ table, urls, t }: { table: TableInfo; urls: { rebuild: stri
 function InfoPanel({ t }: { t: (k: string) => string }) {
     const html = (k: string) => ({ __html: t(k) });
     return (
-        <div className="rounded-lg border border-blue-200 bg-blue-50/40 p-4 text-sm">
+        <div className="rounded-lg border border-info-border bg-info-subtle/40 p-4 text-sm">
             <h3 className="mb-2 font-semibold"><i className="fa fa-info-circle mr-1" aria-hidden />{t('table_maint_info_title')}</h3>
             <h4 className="mt-2 font-semibold">{t('table_maint_trad_simp_h4')}</h4>
             <ul className="list-disc space-y-1 pl-5">
@@ -231,7 +231,7 @@ function InfoPanel({ t }: { t: (k: string) => string }) {
                 <li dangerouslySetInnerHTML={html('table_maint_name_fts_li6')} />
                 <li>{t('table_maint_name_fts_li7')}</li>
             </ul>
-            <p className="mt-2 text-red-600" dangerouslySetInnerHTML={html('table_maint_danger_note')} />
+            <p className="mt-2 text-danger-subtle-foreground" dangerouslySetInnerHTML={html('table_maint_danger_note')} />
         </div>
     );
 }

@@ -405,15 +405,15 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                 marginBottom: 16,
                 padding: 12,
                 borderRadius: 6,
-                border: '1px solid #d6d8db',
-                backgroundColor: '#f8f9fa',
+                border: '1px solid var(--border)',
+                backgroundColor: 'var(--surface-sunken)',
             }}>
-                <div style={{ fontSize: '0.85rem', color: '#495057', marginBottom: 8 }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginBottom: 8 }}>
                     {t('qbe_autosave_hint')}
                     {lastSavedAt ? ` ${t('qbe_last_saved', { time: formatSavedAt(lastSavedAt) })}` : ''}
                 </div>
                 {persistenceNotice && (
-                    <div style={{ fontSize: '0.8rem', color: '#0c5460', marginBottom: 8 }}>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--info-subtle-foreground)', marginBottom: 8 }}>
                         {persistenceNotice}
                     </div>
                 )}
@@ -475,8 +475,8 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                 </select>
             </div>
 
-            {loadingSchema && <div style={{ color: '#6c757d', fontSize: '0.85rem', marginBottom: 8 }}>{t('qbe_loading_schema')}</div>}
-            {schemaError && <div style={{ color: '#dc3545', fontSize: '0.85rem', marginBottom: 8 }}>⚠ {schemaError}</div>}
+            {loadingSchema && <div style={{ color: 'var(--muted-foreground)', fontSize: '0.85rem', marginBottom: 8 }}>{t('qbe_loading_schema')}</div>}
+            {schemaError && <div style={{ color: 'var(--destructive)', fontSize: '0.85rem', marginBottom: 8 }}>⚠ {schemaError}</div>}
 
             {baseTable && schemas[baseTable] && (
                 <>
@@ -557,13 +557,13 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                         <div style={{
                             maxHeight: 180,
                             overflowY: 'auto',
-                            border: '1px solid #dee2e6',
+                            border: '1px solid var(--border)',
                             borderRadius: 4,
                             padding: 8,
-                            backgroundColor: '#fff',
+                            backgroundColor: 'var(--card)',
                         }}>
                             {availableColumns.length === 0 ? (
-                                <span style={{ color: '#6c757d', fontSize: '0.85rem' }}>{t('qbe_no_cols')}</span>
+                                <span style={{ color: 'var(--muted-foreground)', fontSize: '0.85rem' }}>{t('qbe_no_cols')}</span>
                             ) : (
                                 availableColumns.map((col) => (
                                     <label key={col.name} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', fontSize: '0.85rem', cursor: 'pointer' }}>
@@ -579,7 +579,7 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                                             }}
                                         />
                                         <span style={{ fontFamily: 'monospace' }}>{col.name}</span>
-                                        <span style={{ color: '#6c757d', fontSize: '0.75rem' }}>({col.type || '?'})</span>
+                                        <span style={{ color: 'var(--muted-foreground)', fontSize: '0.75rem' }}>({col.type || '?'})</span>
                                     </label>
                                 ))
                             )}
@@ -632,10 +632,10 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                         <div style={{
                             maxHeight: 120,
                             overflowY: 'auto',
-                            border: '1px solid #dee2e6',
+                            border: '1px solid var(--border)',
                             borderRadius: 4,
                             padding: 8,
-                            backgroundColor: '#fff',
+                            backgroundColor: 'var(--card)',
                         }}>
                             {availableColumns.map((col) => (
                                 <label key={col.name} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', fontSize: '0.85rem', cursor: 'pointer' }}>
@@ -722,8 +722,8 @@ export default function QbeBuilder({ tables, schemaEndpoint, onGenerateSql }: Pr
                             fontWeight: 600,
                             border: 'none',
                             borderRadius: 5,
-                            backgroundColor: '#28a745',
-                            color: '#fff',
+                            backgroundColor: 'var(--success)',
+                            color: 'var(--success-foreground)',
                             cursor: 'pointer',
                         }}
                     >
@@ -899,46 +899,46 @@ function formatSavedAt(savedAt: string): string {
 const labelStyle: React.CSSProperties = {
     fontWeight: 600,
     fontSize: '0.9rem',
-    color: '#343a40',
+    color: 'var(--muted-foreground)',
     display: 'block',
     marginBottom: 4,
 };
 
 const selectStyle: React.CSSProperties = {
     padding: '6px 10px',
-    border: '1px solid #ced4da',
+    border: '1px solid var(--input)',
     borderRadius: 4,
     fontSize: '0.85rem',
-    backgroundColor: '#fff',
-    color: '#212529',
+    backgroundColor: 'var(--card)',
+    color: 'var(--foreground)',
 };
 
 const inputStyle: React.CSSProperties = {
     padding: '6px 10px',
-    border: '1px solid #ced4da',
+    border: '1px solid var(--input)',
     borderRadius: 4,
     fontSize: '0.85rem',
-    backgroundColor: '#fff',
-    color: '#212529',
+    backgroundColor: 'var(--card)',
+    color: 'var(--foreground)',
 };
 
 const smallBtnStyle: React.CSSProperties = {
     padding: '4px 12px',
     fontSize: '0.8rem',
-    border: '1px solid #ced4da',
+    border: '1px solid var(--border)',
     borderRadius: 4,
-    backgroundColor: '#fff',
-    color: '#495057',
+    backgroundColor: 'var(--card)',
+    color: 'var(--muted-foreground)',
     cursor: 'pointer',
 };
 
 const removeBtnStyle: React.CSSProperties = {
     padding: '4px 8px',
     fontSize: '0.85rem',
-    border: '1px solid #dc3545',
+    border: '1px solid var(--destructive)',
     borderRadius: 4,
     backgroundColor: 'transparent',
-    color: '#dc3545',
+    color: 'var(--destructive)',
     cursor: 'pointer',
     lineHeight: 1,
 };

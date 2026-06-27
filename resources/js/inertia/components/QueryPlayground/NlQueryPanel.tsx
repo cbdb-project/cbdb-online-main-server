@@ -215,19 +215,19 @@ export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generate
         <div>
             {/* Privacy notice */}
             <div style={{
-                backgroundColor: '#fff3cd',
-                border: '1px solid #ffc107',
+                backgroundColor: 'var(--warning-subtle)',
+                border: '1px solid var(--warning-border)',
                 borderRadius: 6,
                 padding: 12,
                 marginBottom: 16,
                 fontSize: '0.85rem',
-                color: '#856404',
+                color: 'var(--warning-subtle-foreground)',
             }}>
                 <strong>{t('nl_privacy_label')}</strong>{' '}{t('nl_privacy_body', { model: nlModel })}
             </div>
 
             <div style={{ marginBottom: 12 }}>
-                <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#343a40', display: 'block', marginBottom: 4 }}>
+                <label style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--muted-foreground)', display: 'block', marginBottom: 4 }}>
                     {t('nl_query_placeholder')}
                 </label>
                 <textarea
@@ -240,14 +240,14 @@ export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generate
                     style={{
                         width: '100%',
                         padding: 12,
-                        border: '1px solid #ced4da',
+                        border: '1px solid var(--input)',
                         borderRadius: 6,
                         fontSize: '0.9rem',
                         resize: 'vertical',
                         boxSizing: 'border-box',
                     }}
                 />
-                <div style={{ textAlign: 'right', fontSize: '0.75rem', color: '#6c757d', marginTop: 2 }}>
+                <div style={{ textAlign: 'right', fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: 2 }}>
                     {question.length}/1000
                 </div>
             </div>
@@ -279,8 +279,8 @@ export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generate
                         fontWeight: 600,
                         border: 'none',
                         borderRadius: 5,
-                        backgroundColor: loading || !question.trim() || !consent ? '#adb5bd' : '#6f42c1',
-                        color: '#fff',
+                        backgroundColor: loading || !question.trim() || !consent ? 'var(--muted-foreground)' : 'var(--primary)',
+                        color: 'var(--primary-foreground)',
                         cursor: loading || !question.trim() || !consent ? 'default' : 'pointer',
                     }}
                 >
@@ -292,10 +292,10 @@ export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generate
                         style={{
                             padding: '8px 14px',
                             fontSize: '0.85rem',
-                            border: '1px solid #dc3545',
+                            border: '1px solid var(--destructive)',
                             borderRadius: 5,
                             backgroundColor: 'transparent',
-                            color: '#dc3545',
+                            color: 'var(--destructive)',
                             cursor: 'pointer',
                         }}
                     >
@@ -307,13 +307,13 @@ export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generate
             {/* Error display */}
             {error && (
                 <div style={{
-                    backgroundColor: '#f8d7da',
-                    border: '1px solid #f5c6cb',
+                    backgroundColor: 'var(--danger-subtle)',
+                    border: '1px solid var(--danger-border)',
                     borderRadius: 6,
                     padding: 12,
                     marginBottom: 12,
                     fontSize: '0.85rem',
-                    color: '#721c24',
+                    color: 'var(--danger-subtle-foreground)',
                 }}>
                     ⚠ {error}
                 </div>
@@ -325,14 +325,14 @@ export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generate
             {/* Generated SQL */}
             {generatedSql && (
                 <div style={{
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid #dee2e6',
+                    backgroundColor: 'var(--surface-sunken)',
+                    border: '1px solid var(--border)',
                     borderRadius: 6,
                     padding: 16,
                     marginBottom: 12,
                 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                        <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#343a40' }}>
+                        <label style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--muted-foreground)' }}>
                             {t('nl_generated_sql')}
                         </label>
                         <button
@@ -343,8 +343,8 @@ export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generate
                                 fontWeight: 600,
                                 border: 'none',
                                 borderRadius: 5,
-                                backgroundColor: '#007bff',
-                                color: '#fff',
+                                backgroundColor: 'var(--primary)',
+                                color: 'var(--primary-foreground)',
                                 cursor: 'pointer',
                             }}
                         >
@@ -354,8 +354,8 @@ export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generate
                     <pre style={{
                         whiteSpace: 'pre-wrap',
                         wordBreak: 'break-all',
-                        backgroundColor: '#fff',
-                        border: '1px solid #dee2e6',
+                        backgroundColor: 'var(--muted)',
+                        border: '1px solid var(--border)',
                         borderRadius: 4,
                         padding: 12,
                         fontSize: '0.85rem',
@@ -365,7 +365,7 @@ export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generate
                         {generatedSql}
                     </pre>
                     {explanation && (
-                        <div style={{ marginTop: 12, fontSize: '0.85rem', color: '#495057' }}>
+                        <div style={{ marginTop: 12, fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>
                             <strong>{t('nl_explanation')}</strong> {explanation}
                         </div>
                     )}

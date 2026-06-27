@@ -277,28 +277,28 @@ export default function PersonEditor() {
 
 const tabsWrapStyle: React.CSSProperties = {
     marginTop: 12,
-    backgroundColor: '#fff',
-    border: '1px solid #dee2e6',
+    backgroundColor: 'var(--card)',
+    border: '1px solid var(--border)',
     borderRadius: 10,
     overflow: 'hidden',
 };
 
 const tabContentStyle: React.CSSProperties = {
     padding: 16,
-    backgroundColor: '#f4f6f9',
+    backgroundColor: 'var(--surface-sunken)',
 };
 
 const dialogBodyTextStyle: React.CSSProperties = {
-    color: '#475569',
+    color: 'var(--muted-foreground)',
     lineHeight: 1.7,
 };
 
 const dialogPrimaryButtonStyle: React.CSSProperties = {
     borderRadius: 8,
     padding: '8px 14px',
-    border: '1px solid #255f93',
-    backgroundColor: '#255f93',
-    color: '#fff',
+    border: '1px solid var(--primary)',
+    backgroundColor: 'var(--primary)',
+    color: 'var(--primary-foreground)',
     fontWeight: 700,
     cursor: 'pointer',
 };
@@ -306,9 +306,9 @@ const dialogPrimaryButtonStyle: React.CSSProperties = {
 const dialogSecondaryButtonStyle: React.CSSProperties = {
     borderRadius: 8,
     padding: '8px 14px',
-    border: '1px solid #cbd5e1',
-    backgroundColor: '#fff',
-    color: '#475569',
+    border: '1px solid var(--border)',
+    backgroundColor: 'var(--card)',
+    color: 'var(--muted-foreground)',
     fontWeight: 700,
     cursor: 'pointer',
 };
@@ -316,9 +316,9 @@ const dialogSecondaryButtonStyle: React.CSSProperties = {
 const dialogNeutralButtonStyle: React.CSSProperties = {
     borderRadius: 8,
     padding: '8px 14px',
-    border: '1px solid #d7c3c3',
-    backgroundColor: '#fff7f7',
-    color: '#9f2f2f',
+    border: '1px solid var(--danger-border)',
+    backgroundColor: 'var(--danger-subtle)',
+    color: 'var(--danger-subtle-foreground)',
     fontWeight: 700,
     cursor: 'pointer',
 };

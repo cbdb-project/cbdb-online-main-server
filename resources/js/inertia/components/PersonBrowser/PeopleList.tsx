@@ -169,12 +169,12 @@ const itemStyle: React.CSSProperties = {
     padding: '12px 14px',
     borderStyle: 'solid',
     borderWidth: 1,
-    borderTopColor: '#e5e9ef',
-    borderRightColor: '#e5e9ef',
-    borderBottomColor: '#e5e9ef',
-    borderLeftColor: '#e5e9ef',
+    borderTopColor: 'var(--border)',
+    borderRightColor: 'var(--border)',
+    borderBottomColor: 'var(--border)',
+    borderLeftColor: 'var(--border)',
     borderRadius: 10,
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--card)',
     cursor: 'pointer',
     transition: 'background-color 0.15s, border-color 0.15s, box-shadow 0.15s',
     outline: 'none',
@@ -183,11 +183,11 @@ const itemStyle: React.CSSProperties = {
 };
 
 const selectedItemStyle: React.CSSProperties = {
-    backgroundColor: '#fdf5f6',
-    borderTopColor: '#e0b0b7',
-    borderRightColor: '#e0b0b7',
-    borderBottomColor: '#e0b0b7',
-    borderLeftColor: '#e0b0b7',
+    backgroundColor: 'var(--danger-subtle)',
+    borderTopColor: 'var(--danger-border)',
+    borderRightColor: 'var(--danger-border)',
+    borderBottomColor: 'var(--danger-border)',
+    borderLeftColor: 'var(--danger-border)',
     boxShadow: '0 2px 6px rgba(165, 28, 48, 0.08)',
 };
 
@@ -202,8 +202,8 @@ const idBadgeStyle: React.CSSProperties = {
     alignItems: 'center',
     padding: '4px 8px',
     borderRadius: 999,
-    backgroundColor: '#f1f4f8',
-    color: '#607080',
+    backgroundColor: 'var(--muted)',
+    color: 'var(--muted-foreground)',
     fontSize: '0.74rem',
     fontWeight: 700,
     letterSpacing: '0.01em',
@@ -222,12 +222,12 @@ const nameBlockStyle: React.CSSProperties = {
 
 const chnNameStyle: React.CSSProperties = {
     fontSize: '1rem',
-    color: '#1f2d3d',
+    color: 'var(--foreground)',
 };
 
 const romanNameStyle: React.CSSProperties = {
     fontSize: '0.78rem',
-    color: '#667788',
+    color: 'var(--muted-foreground)',
     maxWidth: '100%',
     wordBreak: 'break-word',
 };
@@ -246,21 +246,21 @@ const miniTagStyle: React.CSSProperties = {
     overflow: 'hidden',
     fontSize: '0.82rem',
     lineHeight: 1,
-    border: '1px solid #e8dfe0',
+    border: '1px solid var(--danger-border)',
 };
 
 const miniTagLabelStyle: React.CSSProperties = {
     padding: '3px 6px',
-    backgroundColor: '#f9eced',
-    color: '#7a2030',
+    backgroundColor: 'var(--danger-subtle)',
+    color: 'var(--danger-subtle-foreground)',
     fontWeight: 600,
     whiteSpace: 'nowrap',
 };
 
 const miniTagValueStyle: React.CSSProperties = {
     padding: '3px 6px',
-    backgroundColor: '#fff',
-    color: '#3a1520',
+    backgroundColor: 'var(--card)',
+    color: 'var(--foreground)',
     fontWeight: 600,
     whiteSpace: 'nowrap',
     maxWidth: 80,
@@ -274,7 +274,7 @@ const footerStyle: React.CSSProperties = {
     justifyContent: 'space-between',
     gap: 8,
     padding: '6px 8px',
-    borderTop: '1px solid #dee2e6',
+    borderTop: '1px solid var(--border)',
     flexShrink: 0,
 };
 
@@ -289,10 +289,10 @@ const sortToggleBtnStyle: React.CSSProperties = {
     padding: '6px 10px',
     fontSize: '0.85rem',
     fontWeight: 600,
-    border: '1px solid #ced4da',
+    border: '1px solid var(--border)',
     borderRadius: 6,
-    backgroundColor: '#fff',
-    color: '#495057',
+    backgroundColor: 'var(--card)',
+    color: 'var(--muted-foreground)',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
     minHeight: 34,
@@ -300,7 +300,7 @@ const sortToggleBtnStyle: React.CSSProperties = {
 
 const sortHintStyle: React.CSSProperties = {
     fontSize: '0.75rem',
-    color: '#8a9bae',
+    color: 'var(--muted-foreground)',
     whiteSpace: 'nowrap',
 };
 
@@ -317,12 +317,12 @@ const pagerBtnStyle: React.CSSProperties = {
     padding: '3px 10px',
     borderStyle: 'solid',
     borderWidth: 1,
-    borderTopColor: '#ced4da',
-    borderRightColor: '#ced4da',
-    borderBottomColor: '#ced4da',
-    borderLeftColor: '#ced4da',
+    borderTopColor: 'var(--border)',
+    borderRightColor: 'var(--border)',
+    borderBottomColor: 'var(--border)',
+    borderLeftColor: 'var(--border)',
     borderRadius: 4,
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--card)',
     cursor: 'pointer',
     fontSize: '0.8125rem',
     outline: 'none',
@@ -333,12 +333,12 @@ const pagerBtnStyle: React.CSSProperties = {
 };
 
 const pagerInfoStyle: React.CSSProperties = {
-    color: '#495057',
+    color: 'var(--muted-foreground)',
 };
 
 const msgStyle: React.CSSProperties = {
     padding: 16,
     textAlign: 'center',
-    color: '#6c757d',
+    color: 'var(--muted-foreground)',
     fontSize: '0.875rem',
 };

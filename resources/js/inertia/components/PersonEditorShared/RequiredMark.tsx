@@ -16,4 +16,4 @@ export default function RequiredMark() {
     );
 }
 
-const reqStyle: React.CSSProperties = { color: '#dc2626', fontWeight: 700 };
+const reqStyle: React.CSSProperties = { color: 'var(--destructive)', fontWeight: 700 };

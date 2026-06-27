@@ -18,10 +18,10 @@ export default function SqlDebugPanel({ sql, renderedSql, bindings, perPage, cur
                 style={{
                     padding: '6px 14px',
                     fontSize: '0.8rem',
-                    border: '1px solid #ced4da',
+                    border: '1px solid var(--border)',
                     borderRadius: 4,
-                    backgroundColor: open ? '#e9ecef' : '#fff',
-                    color: '#495057',
+                    backgroundColor: open ? 'var(--muted)' : 'var(--card)',
+                    color: 'var(--muted-foreground)',
                     cursor: 'pointer',
                 }}
             >
@@ -31,12 +31,12 @@ export default function SqlDebugPanel({ sql, renderedSql, bindings, perPage, cur
             {open && (
                 <div style={{
                     marginTop: 8,
-                    border: '1px solid #dee2e6',
+                    border: '1px solid var(--border)',
                     borderRadius: 6,
-                    backgroundColor: '#f8f9fa',
+                    backgroundColor: 'var(--surface-sunken)',
                     padding: 16,
                 }}>
-                    <p style={{ color: '#6c757d', fontSize: '0.85rem', margin: '0 0 12px' }}>
+                    <p style={{ color: 'var(--muted-foreground)', fontSize: '0.85rem', margin: '0 0 12px' }}>
                         每頁 {perPage} 筆，當前第 {currentPage} 頁
                     </p>
 
@@ -45,8 +45,9 @@ export default function SqlDebugPanel({ sql, renderedSql, bindings, perPage, cur
                         <pre style={{
                             whiteSpace: 'pre-wrap',
                             wordBreak: 'break-all',
-                            backgroundColor: '#fff',
-                            border: '1px solid #dee2e6',
+                            backgroundColor: 'var(--card)',
+                            color: 'var(--foreground)',
+                            border: '1px solid var(--border)',
                             borderRadius: 4,
                             padding: 12,
                             fontSize: '0.8rem',
@@ -63,8 +64,9 @@ export default function SqlDebugPanel({ sql, renderedSql, bindings, perPage, cur
                         <pre style={{
                             whiteSpace: 'pre-wrap',
                             wordBreak: 'break-all',
-                            backgroundColor: '#fff',
-                            border: '1px solid #dee2e6',
+                            backgroundColor: 'var(--card)',
+                            color: 'var(--foreground)',
+                            border: '1px solid var(--border)',
                             borderRadius: 4,
                             padding: 12,
                             fontSize: '0.8rem',

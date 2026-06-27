@@ -57,11 +57,11 @@ export default function SubresourceTable<T>({ columns, items, rowKey, actions, a
 }
 
 const wrapStyle: React.CSSProperties = { overflowX: 'auto', marginBottom: 8 };
-const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'collapse', fontSize: '1rem', background: '#fff' };
+const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'collapse', fontSize: '1rem', background: 'var(--card)' };
 const thStyle: React.CSSProperties = {
-    textAlign: 'left', padding: '6px 10px', borderBottom: '2px solid #dee2e6', borderTop: '1px solid #dee2e6',
-    background: '#f8f9fa', color: '#495057', fontWeight: 700, whiteSpace: 'nowrap',
+    textAlign: 'left', padding: '6px 10px', borderBottom: '2px solid var(--border)', borderTop: '1px solid var(--border)',
+    background: 'var(--surface-sunken)', color: 'var(--muted-foreground)', fontWeight: 700, whiteSpace: 'nowrap',
 };
 // padding 對齊 legacy table-sm（≈0.3rem）較緊湊密度。
-const tdStyle: React.CSSProperties = { padding: '6px 10px', borderBottom: '1px solid #dee2e6', color: '#212529', verticalAlign: 'top' };
-const emptyTdStyle: React.CSSProperties = { padding: '16px 10px', textAlign: 'center', color: '#94a3b8', borderBottom: '1px solid #dee2e6' };
+const tdStyle: React.CSSProperties = { padding: '6px 10px', borderBottom: '1px solid var(--border)', color: 'var(--foreground)', verticalAlign: 'top' };
+const emptyTdStyle: React.CSSProperties = { padding: '16px 10px', textAlign: 'center', color: 'var(--muted-foreground)', borderBottom: '1px solid var(--border)' };

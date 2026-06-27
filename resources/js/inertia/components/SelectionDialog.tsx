@@ -57,7 +57,7 @@ export default function SelectionDialog({
                     <div>
                         <div style={{ fontSize: '1.05rem', fontWeight: 700 }}>{title}</div>
                         {description && (
-                            <div style={{ marginTop: 4, color: '#6c757d', fontSize: '0.86rem' }}>
+                            <div style={{ marginTop: 4, color: 'var(--muted-foreground)', fontSize: '0.86rem' }}>
                                 {description}
                             </div>
                         )}
@@ -96,7 +96,8 @@ const dialogStyle: React.CSSProperties = {
     maxHeight: 'calc(100vh - 32px)',
     display: 'flex',
     flexDirection: 'column',
-    backgroundColor: '#fff',
+    backgroundColor: 'var(--card)',
+    color: 'var(--card-foreground)',
     borderRadius: 4,
     boxShadow: '0 28px 72px rgba(15, 23, 42, 0.28)',
     overflow: 'hidden',
@@ -108,16 +109,16 @@ const headerStyle: React.CSSProperties = {
     alignItems: 'flex-start',
     gap: 12,
     padding: '18px 20px',
-    borderBottom: '1px solid #e5e7eb',
+    borderBottom: '1px solid var(--border)',
 };
 
 const closeButtonStyle: React.CSSProperties = {
     width: 36,
     height: 36,
     borderRadius: 4,
-    border: '1px solid #d0d8e2',
-    backgroundColor: '#fff',
-    color: '#334155',
+    border: '1px solid var(--border)',
+    backgroundColor: 'var(--card)',
+    color: 'var(--muted-foreground)',
     cursor: 'pointer',
     fontSize: '1.2rem',
     lineHeight: 1,
@@ -127,7 +128,7 @@ const bodyStyle: React.CSSProperties = {
     flex: 1,
     overflowY: 'auto',
     padding: 20,
-    backgroundColor: '#f8fafc',
+    backgroundColor: 'var(--surface-sunken)',
 };
 
 const footerStyle: React.CSSProperties = {
@@ -135,6 +136,6 @@ const footerStyle: React.CSSProperties = {
     justifyContent: 'flex-end',
     gap: 8,
     padding: '14px 20px',
-    borderTop: '1px solid #e5e7eb',
-    backgroundColor: '#fff',
+    borderTop: '1px solid var(--border)',
+    backgroundColor: 'var(--card)',
 };

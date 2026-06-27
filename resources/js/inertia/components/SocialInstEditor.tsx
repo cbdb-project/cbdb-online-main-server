@@ -265,7 +265,7 @@ export default function SocialInstEditor({
                     <a href={indexUrl} style={gCancelBtn}>{tr('cancel', '取消')}</a>
                 </div>
             </div>
-            {dirty ? <div style={{ marginTop: 8, color: '#92400e', fontSize: '0.8rem' }}>{tr('unsaved_changes', '有未儲存的變更')}</div> : null}
+            {dirty ? <div style={{ marginTop: 8, color: 'var(--warning-subtle-foreground)', fontSize: '0.8rem' }}>{tr('unsaved_changes', '有未儲存的變更')}</div> : null}
         </div>
     );
 }

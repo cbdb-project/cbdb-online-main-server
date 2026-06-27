@@ -60,5 +60,5 @@ export default function AiPrivacyNotice({ aiModel }: { aiModel?: string }) {
 }
 
 const wrapStyle: React.CSSProperties = { marginBottom: 8 };
-const toggleStyle: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', border: '1px solid #93c5fd', background: '#fff', color: '#1d4ed8', borderRadius: 6, padding: '3px 10px', fontSize: '0.78rem', cursor: 'pointer' };
-const boxStyle: React.CSSProperties = { marginTop: 6, padding: '10px 12px', background: '#f8fbff', border: '1px solid #dbeafe', borderRadius: 6, fontSize: '0.8rem', color: '#475569' };
+const toggleStyle: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', border: '1px solid var(--info-border)', background: 'var(--card)', color: 'var(--info-subtle-foreground)', borderRadius: 6, padding: '3px 10px', fontSize: '0.78rem', cursor: 'pointer' };
+const boxStyle: React.CSSProperties = { marginTop: 6, padding: '10px 12px', background: 'var(--info-subtle)', border: '1px solid var(--info-border)', borderRadius: 6, fontSize: '0.8rem', color: 'var(--muted-foreground)' };

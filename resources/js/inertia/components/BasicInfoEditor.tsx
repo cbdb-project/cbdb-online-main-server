@@ -170,22 +170,22 @@ export default function BasicInfoEditor({
     };
 
     // 生成拼音：用中文姓名查 /api/select/search/pinyin，回填拼音姓/名。
+    // 注意：此端點回傳「純文字字串」（如 "An Shi"、"(Wife of Li Bai)"），不是 {data:[...]} 自動完成結構，
+    // 故以 r.text() 讀取（舊版 Blade 編輯器亦直接取用字串）。誤用 r.json() 會在解析純文字時拋錯 → 一律「生成拼音失敗」。
     const generatePinyin = async () => {
         setError(null); setMessage(null); // 清掉前次錯誤/訊息，避免本次成功時頂部殘留舊 error alert。
         try {
             // 不再吞掉 HTTP 失敗：!r.ok 即拋出，落到下方 catch 顯示 generate_pinyin_failed（否則 500/422 會被誤當成功）。
-            const surnameRes = await fetch(`${pinyinEndpoint}?q=${encodeURIComponent(fields.c_surname_chn ?? '')}`, {
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin',
-            }).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); });
-            const mingziRes = await fetch(`${pinyinEndpoint}?q=${encodeURIComponent(fields.c_mingzi_chn ?? '')}&split=0`, {
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin',
-            }).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); });
-            const pick = (res: unknown): string => {
-                const rows = Array.isArray((res as { data?: unknown[] })?.data) ? (res as { data: Array<Record<string, unknown>> }).data : [];
-                const first = rows[0];
-                return first ? String(first.text ?? first.c_name ?? first.value ?? '') : '';
+            const fetchPinyin = async (q: string, split: boolean): Promise<string> => {
+                const r = await fetch(`${pinyinEndpoint}?q=${encodeURIComponent(q)}${split ? '' : '&split=0'}`, {
+                    headers: { Accept: 'text/plain', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin',
+                });
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                return (await r.text()).trim();
             };
-            const sp = pick(surnameRes); const mp = pick(mingziRes);
+            // 姓氏走預設 split=1（已知姓氏後插空格）；名走 split=0（整體轉換、不再拆姓）。
+            const sp = await fetchPinyin(fields.c_surname_chn ?? '', true);
+            const mp = await fetchPinyin(fields.c_mingzi_chn ?? '', false);
             // 回填拼音姓/名後，同步重算派生「拼音全名」(c_name)，使下方自動生成框即時更新（資料流收尾）。
             setFields((p) => { const next = { ...p, c_surname: sp || p.c_surname, c_mingzi: mp || p.c_mingzi }; return { ...next, ...deriveNames(next) }; });
             setPinyinDone(true);

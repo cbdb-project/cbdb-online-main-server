@@ -633,8 +633,19 @@ class ApiController extends Controller {
         return null;
     }
 
+    /**
+     * 稱謂 → 英文片語映射。供「（X母）」「宗氏（X妻）」等女性/親屬以關係命名者一鍵轉寫拼音。
+     *
+     * ⚠️ 順序很重要：多字稱謂（祖母/祖父/孫女）必須排在其單字後綴（母/父/女）之前，
+     * 確保正則 alternation 先嘗試較長者（雖然結尾的「）」錨點通常已能消歧，longest-first 更穩妥）。
+     */
     private function relationshipPhrases(): array {
         return [
+            // 多字稱謂（longest-first）
+            '祖母' => 'Grandmother of',
+            '祖父' => 'Grandfather of',
+            '孫女' => 'Granddaughter of',
+            // 既有女性/親屬稱謂
             '妻' => 'Wife of',
             '母' => 'Mother of',
             '女' => 'Daughter of',
@@ -643,6 +654,16 @@ class ApiController extends Controller {
             '妹' => 'Younger Sister of',
             '姐' => 'Elder Sister of',
             '姊' => 'Elder Sister of',
+            '嫂' => 'Sister-in-law of',
+            // 擴充：男性與其餘常見親屬。
+            // 註：刻意不收單字「子」「孫」——兩者皆為極常見的名字/詞用字（如「公孫」「王孫」本身可為姓氏/詞），
+            // 且 CBDB 中以「某之子／某之孫」為名者罕見（多有本名），收錄會把「（李子）」「（公孫）」這類
+            // 括號別名誤判為關係稱謂，得不償失。需要孫輩女性時仍可用多字「孫女」（Granddaughter，無歧義）。
+            '夫' => 'Husband of',
+            '父' => 'Father of',
+            '兄' => 'Elder Brother of',
+            '弟' => 'Younger Brother of',
+            '婿' => 'Son-in-law of',
         ];
     }
 }

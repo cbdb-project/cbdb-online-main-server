@@ -102,6 +102,69 @@ class ApiSearchPinyinTest extends TestCase {
     }
 
     #[Test]
+    public function search_pinyin_converts_expanded_relationship_patterns_to_english_phrases(): void {
+        DB::table('pinyin')->insert([
+            ['lastname_chn' => '李', 'lastname_pinyin' => 'Li'],
+            ['lastname_chn' => '王', 'lastname_pinyin' => 'Wang'],
+        ]);
+
+        $cases = [
+            '（李白夫）' => 'Husband of Li Bai',
+            '（李白父）' => 'Father of Li Bai',
+            '（王安石兄）' => 'Elder Brother of Wang Anshi',
+            '（李白弟）' => 'Younger Brother of Li Bai',
+            '（李白婿）' => 'Son-in-law of Li Bai',
+            '（王安石嫂）' => 'Sister-in-law of Wang Anshi',
+        ];
+
+        foreach ($cases as $query => $expectedPhrase) {
+            $response = $this->get('/api/select/search/pinyin?q='.urlencode($query));
+            $response->assertOk();
+            $this->assertSame('('.$expectedPhrase.')', trim($response->getContent()));
+        }
+    }
+
+    #[Test]
+    public function search_pinyin_prefers_multi_char_titles_over_single_char_suffix(): void {
+        DB::table('pinyin')->insert([
+            ['lastname_chn' => '李', 'lastname_pinyin' => 'Li'],
+            ['lastname_chn' => '王', 'lastname_pinyin' => 'Wang'],
+            ['lastname_chn' => '宗', 'lastname_pinyin' => 'Zong'],
+        ]);
+
+        // 多字稱謂不可被其單字後綴（母/父/女）誤切：祖母≠母、祖父≠父、孫女≠女。
+        $cases = [
+            '（李白祖母）' => '(Grandmother of Li Bai)',
+            '（王安石祖父）' => '(Grandfather of Wang Anshi)',
+            '（李白孫女）' => '(Granddaughter of Li Bai)',
+            // 前綴形（特例 2）同樣須正確消歧
+            '宗氏（李白祖母）' => 'Zong Shi (Grandmother of Li Bai)',
+        ];
+
+        foreach ($cases as $query => $expected) {
+            $response = $this->get('/api/select/search/pinyin?q='.urlencode($query));
+            $response->assertOk();
+            $this->assertSame($expected, trim($response->getContent()));
+        }
+    }
+
+    #[Test]
+    public function search_pinyin_does_not_treat_non_relationship_parenthetical_as_relationship(): void {
+        DB::table('pinyin')->insert([
+            ['lastname_chn' => '李', 'lastname_pinyin' => 'Li'],
+            ['lastname_chn' => '公', 'lastname_pinyin' => 'Gong'],
+        ]);
+
+        // 「子」「孫」非稱謂（刻意未收）：「（李子）」「（公孫）」這類括號別名/詞不應被誤判為關係稱謂。
+        foreach (['（李子）', '（公孫）'] as $query) {
+            $response = $this->get('/api/select/search/pinyin?q='.urlencode($query));
+            $response->assertOk();
+            $content = trim($response->getContent());
+            $this->assertStringNotContainsString(' of ', $content);
+        }
+    }
+
+    #[Test]
     public function search_pinyin_with_split_zero_does_not_split_by_surname(): void {
         DB::table('pinyin')->insert([
             'lastname_chn' => '安',

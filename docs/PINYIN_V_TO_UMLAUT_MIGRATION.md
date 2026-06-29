@@ -1,8 +1,9 @@
 # 拼音 v → ü 全庫正規化遷移計畫
 
-> 狀態：計畫草案（待 review）
+> 狀態：計畫草案（提交討論）
 > 分支：`feature/pinyin-v-to-umlaut-migration`
 > 相關 PR：[#1086](https://github.com/cbdb-project/cbdb-online-main-server/pull/1086)（僅修正 `app/Models/Pinyin.php` 生成字典）
+> English version: [PINYIN_V_TO_UMLAUT_MIGRATION.en.md](./PINYIN_V_TO_UMLAUT_MIGRATION.en.md)
 
 ## 0. 背景與決議
 
@@ -36,9 +37,9 @@ CBDB 拼音規範長期以 `v` 代替 `ü`（如 `呂 = Lv`、`閭丘 = Lvqiu`�
 
 > 注意：CBDB 拼音多以空白分隔音節（如 `Lü Mengzheng`、`Yelü`），但 `Yelv` 這類連寫情況存在，需同時處理「token 內部音節邊界」。實作時以正則鎖定 `l/n + v(e)` 且左側非字母、右側為母音或邊界。
 
-## 2. 受影響範圍盤點（不可只看人名）
+## 2. 受影響範圍盤點（全表拼音欄位）
 
-> 這一節正面回答「為什麼大家只談人名」：拼音欄位散布在多張表，**地名、官名、朝代、年號、族群等 code 表同樣含 `v`**，必須一併納入。
+> 拼音欄位不僅存在於人名相關欄位；**地名、官名、朝代、年號、族群等 code 表同樣含 `v`**，本計畫一併納入處理。
 
 > 下列欄位清單已對照 `docs/DATABASE_SCHEMA.md`（MySQL/SQLite 兩半一致）逐一核實。掃描階段仍應以指令重新確認資料實況，但欄位名稱本身已確定。
 
@@ -158,7 +159,6 @@ CBDB 拼音規範長期以 `v` 代替 `ü`（如 `呂 = Lv`、`閭丘 = Lvqiu`�
 - **`ADDRESSES` 重建為 MySQL 限定**：`cbdb:regenerate-addresses-table` 用原始 SQL/暫存表，SQLite 不可跑（§4.4）。
 - **派生表/視圖一致性**：只改源頭表，派生資料重建。
 - **資料庫相容**：新寫的掃描/轉換指令遵守 `is_mysql()`/`is_sqlite()`；勿在原始 SQL 用 SQLite 不支援語法（既有 `ADDRESSES` 重建指令為已知例外）。
-- **OneDrive 同步競態**：本 repo 受 OneDrive 同步，自動編輯可能被回寫；每完成一步盡快 commit（見 [[project_onedrive_edit_race]]）。
 
 ## 7. 執行順序與待辦帳本
 

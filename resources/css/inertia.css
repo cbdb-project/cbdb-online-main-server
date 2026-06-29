@@ -35,6 +35,10 @@
  *   destructive = Harvard 紅 #A51C30
  */
 :root {
+    /* 讓瀏覽器以淺色繪製原生 UI（捲軸、表單控件、下拉等）；深色模式於 .dark 覆蓋為 dark。
+       color-scheme 可繼承，僅此一處即同時修正頁面與所有巢狀捲動容器的捲軸顏色。 */
+    color-scheme: light;
+
     --background: hsl(0 0% 100%);
     --foreground: hsl(210 11% 15%);            /* AdminLTE body 文字 #212529 近似 */
     --card: hsl(0 0% 100%);
@@ -105,6 +109,9 @@
 }
 
 .dark {
+    /* 原生捲軸/表單控件改以深色繪製（修正深色頁面殘留的白色捲軸）。 */
+    color-scheme: dark;
+
     --background: hsl(210 10% 15%);
     --foreground: hsl(213 9% 85%);
     --card: hsl(210 10% 19%);

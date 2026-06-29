@@ -1,5 +1,6 @@
 import React from 'react';
 import { usePage } from '@inertiajs/react';
+import { User, IdCard, Briefcase, BookText, Users, History, type LucideIcon } from 'lucide-react';
 import DashboardLayout from '../../Layouts/DashboardLayout';
 import { useTranslation } from '../../hooks/useTranslation';
 import type { SharedProps } from '../../types/page';
@@ -25,11 +26,13 @@ interface DashboardPageProps extends SharedProps {
 
 const nf = new Intl.NumberFormat();
 
-function InfoBox({ icon, color, label, value }: { icon: string; color: string; label: string; value: number }) {
+// 統計卡圖示改用 Lucide 線性圖示（現代、與 shadcn 風格一致），並以「柔和淡底 + 彩色線圖」取代
+// 舊版高飽和實心色塊；每個色調都帶 dark: 變體，深淺模式皆協調不刺眼。
+function InfoBox({ icon: Icon, tone, label, value }: { icon: LucideIcon; tone: string; label: string; value: number }) {
     return (
         <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-3 shadow-sm">
-            <span className={cn('flex h-12 w-12 items-center justify-center rounded text-white', color)}>
-                <i className={icon} aria-hidden />
+            <span className={cn('flex h-12 w-12 items-center justify-center rounded-lg', tone)}>
+                <Icon className="h-6 w-6" strokeWidth={2} aria-hidden />
             </span>
             <div>
                 <div className="text-xs text-muted-foreground">{label}</div>
@@ -77,12 +80,12 @@ export default function DashboardIndex() {
     return (
         <DashboardLayout title={tNav('dashboard')}>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
-                <InfoBox icon="fas fa-user" color="bg-sky-500" label={t('stat_persons')} value={props.totalPersons} />
-                <InfoBox icon="fas fa-id-card" color="bg-green-500" label={t('stat_altnames')} value={props.totalAltnames} />
-                <InfoBox icon="fas fa-briefcase" color="bg-amber-500" label={t('stat_offices')} value={props.totalOffices} />
-                <InfoBox icon="fas fa-book" color="bg-blue-600" label={t('stat_texts')} value={props.totalTexts} />
-                <InfoBox icon="fas fa-users" color="bg-gray-500" label={t('stat_users')} value={props.totalUsers} />
-                <InfoBox icon="fas fa-history" color="bg-red-500" label={t('stat_operations')} value={props.totalOperations} />
+                <InfoBox icon={User} tone="bg-sky-500/12 text-sky-600 dark:bg-sky-400/15 dark:text-sky-400" label={t('stat_persons')} value={props.totalPersons} />
+                <InfoBox icon={IdCard} tone="bg-emerald-500/12 text-emerald-600 dark:bg-emerald-400/15 dark:text-emerald-400" label={t('stat_altnames')} value={props.totalAltnames} />
+                <InfoBox icon={Briefcase} tone="bg-amber-500/12 text-amber-600 dark:bg-amber-400/15 dark:text-amber-400" label={t('stat_offices')} value={props.totalOffices} />
+                <InfoBox icon={BookText} tone="bg-blue-500/12 text-blue-600 dark:bg-blue-400/15 dark:text-blue-400" label={t('stat_texts')} value={props.totalTexts} />
+                <InfoBox icon={Users} tone="bg-violet-500/12 text-violet-600 dark:bg-violet-400/15 dark:text-violet-400" label={t('stat_users')} value={props.totalUsers} />
+                <InfoBox icon={History} tone="bg-rose-500/12 text-rose-600 dark:bg-rose-400/15 dark:text-rose-400" label={t('stat_operations')} value={props.totalOperations} />
             </div>
 
             <div className="mt-4 rounded-lg border border-border bg-card">

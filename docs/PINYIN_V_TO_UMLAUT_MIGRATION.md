@@ -10,8 +10,8 @@
 CBDB 拼音規範長期以 `v` 代替 `ü`（如 `呂 = Lv`、`閭丘 = Lvqiu`、`耶律 = Yelv`）。經 Frank Lin、Song Chen（陳松）、Hongsu、Michael Fuller、Peter Bol 的郵件討論，達成以下共識：
 
 1. **`ü` 為唯一正字（canonical）**，全庫拼音欄位不再以 `v` 代替（依《漢語拼音方案》）。
-2. **輸入時接受 `v`**：手動錄入與搜尋時 `v` 自動轉 `ü`，方便鍵盤輸入。
-3. **舊 `v` 形式可保留為「另一種羅馬化」別名**以兼容搜尋（Michael 提出的 `ALTNAME_DATA` 代碼 **22 alternative romanization**）；此為可選、非必須項。
+2. **輸入時接受 `v`**：手動錄入／拼音生成時將 `v` 正規化為 `ü`（儲存正字）；搜尋時則讓使用者輸入的 `v` 形式同時匹配 `v` 與 `ü`（查詢展開，見 §3），方便鍵盤輸入。
+3. **舊 `v` 形式可選擇性保留為「另一種羅馬化」別名**（Michael 提出的 `ALTNAME_DATA` 代碼 **22 alternative romanization**）；惟搜尋兼容改以查詢展開達成（§3），故此別名對搜尋並非必要，純為可選。
 4. **所有資料修改必須有 audit 記錄**，**不得使用繞過 audit 的集中式 SQL**；以受審計的 mutation API（外部腳本）執行最為安全。
 
 ## 1. 規劃原則（依後續討論調整）
@@ -50,9 +50,9 @@ CBDB 拼音規範長期以 `v` 代替 `ü`（如 `呂 = Lv`、`閭丘 = Lvqiu`�
 
 - **collation 事實**：生產環境 MariaDB 的 `utf8mb4_general_ci` 與 `utf8mb4_unicode_ci` **皆為 accent-insensitive，會把 `ü` 摺疊成 `u`**。受影響欄位 `c_surname`、`c_mingzi`、`pinyin.lastname_pinyin`、`c_alt_name` 為 general_ci，`c_name` 為 unicode_ci，兩者都折疊。
 - **結論**：使用者**打 `u` 已能命中 `ü` 資料**，無需額外程式（Frank 線上實例：搜尋 `yelu` 命中 `Yelü`，符合預期）。因此把資料改成 `ü` **不會**讓既有以 `u` 搜尋的使用者失效。
-- **唯一兼容缺口**：習慣打 **`v`** 的使用者（如 `Lv`、`Yelv`）。對此有兩個可選方案（皆可延後、非阻塞）：
-  1. 將舊 `v` 形式以 `ALTNAME_DATA` 代碼 22 作別名（見 §5）；
-  2. 在查詢層把 `v → ü` normalize。
+- **唯一兼容缺口：習慣打 `v` 的使用者**（如 `Lv`、`Yelv`）——`v` 不會被 collation 折疊成 `ü`。**建議採「查詢展開（query expansion）」：當使用者輸入含 `v` 的音節形式（`lv`/`lve`/`nv`/`nve`）時，系統同時以 `v` 形式與對應 `ü` 形式查詢（OR），而非把查詢中的 `v` 取代為 `ü`。**
+  - 理由：在使用者查詢中**無法可靠區分** `lv` 是 `lü` 的代打、還是西文名（如 `Calvin`）的一部分；直接取代會選定單一解讀、可能讓含 `v` 的西文名查詢落空。同時查兩者最穩健——既命中已正規化的 `ü` 資料，也命中過渡期殘留的 `v` 形式與西文名。
+  - 此法可延後、非阻塞；且**使代碼 22 別名對搜尋並非必要**（別名若仍要做，純為搜尋以外的目的，見 §5.3）。
 - **SQLite 例外**：測試環境（SQLite）為二進位/`NOCASE` 比較，**不折疊** `ü`/`u`。撰寫回歸測試時須注意此差異（必要時於測試端先正規化或自訂 collation），勿據 SQLite 行為推斷生產行為。
 
 ## 4. 受影響範圍盤點（分階段）
@@ -108,10 +108,11 @@ CBDB 拼音規範長期以 `v` 代替 `ü`（如 `呂 = Lv`、`閭丘 = Lvqiu`�
 - **`c_name` 自動重算（無待解項）**：handler 的 `buildMergedPayload()` 會先把 `changes` 併入整筆原紀錄，`updateById()` 再由合併後的 `c_surname`+`c_mingzi` 重算 `c_name`（連同 `c_name_chn`/`c_name_proper`/`c_name_rm`）。因此腳本**只需送修正後的 `c_surname`/`c_mingzi`**，`c_name` 會自動跟著正確，無資料遺失風險、無需另行處理。
 - 建議批量節奏：一次數百筆，或**一個姓氏一批**，先 dry-run / 取樣複核再正式送出。
 
-### 5.3 別名兼容（可選、延後）
-- 若決定保留舊 `v` 形式供搜尋兼容：以 `POST /api/v2/create`、`resource: "altnames"`、`c_alt_name_type_code: 22`、`c_alt_name: <v 形式>`、並附 `c_alt_name_chn`（PK 需要中文名）建立別名列。
+### 5.3 別名（可選；搜尋兼容已由查詢展開達成）
+- 搜尋兼容已由查詢展開（§3）達成，**代碼 22 別名並非搜尋所需**。以下僅在「基於搜尋以外的理由」仍要保留舊 `v` 形式為別名時適用。
+- 作法：以 `POST /api/v2/create`、`resource: "altnames"`、`c_alt_name_type_code: 22`、`c_alt_name: <v 形式>`、並附 `c_alt_name_chn`（PK 需要中文名）建立別名列。
 - **前置條件**：`ALTNAME_CODES` 目前無 seed，須先確認/建立代碼 22「alternative romanization」（含中英說明），否則 FK 會拒絕未知代碼。
-- 依共識，此步在**資料清理完成後**再加；是否必須無強烈定論。
+- 若要做，建議在**資料清理完成後**再加；是否必須無強烈定論。
 
 ### 5.4 盤點工具
 - 仍建議提供唯讀 artisan 指令 `php artisan cbdb:scan-pinyin-v`：掃描 §4 候選欄位、依音節規則分類（疑似拼音 / 疑似西文名）、輸出 CSV 供人工複核並對齊 Frank 的 Google Sheet。此指令**只讀不寫**，可安全在生產執行。
@@ -123,14 +124,14 @@ CBDB 拼音規範長期以 `v` 代替 `ü`（如 `呂 = Lv`、`閭丘 = Lvqiu`�
    - 在「漢字→拼音」生成入口加 `v → ü` 正規化（已核實入口）：`BiogMainRepository::auto_pinyin()`、`ApiController::buildPinyinWord()` / `searchPinyin()`、三個批次匯入各自的 `buildPinyin()`（`AdminBatchLoadOfficesController`、`AdminBatchLoadBookTitlesController`、`AdminBatchLoadSocialInstitutesController`）；這些路徑生成前已呼叫 `VariantCharNormalizer::normalize()`，是自然掛點。需新建共用 `v→ü` helper（目前 repo 無此 helper）。
    - 註：`nve` 在生成字典中本就不存在；`nve → nüe` 僅在輸入正規化端有意義。
 2. **修正高可見人名拼音**：透過審計 mutation API 批次修正（§5.2），分批（數百筆／一姓氏一批）。
-3. **（可選）保留舊 `v` 形式供搜尋兼容**：以代碼 22 別名（§5.3），於資料清理完成後再加；非必須。
-4. **建議下游系統與 Access 版**適時加上 `v → ü` 查詢兼容（溝通、非阻塞）。
+3. **（可選、可延後）搜尋兼容**：以查詢展開讓使用者輸入的 `v` 形式同時匹配 `v` 與 `ü`（§3）；`ALTNAME_DATA` 代碼 22 別名對搜尋並非必要，如需保留純為其他目的（§5.3）。
+4. **建議下游系統與 Access 版**適時加上查詢兼容——查詢時同時匹配 `v` 與 `ü` 形式（溝通、非阻塞）。
 5. **持續掃描、修正其他非人名拼音欄位**（階段 B，§4）。
 
 ## 7. 風險與注意事項
 
 - **西文名誤傷**（Silva/Calvin…）：靠音節規則 + 人工複核；`c_*_proper`、`c_*_rm`、譯名欄位不動。
-- **搜尋現況**：`u` 已能命中 `ü`（collation 折疊）；僅 `v` 需兼容，且可延後（§3）。SQLite 測試不折疊，撰寫測試須注意。
+- **搜尋現況**：`u` 已能命中 `ü`（collation 折疊）；僅 `v` 需兼容，採查詢展開（輸入 `v` 同時查 `v` 與 `ü`），且可延後（§3）。SQLite 測試不折疊，撰寫測試須注意。
 - **代碼 22 FK 前置**：寫代碼 22 前須先於 `ALTNAME_CODES` 建立該代碼（§5.3）。
 - **階段 B 審計路徑**：code 表目前僅 `NIAN_HAO` 有 mutation handler，需先建受審計寫入 API（見 [Code 表受審計寫入 API 建設計畫](./CODE_TABLE_MUTATION_API_PLAN.md)）才動工（§4）。
 - **無主鍵表**：`SOCIAL_INSTITUTION_ALTNAME_DATA` 須特例處理（§4）。
@@ -143,8 +144,9 @@ CBDB 拼音規範長期以 `v` 代替 `ü`（如 `呂 = Lv`、`閭丘 = Lvqiu`�
 - [ ] 階段一（止血）：新建共用 `v→ü` helper，掛入生成入口（`auto_pinyin` + 三批次 `buildPinyin` + `ApiController`）防止新 `v`
 - [ ] 盤點：`cbdb:scan-pinyin-v` 唯讀掃描 + 報告，對齊 Frank 的 Google Sheet 與西文名排除清單
 - [ ] 階段二（人名）：外部腳本走 `/api/v2/mutate` 批次修正 `c_surname`/`c_mingzi`（`c_name` 由系統自動重算），分批、先 dry-run 複核
-- [ ] （可選）確認／建立 `ALTNAME_CODES` 代碼 22，再以 `/api/v2/create` 補別名（資料清理完成後）
-- [ ] 溝通下游系統與 Access 版，建議適時加 `v→ü` 查詢兼容
+- [ ] （可選、可延後）搜尋兼容：於拼音 LIKE 查詢端實作查詢展開（輸入 `v` 形式時同時查 `v` 與 `ü`）（§3）
+- [ ] （可選，搜尋以外目的）確認／建立 `ALTNAME_CODES` 代碼 22，再以 `/api/v2/create` 補別名（資料清理完成後）
+- [ ] 溝通下游系統與 Access 版，建議查詢時同時匹配 `v` 與 `ü` 形式
 - [ ] 階段 B 前置：依 [Code 表受審計寫入 API 建設計畫](./CODE_TABLE_MUTATION_API_PLAN.md) 建立 code 表受審計寫入 API
 - [ ] 階段 B：API 就緒後，分批掃描修正其他拼音欄位（含 `TEXT_INSTANCE_DATA` 複合主鍵、`SOCIAL_INSTITUTION_ALTNAME_DATA` 無主鍵特例、`ADDRESSES` 重建）
 - [ ] 回歸測試（生成 / 正規化 / 人名修正 / audit / 西文名排除；注意 SQLite collation 差異）

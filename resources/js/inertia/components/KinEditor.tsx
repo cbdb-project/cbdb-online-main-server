@@ -8,6 +8,7 @@ import MirrorConflictNotice, { MirrorConflict } from './PersonEditorShared/Mirro
 import MirrorSuspectedNotice, { MirrorSuspected } from './PersonEditorShared/MirrorSuspectedNotice';
 import MirrorDeleteMultipleNotice, { MirrorDeleteMultiple } from './PersonEditorShared/MirrorDeleteMultipleNotice';
 import OppositeEdgeNotice from './PersonEditorShared/OppositeEdgeNotice';
+import PersonJumpLink from './PersonEditorShared/PersonJumpLink';
 import { useOppositeEdgeDetection } from './PersonEditorShared/useOppositeEdgeDetection';
 import {
     gridCardStyle, gGrid, gInputStyle, gReadonlyStyle, gHintStyle, gOkStyle, gErrStyle,
@@ -295,7 +296,13 @@ export default function KinEditor({
 
             <div style={gGrid}>
                 {searchRow('c_kin_code', tr('kinship_relation', '親屬關係'), 'c_kin_code', '/api/select/search/kincode', false, '0', true)}
-                {searchRow('c_kin_id', tr('relative_name', '親屬姓名'), 'c_kin_id', '/api/select/search/biog', false, '0', true)}
+                {/* 親屬姓名：選定後於下方提供「前往此人物頁」連結（新分頁，不影響本頁編輯）。 */}
+                {gridCell(tr('relative_name', '親屬姓名'), { code: 'c_kin_id', required: true }, <>
+                    <CodeAutocomplete mode="search" endpoint="/api/select/search/biog"
+                        value={fields.c_kin_id ?? '0'} initialLabel={labels.c_kin_id ?? ''} disabled={!editable}
+                        onChange={(v, l) => { set('c_kin_id', v || '0'); setLabel('c_kin_id', l); }} />
+                    <PersonJumpLink personId={fields.c_kin_id} name={labels.c_kin_id} tr={tr} />
+                </>)}
 
                 {/* 互逆配對碼：依正向碼取候選，預設第一個（同 legacy），反向關係有歧義（父→子/女、第幾子…）故可手選。 */}
                 {gridCell(tr('reverse_pair_label', '互逆配對碼'), { code: 'c_kinship_pair', full: true }, <>

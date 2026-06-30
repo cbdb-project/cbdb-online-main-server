@@ -9,6 +9,7 @@ import { redirectAfterSubresourceCreate } from './PersonEditorShared/afterCreate
 import MirrorConflictNotice, { MirrorConflict } from './PersonEditorShared/MirrorConflictNotice';
 import MirrorSuspectedNotice, { MirrorSuspected } from './PersonEditorShared/MirrorSuspectedNotice';
 import OppositeEdgeNotice from './PersonEditorShared/OppositeEdgeNotice';
+import PersonJumpLink from './PersonEditorShared/PersonJumpLink';
 import { useOppositeEdgeDetection } from './PersonEditorShared/useOppositeEdgeDetection';
 import {
     gridCardStyle, gGrid, gInputStyle, gReadonlyStyle, gHintStyle, gOkStyle, gErrStyle,
@@ -487,7 +488,13 @@ export default function AssocEditor({
             <GridSection title={tr('assoc_core_section', '社會關係')}>
                 <div style={gGrid}>
                     {searchRow('c_assoc_code', tr('assoc_field', '社會關係'), 'c_assoc_code', '/api/select/search/assoccode', assocHighlight, '0', true)}
-                    {searchRow('c_assoc_id', tr('assoc_person', '關聯人物'), 'c_assoc_id', '/api/select/search/biog', false, '0', true)}
+                    {/* 關聯人物：選定後於下方提供「前往此人物頁」連結（新分頁，不影響本頁編輯）。 */}
+                    {gridCell(tr('assoc_person', '關聯人物'), { code: 'c_assoc_id', required: true }, <>
+                        <CodeAutocomplete mode="search" endpoint="/api/select/search/biog"
+                            value={fields.c_assoc_id ?? '0'} initialLabel={labels.c_assoc_id ?? ''} disabled={!editable}
+                            onChange={(v, l) => { set('c_assoc_id', v || '0'); setLabel('c_assoc_id', l); }} />
+                        <PersonJumpLink personId={fields.c_assoc_id} name={labels.c_assoc_id} tr={tr} />
+                    </>)}
                     {/* 關係次數（書信計次）：重要、非出處，移入核心區，置於社會關係/關聯人物之後。 */}
                     {textRow('c_assoc_count', tr('assoc_count_field', '數量'), 'c_assoc_count', false, tr('assoc_count_hint', '此欄位僅適用於書信：當無法以標題及日期區分多次信件時，則僅建「一筆」社會關係，並將信件總數填於此欄。請填阿拉伯數字'))}
                     {/* 次序不重要，下移至核心欄之後（去強調）。 */}

@@ -2,7 +2,7 @@
 
 > Status: Draft plan (for discussion)
 > Branch: `feature/pinyin-v-to-umlaut-migration`
-> Related PR: [#1086](https://github.com/cbdb-project/cbdb-online-main-server/pull/1086) (fixes only the generation dictionary in `app/Models/Pinyin.php`)
+> Related PR: [#1086](https://github.com/cbdb-project/cbdb-online-main-server/pull/1086) (generation-dictionary fix, folded into #1087)
 > 中文版本: [PINYIN_V_TO_UMLAUT_MIGRATION.md](./PINYIN_V_TO_UMLAUT_MIGRATION.md)
 
 ## 0. Background and Agreed Decisions
@@ -11,12 +11,19 @@ The CBDB pinyin convention has long used `v` in place of `ü` (e.g. `呂 = Lv`, 
 
 1. **`ü` is the single canonical form**; pinyin fields across the database should no longer use `v` in its place (per the *Scheme for the Chinese Phonetic Alphabet / Hanyu Pinyin*).
 2. **`v` is accepted on input**: during manual entry and search, `v` is automatically converted to `ü` for keyboard convenience.
-3. **The old `v` forms are kept as an "alternative romanization" alias** for search compatibility, using Michael's proposed `ALTNAME_DATA` alias code **22 (alternative romanization)**. This avoids treating the `v` form as a real name and keeps it out of `c_notes`.
-4. **All data changes must be audited**, performed through an audited batch process (Repository / Service + `AuditLogService`); **raw SQL `UPDATE` is not allowed**.
+3. **The old `v` forms may be kept as an "alternative romanization" alias** for search compatibility (Michael's proposed `ALTNAME_DATA` code **22, alternative romanization**); this is optional, not mandatory.
+4. **All data changes must be audited**; **centralized SQL that bypasses the audit log must not be used**. Performing the corrections via the audited mutation API (an external script) is the safest approach.
 
-> PR #1086 only addresses the "generation dictionary", i.e. it *prevents future `v`* from being generated. **Cleaning up the existing data is the main body of this plan**, and it must cover all pinyin fields beyond personal names (place names, office titles, dynasties, reign periods, ethnicities, etc.).
+## 1. Planning Principles (adjusted per follow-up discussion)
 
-## 1. Pinyin Detection Rule (Core)
+Per Frank's follow-up suggestions, this plan adopts the following principles to avoid coupling a straightforward data-quality correction with the larger compatibility effort:
+
+- **Decouple data correction from search compatibility**: treat `v → ü` as a **data-quality correction** — equivalent to an editor fixing records one by one in the UI, only more systematic and less error-prone, with full audit traceability. Search compatibility is **separate and deferrable** work and should not block the data correction.
+- **Phased, person-names first**: a full-database migration does not need to be done in one go. Start with the **high-visibility, low-risk person-name pinyin**, then handle other pinyin fields (place names, office titles, reign periods, etc.) in later stages after scanning and review.
+- **Do not block on downstream systems, nor on the Access edition**: the canonical correction in the online academic database need not wait for downstream systems to implement the same change, nor for the Access edition (the standalone CBDB distribution — a parallel edition rather than a downstream system). We will communicate the change and recommend compatible behavior to both downstream systems and the Access edition, but none of these should block fixing data-quality issues.
+- **Execute via the mutation API**: use the existing, tested audited mutation API (an external script) rather than building a new or bypassing write path.
+
+## 2. Pinyin Detection Rule (Core)
 
 In Hanyu Pinyin, `ü` appears only after the initials `l` / `n`. The exhaustive set of affected syllables is just four:
 
@@ -37,144 +44,109 @@ Therefore **only these four substrings need conversion** (handle each case separ
 
 > Note: CBDB pinyin is mostly whitespace-delimited by syllable (e.g. `Lü Mengzheng`, `Yelü`), but joined forms such as `Yelv` exist, so intra-token syllable boundaries must also be handled. In implementation, use a regex anchored on `l/n + v(e)` with a non-letter to the left and a vowel or boundary to the right.
 
-## 2. Scope Inventory (all pinyin fields, database-wide)
+## 3. Current Search Behavior (determines the scope of compatibility work)
 
-> Pinyin fields are not limited to name-related columns; **place names, office titles, dynasties, reign periods, ethnicities, and other code tables also contain `v`**, and this plan handles them together.
+> This section is the basis for "why search compatibility can be deferred".
 
-> The column list below has been verified one by one against `docs/DATABASE_SCHEMA.md` (the MySQL and SQLite halves agree). The scan phase should still re-confirm the actual data, but the column names themselves are settled.
+- **Collation fact**: on production MariaDB, both `utf8mb4_general_ci` and `utf8mb4_unicode_ci` are **accent-insensitive and fold `ü` to `u`**. The affected columns `c_surname`, `c_mingzi`, `pinyin.lastname_pinyin`, and `c_alt_name` are general_ci; `c_name` is unicode_ci — both fold.
+- **Conclusion**: users **searching with plain `u` already match `ü` data** with no code change (Frank's live example: searching `yelu` matches `Yelü`, as expected). So changing the data to `ü` does **not** break existing users who search with `u`.
+- **The only compatibility gap**: users accustomed to typing **`v`** (e.g. `Lv`, `Yelv`). For that there are two optional approaches (both deferrable, non-blocking):
+  1. add the old `v` form as an `ALTNAME_DATA` code-22 alias (see §5); or
+  2. normalize `v → ü` at the query layer.
+- **SQLite exception**: the test environment (SQLite) uses binary / `NOCASE` comparison and does **not** fold `ü`/`u`. Keep this in mind when writing regression tests (normalize on the test side or use a custom collation if needed); do not infer production behavior from SQLite.
 
-### A. Hanyu Pinyin fields (to be converted)
+## 4. Scope Inventory (phased)
+
+> Pinyin fields are not limited to name-related columns; place names, office titles, dynasties, reign periods, ethnicities, and other code tables also contain `v`. But per the "person-names first, others in batches" principle, the table below marks the phase. Column names have been verified one by one against `docs/DATABASE_SCHEMA.md`.
+
+### Phase A — person-name pinyin (priority)
 | Table | Column | Notes |
 |-------|--------|-------|
-| `BIOG_MAIN` | `c_name`, `c_surname`, `c_mingzi` | Hanyu Pinyin; **auto-generated from a pinyin source** (see §5: `c_surname` from the DB `pinyin` table, `c_mingzi` from `Pinyin::$dic`, `c_name` = the two concatenated). **Should not be UPDATE-d directly**; fix the source and regenerate (see §4.3). |
-| `ALTNAME_DATA` | `c_alt_name` | Person alt-name romanization (`c_alt_name_chn` is the Chinese; composite primary key) |
-| `ADDR_CODES` | `c_name` | Place-name romanization (`c_name_chn` is the Chinese) |
-| `ADDRESSES` (derived) | `c_name`, `belongs1_Name`…`belongs5_Name` | Derived from `ADDR_CODES.c_name`; **rebuild after changing the source, do not edit directly** (see §4.4) |
-| `OFFICE_CODES` | `c_office_pinyin`, `c_office_pinyin_alt` | Office-title pinyin |
-| `ETHNICITY_TRIBE_CODES` | `c_name`, `c_romanized`, `c_surname` | Ethnicity romanization |
-| `DYNASTIES` | `c_dynasty` | Dynasty romanization (in practice almost no `lv/nv`, still scanned) |
-| `NIAN_HAO` | `c_nianhao_pin` | Reign-period pinyin (`c_nianhao_chn` is the Chinese) |
-| `CHORONYM_CODES` | `c_choronym_desc` | Choronym romanization (`c_choronym_chn` is the Chinese) |
-| `TEXT_CODES` | `c_title` | Book-title romanization (`c_title_chn` Chinese; `c_title_trans` is a translation, not converted) |
-| `TEXT_INSTANCE_DATA` | `c_instance_title` | Edition/instance title romanization |
-| `TEXT_BIBLCAT_CODES` | `c_text_cat_pinyin` | Bibliographic-category pinyin |
-| `GANZHI_CODES` | `c_ganzhi_py` | Ganzhi pinyin (the 60 ganzhi contain no `lü/nü`, expected 0 rows, still scanned) |
-| `SOCIAL_INSTITUTION_NAME_CODES` | `c_inst_name_py` | Social-institution name pinyin |
-| `SOCIAL_INSTITUTION_TYPES` | `c_inst_type_py` | Social-institution type pinyin |
-| `SOCIAL_INSTITUTION_ALTNAME_DATA` | `c_inst_altname_py` | Social-institution alt-name pinyin |
-| `ADMIN_CAT_CODES` | `c_admin_cat_py` | Administrative-category pinyin (`c_admin_cat_trans` is a translation, not converted) |
+| `BIOG_MAIN` | `c_surname`, `c_mingzi` | Hanyu Pinyin; the mutation API **can update these directly**, and the update path does not re-run `auto_pinyin` (it will not regenerate-from-Chinese and overwrite your supplied value). |
+| `BIOG_MAIN` | `c_name` | Full name (`c_surname + ' ' + c_mingzi`); the mutation API blocks it as a direct input, but the update path **automatically recomputes `c_name` from the merged `c_surname`+`c_mingzi`** (the handler first merges the changes onto the full original record). **So after correcting `c_surname`/`c_mingzi`, `c_name` follows automatically — no separate handling needed.** |
+| `ALTNAME_DATA` | `c_alt_name` | Person alt-name romanization (`c_alt_name_chn` is the Chinese; 3-column composite PK). |
 
-> During the scan, enumerate columns automatically by the rule "any column name ending in `_py` / `_pinyin`, or flagged as romanized in the schema", so the table above does not silently miss future columns.
+### Phase B — other pinyin fields (later batches, after scan + review)
+| Table | Column | PK note |
+|-------|--------|---------|
+| `ADDR_CODES` | `c_name` | Single PK `c_addr_id`; the derived table `ADDRESSES` (`c_name`, `belongs1_Name`…`belongs5_Name`) is rebuilt after changing the source |
+| `OFFICE_CODES` | `c_office_pinyin`, `c_office_pinyin_alt` | Single PK `c_office_id` |
+| `ETHNICITY_TRIBE_CODES` | `c_name`, `c_romanized`, `c_surname` | Single PK `c_ethnicity_code` |
+| `DYNASTIES` | `c_dynasty` | Single PK `c_dy` (in practice almost no `lv/nv`) |
+| `NIAN_HAO` | `c_nianhao_pin` | Single PK `c_nianhao_id` |
+| `CHORONYM_CODES` | `c_choronym_desc` | Single PK `c_choronym_code` |
+| `TEXT_CODES` | `c_title` | Single PK `c_textid` (`c_title_trans` is a translation, not converted) |
+| `TEXT_INSTANCE_DATA` | `c_instance_title` | **Composite PK, 3 keys** `c_textid`, `c_text_edition_id`, `c_text_instance_id` |
+| `TEXT_BIBLCAT_CODES` | `c_text_cat_pinyin` | Single PK `c_text_cat_code` |
+| `GANZHI_CODES` | `c_ganzhi_py` | Single PK; the 60 ganzhi contain no `lü/nü`, expected 0 rows |
+| `SOCIAL_INSTITUTION_NAME_CODES` | `c_inst_name_py` | Single PK `c_inst_name_code` |
+| `SOCIAL_INSTITUTION_TYPES` | `c_inst_type_py` | Single PK `c_inst_type_code` |
+| `SOCIAL_INSTITUTION_ALTNAME_DATA` | `c_inst_altname_py` | **No primary key** (special case, see below) |
+| `ADMIN_CAT_CODES` | `c_admin_cat_py` | Single PK `c_admin_cat_code` |
 
-### B. Non-Hanyu-Pinyin romanization fields (left untouched by default; require a separate decision)
-| Table | Column | Reason |
-|-------|--------|--------|
-| `BIOG_MAIN` | `c_name_rm`, `c_surname_rm`, `c_mingzi_rm` | **Non-pinyin romanizations such as Wade-Giles / McCune-Reischauer**, user-editable. Their use of `ü` differs from Hanyu Pinyin, so they are **not part of this automatic conversion**. |
-| `BIOG_MAIN` | `c_name_proper`, `c_surname_proper`, `c_mingzi_proper` | The person's native (non-Chinese) name in Latin script; may contain a genuine `v`. **Not pinyin, not converted.** |
+> During the scan, enumerate columns automatically by the rule "any column name ending in `_py` / `_pinyin`, or flagged as romanized in the schema", so future columns are not missed.
+> **No-PK special case**: `SOCIAL_INSTITUTION_ALTNAME_DATA` has no PRIMARY KEY (only two ordinary indexes; all columns nullable). Since auditing needs a per-row locating key, this table cannot go through per-row audited changes; a synthetic identifier or manual handling must be defined.
+> **Phase B audit path (assessed — an API must be built first)**: the mutation API (`/api/v2/*`) is currently oriented around persons and their sub-resources; among code tables **only `NIAN_HAO` has a handler**. The `/codes` UI is generic but writes only `operations`, not `audit_log`, and is CSRF web routes unsuitable for an external script. So before starting Phase B, an audited write API for the code tables must be built — see the [Code-Table Audited Mutation API Construction Plan](./CODE_TABLE_MUTATION_API_PLAN.en.md). Do not use audit-bypassing SQL.
 
-### C. Never converted
-- `v` confirmed to belong to a Western / foreign name (see the exclusion rule in §1).
-- Translation fields (not romanizations): `OFFICE_CODES.c_office_trans` / `c_office_trans_alt`, `TEXT_CODES.c_title_trans`, `ADMIN_CAT_CODES.c_admin_cat_trans`, and similar English-translation columns.
+### Columns NOT converted
+- **Non-Hanyu-Pinyin romanizations**: `BIOG_MAIN.c_name_rm`, `c_surname_rm`, `c_mingzi_rm` (Wade-Giles / McCune-Reischauer, user-editable, different `ü` usage).
+- **Native names**: `BIOG_MAIN.c_name_proper`, `c_surname_proper`, `c_mingzi_proper` (Latin script, may contain a genuine `v`).
+- **Translation fields**: `OFFICE_CODES.c_office_trans` / `c_office_trans_alt`, `TEXT_CODES.c_title_trans`, `ADMIN_CAT_CODES.c_admin_cat_trans`, etc.
+- `v` confirmed to belong to a Western / foreign name (see the exclusion rule in §2).
 
-## 3. Phase 1: Inventory Scan (read-only, no data changes)
+## 5. Correction Method: External Script via the Existing Audited Mutation API
 
-Goal: before touching any data, clearly establish "which columns and which rows across the database contain `v`, and of those which are pinyin and which are Western names".
+> Principle: **reuse the tested audited mutation API; no centralized SQL that bypasses the audit.**
 
-- Add a read-only artisan command: `php artisan cbdb:scan-pinyin-v`
-  - Scans every candidate table/column in §2-A (the list maintained in a config inside the command, for easy extension).
-  - For each `table.column`, reports: count of rows containing `v`, an automatic classification by syllable rule (likely pinyin / likely Western name), and sample rows.
-  - Outputs a CSV report (under `storage/app/pinyin-v-scan/`) for human review and alignment with Frank's Google Sheet.
-- This phase **writes no data** and is safe to run against production.
-- Acceptance: the report covers all candidate columns; the Western-name misclassification rate is acceptable under spot-checking.
+### 5.1 Mutation API (verified)
+- Endpoints: `POST /api/v2/mutate` (update), `POST /api/v2/create` (create), `POST /api/v2/delete` (delete).
+- Auth: Sanctum **Bearer token** (to an active, non-crowdsourcing user); `/api/v2/*` is **CSRF-exempt** → suitable for an external batch script. `mode: "direct"` requires `canWriteDirectly()` (non-crowdsourcing).
+- **Audit is automatic**: the handler calls `AuditLogService::write()` and populates `operations` automatically — no extra code.
 
-## 4. Phase 2: Data Changes with Audit Logging
+### 5.2 Person-name pinyin correction
+- `BIOG_MAIN.c_surname` / `c_mingzi`: `/api/v2/mutate` **allows direct updates**, and the update path does **not** re-run `auto_pinyin` (it will not regenerate-from-Chinese and overwrite your supplied value). The script can supply the corrected pinyin directly.
+- **`c_name` is recomputed automatically (no open item)**: the handler's `buildMergedPayload()` first merges `changes` onto the full original record, then `updateById()` recomputes `c_name` from the merged `c_surname`+`c_mingzi` (along with `c_name_chn`/`c_name_proper`/`c_name_rm`). So the script **only needs to send the corrected `c_surname`/`c_mingzi`** and `c_name` follows correctly — no data-loss risk, no separate handling.
+- Suggested batch cadence: a few hundred records at a time, or **one surname per batch**; dry-run / sample-review before submitting for real.
 
-> Design principle: **every business-data change writes one `audit_log` row within the same transaction**; raw SQL must not be used to change business data while bypassing the audit. (Sole exception: the derived table `ADDRESSES` is rebuilt wholesale by the existing rebuild command — a technical regeneration, not separately audited; see §4.4.)
+### 5.3 Alias compatibility (optional, deferred)
+- If the old `v` forms are kept for search compatibility: create alias rows via `POST /api/v2/create`, `resource: "altnames"`, `c_alt_name_type_code: 22`, `c_alt_name: <v form>`, plus `c_alt_name_chn` (the PK requires the Chinese name).
+- **Prerequisite**: `ALTNAME_CODES` currently has no seed; code 22 "alternative romanization" (with Chinese/English descriptions) must be confirmed/created first, or the FK will reject the unknown code.
+- Per the agreement, this step is added **after the data cleanup is complete**; whether it is mandatory is undecided.
 
-### 4.1 Existing audit infrastructure (usage and limitations)
-- `app/Services/AuditLogService.php` `write()` / `logChange()`:
-  - Parameters: `table`, `operation`, `rowPk` (**required, not nullable**), `oldData`, `newData`, `actorType`, `actorId`, `operationId`, `occurredAt`, `createdAt`.
-  - Auto-generates `operation_id` via `Str::ulid()` (a batch may pass **the same** `operationId` to tag the whole batch, easing later batch trace/rollback).
-  - Updates `person_change_index` automatically via `DB::afterCommit`, so person-related table changes are detected with no extra work.
-- **Important: `AuditLogService` only writes the audit; it does not perform the data UPDATE itself.** The conversion command must therefore do both "write the data + call `write()`" within the same transaction.
-- **Code tables have no ready-made "UPDATE + audit" path**: all 35 existing `AuditLogService` call sites are in person / sub-resource write flows (BiogMain, altname, address, …) and NianHao. Tables like `ADDR_CODES`, `OFFICE_CODES`, `DYNASTIES`, `ETHNICITY_TRIBE_CODES` only have bare Eloquent models with `$guarded=[]` and **no** repository that pairs the write with an audit. So this command must use `Model::update()` / `save()` itself and then call `AuditLogService::write()` per row — **this is a new flow to build**, not reuse of existing infrastructure.
-- `audit_log` is **append-only**; rollback is done by writing a reverse `UPDATE` (new→old) as a new row, never by deleting audit rows.
+### 5.4 Scan tool
+- A read-only artisan command `php artisan cbdb:scan-pinyin-v` is still recommended: scan the §4 candidate columns, classify by syllable rule (likely pinyin / likely Western name), and output a CSV for human review and alignment with Frank's Google Sheet. This command is **read-only** and safe to run against production.
 
-### 4.2 Conversion command design
-- Add an artisan command: `php artisan cbdb:convert-pinyin-v [--dry-run] [--table=] [--limit=]` (naming/signature aligned with existing `cbdb:*` conventions).
-  - Defaults to `--dry-run`: only prints the diff to be applied, writes nothing.
-  - Per-row change flow (within one DB transaction):
-    1. Compute the `new` value per the syllable rule; skip if unchanged from `old` or judged a Western name.
-    2. Resolve `rowPk`: the command needs a built-in "per-table primary key map" and builds `rowPk` per each table's actual primary key. The primary keys of the affected tables have been verified as follows:
-       - **Composite primary key (2 tables)**:
-         - `ALTNAME_DATA` (3 keys: `c_alt_name_chn`, `c_alt_name_type_code`, `c_personid`) — **registered** in `CompositePrimaryKey::SCHEMAS`; `App\Support\CompositePrimaryKey` can be used.
-         - `TEXT_INSTANCE_DATA` (3 keys: `c_textid`, `c_text_edition_id`, `c_text_instance_id`) — **not registered** in SCHEMAS; build `rowPk` manually.
-       - **Single primary key**: `ADDR_CODES.c_addr_id`, `OFFICE_CODES.c_office_id`, `DYNASTIES.c_dy`, `ETHNICITY_TRIBE_CODES.c_ethnicity_code`, `NIAN_HAO.c_nianhao_id`, `CHORONYM_CODES.c_choronym_code`, `TEXT_CODES.c_textid`, `TEXT_BIBLCAT_CODES.c_text_cat_code`, `GANZHI_CODES.c_ganzhi_code`, `SOCIAL_INSTITUTION_NAME_CODES.c_inst_name_code`, `SOCIAL_INSTITUTION_TYPES.c_inst_type_code`, `ADMIN_CAT_CODES.c_admin_cat_code` (none registered in SCHEMAS; build `rowPk` manually).
-       - **No primary key (special case, must be handled separately)**: `SOCIAL_INSTITUTION_ALTNAME_DATA` **has no PRIMARY KEY** (only two ordinary indexes on `c_inst_code` / `c_inst_name_code`; all columns nullable). Since `AuditLogService::write()` requires `rowPk`, **this table cannot go through per-row audited conversion**. Choose one of: (a) build a synthetic `rowPk` from a uniquely-identifying column combination (first confirm whether `c_inst_code` + `c_inst_name_code` + `c_inst_altname_type` etc. is unique), or (b) exclude it from automatic conversion and handle it manually with separate logging. Apply the same principle to any other no-PK tables found during the scan.
-    3. Change the pinyin column via Eloquent `Model::update()` (**not raw SQL**).
-    4. `AuditLogService::write()` records `operation='UPDATE'`, `actorType='system'`, `actorId='pinyin-v-migration'`, a shared `operationId` for the whole batch, and `oldData`/`newData` containing only the affected columns.
-  - Batched, resumable (track a processed watermark), and interruptible.
-- Acceptance: the `--dry-run` diff is human-reviewed; after the real run, `audit_log` can fully reconstruct every change; spot-checks confirm correct conversion and no Western-name damage.
+## 6. Phased Execution Plan (adopting Frank's suggestion)
 
-### 4.3 `BIOG_MAIN` pinyin fields: "regenerate" rather than "edit directly"
-- `c_name`/`c_surname`/`c_mingzi` are auto-generated from the DB `pinyin` table (surname) and `Pinyin::$dic` (given name). A direct UPDATE risks being overwritten later by any edit that triggers `BiogMainRepository::auto_pinyin()` (depending on whether the source has been fixed).
-- Correct order: **first** complete the source fixes in §5 (merge PR #1086 + change surnames in the DB `pinyin` table to `ü`), **then** regenerate pinyin for affected persons and write back with audit; this avoids "fixed-then-overwritten-by-generation". `ALTNAME_DATA` and the code tables are not auto-generated, so convert them directly per §4.2.
+1. **Stop the bleed**: make `ü` the canonical form for new data input; make the necessary frontend/generation changes to prevent storing new `v`.
+   - Merge PR #1086 (`Pinyin::$dic`: `lv/lve/nv → lü/lüe/nü`) + update surnames in the DB `pinyin` table.
+   - Add `v → ü` normalization at the "Chinese → pinyin" generation entry points (verified): `BiogMainRepository::auto_pinyin()`, `ApiController::buildPinyinWord()` / `searchPinyin()`, and the three batch importers' own `buildPinyin()` (`AdminBatchLoadOfficesController`, `AdminBatchLoadBookTitlesController`, `AdminBatchLoadSocialInstitutesController`); these paths already call `VariantCharNormalizer::normalize()` before generation, a natural hook point. A shared `v→ü` helper must be created (the repo currently has none).
+   - Note: `nve` is not present in the generation dictionary; `nve → nüe` only matters for input normalization.
+2. **Correct high-visibility person-name pinyin**: batch-correct via the audited mutation API (§5.2), in batches (a few hundred / one surname at a time).
+3. **(Optional) Preserve old `v` forms for search compatibility**: via code-22 aliases (§5.3), added after the data cleanup; not mandatory.
+4. **Recommend that downstream systems and the Access edition** add `v → ü` query compatibility when practical (communicate, non-blocking).
+5. **Continue scanning and correcting other non-name pinyin fields** (Phase B, §4).
 
-### 4.4 Rebuilding the derived table `ADDRESSES`
-- Do not edit `ADDRESSES` directly; after changing `ADDR_CODES.c_name`, rebuild it with the existing `php artisan cbdb:regenerate-addresses-table` (`app/Console/Commands/RegenerateAddresses.php`, supports `--dry-run`).
-- **Note: that command currently uses raw `TEMPORARY TABLE` + `INSERT…SELECT`, which is MySQL/MariaDB-only** and cannot run on SQLite. This conflicts with the portability principle in §6; this plan keeps it as-is (production is MariaDB) but must flag the limitation in the doc and the command help, and must not run this step in a SQLite environment.
+## 7. Risks and Cautions
 
-### 4.5 Alias compatibility (persons only) and prerequisites for code 22
-- Per the agreement, for affected persons the original `v` form is written into `ALTNAME_DATA` as code **22 (alternative romanization)** for search compatibility, also recorded via `AuditLogService`. Code tables (place names, office titles, etc.) **get no alias**; their search compatibility relies on application-layer normalization (see §5).
-- **Prerequisite (must be done first)**: `ALTNAME_CODES` (PK `c_name_type_code`) currently **has no seed** in the repo, so it cannot be confirmed that code 22 exists with the meaning "alternative romanization". `ALTNAME_DATA.c_alt_name_type_code` has an FK to `ALTNAME_CODES`, and **writing an unknown code will be rejected by the FK**. So code 22 (with Chinese/English descriptions) must be confirmed/created first.
-- **PK constraint**: the `ALTNAME_DATA` primary key is `(c_alt_name_chn, c_alt_name_type_code, c_personid)` and **does not include** `c_alt_name`. So writing a code-22 alias requires also supplying the Chinese name `c_alt_name_chn` (not just the romanization string), and there can be only one code-22 row per (Chinese name, person). The implementation must decide what `c_alt_name_chn` is set to (typically the person's corresponding Chinese name).
+- **Western-name damage** (Silva/Calvin…): guarded by the syllable rule + manual review; `c_*_proper`, `c_*_rm`, and translation fields are untouched.
+- **Current search behavior**: `u` already matches `ü` (collation folding); only `v` needs compatibility, and it can be deferred (§3). SQLite (tests) does not fold — keep this in mind when writing tests.
+- **Code-22 FK prerequisite**: code 22 must be created in `ALTNAME_CODES` before writing code-22 rows (§5.3).
+- **Phase B audit path**: among code tables only `NIAN_HAO` currently has a mutation handler; an audited write API must be built first (see the [Code-Table Audited Mutation API Construction Plan](./CODE_TABLE_MUTATION_API_PLAN.en.md)) before starting (§4).
+- **No-PK table**: `SOCIAL_INSTITUTION_ALTNAME_DATA` needs special handling (§4).
+- **Derived table consistency**: `ADDRESSES` is rebuilt with `cbdb:regenerate-addresses-table` only after changing the source `ADDR_CODES` (that command is MySQL-only and cannot run on SQLite).
+- **No audit-bypassing centralized SQL**: all data changes go through the mutation API or an audited flow.
 
-## 5. Phase 3: Code Changes (last step)
+## 8. Execution Order and To-do Ledger
 
-1. **Merge the generation dictionary**: merge PR #1086 (`app/Models/Pinyin.php` `$dic`: `lv/lve/nv → lü/lüe/nü`) and update the relevant surnames in the DB `pinyin` table.
-   - Verified: the only `v`-containing values in `$dic` are `lv`, `lve`, `nv` — no other stray `v`; **`nve` is not present in the dictionary** (no character maps to `nve`), so there is nothing to fix for `nve` on the generation side. `nve → nüe` only matters for input/search normalization (a user may type `nve`).
-   - PR #1086 is not yet merged into this branch (the working tree still has `v`); confirm during merge.
-2. **Input normalization**: add the `v → ü` rule at the unified "Chinese → pinyin" generation entry points. Verified entry points:
-   - Main path `BiogMainRepository::auto_pinyin()` (person create/update; `c_surname` looks up the DB `pinyin` table, `c_mingzi` goes through `Pinyin::getPinyin()`).
-   - `ApiController::buildPinyinWord()` / `searchPinyin()` (the "Generate Pinyin" button, `GET api/search/pinyin`).
-   - **Batch importers have their own separate `buildPinyin()`**: `AdminBatchLoadOfficesController`, `AdminBatchLoadBookTitlesController`, `AdminBatchLoadSocialInstitutesController` each have one and must be updated individually to avoid uncovered paths.
-   - These paths already call `VariantCharNormalizer::normalize()` before generation, which is the natural place to add `v → ü` normalization.
-   - The repo currently **has no `v→ü` normalization helper** (searching the whole repo for `ü`/`lü`/`nü` returns 0 hits); a shared helper must be created for both the generation side and the search side.
-3. **Search compatibility**: normalize the query string as well (Michael's option ②) so that a user typing `v` still matches `ü` data; personal names additionally have the code-22 alias as a second safeguard. Verified scope:
-   - Pinyin LIKE matching is in `app/Services/PersonBrowserService.php` (the LIKE fallback queries over `c_name`/`c_surname`/`c_mingzi` etc.) — this is where query-side normalization is needed.
-   - **The FTS index (`NameSearchIndexService` / `CBDB__NAME_FTS`) is built from the Chinese `c_name_chn`, not pinyin**, so it needs no `v→ü`; search compatibility targets only the pinyin LIKE path — do not touch the FTS.
-4. **Regression tests**: pinyin generation (including the three batch `buildPinyin`), input normalization, pinyin LIKE search compatibility, audit logging, composite-key `rowPk` resolution (`ALTNAME_DATA` / `TEXT_INSTANCE_DATA`), the no-PK special case, and Western-name exclusion — all covered.
-5. **Compatibility**: confirm `ü` (U+00FC) works in MariaDB (utf8mb4) and SQLite; Michael has confirmed `ü` is a legal non-ASCII character (0xFC) and is not among the illegal characters cleaned up earlier.
-6. **Re-expose the `pinyin` table in the codes UI (the final step of this plan)**: the `pinyin` table (surname-pinyin lookup) is currently hidden from the `/codes` index list by the `ui_hidden` array in `config/codes.php` (which contains `'pinyin'`). Once the preceding steps are complete and the pinyin data has been normalized to `ü`, remove `'pinyin'` from `ui_hidden` so it reappears in the codes table list for viewing/maintenance.
-   - `pinyin` is already in the `tables` allow-list in `config/codes.php` (label "surname pinyin lookup table"), so only the one `ui_hidden` entry needs removing — no other configuration changes.
-   - Why this is the last step: only re-expose it after both the data and the generation dictionary are on `ü` and display is confirmed correct, to avoid users seeing a transitional state that still contains `v`.
-   - Background design: see `docs/CODES_BOOLEAN_FILTER_DESIGN.md` §9.1 (`ui_hidden` affects only the index list, not direct access to `/codes/{table}` nor the Query Playground / NL / MCP allow-lists).
-
-## 6. Risks and Cautions
-
-- **Western-name damage** (Silva/Calvin…): guarded by the syllable rule + manual review; also note that `c_*_proper` (native names) may contain a genuine `v` and must not be converted.
-- **Wade-Giles and other non-pinyin fields** (`c_*_rm`): untouched this round, to avoid breaking a separate romanization system.
-- **`BIOG_MAIN` generation overwrite**: name pinyin is auto-generated, so fix the source before regenerating, or a direct edit will be overwritten by later edits (§4.3).
-- **Code-22 FK prerequisite**: code 22 must be created in `ALTNAME_CODES` before writing code-22 rows in `ALTNAME_DATA`, or the FK will reject it (§4.5).
-- **`ADDRESSES` rebuild is MySQL-only**: `cbdb:regenerate-addresses-table` uses raw SQL / temporary tables and cannot run on SQLite (§4.4).
-- **Derived table / view consistency**: change only the source tables and rebuild the derived data.
-- **Database portability**: the new scan/convert commands must respect `is_mysql()`/`is_sqlite()`; do not use SQLite-unsupported syntax in raw SQL (the existing `ADDRESSES` rebuild command is a known exception).
-
-## 7. Execution Order and To-do Ledger
-
-> Ordering note: **fix the pinyin source first (generation dictionary + DB pinyin table), then regenerate `BIOG_MAIN`**, otherwise direct edits will be overwritten by generation (§4.3).
-
-- [ ] Phase 1: `cbdb:scan-pinyin-v` read-only scan command + report; confirm the complete list of affected tables/columns (covering all of §2-A)
-- [ ] Align the column list and the Western-name exclusion list with Frank's Google Sheet
-- [ ] Source fix: merge PR #1086 (`Pinyin::$dic`) + update surnames in the DB `pinyin` table to `ü`
-- [ ] Prerequisite: confirm/create `ALTNAME_CODES` code 22 "alternative romanization" (needed for the FK, §4.5)
-- [ ] Phase 2: `cbdb:convert-pinyin-v --dry-run` conversion command (`Model::update()` + `AuditLogService`, no raw SQL) — handle all §2-A tables, including the composite-key tables (`ALTNAME_DATA`, `TEXT_INSTANCE_DATA`) and the single-key code tables
-- [ ] Phase 2: special case `SOCIAL_INSTITUTION_ALTNAME_DATA` (no PK) — synthetic identifier or manual handling (§4.2)
-- [ ] Phase 2: **regenerate** pinyin for affected `BIOG_MAIN` persons (after the source fix) and write back with audit (§4.3)
-- [ ] Phase 2: after changing `ADDR_CODES`, rebuild `ADDRESSES` with `cbdb:regenerate-addresses-table` (MySQL only, §4.4)
-- [ ] Phase 2: write code-22 aliases for persons (search compatibility, with Chinese name `c_alt_name_chn`)
-- [ ] Phase 2: dry-run review → real run → audit reconstruction verification
-- [ ] Phase 3: build a shared `v→ü` normalize helper; hook it into the generation side (`auto_pinyin` + the three batch `buildPinyin`) and the search side (`PersonBrowserService` pinyin LIKE)
-- [ ] Phase 3: regression tests (generation / normalization / search / audit / rowPk / Western-name exclusion)
+- [ ] Phase 1 (stop the bleed): merge PR #1086 + update surnames in the DB `pinyin` table to `ü`
+- [ ] Phase 1 (stop the bleed): build a shared `v→ü` helper and hook it into the generation entry points (`auto_pinyin` + the three batch `buildPinyin` + `ApiController`) to prevent new `v`
+- [ ] Inventory: `cbdb:scan-pinyin-v` read-only scan + report; align with Frank's Google Sheet and the Western-name exclusion list
+- [ ] Phase 2 (person names): external script via `/api/v2/mutate` to batch-correct `c_surname`/`c_mingzi` (`c_name` is recomputed automatically by the system), in batches, dry-run reviewed first
+- [ ] (Optional) confirm/create `ALTNAME_CODES` code 22, then add aliases via `/api/v2/create` (after the data cleanup)
+- [ ] Communicate with downstream systems and the Access edition, recommending they add `v→ü` query compatibility when practical
+- [ ] Phase B prerequisite: build the code-table audited write API per the [Code-Table Audited Mutation API Construction Plan](./CODE_TABLE_MUTATION_API_PLAN.en.md)
+- [ ] Phase B: once the API is ready, scan and correct other pinyin fields in batches (including the `TEXT_INSTANCE_DATA` composite PK, the `SOCIAL_INSTITUTION_ALTNAME_DATA` no-PK special case, and the `ADDRESSES` rebuild)
+- [ ] Regression tests (generation / normalization / person-name correction / audit / Western-name exclusion; mind the SQLite collation difference)
 - [ ] Doc sync: `CHANGELOG.md`, and `DATABASE.md` / `README.md` as needed
 - [ ] **Final step**: remove `'pinyin'` from `ui_hidden` in `config/codes.php` to re-expose the surname-pinyin table in the codes UI

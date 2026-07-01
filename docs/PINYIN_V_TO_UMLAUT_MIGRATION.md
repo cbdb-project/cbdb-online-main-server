@@ -62,6 +62,16 @@
 - 自 `config/codes.php` 的 `ui_hidden` **移除 `'pinyin'`**（重新顯示姓氏拼音表）為**既定計畫的一環**，**非另需人工決定**。
 - **移除 M2 掃描指令 `cbdb:scan-pinyin-v`**（採 Frank #1087@L83：盤點屬一次性工作、不需常設指令）：刪除 `app/Console/Commands/ScanPinyinV.php`、`tests/Feature/ScanPinyinVTest.php`、`app/Console/Kernel.php` 的註冊列，作為整個 Phase A 的**最後一個小環節**。（`app/Support/PinyinUmlaut.php` 為止血與查詢展開共用，**保留**。）
 
+### D-11 執行實測結果與最終機制定案（全量生產 dry-run + execute 後回填）
+> 以下取代 §D-3／§D-4 原「重生為主 + oracle」設計——生產全量 dry-run 顯示 `auto_pinyin` 對約 27%(1558) 人名無法復現 Sheet 人工校訂（多音字/生僻字/「之妻」英譯），故改為 **Sheet 權威優先**。
+
+- **BIOG 最終機制（Sheet 權威優先）**：寫入值取自 Sheet `correct`——兩分量行→直接採用；一分量行＋完整名→由完整名扣除已知分量推導（強制 `trim(surname.' '.mingzi)==完整名`）。`auto_pinyin` 重生**僅作 high/low 信心標記、不 gate 寫入**；low 另出 `*-low-confidence.json` 供抽查。實作見 `app/Services/Pinyin/PinyinMigrationPlanner.php`。
+- **孤兒（只有 c_name 行）＝Sheet 完整名第一空格拆**：現庫分量常髒（如 `c_surname='Lu9'`＝Lü），故不信任現庫拼寫，只用現庫 `c_surname` 是否為空判斷有無姓；姓取自 Sheet 完整名第一空格前（CBDB 姓恆單 token）。**多空格（≥2，描述性/親屬「之女·妻」如「次室女」）、含括號（消歧/之妻）、現庫姓含空格 → 一律交人工**（是否可拆需語義判斷：親屬女可拆、其餘不可）。
+- **寫入契約**：`POST /api/v2/mutate` payload 需**頂層 `person_id`＝pk.c_personid**（缺則 422 校驗失敗），resource `basicinformation`／`altnames`，`mode:direct`，只送 c_surname/c_mingzi（c_name 由 handler 重算）。base-url 因 nginx 強制 https、本地憑證不符，改用 `php artisan serve` 內建 http server（`--base-url=http://127.0.0.1:PORT`）。
+- **指令**：`cbdb:migrate-pinyin-v {--table=both|biog|altname} {--fetch} {--confidence=all|high|low} {--execute} {--base-url=}`；預設 dry-run；`--confidence` 分批（high 批＝BIOG high + ALTNAME、跳過 BIOG low；low 批＝BIOG low）。Token 只從環境變數 `CBDB_MIGRATE_TOKEN` 讀。
+- **執行結果（2026-07-01）**：第一批 high+ALTNAME 成功 5146、第二批 low 成功 1506，**累計 6652 筆寫入生產、線上抽樣驗證正確**（含生僻字 `呂搢→Lü Jin`、複姓孤兒 `閭丘陞→Lüqiu Sheng`）。
+- **待人工（尚未寫）**：孤兒多空格（~47，等「親屬女可拆」規則）、括號孤兒 9、ALTNAME 歧義 27（>1 命中）、**分量中文名 NULL 的無名記錄 24**（如 `鄭履正`，handler 校驗「名不能為空」拒絕、API 無法更新，需另途）。清單見人工複核 xlsx（不入版控）。
+
 ## 0. 背景與決議
 
 CBDB 拼音規範長期以 `v` 代替 `ü`（如 `呂 = Lv`、`閭丘 = Lvqiu`、`耶律 = Yelv`）。經 Frank Lin、Song Chen（陳松）、Hongsu、Michael Fuller、Peter Bol 的郵件討論，達成以下共識：

@@ -1,9 +1,20 @@
 # Code-Table Audited Mutation API Construction Plan
 
-> Status: Draft plan (for discussion)
-> Branch: `feature/pinyin-v-to-umlaut-migration`
+> Status: **Finalized (ready to execute; §D is authoritative — where it conflicts with older prose below, §D governs)**
+> Branch: `feature/pinyin-v-to-umlaut-migration` (each implementation milestone gets its own branch and PR)
 > Related plan: [Pinyin v → ü Normalization Plan](./PINYIN_V_TO_UMLAUT_MIGRATION.en.md) (this plan is a **prerequisite for its Phase B**)
 > 中文版本: [CODE_TABLE_MUTATION_API_PLAN.md](./CODE_TABLE_MUTATION_API_PLAN.md)
+
+## §D. Locked Decisions (execute as-is; do NOT re-confirm)
+
+- **D-1 No-PK table `SOCIAL_INSTITUTION_ALTNAME_DATA`: SKIP.** It has no edit entry point, so it is **excluded from this API and from the migration — not handled** (do NOT build a "synthetic identifier" path). Treat every "synthetic key / special-case handling" passage about this table below as **not to be executed — simply skip it**.
+- **D-2 `/codes` UI audit gap: fix it within this plan's scope.** Add `AuditLogService::write()` to the `CodesController` direct-write paths (`store`/`update`/`destroy`) so the UI is audited consistently with the new API (promoted from "optional follow-up" to **required**).
+- **D-3 `person_id` contract: implementer's choice, either option, both guarded by tests and non-blocking.**
+  - (a) Modify `MutationController`: make `person_id` optional for code resources (`person_id_column === null`) — **regression tests must confirm existing person sub-resources are unchanged** (still 422 on missing person_id; cross-check still fires); OR
+  - (b) **zero controller change**: the external script sends `person_id: 0` for code tables (reusing `NianHaoMutationHandler`'s existing approach).
+- **D-4 `ADDRESSES` derived table:** after correcting `ADDR_CODES`, **rebuild** via `cbdb:regenerate-addresses-table` (production, MySQL-only).
+- **D-5 Phase B "what to change" is governed by the scan rule, no human Sheet needed:** code tables are essentially pure pinyin (verified: of 498 `ETHNICITY.c_name` rows, 11 with v are all genuine pinyin, 0 Western; of 173 `CHORONYM` rows, 1 `Vietnam` has no `lv/nv` syllable and is excluded by the rule). So **apply the deterministic `lv/lve/nv/nve` syllable rule directly to both dedicated pinyin columns and romanized-name columns**; the scan command additionally emits a small `[OTHER-v]` list for a human eyeball (safety net). `ADDR_CODES` is confirmed by the read-only scan at Phase B start before any write.
+- **Scope adjustments**: per D-1, remove `SOCIAL_INSTITUTION_ALTNAME_DATA` from this API's target tables; per D-2, add the `CodesController` audit-fix item.
 
 ## 0. Background and Motivation
 
@@ -30,8 +41,8 @@
 ## 2. Goals and Scope
 
 - **Goal**: enable an external script to modify code-table columns (primarily pinyin columns, but designed as generic column writes) using a **Bearer token**, audited via `audit_log`, and reviewable.
-- **Scope** (aligned with pinyin migration Phase B): `ADDR_CODES`, `OFFICE_CODES`, `DYNASTIES`, `NIAN_HAO` (already done, serves as the template), `CHORONYM_CODES`, `ETHNICITY_TRIBE_CODES`, `TEXT_CODES`, `TEXT_INSTANCE_DATA`, `TEXT_BIBLCAT_CODES`, `GANZHI_CODES`, `SOCIAL_INSTITUTION_NAME_CODES`, `SOCIAL_INSTITUTION_TYPES`, `SOCIAL_INSTITUTION_ALTNAME_DATA`, `ADMIN_CAT_CODES`.
-- **Non-goals**: do not change existing person sub-resource handler behavior; this plan does not require changing the `/codes` UI (adding audit there is an optional follow-up, see §5).
+- **Scope** (aligned with pinyin migration Phase B; per §D-1, `SOCIAL_INSTITUTION_ALTNAME_DATA` is **removed**): `ADDR_CODES`, `OFFICE_CODES`, `DYNASTIES`, `NIAN_HAO` (already done, serves as the template), `CHORONYM_CODES`, `ETHNICITY_TRIBE_CODES`, `TEXT_CODES`, `TEXT_INSTANCE_DATA`, `TEXT_BIBLCAT_CODES`, `GANZHI_CODES`, `SOCIAL_INSTITUTION_NAME_CODES`, `SOCIAL_INSTITUTION_TYPES`, `ADMIN_CAT_CODES`.
+- **Non-goals**: do not change existing person sub-resource handler behavior. (Note: fixing `/codes` UI audit is now **required**, see §D-2 — no longer an "optional follow-up".)
 
 ## 3. Reusable Existing Infrastructure
 
@@ -47,7 +58,7 @@
 - **The `person_id` contract**: `MutationController` currently requires `person_id` for every resource. For code-table resources, `person_id` should be **made optional** (or a code-table-specific resolution path provided), to avoid stuffing in a meaningless `person_id`. This change must ensure existing person sub-resource handlers are unaffected.
 - **Primary keys**:
   - Register single and composite keys (e.g. `TEXT_INSTANCE_DATA` 3-key) in `CompositePrimaryKey::SCHEMAS`.
-  - **No-PK special case `SOCIAL_INSTITUTION_ALTNAME_DATA`**: define a synthetic-identifier strategy (a uniquely-identifying column combination) or exclude it from the API and handle it manually.
+  - **No-PK table `SOCIAL_INSTITUTION_ALTNAME_DATA`: SKIP — not handled** (see §D-1; do not build a synthetic key).
 - **Auth / authorization**: reuse Sanctum **Bearer token**, `active` and non-crowdsourcing (`canWriteDirectly()`); keep both `direct` and `proposal` modes.
 - **Endpoints**: reuse `/api/v2/mutate`, `/api/v2/create`, `/api/v2/delete`, routing to the corresponding code-table handler by the `resource` string.
 - **resource_id encoding consistency**: the composite-key `resource_id` must match the existing `CodesController` / `OperationsController` format, to avoid breaking `operations` link resolution.
@@ -60,15 +71,15 @@
 4. Create a concrete handler per table (`update` first; `create` / `delete` as needed), and refactor `NianHaoMutationHandler` onto the new base.
 5. Register each handler in `MutationHandlerRegistry`.
 6. Adjust `MutationController`: make `person_id` optional for code resources.
-7. Handle the no-PK special case (`SOCIAL_INSTITUTION_ALTNAME_DATA`).
+7. No-PK table `SOCIAL_INSTITUTION_ALTNAME_DATA`: **SKIP — not handled** (§D-1). New item instead: add `AuditLogService::write()` to the `CodesController` direct-write paths (§D-2).
 8. Tests: per-table `update` + `audit_log` assertions (old/new, operation_id), composite-PK resolution, authorization (active / non-crowdsourcing), `direct`/`proposal` modes, SQLite/MariaDB compatibility.
 
 ## 6. Risks and Cautions
 
 - **`person_id` contract change**: regression-test that existing person sub-resource handlers are unaffected.
-- **No-PK table**: `SOCIAL_INSTITUTION_ALTNAME_DATA` cannot go through per-row auditing; needs a special case.
+- **No-PK table**: `SOCIAL_INSTITUTION_ALTNAME_DATA` is **skipped — not handled** (§D-1).
 - **Composite-key resource_id consistency**: align the encoding with the existing `CodesController` / `OperationsController`.
-- **UI/API gap**: the `/codes` UI still writes only `operations`, not `audit_log`; to make the UI consistent with the API, the `CodesController` direct-write path could later add `AuditLogService::write()` (listed as an optional follow-up in this plan).
+- **UI/API gap**: the `/codes` UI currently writes only `operations`, not `audit_log`; **this plan requires** adding `AuditLogService::write()` to the `CodesController` direct-write paths (§D-2).
 - **Database portability**: respect `is_mysql()` / `is_sqlite()`.
 
 ## 7. Relationship to the Pinyin Migration Plan
@@ -85,7 +96,7 @@
 - [ ] Per-code-table concrete handlers (starting with `update`); refactor `NianHaoMutationHandler` onto the new base
 - [ ] Register handlers in `MutationHandlerRegistry`
 - [ ] `MutationController`: make `person_id` optional for code resources (and regress existing handlers)
-- [ ] No-PK table `SOCIAL_INSTITUTION_ALTNAME_DATA` special-case handling
+- [ ] No-PK table `SOCIAL_INSTITUTION_ALTNAME_DATA`: **SKIP — not handled** (§D-1)
 - [ ] Tests (update / audit / composite PK / authorization / modes / compatibility)
-- [ ] (Optional follow-up) add `AuditLogService::write()` to the `CodesController` direct-write path, making UI and API auditing consistent
+- [ ] **(Required, §D-2)** add `AuditLogService::write()` to the `CodesController` direct-write paths, making UI and API auditing consistent
 - [ ] Doc sync: `AGENTS.md` module entry, and `CHANGELOG.md` as needed

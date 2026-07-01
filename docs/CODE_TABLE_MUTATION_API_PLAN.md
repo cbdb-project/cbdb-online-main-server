@@ -1,9 +1,20 @@
 # Code 表受審計寫入 API 建設計畫
 
-> 狀態：計畫草案（提交討論）
-> 分支：`feature/pinyin-v-to-umlaut-migration`
+> 狀態：**決策定案（可執行；本文 §D 為權威，與其下較早敘述衝突時以 §D 為準）**
+> 分支：`feature/pinyin-v-to-umlaut-migration`（實作各小環節各起新分支、各自 PR）
 > 關聯計畫：[拼音 v → ü 全庫正規化遷移計畫](./PINYIN_V_TO_UMLAUT_MIGRATION.md)（本計畫為其**階段 B 的前置依賴**）
 > English version: [CODE_TABLE_MUTATION_API_PLAN.en.md](./CODE_TABLE_MUTATION_API_PLAN.en.md)
+
+## §D. 決策定案（LLM 照此執行，勿再確認）
+
+- **D-1 無主鍵表 `SOCIAL_INSTITUTION_ALTNAME_DATA`：直接 SKIP。** 該表無編輯入口，**排除於本 API 與遷移之外、不處理**（不採「合成識別鍵」方案）。下文所有關於此表的「合成 key／特例處理」段落一律視為**不執行、僅跳過**。
+- **D-2 `/codes` 管理介面審計缺口：本計畫範圍內補齊。** 於 `CodesController` 直寫路徑（`store`/`update`/`destroy`）加 `AuditLogService::write()`，使 UI 與新 API 審計一致（從「可選後續」升為**必做**）。
+- **D-3 `person_id` 契約：實作者自選、二擇一，皆以測試兜住、非阻塞。**
+  - (a) 改 `MutationController`：code resource（`person_id_column === null`）時 `person_id` 可選——**須以回歸測試確保既有人物子資源行為不變**（缺 person_id 仍 422、交叉校驗仍觸發）；或
+  - (b) **零控制器改動**：外部腳本對 code 表照送 `person_id: 0`（沿用 `NianHaoMutationHandler` 既有做法）。
+- **D-4 `ADDRESSES` 派生表：** 改完 `ADDR_CODES` 後以 `cbdb:regenerate-addresses-table`（生產、MySQL-only）**重建**。
+- **D-5 Phase B 的「改哪些」以掃描規則為準、不需人工 Sheet：** code 表基本純拼音（實測：`ETHNICITY.c_name` 498 列 11 條含 v 全為真拼音、0 西文；`CHORONYM` 173 列 1 條 `Vietnam` 不含 `lv/nv` 音節、規則天然排除）。故**專用拼音欄與 romanized-name 欄一律以確定性 `lv/lve/nv/nve` 音節規則直接替換**；掃描命令另出 `[OTHER-v]` 小清單供人類瞄一眼（安全網）。`ADDR_CODES` 於 Phase B 起步以只讀掃描實錘後再寫。
+- **範圍調整**：因 D-1，本 API 的目標表**移除 `SOCIAL_INSTITUTION_ALTNAME_DATA`**；因 D-2，**加入 `CodesController` 補審計**一項。
 
 ## 0. 背景與動機
 
@@ -30,8 +41,8 @@
 ## 2. 目標與範圍
 
 - **目標**：讓外部腳本能以 **Bearer token**、經 **audit_log** 審計、可複核地修改 code 表欄位（首要為拼音欄位，但設計為通用欄位寫入）。
-- **範圍**（對齊拼音遷移階段 B）：`ADDR_CODES`、`OFFICE_CODES`、`DYNASTIES`、`NIAN_HAO`（已具備，作為樣板）、`CHORONYM_CODES`、`ETHNICITY_TRIBE_CODES`、`TEXT_CODES`、`TEXT_INSTANCE_DATA`、`TEXT_BIBLCAT_CODES`、`GANZHI_CODES`、`SOCIAL_INSTITUTION_NAME_CODES`、`SOCIAL_INSTITUTION_TYPES`、`SOCIAL_INSTITUTION_ALTNAME_DATA`、`ADMIN_CAT_CODES`。
-- **非目標**：不改既有 person sub-resource handler 行為；本計畫不強制改 `/codes` UI（其補 audit 為可選後續，見 §5）。
+- **範圍**（對齊拼音遷移階段 B；依 §D-1 已**移除** `SOCIAL_INSTITUTION_ALTNAME_DATA`）：`ADDR_CODES`、`OFFICE_CODES`、`DYNASTIES`、`NIAN_HAO`（已具備，作為樣板）、`CHORONYM_CODES`、`ETHNICITY_TRIBE_CODES`、`TEXT_CODES`、`TEXT_INSTANCE_DATA`、`TEXT_BIBLCAT_CODES`、`GANZHI_CODES`、`SOCIAL_INSTITUTION_NAME_CODES`、`SOCIAL_INSTITUTION_TYPES`、`ADMIN_CAT_CODES`。
+- **非目標**：不改既有 person sub-resource handler 行為。（註：`/codes` UI 補 audit **已改為必做**，見 §D-2，不再是「可選後續」。）
 
 ## 3. 可重用的現有基礎
 
@@ -47,7 +58,7 @@
 - **`person_id` 契約**：`MutationController` 目前對所有 resource 都要求 `person_id`。對 code 表 resource 應**讓 `person_id` 可選**（或提供 code 表專用解析路徑），避免硬塞無意義的 `person_id`。此調整需確保既有 person sub-resource handler 行為不變。
 - **主鍵**：
   - 單鍵與複合鍵（如 `TEXT_INSTANCE_DATA` 3 鍵）登錄 `CompositePrimaryKey::SCHEMAS`。
-  - **無主鍵特例 `SOCIAL_INSTITUTION_ALTNAME_DATA`**：須定合成識別策略（以可唯一定位的欄位組合）或排除於 API 之外、人工處理。
+  - **無主鍵表 `SOCIAL_INSTITUTION_ALTNAME_DATA`：直接 SKIP、不處理**（見 §D-1；不建合成識別鍵）。
 - **認證／授權**：沿用 Sanctum **Bearer token**、`active` 且非 crowdsourcing（`canWriteDirectly()`）；保留 `direct` / `proposal` 兩模式。
 - **端點**：沿用 `/api/v2/mutate`、`/api/v2/create`、`/api/v2/delete`，以 `resource` 字串路由到對應 code 表 handler。
 - **resource_id 編碼一致性**：複合主鍵的 `resource_id` 須與 `CodesController` / `OperationsController` 既有格式對齊，避免 `operations` 連結解析失準。
@@ -60,15 +71,15 @@
 4. 為各表新建 concrete handler（首要 `update`；必要時 `create` / `delete`），並把 `NianHaoMutationHandler` 重構至新基底。
 5. 在 `MutationHandlerRegistry` 註冊各 handler。
 6. 調整 `MutationController`：code resource 時 `person_id` 可選。
-7. 處理無主鍵表特例（`SOCIAL_INSTITUTION_ALTNAME_DATA`）。
+7. 無主鍵表 `SOCIAL_INSTITUTION_ALTNAME_DATA`：**SKIP、不處理**（§D-1）。另新增：於 `CodesController` 直寫路徑補 `AuditLogService::write()`（§D-2）。
 8. 測試：每表 `update` + `audit_log` 斷言（old/new、operation_id）、複合主鍵解析、授權（active／非 crowdsourcing）、`direct`/`proposal` 模式、SQLite/MariaDB 相容。
 
 ## 6. 風險與注意事項
 
 - **`person_id` 契約改動**：須回歸測試既有 person sub-resource handler 不受影響。
-- **無主鍵表**：`SOCIAL_INSTITUTION_ALTNAME_DATA` 不可走逐列審計，需特例。
+- **無主鍵表**：`SOCIAL_INSTITUTION_ALTNAME_DATA` **SKIP、不處理**（§D-1）。
 - **複合主鍵 resource_id 一致性**：與既有 `CodesController` / `OperationsController` 編碼對齊。
-- **UI 與 API 落差**：`/codes` UI 仍只寫 `operations`、不寫 `audit_log`；若要 UI 與 API 一致，可在後續把 `CodesController` 直寫路徑補上 `AuditLogService::write()`（本計畫列為可選後續）。
+- **UI 與 API 落差**：`/codes` UI 目前只寫 `operations`、不寫 `audit_log`；**本計畫必做**把 `CodesController` 直寫路徑補上 `AuditLogService::write()`（§D-2）。
 - **資料庫相容**：遵守 `is_mysql()` / `is_sqlite()`。
 
 ## 7. 與拼音遷移計畫的關係
@@ -85,7 +96,7 @@
 - [ ] 各 code 表 concrete handler（`update` 起步），重構 `NianHaoMutationHandler` 至新基底
 - [ ] `MutationHandlerRegistry` 註冊
 - [ ] `MutationController`：code resource 的 `person_id` 改為可選（並回歸既有 handler）
-- [ ] 無主鍵表 `SOCIAL_INSTITUTION_ALTNAME_DATA` 特例處理
+- [ ] 無主鍵表 `SOCIAL_INSTITUTION_ALTNAME_DATA`：**SKIP、不處理**（§D-1）
 - [ ] 測試（update / audit / 複合主鍵 / 授權 / 模式 / 相容）
-- [ ] （可選後續）`CodesController` 直寫路徑補 `AuditLogService::write()`，使 UI 與 API 審計一致
+- [ ] **（必做，§D-2）** `CodesController` 直寫路徑補 `AuditLogService::write()`，使 UI 與 API 審計一致
 - [ ] 文件同步：`AGENTS.md` 模組入口、必要時 `CHANGELOG.md`

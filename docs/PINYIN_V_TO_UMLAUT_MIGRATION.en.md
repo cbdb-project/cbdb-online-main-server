@@ -1,9 +1,62 @@
 # Database-wide Pinyin `v` → `ü` Normalization Plan
 
-> Status: Draft plan (for discussion)
-> Branch: `feature/pinyin-v-to-umlaut-migration`
+> Status: **Finalized (ready to execute; §D "Locked Decisions" is authoritative — where it conflicts with older prose below, §D governs)**
+> Branch: `feature/pinyin-v-to-umlaut-migration` (this branch = the "plan PR" #1087; **each implementation milestone gets its own descriptively-named branch and its own PR**)
 > Related PR: [#1086](https://github.com/cbdb-project/cbdb-online-main-server/pull/1086) (generation-dictionary fix, folded into #1087)
 > 中文版本: [PINYIN_V_TO_UMLAUT_MIGRATION.md](./PINYIN_V_TO_UMLAUT_MIGRATION.md)
+
+## §D. Locked Decisions (execute as-is; do NOT re-confirm or re-litigate)
+
+> The following were **decided** after the team's email discussion and are ready to execute; no further human confirmation is needed. **Secrets such as tokens are NOT written into this document.**
+
+### D-0 Scope & workflow
+- **Split into two independent goals**: **Phase A first** = stop-the-bleed + read-only scan + query expansion + person-name audited batch correction; **Phase B (other code-table pinyin) is a later, separate goal**, gated on first building the [Code-Table Audited Mutation API](./CODE_TABLE_MUTATION_API_PLAN.en.md).
+- **Workflow (every milestone)**: first dispatch a "read the code + read the diff" review agent, iterate until no serious issues; then run **codex (a terminal command, NOT an agent)** until no serious issues; only then advance. **Do not merge without explicit human instruction.**
+- **Each milestone = its own descriptively-named branch + its own PR** (e.g. `feature/pinyin-stop-the-bleed`, `feature/pinyin-scan-command`, `feature/pinyin-query-expansion`, `feature/pinyin-names-migration`).
+
+### D-1 Do NOT do the code-22 alias
+- **Do not create the `ALTNAME_DATA` code-22 "alternative romanization" alias** (team confirmed: query expansion covers search, so code 22 is redundant). Treat every "code 22 / alias" passage below as **NOT to be executed**.
+
+### D-2 Source of truth = the public Google Sheet (per-record list); the scan command only cross-checks
+- Two tabs (public, directly CSV-exportable):
+  - **ALTNAME_DATA**: `gid=1425535916`, CSV: `https://docs.google.com/spreadsheets/d/19SOyBtA8cKE9aq_hIkxRiT-e2i6f5bFDIY_TcNAn57I/export?format=csv&gid=1425535916`; 957 data rows; columns `table,field,id,wrong_pinyin,correct_pinyin,note_en,note_zh`.
+  - **BIOG_MAIN**: `gid=248977087`, CSV: same URL with `gid=248977087`; 11,407 data rows (`c_name` 5,783 / `c_surname` 3,509 / `c_mingzi` 2,115); columns `table,field,id,wrong_pinyin,correct_pinyin`.
+- `id` = `c_personid`. **Western names are already human-excluded.** **The Sheet is authoritative — apply it row by row**; the scan command `cbdb:scan-pinyin-v` only cross-checks and reports diffs, and **must not override the Sheet**.
+
+### D-3 BIOG_MAIN application
+- **Send only `c_surname` and/or `c_mingzi`** via `/api/v2/mutate`; `c_name` is recomputed by the system. **Ignore the Sheet's `c_name` rows** (the API blocks direct `c_name` writes).
+
+### D-4 The 204 "orphan `c_name`" BIOG_MAIN rows — use "decompose into components" (approach A)
+- Definition: in the BIOG_MAIN tab, a `c_personid` that has a `c_name` change but **no** corresponding `c_surname`/`c_mingzi` row — **204** in total (detection: ids present in the `c_name` set but absent from the `c_surname ∪ c_mingzi` set).
+- Handling: for each, **read that person's actual `c_surname`/`c_mingzi`/`c_name`**, use the deterministic syllable rule (`lv/lve/nv/nve`) to decide which component holds the `v`, and **update only that component**.
+- **Verification gate (mandatory)**: after applying, the recomputed `c_name` MUST equal the Sheet's `correct_pinyin`. **Anything that does not reconcile is NOT written** — collect it into a small exception list for a human (Hongsu) to decide.
+
+### D-5 ALTNAME application (composite-PK resolution)
+- The Sheet's `id` = `c_personid`, but `ALTNAME_DATA` has a **3-column composite PK**. Locate the row by **`c_personid = id` AND `c_alt_name = wrong_pinyin`**, resolve the full PK (per `CompositePrimaryKey::SCHEMAS` / a read), then `/api/v2/mutate` to set `c_alt_name` = `correct_pinyin`.
+- If a `(c_personid, c_alt_name)` pair matches **>1 row** (ambiguous) → **skip and add to the exception list**.
+
+### D-6 Execution method & cadence
+- Use the operator's Sanctum **Bearer token** (an active, non-crowdsourcing user with `canWriteDirectly()`; **the token is NOT written into any file / commit / PR / log**). Use `/api/v2/*`, `mode:"direct"`, audit automatic.
+- Flow: **(1) dry-run first**, producing the full planned change set as an artifact and self-asserting "nothing outside the Sheet, no `[OTHER-v]` slips in"; **(2) run all batches through** (BIOG_MAIN one surname per batch, ALTNAME in chunks); **(3) after completion, output a sample** for human spot-check.
+- Target = **production directly** (no staging). **Rollback**: every change is an audited mutation, so any erroneous record can be reversed via the same audited API / operations restore.
+
+### D-7 Stop-the-bleed status
+- The generation dictionary `app/Models/Pinyin.php` (29 entries) is **done** (commit d4ad265).
+- **To build**: a shared `v→ü` helper wired into the generation entry points (`BiogMainRepository::auto_pinyin()`, the three batch `buildPinyin()`, `ApiController::buildPinyinWord()`/`searchPinyin()`).
+- The DB `pinyin` table's 4 surnames were **already corrected on production by Frank** → **read-only verify, do not rewrite** (if needed, cross-check via `https://input.cbdb.fas.harvard.edu/app/basicinformation`).
+
+### D-8 Search
+- `u` already folds to `ü` via collation (no change needed). **Query expansion** (when a user types `lv/lve/nv/nve`, OR-search both the `v` and `ü` forms) is **in Phase A**. SQLite tests do not fold — account for it.
+
+### D-9 Phase B (forward — executed in the later Phase B goal)
+- **Empirical conclusion: code tables are essentially pure pinyin; no Phase-A-style human Sheet is needed.** Evidence: of 498 `ETHNICITY_TRIBE_CODES.c_name` rows, 11 contain `v` — **all genuine pinyin, 0 Western**; of 173 `CHORONYM_CODES.c_choronym_desc` rows, 1 is `Vietnam` — which **has no `lv/nv` syllable cluster, so the rule leaves it untouched**.
+- Approach: **apply the deterministic syllable rule directly to both dedicated pinyin columns and romanized-name columns**; the scan command additionally emits a small `[OTHER-v]` list (v that is NOT in an `lv/lve/nv/nve` syllable, e.g. `Vietnam`) for a 30-second human eyeball (a safety net, not a per-row review). `ADDR_CODES` (the largest, not publicly full-scannable) is confirmed by the read-only scan command at Phase B start before any write.
+- **D-9a No-PK table `SOCIAL_INSTITUTION_ALTNAME_DATA`: SKIP** (no edit entry point; excluded from the API and the migration).
+- **D-9b `/codes` UI audit gap: fix it** (add `AuditLogService::write()` to the `CodesController` direct-write paths, consistent with the new API) — see the code-table API plan.
+- **D-9c `ADDRESSES` derived table:** after correcting `ADDR_CODES`, **rebuild** via `cbdb:regenerate-addresses-table` (production, MySQL-only).
+
+### D-10 Final step
+- Removing `'pinyin'` from `config/codes.php`'s `ui_hidden` (to re-expose the surname-pinyin table) is **part of the agreed plan** (done after the data is clean), **not a separate human decision**.
 
 ## 0. Background and Agreed Decisions
 
@@ -11,7 +64,7 @@ The CBDB pinyin convention has long used `v` in place of `ü` (e.g. `呂 = Lv`, 
 
 1. **`ü` is the single canonical form**; pinyin fields across the database should no longer use `v` in its place (per the *Scheme for the Chinese Phonetic Alphabet / Hanyu Pinyin*).
 2. **`v` is accepted on input**: on manual entry / pinyin generation, `v` is normalized to `ü` (canonical storage); on search, a user-typed `v` form matches both `v` and `ü` (query expansion, see §3) for keyboard convenience.
-3. **The old `v` forms may optionally be kept as an "alternative romanization" alias** (Michael's proposed `ALTNAME_DATA` code **22, alternative romanization**); however, search compatibility is achieved via query expansion (§3), so this alias is not needed for search and is purely optional.
+3. ~~The old `v` forms may optionally be kept as an "alternative romanization" alias (`ALTNAME_DATA` code 22)~~ **(DROPPED: not doing it — see §D-1; query expansion covers search)**.
 4. **All data changes must be audited**; **centralized SQL that bypasses the audit log must not be used**. Performing the corrections via the audited mutation API (an external script) is the safest approach.
 
 ## 1. Planning Principles (adjusted per follow-up discussion)
@@ -85,7 +138,7 @@ Therefore **only these four substrings need conversion** (handle each case separ
 | `ADMIN_CAT_CODES` | `c_admin_cat_py` | Single PK `c_admin_cat_code` |
 
 > During the scan, enumerate columns automatically by the rule "any column name ending in `_py` / `_pinyin`, or flagged as romanized in the schema", so future columns are not missed.
-> **No-PK special case**: `SOCIAL_INSTITUTION_ALTNAME_DATA` has no PRIMARY KEY (only two ordinary indexes; all columns nullable). Since auditing needs a per-row locating key, this table cannot go through per-row audited changes; a synthetic identifier or manual handling must be defined.
+> **No-PK special case**: `SOCIAL_INSTITUTION_ALTNAME_DATA` has no PRIMARY KEY. **Per §D-9a it is simply SKIPPED — not handled** (no edit entry point; excluded from the API and the migration).
 > **Phase B audit path (assessed — an API must be built first)**: the mutation API (`/api/v2/*`) is currently oriented around persons and their sub-resources; among code tables **only `NIAN_HAO` has a handler**. The `/codes` UI is generic but writes only `operations`, not `audit_log`, and is CSRF web routes unsuitable for an external script. So before starting Phase B, an audited write API for the code tables must be built — see the [Code-Table Audited Mutation API Construction Plan](./CODE_TABLE_MUTATION_API_PLAN.en.md). Do not use audit-bypassing SQL.
 
 ### Columns NOT converted
@@ -108,7 +161,7 @@ Therefore **only these four substrings need conversion** (handle each case separ
 - **`c_name` is recomputed automatically (no open item)**: the handler's `buildMergedPayload()` first merges `changes` onto the full original record, then `updateById()` recomputes `c_name` from the merged `c_surname`+`c_mingzi` (along with `c_name_chn`/`c_name_proper`/`c_name_rm`). So the script **only needs to send the corrected `c_surname`/`c_mingzi`** and `c_name` follows correctly — no data-loss risk, no separate handling.
 - Suggested batch cadence: a few hundred records at a time, or **one surname per batch**; dry-run / sample-review before submitting for real.
 
-### 5.3 Alias (optional; search compatibility is achieved via query expansion)
+### 5.3 Alias (**DROPPED — not executed; see §D-1**; kept below for record only)
 - Search compatibility is achieved via query expansion (§3), so the **code-22 alias is not needed for search**. The following applies only if the old `v` forms are kept as aliases for reasons other than search.
 - How: create alias rows via `POST /api/v2/create`, `resource: "altnames"`, `c_alt_name_type_code: 22`, `c_alt_name: <v form>`, plus `c_alt_name_chn` (the PK requires the Chinese name).
 - **Prerequisite**: `ALTNAME_CODES` currently has no seed; code 22 "alternative romanization" (with Chinese/English descriptions) must be confirmed/created first, or the FK will reject the unknown code.
@@ -124,7 +177,7 @@ Therefore **only these four substrings need conversion** (handle each case separ
    - Add `v → ü` normalization at the "Chinese → pinyin" generation entry points (verified): `BiogMainRepository::auto_pinyin()`, `ApiController::buildPinyinWord()` / `searchPinyin()`, and the three batch importers' own `buildPinyin()` (`AdminBatchLoadOfficesController`, `AdminBatchLoadBookTitlesController`, `AdminBatchLoadSocialInstitutesController`); these paths already call `VariantCharNormalizer::normalize()` before generation, a natural hook point. A shared `v→ü` helper must be created (the repo currently has none).
    - Note: `nve` is not present in the generation dictionary; `nve → nüe` only matters for input normalization.
 2. **Correct high-visibility person-name pinyin**: batch-correct via the audited mutation API (§5.2), in batches (a few hundred / one surname at a time).
-3. **(Optional, deferrable) Search compatibility**: via query expansion, so a user-typed `v` form matches both `v` and `ü` (§3); the `ALTNAME_DATA` code-22 alias is not needed for search and, if kept, is for other purposes (§5.3).
+3. **Search compatibility (executed in Phase A, see §D-8)**: via query expansion, so a user-typed `v` form matches both `v` and `ü` (§3). (The code-22 alias is not done, see §D-1.)
 4. **Recommend that downstream systems and the Access edition** add query compatibility — matching both `v` and `ü` forms at query time — when practical (communicate, non-blocking).
 5. **Continue scanning and correcting other non-name pinyin fields** (Phase B, §4).
 
@@ -132,9 +185,9 @@ Therefore **only these four substrings need conversion** (handle each case separ
 
 - **Western-name damage** (Silva/Calvin…): guarded by the syllable rule + manual review; `c_*_proper`, `c_*_rm`, and translation fields are untouched.
 - **Current search behavior**: `u` already matches `ü` (collation folding); only `v` needs compatibility, via query expansion (a typed `v` searches both `v` and `ü`), and it can be deferred (§3). SQLite (tests) does not fold — keep this in mind when writing tests.
-- **Code-22 FK prerequisite**: code 22 must be created in `ALTNAME_CODES` before writing code-22 rows (§5.3).
+- ~~Code-22 FK prerequisite~~ **(N/A: code 22 is not done — see §D-1)**.
 - **Phase B audit path**: among code tables only `NIAN_HAO` currently has a mutation handler; an audited write API must be built first (see the [Code-Table Audited Mutation API Construction Plan](./CODE_TABLE_MUTATION_API_PLAN.en.md)) before starting (§4).
-- **No-PK table**: `SOCIAL_INSTITUTION_ALTNAME_DATA` needs special handling (§4).
+- **No-PK table**: `SOCIAL_INSTITUTION_ALTNAME_DATA` is **SKIPPED — not handled** (see §D-9a).
 - **Derived table consistency**: `ADDRESSES` is rebuilt with `cbdb:regenerate-addresses-table` only after changing the source `ADDR_CODES` (that command is MySQL-only and cannot run on SQLite).
 - **No audit-bypassing centralized SQL**: all data changes go through the mutation API or an audited flow.
 
@@ -144,11 +197,11 @@ Therefore **only these four substrings need conversion** (handle each case separ
 - [ ] Phase 1 (stop the bleed): build a shared `v→ü` helper and hook it into the generation entry points (`auto_pinyin` + the three batch `buildPinyin` + `ApiController`) to prevent new `v`
 - [ ] Inventory: `cbdb:scan-pinyin-v` read-only scan + report; align with Frank's Google Sheet and the Western-name exclusion list
 - [ ] Phase 2 (person names): external script via `/api/v2/mutate` to batch-correct `c_surname`/`c_mingzi` (`c_name` is recomputed automatically by the system), in batches, dry-run reviewed first
-- [ ] (Optional, deferrable) Search compatibility: implement query expansion on the pinyin LIKE query side (a typed `v` form searches both `v` and `ü`) (§3)
-- [ ] (Optional, for non-search purposes) confirm/create `ALTNAME_CODES` code 22, then add aliases via `/api/v2/create` (after the data cleanup)
+- [ ] **(Phase A, §D-8)** Search compatibility: implement query expansion on the pinyin LIKE query side (a typed `v` form searches both `v` and `ü`) (§3)
+- [ ] ~~confirm/create `ALTNAME_CODES` code 22, then add aliases~~ **(not doing it — see §D-1)**
 - [ ] Communicate with downstream systems and the Access edition, recommending they match both `v` and `ü` forms at query time
 - [ ] Phase B prerequisite: build the code-table audited write API per the [Code-Table Audited Mutation API Construction Plan](./CODE_TABLE_MUTATION_API_PLAN.en.md)
-- [ ] Phase B: once the API is ready, scan and correct other pinyin fields in batches (including the `TEXT_INSTANCE_DATA` composite PK, the `SOCIAL_INSTITUTION_ALTNAME_DATA` no-PK special case, and the `ADDRESSES` rebuild)
+- [ ] Phase B: once the API is ready, scan and correct other pinyin fields in batches (including the `TEXT_INSTANCE_DATA` composite PK and the `ADDRESSES` rebuild; `SOCIAL_INSTITUTION_ALTNAME_DATA` is **SKIPPED, see §D-9a**)
 - [ ] Regression tests (generation / normalization / person-name correction / audit / Western-name exclusion; mind the SQLite collation difference)
 - [ ] Doc sync: `CHANGELOG.md`, and `DATABASE.md` / `README.md` as needed
 - [ ] **Final step**: remove `'pinyin'` from `ui_hidden` in `config/codes.php` to re-expose the surname-pinyin table in the codes UI

@@ -15,21 +15,21 @@ class PinyinUmlautTest extends TestCase {
     public static function pinyinCases(): array {
         return [
             // 四種音節（小寫）
-            'lv'  => ['lv', 'lü'],
+            'lv' => ['lv', 'lü'],
             'lve' => ['lve', 'lüe'],
-            'nv'  => ['nv', 'nü'],
+            'nv' => ['nv', 'nü'],
             'nve' => ['nve', 'nüe'],
             // 大小寫保留
-            'Lv title'  => ['Lv', 'Lü'],
-            'Nv title'  => ['Nv', 'Nü'],
-            'LV upper'  => ['LV', 'LÜ'],
+            'Lv title' => ['Lv', 'Lü'],
+            'Nv title' => ['Nv', 'Nü'],
+            'LV upper' => ['LV', 'LÜ'],
             'Lve title' => ['Lve', 'Lüe'],
             // 邊界：結尾 / 空白 / 子音（連寫音節）
-            'Yelv end'       => ['Yelv', 'Yelü'],
-            'Lv space'       => ['Lv Yin', 'Lü Yin'],
-            'Lvzhai cons'    => ['Lvzhai', 'Lüzhai'],
+            'Yelv end' => ['Yelv', 'Yelü'],
+            'Lv space' => ['Lv Yin', 'Lü Yin'],
+            'Lvzhai cons' => ['Lvzhai', 'Lüzhai'],
             'Yelv Xianzhong' => ['Yelv Xianzhong', 'Yelü Xianzhong'],
-            'nv zhen'        => ['nv zhen', 'nü zhen'],
+            'nv zhen' => ['nv zhen', 'nü zhen'],
             // 多次出現
             'two hits' => ['Lv Lvqiu', 'Lü Lüqiu'],
         ];
@@ -45,15 +45,15 @@ class PinyinUmlautTest extends TestCase {
     public static function westernAndUnaffectedCases(): array {
         return [
             // 西文名：l/n 後的 v 接母音 a/i/o/u，不應轉換
-            'Silva'   => ['Silva'],
-            'Calvin'  => ['Calvin'],
-            'Melvin'  => ['Melvin'],
-            'Sylvia'  => ['Sylvia'],
-            'Galvao'  => ['Galvao'],
-            'Vasco'   => ['Vasco'],   // 開頭的 v，非 l/n 之後
+            'Silva' => ['Silva'],
+            'Calvin' => ['Calvin'],
+            'Melvin' => ['Melvin'],
+            'Sylvia' => ['Sylvia'],
+            'Galvao' => ['Galvao'],
+            'Vasco' => ['Vasco'],   // 開頭的 v，非 l/n 之後
             'Verbiest' => ['Verbiest'],
             // 無 l/n 前綴的 v
-            'David'   => ['David'],
+            'David' => ['David'],
             // 已是 ü（冪等）
             'lue done' => ['lüe'],
             'Yelu done' => ['Yelü'],

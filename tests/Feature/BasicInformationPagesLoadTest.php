@@ -649,6 +649,31 @@ class BasicInformationPagesLoadTest extends TestCase {
     }
 
     #[Test]
+    public function test_app_basicinformation_index_localizes_column_headers() {
+        // 迴歸：欄位標題原本硬編 raw column 名（c_personid/zi/hao…），不隨語系切換。
+        // 現改用 biogmains.col_* 翻譯 key；此處驗證兩語系都帶出正確標題。
+        $this->get(route('app.basicinformation.index'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('page_translations.biogmains.col_personid', '人物 ID')
+                ->where('page_translations.biogmains.col_name', '姓名（拼音）')
+                ->where('page_translations.biogmains.col_index_year', '指數年')
+                ->where('page_translations.biogmains.col_index_address', '指數地址')
+                ->where('page_translations.biogmains.col_zi', '字')
+                ->where('page_translations.biogmains.col_hao', '號')
+                ->etc());
+
+        $this->withSession(['locale' => 'en'])
+            ->get(route('app.basicinformation.index'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('page_translations.biogmains.col_personid', 'Person ID')
+                ->where('page_translations.biogmains.col_name', 'Name (Pinyin)')
+                ->where('page_translations.biogmains.col_index_address', 'Index Address')
+                ->where('page_translations.biogmains.col_zi', 'Courtesy Name (Zi)')
+                ->where('page_translations.biogmains.col_hao', 'Style Name (Hao)')
+                ->etc());
+    }
+
+    #[Test]
     public function test_basicinformation_index_with_empty_query_and_pagination() {
         $response = $this->get('/basicinformation?q=&page=2');
         $response->assertStatus(200);

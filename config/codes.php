@@ -52,7 +52,7 @@ return [
         'ASSOC_TYPES' => '社團組織類型分類',
         'ASSUME_OFFICE_CODES' => '就職方式代碼表',
         'BIOG_ADDR_CODES' => '傳記地址類型代碼表',
-        'BIOG_ADDR_DATA' => '傳記地址資料表表',
+        'BIOG_ADDR_DATA' => '傳記地址資料表',
         'BIOG_INST_CODES' => '傳記機構類型代碼表',
         'BIOG_INST_DATA' => '傳記機構資料表',
         'BIOG_MAIN' => '人物傳記主表',

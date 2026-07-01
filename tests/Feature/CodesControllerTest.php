@@ -418,6 +418,50 @@ class CodesControllerTest extends TestCase {
     }
 
     #[Test]
+    public function testCodesDescriptionFollowsLocaleWithConfigFallback() {
+        // 說明欄改為隨語系解析 codes.table_desc.<表名>；缺翻譯時退回 config 原文。
+        // 真實情況：en/zh-TW 兩檔皆備齊全部 81 個 key，故 zh-TW 不會落到 en fallback。
+        config(['codes.tables' => [
+            'TEST_CODES' => '測試代碼表',   // 兩語系皆有翻譯 → 隨語系
+            'ZZZ_FAKE'   => '假表原文說明', // 兩語系皆無翻譯 → 退回 config
+        ]]);
+        config(['codes.ui_hidden' => []]);
+        app('translator')->addLines(['codes.table_desc.TEST_CODES' => 'Test Codes Table'], 'en');
+        app('translator')->addLines(['codes.table_desc.TEST_CODES' => '測試代碼表（譯）'], 'zh-TW');
+
+        // en：有翻譯 → 英文；無翻譯 → 退回 config 原文
+        app()->setLocale('en');
+        $rows = collect((new CodesRepository())->codes());
+        $this->assertSame('Test Codes Table', $rows->firstWhere('name', 'TEST_CODES')['description']);
+        $this->assertSame('假表原文說明', $rows->firstWhere('name', 'ZZZ_FAKE')['description']);
+
+        // zh-TW：有翻譯 → 中文譯文；無翻譯 → 退回 config 原文
+        app()->setLocale('zh-TW');
+        $rows = collect((new CodesRepository())->codes());
+        $this->assertSame('測試代碼表（譯）', $rows->firstWhere('name', 'TEST_CODES')['description']);
+        $this->assertSame('假表原文說明', $rows->firstWhere('name', 'ZZZ_FAKE')['description']);
+    }
+
+    #[Test]
+    public function testCodesTableDescKeysStayInParityWithConfig() {
+        // 鎖定不變量：config/codes.php tables 的每個表名，en 與 zh-TW 的 table_desc 都必須有對應 key。
+        // 否則（因 app.fallback_locale=en）zh-TW 缺 key 會落回英文，或 en 缺 key 使英文欄退回中文原文。
+        $config = require base_path('config/codes.php');
+        $en = require base_path('resources/lang/en/codes.php');
+        $zh = require base_path('resources/lang/zh-TW/codes.php');
+
+        $configKeys = array_keys($config['tables']);
+        $enKeys = array_keys($en['table_desc']);
+        $zhKeys = array_keys($zh['table_desc']);
+        sort($configKeys);
+        sort($enKeys);
+        sort($zhKeys);
+
+        $this->assertSame($configKeys, $enKeys, 'en/codes.php table_desc 的 key 必須與 config/codes.php tables 完全一致');
+        $this->assertSame($configKeys, $zhKeys, 'zh-TW/codes.php table_desc 的 key 必須與 config/codes.php tables 完全一致');
+    }
+
+    #[Test]
     public function testUiHiddenTableAbsentFromCodesIndexRoute() {
         // 路由層級：GET /codes 首頁不應列出被隱藏的表。
         config(['codes.ui_hidden' => ['CBDB__NAME_FTS']]);

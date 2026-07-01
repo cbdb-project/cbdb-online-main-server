@@ -291,8 +291,13 @@ class PinyinMigrationPlanner {
             // 現庫姓含空格（罕見：帶空格複姓、或描述性條目如「Tao hua shi nü」）→ 第一空格拆不可靠，交人工。
             return ['', '', null, 'orphan-cname'];
         }
+        if (substr_count($n, ' ') >= 2) {
+            // 現庫有姓、但完整名多空格（描述性/親屬「之女·妻」類，如「次室女」）：第一空格拆姓不可靠，
+            // 是否可拆需語義判斷（親屬關係女可拆、其餘不可）→ 一律交人工待批量規則，絕不誤拆。
+            return ['', '', null, 'orphan-multiword'];
+        }
 
-        // 現庫有姓且為單一 token：以 Sheet 完整名第一個空格拆（CBDB 姓恆單 token）。
+        // 現庫有姓、單 token、完整名單空格：以第一個空格拆（CBDB 姓恆單 token）。
         $parts = explode(' ', $n, 2);
         $mingzi = isset($parts[1]) ? ltrim($parts[1]) : '';
         if ($blank($mingzi)) {

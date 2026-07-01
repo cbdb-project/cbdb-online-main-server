@@ -183,4 +183,32 @@ class MigratePinyinVCommandTest extends TestCase {
             putenv('CBDB_MIGRATE_TOKEN='.$prev);
         }
     }
+
+    #[Test]
+    public function execute_payload_includes_person_id(): void {
+        \Illuminate\Support\Facades\Http::fake(['*' => \Illuminate\Support\Facades\Http::response(['ok' => true], 200)]);
+        $prev = getenv('CBDB_MIGRATE_TOKEN');
+        putenv('CBDB_MIGRATE_TOKEN=test-token');
+
+        $this->artisan('cbdb:migrate-pinyin-v', [
+            '--table' => 'altname',
+            '--altname-csv' => $this->csv,
+            '--out-dir' => $this->outDir,
+            '--execute' => true,
+            '--base-url' => 'http://api.test',
+        ])->assertSuccessful();
+
+        putenv($prev === false ? 'CBDB_MIGRATE_TOKEN' : 'CBDB_MIGRATE_TOKEN='.$prev);
+
+        // payload 必含頂層 person_id ＝ pk.c_personid（否則 /api/v2/mutate 回 422）
+        \Illuminate\Support\Facades\Http::assertSent(function ($request) {
+            $d = $request->data();
+
+            return $request->url() === 'http://api.test/api/v2/mutate'
+                && ($d['resource'] ?? null) === 'altnames'
+                && ($d['mode'] ?? null) === 'direct'
+                && ($d['person_id'] ?? null) === 10
+                && ($d['target']['pk']['c_personid'] ?? null) === 10;
+        });
+    }
 }

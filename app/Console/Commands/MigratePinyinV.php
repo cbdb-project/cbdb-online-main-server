@@ -317,6 +317,8 @@ class MigratePinyinV extends Command {
             $payload = [
                 'resource' => $m['resource'],
                 'mode' => 'direct',
+                // person 子資源（basicinformation／altnames）API 要求頂層 person_id ＝ 該人 c_personid。
+                'person_id' => $m['pk']['c_personid'] ?? 0,
                 'target' => ['pk' => $m['pk']],
                 'changes' => $m['changes'],
             ];

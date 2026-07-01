@@ -120,30 +120,36 @@ export default function Navbar({ onToggleSidebar, isDark, onToggleDark, breadcru
                             <>
                                 {/* 點擊外部關閉 */}
                                 <div className="fixed inset-0 z-10" onClick={() => setUserMenuOpen(false)} />
-                                <div className="absolute right-0 z-20 mt-1 w-56 rounded border border-border bg-popover py-2 text-popover-foreground shadow-lg">
-                                    <div className="border-b border-border px-4 pb-2">
-                                        <div className="font-semibold">{user.name}</div>
+                                <div
+                                    role="menu"
+                                    className="absolute right-0 z-20 mt-1 w-56 overflow-hidden rounded-md border border-border bg-popover py-1 text-popover-foreground shadow-lg"
+                                >
+                                    <div className="px-4 py-2">
+                                        <div className="truncate font-semibold">{user.name}</div>
                                         {user.institution ? (
-                                            <div className="text-xs text-muted-foreground">{user.institution}</div>
+                                            <div className="truncate text-xs text-muted-foreground">{user.institution}</div>
                                         ) : null}
                                     </div>
-                                    <div className="flex justify-between gap-2 px-4 pt-2">
-                                        {shell.profile_url ? (
-                                            <a
-                                                href={shell.profile_url}
-                                                className="rounded border border-border px-3 py-1 text-sm hover:bg-muted"
-                                            >
-                                                {tCommon('profile_settings')}
-                                            </a>
-                                        ) : <span />}
-                                        <button
-                                            type="button"
-                                            onClick={logout}
-                                            className="rounded border border-border px-3 py-1 text-sm hover:bg-muted"
+                                    <div className="my-1 border-t border-border" />
+                                    {shell.profile_url ? (
+                                        <a
+                                            href={shell.profile_url}
+                                            role="menuitem"
+                                            className="flex items-center gap-2.5 px-4 py-2 text-sm hover:bg-muted"
                                         >
-                                            {tCommon('sign_out')}
-                                        </button>
-                                    </div>
+                                            <i className="fas fa-user-cog w-4 text-center text-muted-foreground" aria-hidden />
+                                            {tCommon('profile_settings')}
+                                        </a>
+                                    ) : null}
+                                    <button
+                                        type="button"
+                                        onClick={logout}
+                                        role="menuitem"
+                                        className="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-destructive hover:bg-destructive/10"
+                                    >
+                                        <i className="fas fa-sign-out-alt w-4 text-center" aria-hidden />
+                                        {tCommon('sign_out')}
+                                    </button>
                                 </div>
                             </>
                         )}

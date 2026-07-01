@@ -122,9 +122,47 @@ class PinyinMigrationPlannerTest extends TestCase {
         $this->assertSame(['c_surname' => 'Lü', 'c_mingzi' => 'Kun'], $byId[6]['changes']);
         // person 7：只 surname 行 → 只改 surname。
         $this->assertSame(['c_surname' => 'Lü'], $byId[7]['changes']);
-        // person 8：孤兒 → 例外
-        $orphan = array_values(array_filter($plan['exceptions'], fn ($e) => $e['id'] === 8));
-        $this->assertSame('orphan-cname', $orphan[0]['reason']);
+        // person 8：孤兒（單姓）→ 用現庫姓的詞數自動拆（原 §D-4 approach A）。
+        $this->assertSame(['c_surname' => 'Lü', 'c_mingzi' => 'Kun'], $byId[8]['changes']);
+    }
+
+    #[Test]
+    public function it_splits_orphan_by_sheet_first_space(): void {
+        DB::table('BIOG_MAIN')->insert([
+            // 30：現庫姓髒（Lu9＝Lü）、c_name 也髒 → 姓取自 Sheet correct（第一空格前），不信現庫拼寫
+            ['c_personid' => 30, 'c_name_chn' => '呂建中', 'c_surname' => 'Lu9', 'c_mingzi' => 'Jianzhong', 'c_name' => 'Lv Jianzhong'],
+            // 31：現庫無姓（描述性）→ 整名為 mingzi
+            ['c_personid' => 31, 'c_name_chn' => '女子', 'c_surname' => '', 'c_mingzi' => 'nv zi', 'c_name' => 'nv zi'],
+            // 32：完整名含括號（消歧）→ 保守交人工
+            ['c_personid' => 32, 'c_name_chn' => '呂洵', 'c_surname' => 'Lv', 'c_mingzi' => 'Xun', 'c_name' => 'Lv Xun'],
+            // 33：現庫姓含空格（帶空格複姓/描述性）→ 第一空格拆不可靠、交人工
+            ['c_personid' => 33, 'c_name_chn' => '桃花石女', 'c_surname' => 'Tao hua', 'c_mingzi' => 'shi nv', 'c_name' => 'Tao hua shi nv'],
+        ]);
+        $this->regenMap['呂建中'] = ['c_surname' => 'Lü', 'c_mingzi' => 'Jianzhong', 'c_name' => 'Lü Jianzhong'];
+
+        $plan = $this->planner()->planBiogMain([
+            ['id' => 30, 'field' => 'c_name', 'wrong_pinyin' => 'Lv Jianzhong', 'correct_pinyin' => 'Lü Jianzhong'],
+            ['id' => 31, 'field' => 'c_name', 'wrong_pinyin' => 'nv zi', 'correct_pinyin' => 'nü zi'],
+            ['id' => 32, 'field' => 'c_name', 'wrong_pinyin' => 'Lv Xun', 'correct_pinyin' => 'Lü Xun (2)'],
+            ['id' => 33, 'field' => 'c_name', 'wrong_pinyin' => 'Tao hua shi nv', 'correct_pinyin' => 'Tao hua shi nü'],
+        ]);
+        $byId = [];
+        foreach ($plan['mutations'] as $m) {
+            $byId[$m['pk']['c_personid']] = $m;
+        }
+        $reasons = [];
+        foreach ($plan['exceptions'] as $e) {
+            $reasons[$e['id']] = $e['reason'];
+        }
+
+        // 30：現庫髒姓也拆對——姓取自 Sheet correct 'Lü Jianzhong' 第一空格前
+        $this->assertSame(['c_surname' => 'Lü', 'c_mingzi' => 'Jianzhong'], $byId[30]['changes']);
+        // 31：無姓 → 只改 mingzi 為整名
+        $this->assertSame(['c_mingzi' => 'nü zi'], $byId[31]['changes']);
+        // 32：含括號 → 交人工（orphan-cname）
+        $this->assertSame('orphan-cname', $reasons[32]);
+        // 33：現庫姓含空格 → 交人工
+        $this->assertSame('orphan-cname', $reasons[33]);
     }
 
     #[Test]

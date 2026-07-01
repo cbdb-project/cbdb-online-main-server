@@ -226,8 +226,8 @@ class PinyinMigrationPlanner {
                 return ['', '', null, 'cannot-split-suffix'];
             }
 
-            // 只有完整名列，無分量行 → 無法可靠拆分（交人工）。
-            return ['', '', null, 'orphan-cname'];
+            // 只有完整名列（孤兒，原 §D-4）：以 Sheet 完整名的第一個空格拆回姓/名。
+            return $this->splitOrphanByCurrent($trimmedName, $curS, $curM);
         }
 
         // 無完整名列：只改 Sheet 明確標記的分量（尊重 scoping）。
@@ -254,6 +254,61 @@ class PinyinMigrationPlanner {
         }
 
         return ['', '', null, 'no-sheet-field'];
+    }
+
+    /**
+     * 孤兒（Sheet 只有 c_name 行）：以 Sheet 完整名的第一個空格把姓/名拆開（原 §D-4 approach A）。
+     *
+     * 現庫分量（c_surname）常為髒值（如「Lu9」＝Lü）、與 c_name 對不上，故**不信任現庫分量拼寫**，
+     * 只用「現庫是否有姓」(c_surname 非空) 決定拆法；姓的拼寫一律取自 Sheet 權威完整名：
+     * - 現庫無姓 → 整個完整名為名（只改 c_mingzi）。
+     * - 現庫有姓 → CBDB 姓恆為單一無空白 token，故取完整名第一個空格前為姓、其餘為名。
+     * 保守交人工（不寫）：
+     * - Sheet 完整名為空 → derived-empty。
+     * - 完整名含括號（消歧「(2)」、之妻「(Wife of …)」）拆分不可靠 → orphan-cname。
+     * - 現庫有姓但完整名無空白（無名部分）：現庫有名則矛盾、否則只改 surname。
+     *
+     * @param  string  $n     Sheet 完整名 correct（已 trim）
+     * @param  string  $curS  現庫 c_surname（僅用其是否為空，不信任拼寫）
+     * @param  string  $curM  現庫 c_mingzi
+     * @return array{0:string, 1:string, 2:?string, 3:?string}  [surname, mingzi, onlyField, error]
+     */
+    private function splitOrphanByCurrent(string $n, string $curS, string $curM): array {
+        $blank = static fn (string $v): bool => trim($v) === '';
+
+        if ($blank($n)) {
+            // Sheet correct 為空 → 絕不 blanking，交人工。
+            return ['', '', null, 'derived-empty'];
+        }
+        if (str_contains($n, '(') || str_contains($n, ')')) {
+            return ['', '', null, 'orphan-cname'];
+        }
+        if ($blank($curS)) {
+            // 現庫無姓 → 整個完整名為名。
+            return ['', $n, 'c_mingzi', null];
+        }
+        if (str_contains(trim($curS), ' ')) {
+            // 現庫姓含空格（罕見：帶空格複姓、或描述性條目如「Tao hua shi nü」）→ 第一空格拆不可靠，交人工。
+            return ['', '', null, 'orphan-cname'];
+        }
+
+        // 現庫有姓且為單一 token：以 Sheet 完整名第一個空格拆（CBDB 姓恆單 token）。
+        $parts = explode(' ', $n, 2);
+        $mingzi = isset($parts[1]) ? ltrim($parts[1]) : '';
+        if ($blank($mingzi)) {
+            // 完整名無名部分：現庫有名 → 矛盾交人工；否則只改姓。
+            if (!$blank($curM)) {
+                return ['', '', null, 'name-is-surname-but-mingzi-present'];
+            }
+
+            return [$n, '', 'c_surname', null];
+        }
+        $surname = $parts[0];
+        if ($blank($surname)) {
+            return ['', '', null, 'derived-empty'];
+        }
+
+        return [$surname, $mingzi, null, null];
     }
 
     /**

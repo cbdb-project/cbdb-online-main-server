@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Pinyin;
 use App\Repositories\OperationRepository;
 use App\Support\CompositePrimaryKey;
+use App\Support\PinyinUmlaut;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -339,7 +340,8 @@ class AdminBatchLoadOfficesController extends Controller {
             return strtolower(trim(preg_replace('/\s+/u', ' ', $value)));
         }
 
-        return implode(' ', $syllables);
+        // 止血：把生成拼音中殘留的 v 代寫正規化為 ü。
+        return PinyinUmlaut::normalize(implode(' ', $syllables));
     }
 
     /**

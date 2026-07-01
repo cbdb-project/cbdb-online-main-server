@@ -7,6 +7,7 @@ import { NavButton } from '../../ui/NavButton';
 import { useTabPager } from '../shared/useTabPager';
 import { stableKey } from '../shared/stableKey';
 import { buildTextUrl, type TextCodeRecord } from '../shared/textLookup';
+import { formatBilingualLabel } from '../shared/formatters';
 import { useTextCodes } from '../shared/useTextCodes';
 import { getCsrfToken } from '../shared/csrf';
 import { buildEditV2CreateUrl, buildEditV2EditUrl } from '../shared/legacyEditUrl';
@@ -184,10 +185,17 @@ const linkStyle: React.CSSProperties = {
     textDecoration: 'none',
 };
 
-/** 出處欄：對齊 legacy `{{ $value->c_title_chn }}`（中文書名），缺則回退 text 記錄／英文名／text_id。 */
+/**
+ * 出處欄：優先以 text 記錄組出「中文書名 / 拼音」（對齊著述分頁的雙語顯示，把出處書名的拼音一併帶出）；
+ * 缺 text 記錄時回退列自帶的中文／拼音書名，最後回退 text_id。
+ */
 function renderSourceTitle(item: SourceItem, textRecords: Record<number, TextCodeRecord>): React.ReactNode {
     const record = textRecords[item.text_id ?? 0];
-    return record?.c_title_chn ?? item.title_chn ?? item.title ?? (item.text_id ? String(item.text_id) : null);
+    // 中文書名與拼音各自獨立取值（皆優先 text 記錄、缺則回退列自帶欄位），保留「中文優先」原則的同時把拼音一併帶出；
+    // 兩者皆缺時回退 text_id。
+    const chn = record?.c_title_chn ?? item.title_chn ?? null;
+    const pinyin = record?.c_title ?? item.title ?? null;
+    return formatBilingualLabel(chn, pinyin) ?? (item.text_id ? String(item.text_id) : null);
 }
 
 /**

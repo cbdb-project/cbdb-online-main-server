@@ -20,6 +20,13 @@ class CodesIndexInertiaTest extends TestCase {
         config(['codes.ui_hidden' => []]);
         config(['migration_flags.pages.codes' => 'old']);
 
+        // 說明欄現在改由 codes.table_desc.<表名> 翻譯驅動（見 CodesTableDescription），
+        // 會蓋過 config 原文；此處覆寫翻譯以維持測試確定性、不耦合真實 lang 檔內容。
+        app('translator')->addLines([
+            'codes.table_desc.OFFICE_CODES' => '官職代碼',
+            'codes.table_desc.ADDR_CODES' => '地址代碼',
+        ], 'zh-TW');
+
         $this->get(route('app.codes.index'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page

@@ -380,8 +380,11 @@ class BiogMainRepository {
      */
     public static function namesByQuery(Request $request, $num = 20) {
         //20220303增加addslashes()防禦查詢參數
-        // #85：拼音 ü→v 規範化（CBDB 以 v 存 ü 韻，如 呂=Lv）——使用者輸入 ü 或 v 皆可命中。
-        $request->q = addslashes(\App\Support\PinyinSearchNormalizer::umlautToV($request->q ?? ''));
+        // #85 + §D-8 查詢展開：遷移後人名以正字 ü 儲存；$request->q 保留主要形式（供數字判斷／
+        // FTS／orderByRaw 內插，addslashes 防禦），$qForms 為綁定用的 v／ü 展開集（OR 同查）。
+        $rawQ = $request->q ?? '';
+        $request->q = addslashes(\App\Support\PinyinSearchNormalizer::umlautToV($rawQ));
+        $qForms = \App\Support\PinyinSearchNormalizer::expand($rawQ);
         if ($temp = $request->num) {
             $num = addslashes($temp);
         }
@@ -535,19 +538,21 @@ class BiogMainRepository {
                   ->where('A2.c_alt_name_type_code', '=', 5);
         });
 
-        $names = $names->where(function ($query) use ($request) {
+        $names = $names->where(function ($query) use ($request, $qForms) {
             $query->where('BIOG_MAIN.c_name_chn', 'like', '%'.$request->q.'%')
-                ->orWhere('BIOG_MAIN.c_name', 'like', $request->q)
-                ->orWhere('BIOG_MAIN.c_surname', 'like', $request->q)
-                ->orWhere('BIOG_MAIN.c_mingzi', 'like', $request->q)
-                ->orWhere('BIOG_MAIN.c_personid', $request->q)
-                #20230626增加[外文全名]與[外文羅馬字轉寫姓名]可查得
-                ->orWhere('BIOG_MAIN.c_name_proper', 'like', $request->q)
-                ->orWhere('BIOG_MAIN.c_name_rm', 'like', $request->q)
-                ->orWhere('BIOG_MAIN.c_mingzi_proper', 'like', $request->q)
-                ->orWhere('BIOG_MAIN.c_surname_proper', 'like', $request->q)
-                ->orWhere('BIOG_MAIN.c_mingzi_rm', 'like', $request->q)
-                ->orWhere('BIOG_MAIN.c_surname_rm', 'like', $request->q);
+                ->orWhere('BIOG_MAIN.c_personid', $request->q);
+            // §D-8：拼音／羅馬字欄位以展開集 OR 同查 v／ü 形（單一形輸入時 $qForms 僅一元、行為不變）。
+            #20230626增加[外文全名]與[外文羅馬字轉寫姓名]可查得
+            $pinyinCols = [
+                'c_name', 'c_surname', 'c_mingzi',
+                'c_name_proper', 'c_name_rm', 'c_mingzi_proper',
+                'c_surname_proper', 'c_mingzi_rm', 'c_surname_rm',
+            ];
+            foreach ($pinyinCols as $col) {
+                foreach ($qForms as $form) {
+                    $query->orWhere("BIOG_MAIN.{$col}", 'like', $form);
+                }
+            }
         });
 
         // 朝代篩選
@@ -585,8 +590,10 @@ class BiogMainRepository {
             return collect();
         }
 
-        // #85：拼音 ü→v 規範化（與 namesByQuery 一致，使朝代分面與搜尋結果同口徑）。
-        $q = addslashes(\App\Support\PinyinSearchNormalizer::umlautToV($q));
+        // #85 + §D-8：與 namesByQuery 同口徑——$q 為主要形式（FTS／personid），$qForms 為 v／ü 展開集。
+        $rawQ = $q;
+        $q = addslashes(\App\Support\PinyinSearchNormalizer::umlautToV($rawQ));
+        $qForms = \App\Support\PinyinSearchNormalizer::expand($rawQ);
 
         // 純數字：單筆精確查詢，不需要 facet
         if (ctype_digit($q)) {
@@ -627,18 +634,20 @@ class BiogMainRepository {
         // 回退 LIKE 路徑
         $fallbackBaseQuery = DB::table('BIOG_MAIN')
             ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
-            ->where(function ($query) use ($q) {
+            ->where(function ($query) use ($q, $qForms) {
                 $query->where('BIOG_MAIN.c_name_chn', 'like', '%' . $q . '%')
-                    ->orWhere('BIOG_MAIN.c_name', 'like', $q)
-                    ->orWhere('BIOG_MAIN.c_surname', 'like', $q)
-                    ->orWhere('BIOG_MAIN.c_mingzi', 'like', $q)
-                    ->orWhere('BIOG_MAIN.c_personid', $q)
-                    ->orWhere('BIOG_MAIN.c_name_proper', 'like', $q)
-                    ->orWhere('BIOG_MAIN.c_name_rm', 'like', $q)
-                    ->orWhere('BIOG_MAIN.c_mingzi_proper', 'like', $q)
-                    ->orWhere('BIOG_MAIN.c_surname_proper', 'like', $q)
-                    ->orWhere('BIOG_MAIN.c_mingzi_rm', 'like', $q)
-                    ->orWhere('BIOG_MAIN.c_surname_rm', 'like', $q);
+                    ->orWhere('BIOG_MAIN.c_personid', $q);
+                // §D-8：與 namesByQuery 一致，拼音／羅馬字欄位以展開集 OR 同查 v／ü 形。
+                $pinyinCols = [
+                    'c_name', 'c_surname', 'c_mingzi',
+                    'c_name_proper', 'c_name_rm', 'c_mingzi_proper',
+                    'c_surname_proper', 'c_mingzi_rm', 'c_surname_rm',
+                ];
+                foreach ($pinyinCols as $col) {
+                    foreach ($qForms as $form) {
+                        $query->orWhere("BIOG_MAIN.{$col}", 'like', $form);
+                    }
+                }
             });
 
         $validDynasties = (clone $fallbackBaseQuery)

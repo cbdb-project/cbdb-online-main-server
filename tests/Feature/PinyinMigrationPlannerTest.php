@@ -137,6 +137,8 @@ class PinyinMigrationPlannerTest extends TestCase {
             ['c_personid' => 32, 'c_name_chn' => '呂洵', 'c_surname' => 'Lv', 'c_mingzi' => 'Xun', 'c_name' => 'Lv Xun'],
             // 33：現庫姓含空格（帶空格複姓/描述性）→ 第一空格拆不可靠、交人工
             ['c_personid' => 33, 'c_name_chn' => '桃花石女', 'c_surname' => 'Tao hua', 'c_mingzi' => 'shi nv', 'c_name' => 'Tao hua shi nv'],
+            // 34：現庫有姓(單token)、但完整名多空格（描述性/親屬女如「次室女」）→ 不拆姓、交人工待規則
+            ['c_personid' => 34, 'c_name_chn' => '次室女', 'c_surname' => 'Ci', 'c_mingzi' => 'shi nv', 'c_name' => 'Ci shi nv'],
         ]);
         $this->regenMap['呂建中'] = ['c_surname' => 'Lü', 'c_mingzi' => 'Jianzhong', 'c_name' => 'Lü Jianzhong'];
 
@@ -145,6 +147,7 @@ class PinyinMigrationPlannerTest extends TestCase {
             ['id' => 31, 'field' => 'c_name', 'wrong_pinyin' => 'nv zi', 'correct_pinyin' => 'nü zi'],
             ['id' => 32, 'field' => 'c_name', 'wrong_pinyin' => 'Lv Xun', 'correct_pinyin' => 'Lü Xun (2)'],
             ['id' => 33, 'field' => 'c_name', 'wrong_pinyin' => 'Tao hua shi nv', 'correct_pinyin' => 'Tao hua shi nü'],
+            ['id' => 34, 'field' => 'c_name', 'wrong_pinyin' => 'Ci shi nv', 'correct_pinyin' => 'Ci shi nü'],
         ]);
         $byId = [];
         foreach ($plan['mutations'] as $m) {
@@ -163,6 +166,8 @@ class PinyinMigrationPlannerTest extends TestCase {
         $this->assertSame('orphan-cname', $reasons[32]);
         // 33：現庫姓含空格 → 交人工
         $this->assertSame('orphan-cname', $reasons[33]);
+        // 34：完整名多空格 → 不拆姓、交人工待規則
+        $this->assertSame('orphan-multiword', $reasons[34]);
     }
 
     #[Test]

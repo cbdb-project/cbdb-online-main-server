@@ -423,7 +423,7 @@ class CodesControllerTest extends TestCase {
         // 真實情況：en/zh-TW 兩檔皆備齊全部 81 個 key，故 zh-TW 不會落到 en fallback。
         config(['codes.tables' => [
             'TEST_CODES' => '測試代碼表',   // 兩語系皆有翻譯 → 隨語系
-            'ZZZ_FAKE'   => '假表原文說明', // 兩語系皆無翻譯 → 退回 config
+            'ZZZ_FAKE' => '假表原文說明', // 兩語系皆無翻譯 → 退回 config
         ]]);
         config(['codes.ui_hidden' => []]);
         app('translator')->addLines(['codes.table_desc.TEST_CODES' => 'Test Codes Table'], 'en');

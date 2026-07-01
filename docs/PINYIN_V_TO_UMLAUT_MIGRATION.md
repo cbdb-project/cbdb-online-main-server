@@ -21,15 +21,18 @@
 - 兩個分頁（公開、可直接 CSV 匯出）：
   - **ALTNAME_DATA**：`gid=1425535916`，CSV：`https://docs.google.com/spreadsheets/d/19SOyBtA8cKE9aq_hIkxRiT-e2i6f5bFDIY_TcNAn57I/export?format=csv&gid=1425535916`；957 資料列；欄位 `table,field,id,wrong_pinyin,correct_pinyin,note_en,note_zh`。
   - **BIOG_MAIN**：`gid=248977087`，CSV：同上網址改 `gid=248977087`；11,407 資料列（`c_name` 5,783／`c_surname` 3,509／`c_mingzi` 2,115）；欄位 `table,field,id,wrong_pinyin,correct_pinyin`。
-- `id` ＝ `c_personid`。**西文名已人工排除**。**Sheet 為權威、逐條照改**；掃描命令 `cbdb:scan-pinyin-v` 只做交叉核對與差異報告，**不得覆蓋 Sheet**。
+- `id` ＝ `c_personid`。**西文名已人工排除**。**Sheet 為權威核對基準**；掃描命令 `cbdb:scan-pinyin-v` 只做交叉核對與差異報告，**不得覆蓋 Sheet**。
+- **掃描盤點的定位（採 Frank #1087@L83）**：主要盤點可直接在**上週的 SQLite data dump 上以一次性 SQL** 查得，不必依賴常設指令；止血（§D-7）修好後不再產生新 v 記錄，僅需對「最後一週新增資料」再過一遍，之後如有零星遺漏單獨修正即可。**M2 的 `cbdb:scan-pinyin-v` 已合併、於 Phase A 期間保留為只讀備用工具，但不列為每次必跑的常設流程；並將於整個 Phase A 收尾時移除（見 §D-10 最後一步）。**
 
-### D-3 BIOG_MAIN 套用法
-- **只送 `c_surname` 與／或 `c_mingzi`** 走 `/api/v2/mutate`；`c_name` 由系統自動重算。**忽略 Sheet 的 `c_name` 列**（API 封鎖直寫 c_name）。
+### D-3 BIOG_MAIN 套用法（採 Frank #1087@L104：重生 + Sheet 當 oracle + 寫入前漂移檢查）
+- **機制＝重新合成，而非直接套 Sheet 值**：拼音生成庫已由止血修好（§D-7），故對每個受影響 `c_personid` **直接呼叫 `BiogMainRepository::auto_pinyin()`**，以其中文名（`c_name_chn`）重新合成 `c_surname`／`c_mingzi`／`c_name`（自然產出正字 ü）。
+- **寫入前漂移檢查（②a，必做）**：套用前先讀該人現值；若欄位現值**已不等於** Sheet 的 `wrong_pinyin`（表示已被改過／已遷移），**跳過並記錄**——避免覆寫他人變更，且天然冪等（重跑安全）。
+- **oracle 閘（②b，必做）**：重新合成的結果**必須等於** Sheet 的 `correct_pinyin` 才寫入；**對不上的不寫**，收入例外清單交 Hongsu 裁決。
+- **只送 `c_surname` 與／或 `c_mingzi`** 走 `/api/v2/mutate`；`c_name` 由 handler 自動重算（§5.2）。**忽略 Sheet 的 `c_name` 直寫列**（API 封鎖直寫 c_name）。
 
-### D-4 BIOG_MAIN 的 204 條「孤兒 c_name」——用「拆分量」法（approach A）
-- 定義：在 BIOG_MAIN 分頁中，某 `c_personid` 有 `c_name` 改動、但**沒有**對應的 `c_surname`／`c_mingzi` 列——共 **204** 個（偵測：出現在 `c_name` 集合、卻不在 `c_surname ∪ c_mingzi` 集合的 id）。
-- 處理：逐一**讀該人真實的 `c_surname`／`c_mingzi`／`c_name`**，以確定性音節規則（`lv/lve/nv/nve`）判定 v 落在哪個分量、**只改那個分量**。
-- **驗證閘（必做）**：套用後「重算的 `c_name` 必須等於 Sheet 的 `correct_pinyin`」。**對不上的不寫**，收進一份小小的例外清單交人類（Hongsu）裁決。
+### D-4 BIOG_MAIN 的 204 條「孤兒 c_name」——由 §D-3 重生機制天然涵蓋（原「拆分量」approach A 廢除）
+- 原問題：某 `c_personid` 僅有 `c_name` 改動、無對應 `c_surname`／`c_mingzi` 列——共 **204** 個（出現在 `c_name` 集合、卻不在 `c_surname ∪ c_mingzi` 集合的 id），需判定 v 落在哪個分量。
+- **採 §D-3 重生機制後此問題消失**：`auto_pinyin()` 會一次產出全部分量（surname／mingzi／name），無需判定 v 落點。§D-3 的 oracle 閘（重生 `c_name` == Sheet `correct_pinyin`）仍為必做；對不上者入例外清單。
 
 ### D-5 ALTNAME 套用法（複合主鍵定位）
 - Sheet 的 `id` ＝ `c_personid`，但 `ALTNAME_DATA` 為 **3-鍵複合主鍵**。以 **`c_personid = id` 且 `c_alt_name = wrong_pinyin`** 定位該列、解析完整 PK（依 `CompositePrimaryKey::SCHEMAS`／讀取），再 `/api/v2/mutate` 將 `c_alt_name` 改為 `correct_pinyin`。
@@ -37,7 +40,7 @@
 
 ### D-6 執行方式與節奏
 - 使用操作者的 Sanctum **Bearer token**（active、非 crowdsourcing、可 `canWriteDirectly()` 的使用者；**Token 不寫入任何檔案／commit／PR／log**）。走 `/api/v2/*`、`mode:"direct"`，audit 自動。
-- 流程：**(1) 先 dry-run**，產出「完整預定變更集」為產物，並自檢「無 Sheet 以外項、無 `[OTHER-v]` 混入」；**(2) 分批跑完**（BIOG_MAIN 一姓氏一批、ALTNAME 分塊）；**(3) 跑完後輸出抽樣**供人類抽查。
+- 流程（每筆）：**(0) 讀現值 → 漂移檢查**（現值 ≠ Sheet `wrong_pinyin` 則跳過並記錄）；**(1)** BIOG_MAIN 走 `auto_pinyin()` 重生（§D-3）／ALTNAME 以 `wrong_pinyin` 定位完整 PK（§D-5）；**(2) oracle 閘**（結果 == Sheet `correct_pinyin` 才續，否則入例外清單）；**(3) dry-run** 產出「完整預定變更集 + 例外/跳過清單」並自檢「無 Sheet 以外項、無 `[OTHER-v]` 混入」；**(4) 分批跑完**（BIOG_MAIN 一姓氏一批、ALTNAME 分塊）；**(5) 輸出抽樣**供人類抽查。
 - 目標＝**直接生產**（無 staging）。**回退**：每筆皆審計 mutation，抽查發現錯的可經同一審計路徑／operations restore 逐筆回退。
 
 ### D-7 止血現況
@@ -55,8 +58,9 @@
 - **D-9b `/codes` 管理介面審計缺口：補上**（於 `CodesController` 直寫路徑加 `AuditLogService::write()`，與新 API 審計一致）——詳見 code 表 API 計畫。
 - **D-9c `ADDRESSES` 派生表：** 改完 `ADDR_CODES` 後以 `cbdb:regenerate-addresses-table`（生產、MySQL-only）**重建**。
 
-### D-10 最後一步
-- 自 `config/codes.php` 的 `ui_hidden` **移除 `'pinyin'`**（重新顯示姓氏拼音表）為**既定計畫的一環**（資料清乾淨後執行），**非另需人工決定**。
+### D-10 最後一步（Phase A 收尾，資料清乾淨後執行）
+- 自 `config/codes.php` 的 `ui_hidden` **移除 `'pinyin'`**（重新顯示姓氏拼音表）為**既定計畫的一環**，**非另需人工決定**。
+- **移除 M2 掃描指令 `cbdb:scan-pinyin-v`**（採 Frank #1087@L83：盤點屬一次性工作、不需常設指令）：刪除 `app/Console/Commands/ScanPinyinV.php`、`tests/Feature/ScanPinyinVTest.php`、`app/Console/Kernel.php` 的註冊列，作為整個 Phase A 的**最後一個小環節**。（`app/Support/PinyinUmlaut.php` 為止血與查詢展開共用，**保留**。）
 
 ## 0. 背景與決議
 
@@ -159,6 +163,7 @@ CBDB 拼音規範長期以 `v` 代替 `ü`（如 `呂 = Lv`、`閭丘 = Lvqiu`�
 ### 5.2 人名拼音修正
 - `BIOG_MAIN.c_surname` / `c_mingzi`：`/api/v2/mutate` **允許直接更新**，且 update 路徑**不會**重跑 `auto_pinyin`（不會用中文重生覆蓋你給的值）。腳本直接帶入修正後拼音即可。
 - **`c_name` 自動重算（無待解項）**：handler 的 `buildMergedPayload()` 會先把 `changes` 併入整筆原紀錄，`updateById()` 再由合併後的 `c_surname`+`c_mingzi` 重算 `c_name`（連同 `c_name_chn`/`c_name_proper`/`c_name_rm`）。因此腳本**只需送修正後的 `c_surname`/`c_mingzi`**，`c_name` 會自動跟著正確，無資料遺失風險、無需另行處理。
+- **修正值的取得＝重生（§D-3，Frank #1087@L104）**：不直接照抄 Sheet 值，而是呼叫 `auto_pinyin()` 以中文名重新合成 `c_surname`/`c_mingzi`（止血後自然產出 ü），並以「寫入前漂移檢查 + Sheet `correct_pinyin` oracle 閘」把關；因 update 路徑不重跑 `auto_pinyin`，送出我方重生的值即穩定落庫。
 - 建議批量節奏：一次數百筆，或**一個姓氏一批**，先 dry-run / 取樣複核再正式送出。
 
 ### 5.3 別名（**作廢，不執行 —— 見 §D-1**；以下僅存檔說明）
@@ -168,7 +173,7 @@ CBDB 拼音規範長期以 `v` 代替 `ü`（如 `呂 = Lv`、`閭丘 = Lvqiu`�
 - 若要做，建議在**資料清理完成後**再加；是否必須無強烈定論。
 
 ### 5.4 盤點工具
-- 仍建議提供唯讀 artisan 指令 `php artisan cbdb:scan-pinyin-v`：掃描 §4 候選欄位、依音節規則分類（疑似拼音 / 疑似西文名）、輸出 CSV 供人工複核並對齊 Frank 的 Google Sheet。此指令**只讀不寫**，可安全在生產執行。
+- 只讀 artisan 指令 `php artisan cbdb:scan-pinyin-v`（M2 已合併）：掃描 §4 候選欄位、依音節規則分類（疑似拼音 / 疑似西文名）、輸出 CSV 供人工複核並對齊 Frank 的 Google Sheet。此指令**只讀不寫**，可安全在生產執行。**惟採 Frank #1087@L83：盤點屬一次性工作，主要以 dump 上的一次性 SQL 為主；本指令僅為 Phase A 期間備用，並於收尾時移除（§D-2／§D-10）。**
 
 ## 6. 分階段執行計畫（採納 Frank 建議）
 
@@ -195,13 +200,14 @@ CBDB 拼音規範長期以 `v` 代替 `ü`（如 `呂 = Lv`、`閭丘 = Lvqiu`�
 
 - [ ] 階段一（止血）：合併 PR #1086 + 更新 DB `pinyin` 表姓氏為 `ü`
 - [ ] 階段一（止血）：新建共用 `v→ü` helper，掛入生成入口（`auto_pinyin` + 三批次 `buildPinyin` + `ApiController`）防止新 `v`
-- [ ] 盤點：`cbdb:scan-pinyin-v` 唯讀掃描 + 報告，對齊 Frank 的 Google Sheet 與西文名排除清單
-- [ ] 階段二（人名）：外部腳本走 `/api/v2/mutate` 批次修正 `c_surname`/`c_mingzi`（`c_name` 由系統自動重算），分批、先 dry-run 複核
-- [ ] **（Phase A，§D-8）** 搜尋兼容：於拼音 LIKE 查詢端實作查詢展開（輸入 `v` 形式時同時查 `v` 與 `ü`）（§3）
+- [x] 盤點：`cbdb:scan-pinyin-v` 唯讀掃描 + 報告（M2 已合併）；**主要盤點以 dump 一次性 SQL 為主，指令為備用、Phase A 收尾時移除（§D-2／§D-10，Frank #1087@L83）**
+- [ ] 階段二（人名）：外部腳本走 `/api/v2/mutate` 批次修正 `c_surname`/`c_mingzi`——**採「重生 + Sheet oracle + 寫入前漂移檢查」（§D-3，Frank #1087@L104）**，`c_name` 由系統自動重算，分批、先 dry-run 複核
+- [x] **（Phase A，§D-8）** 搜尋兼容：拼音 LIKE 查詢端查詢展開（輸入 `v` 同查 `v` 與 `ü`）（§3）——M3 PR #1099
 - [ ] ~~確認／建立 `ALTNAME_CODES` 代碼 22 並補別名~~ **（不做，見 §D-1）**
 - [ ] 溝通下游系統與 Access 版，建議查詢時同時匹配 `v` 與 `ü` 形式
 - [ ] 階段 B 前置：依 [Code 表受審計寫入 API 建設計畫](./CODE_TABLE_MUTATION_API_PLAN.md) 建立 code 表受審計寫入 API
 - [ ] 階段 B：API 就緒後，分批掃描修正其他拼音欄位（含 `TEXT_INSTANCE_DATA` 複合主鍵、`ADDRESSES` 重建；`SOCIAL_INSTITUTION_ALTNAME_DATA` **SKIP，見 §D-9a**）
 - [ ] 回歸測試（生成 / 正規化 / 人名修正 / audit / 西文名排除；注意 SQLite collation 差異）
 - [ ] 文件同步：`CHANGELOG.md`、必要時 `DATABASE.md` / `README.md`
-- [ ] **最後環節**：自 `config/codes.php` 的 `ui_hidden` 移除 `'pinyin'`，於 codes 介面重新顯示姓氏拼音對照表
+- [ ] **最後環節（§D-10）**：自 `config/codes.php` 的 `ui_hidden` 移除 `'pinyin'`，於 codes 介面重新顯示姓氏拼音對照表
+- [ ] **Phase A 最末步（§D-10）**：移除 M2 掃描指令 `cbdb:scan-pinyin-v`（`ScanPinyinV.php` + 測試 + Kernel 註冊；保留 `PinyinUmlaut.php`）

@@ -32,6 +32,12 @@ class ViewTableService {
                 : Arr::get($definition, 'title', $key);
             // Original Chinese title from config (always zh-TW, used for CHN column)
             $titleChn = Arr::get($definition, 'title', $key);
+            // Localized description (follows current locale); fall back to raw config when no translation exists
+            $descKey = $translationKey . '_desc';
+            $translatedDesc = trans($descKey);
+            $description = (is_string($translatedDesc) && $translatedDesc !== $descKey)
+                ? $translatedDesc
+                : Arr::get($definition, 'description', '');
 
             return [
                 'key' => $key,
@@ -39,7 +45,7 @@ class ViewTableService {
                 'title' => $title,
                 'title_en' => $titleEn,
                 'title_chn' => $titleChn,
-                'description' => Arr::get($definition, 'description', ''),
+                'description' => $description,
                 'aliases' => $aliases,
                 'column_count' => count(Arr::get($definition, 'columns', [])),
             ];
@@ -137,10 +143,16 @@ class ViewTableService {
         $localizedTitle = (is_string($translatedTitle) && $translatedTitle !== $translationKey)
             ? $translatedTitle
             : ($definition['title'] ?? $effectiveKey);
+        // Localized description (follows current locale); fall back to raw config when no translation exists
+        $descKey = $translationKey . '_desc';
+        $translatedDesc = trans($descKey);
+        $localizedDesc = (is_string($translatedDesc) && $translatedDesc !== $descKey)
+            ? $translatedDesc
+            : ($definition['description'] ?? null);
 
         return [
             'title' => $localizedTitle,
-            'description' => $definition['description'] ?? null,
+            'description' => $localizedDesc,
             'columns' => $columns,
             'rows' => $rows,
             'key' => $effectiveKey,

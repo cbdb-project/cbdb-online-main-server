@@ -101,7 +101,7 @@ class CodesRepository {
                 }
                 $result[] = [
                     'name' => $name,
-                    'description' => $description,
+                    'description' => $this->localizedTableDescription((string) $name, (string) $description),
                 ];
             }
 
@@ -122,6 +122,20 @@ class CodesRepository {
         }
 
         return $result;
+    }
+
+    /**
+     * Resolve a code table's list description for the current locale.
+     *
+     * Prefers the `codes.table_desc.<TABLE>` translation (en/zh-TW), falling back to the
+     * raw config/codes.php value when no translation key exists. `trans()` returns the key
+     * itself on a miss (and an array for a group key), so both are guarded.
+     */
+    private function localizedTableDescription(string $name, string $fallback): string {
+        $key = 'codes.table_desc.' . $name;
+        $translated = trans($key);
+
+        return (is_string($translated) && $translated !== $key) ? $translated : $fallback;
     }
 
     /**

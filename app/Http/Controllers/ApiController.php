@@ -447,8 +447,10 @@ class ApiController extends Controller {
 
     public function searchBiog(Request $request) {
         // 20251218性能優化：使用與 /api/name 相同的 FTS 索引查詢邏輯
-        // #85：拼音 ü→v 規範化（CBDB 以 v 存 ü 韻）。
-        $request->q = addslashes(\App\Support\PinyinSearchNormalizer::umlautToV($request->q));
+        // #85 + §D-8：$request->q 為主要形式（數字／FTS／orderByRaw），$qForms 為綁定用的 v／ü 展開集。
+        $rawQ = $request->q ?? '';
+        $request->q = addslashes(\App\Support\PinyinSearchNormalizer::umlautToV($rawQ));
+        $qForms = \App\Support\PinyinSearchNormalizer::expand($rawQ);
         $num = 20;
 
         // 優化1：當輸入為純數字時，直接按 c_personid 精確查詢
@@ -483,11 +485,14 @@ class ApiController extends Controller {
 
                 $data = $query->paginate($num);
             } else {
-                // 回退方案：FTS 未找到結果時，使用原有的 LIKE 查詢
-                $data = BiogMain::where('c_name_chn', 'like', '%'.$request->q.'%')
-                    ->orWhere('c_name', 'like', '%'.$request->q.'%')
-                    ->orWhere('c_personid', $request->q)
-                    ->paginate($num);
+                // 回退方案：FTS 未找到結果時，使用原有的 LIKE 查詢（§D-8：c_name 以展開集 OR 同查 v／ü 形）
+                $data = BiogMain::where(function ($sub) use ($request, $qForms) {
+                    $sub->where('c_name_chn', 'like', '%'.$request->q.'%')
+                        ->orWhere('c_personid', $request->q);
+                    foreach ($qForms as $form) {
+                        $sub->orWhere('c_name', 'like', '%'.$form.'%');
+                    }
+                })->paginate($num);
             }
         }
 

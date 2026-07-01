@@ -930,6 +930,27 @@ class PersonBrowserTest extends TestCase {
     }
 
     #[Test]
+    public function test_search_finds_umlaut_stored_name_by_v_input(): void {
+        // §D-8 查詢展開：遷移後以正字 ü 儲存的名（Lü Kun），習慣打 v 的使用者（Lv Kun）須仍搜得到。
+        // SQLite 不折疊 ü/u，命中純來自 expand() 的 OR 展開，驗證 PersonBrowser 入口的程式端展開。
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 777,
+            'c_name_chn' => '呂坤',
+            'c_name' => 'Lü Kun',
+            'c_surname' => 'Lü',
+            'c_mingzi' => 'Kun',
+            'c_dy' => 2,
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->getJson(route('app.person-browser.search') . '?' . http_build_query(['q' => 'Lv Kun']));
+
+        $response->assertOk();
+        $ids = collect($response->json('data'))->pluck('c_personid')->map(fn ($id) => (int) $id)->all();
+        $this->assertContains(777, $ids, 'v 形輸入「Lv Kun」應命中以 ü 儲存的呂坤(777)');
+    }
+
+    #[Test]
     public function test_search_by_alt_name_via_fts(): void {
         $response = $this->actingAs($this->user)
             ->getJson(route('app.person-browser.search') . '?q=太白');

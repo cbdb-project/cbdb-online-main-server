@@ -329,6 +329,32 @@ class BiogMainNameSearchTest extends TestCase {
     }
 
     #[Test]
+    public function test_umlaut_stored_name_found_by_v_input_after_migration(): void {
+        // §D-8 查詢展開（遷移後情境）：人名以正字 ü 儲存（Lü Kun）。習慣打 v 的使用者須仍命中。
+        // 註：SQLite 不折疊 ü/u，故此處命中完全來自 expand() 的 OR 展開，非 collation——
+        //     正好驗證程式端展開邏輯本身（生產環境另有 collation 摺疊，非本測試對象）。
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 5002,
+            'c_name_chn' => '呂坤',
+            'c_name' => 'Lü Kun',   // 遷移後以正字 ü 儲存
+            'c_surname' => '呂',
+            'c_mingzi' => '坤',
+            'c_index_year' => 1536,
+            'c_dy' => 15,
+            'c_index_addr_id' => 100,
+        ]);
+        // 刻意不建 FTS 列 → 落到 LIKE 退路（與正式環境一致：FTS 僅索引中文）。
+
+        $idsFor = fn (string $q): array => collect(
+            BiogMainRepository::namesByQuery(new Request(['q' => $q]), 20)->items()
+        )->pluck('c_personid')->map(fn ($id) => (int) $id)->all();
+
+        $this->assertContains(5002, $idsFor('Lv Kun'), 'v 形輸入應命中以 ü 儲存的呂坤(5002)');
+        $this->assertContains(5002, $idsFor('Lü Kun'), 'ü 形輸入應命中呂坤(5002)');
+        $this->assertContains(5002, $idsFor('lv kun'), '小寫 v 形亦應命中（LIKE ASCII 大小寫不敏感）');
+    }
+
+    #[Test]
     public function test_pinyin_normalizer_helper(): void {
         // ü／Ü 折成 v／V；中文／無 ü 字串為 no-op；null 安全。
         $this->assertSame('Lv Zhen', \App\Support\PinyinSearchNormalizer::umlautToV('Lü Zhen'));

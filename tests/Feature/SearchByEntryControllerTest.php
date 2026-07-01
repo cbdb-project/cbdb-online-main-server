@@ -375,6 +375,24 @@ class SearchByEntryControllerTest extends TestCase {
     }
 
     #[Test]
+    public function test_person_keyword_expands_v_to_umlaut(): void {
+        // §D-8 查詢展開：以正字 ü 儲存的別名（Lü Kun），習慣打 v 的使用者（Lv Kun）
+        // 須經 ALTNAME EXISTS 子查詢的展開集命中（SQLite 不折疊，純驗程式端展開）。
+        DB::table('ALTNAME_DATA')->insert([
+            ['c_personid' => 2, 'c_alt_name' => 'Lü Kun', 'c_alt_name_chn' => '呂坤'],
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->getJson(route('app.search-by.entry.query', [
+                'person_keyword' => 'Lv Kun',
+            ]));
+
+        $response->assertOk()
+            ->assertJsonPath('data.summary.person_count', 1)
+            ->assertJsonPath('data.records.data.0.c_personid', 2);
+    }
+
+    #[Test]
     public function test_query_can_include_subordinate_places(): void {
         $response = $this->actingAs($this->user)
             ->getJson(route('app.search-by.entry.query', [

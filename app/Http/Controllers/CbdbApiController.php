@@ -268,8 +268,10 @@ class CbdbApiController extends Controller {
     }
 
     protected function searchPersonCandidates(string $name, int $limit = 20): array {
-        // #85：拼音 ü→v 規範化（CBDB 以 v 存 ü 韻）。
-        $term = \App\Support\PinyinSearchNormalizer::umlautToV(trim($name));
+        // #85 + §D-8：$term 為主要形式（數字／FTS），$termForms 為綁定用的 v／ü 展開集。
+        $rawTerm = trim($name);
+        $term = \App\Support\PinyinSearchNormalizer::umlautToV($rawTerm);
+        $termForms = \App\Support\PinyinSearchNormalizer::expand($rawTerm);
 
         if ($term === '') {
             return [];
@@ -321,10 +323,11 @@ class CbdbApiController extends Controller {
             $this->appendPersonIdsFromQuery(
                 DB::table('BIOG_MAIN')
                     ->select('c_personid')
-                    ->where(function ($query) use ($term) {
-                        $query->where('c_name_chn', $term)
-                            ->orWhere('c_name', $term)
-                            ->orWhere('c_name_rm', $term);
+                    ->where(function ($query) use ($term, $termForms) {
+                        $query->where('c_name_chn', $term);
+                        foreach ($termForms as $form) {
+                            $query->orWhere('c_name', $form)->orWhere('c_name_rm', $form);
+                        }
                     })
                     ->orderBy('c_personid'),
                 $collector,
@@ -334,9 +337,11 @@ class CbdbApiController extends Controller {
             $this->appendPersonIdsFromQuery(
                 DB::table('ALTNAME_DATA')
                     ->select('c_personid')
-                    ->where(function ($query) use ($term) {
-                        $query->where('c_alt_name_chn', $term)
-                            ->orWhere('c_alt_name', $term);
+                    ->where(function ($query) use ($term, $termForms) {
+                        $query->where('c_alt_name_chn', $term);
+                        foreach ($termForms as $form) {
+                            $query->orWhere('c_alt_name', $form);
+                        }
                     })
                     ->orderBy('c_personid'),
                 $collector,
@@ -348,10 +353,12 @@ class CbdbApiController extends Controller {
             $this->appendPersonIdsFromQuery(
                 DB::table('BIOG_MAIN')
                     ->select('c_personid')
-                    ->where(function ($query) use ($likeTerm) {
-                        $query->where('c_name_chn', 'like', $likeTerm)
-                            ->orWhere('c_name', 'like', $likeTerm)
-                            ->orWhere('c_name_rm', 'like', $likeTerm);
+                    ->where(function ($query) use ($likeTerm, $termForms) {
+                        $query->where('c_name_chn', 'like', $likeTerm);
+                        foreach ($termForms as $form) {
+                            $like = '%' . $form . '%';
+                            $query->orWhere('c_name', 'like', $like)->orWhere('c_name_rm', 'like', $like);
+                        }
                     })
                     ->orderBy('c_personid'),
                 $collector,
@@ -361,9 +368,11 @@ class CbdbApiController extends Controller {
             $this->appendPersonIdsFromQuery(
                 DB::table('ALTNAME_DATA')
                     ->select('c_personid')
-                    ->where(function ($query) use ($likeTerm) {
-                        $query->where('c_alt_name_chn', 'like', $likeTerm)
-                            ->orWhere('c_alt_name', 'like', $likeTerm);
+                    ->where(function ($query) use ($likeTerm, $termForms) {
+                        $query->where('c_alt_name_chn', 'like', $likeTerm);
+                        foreach ($termForms as $form) {
+                            $query->orWhere('c_alt_name', 'like', '%' . $form . '%');
+                        }
                     })
                     ->orderBy('c_personid'),
                 $collector,

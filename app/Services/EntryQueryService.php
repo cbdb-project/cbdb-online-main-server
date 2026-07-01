@@ -249,21 +249,28 @@ class EntryQueryService {
         }
 
         if ($filters['person_keyword'] !== null) {
-            // #85：拼音 ü→v 規範化（CBDB 以 v 存 ü 韻）。
-            $keyword = '%' . \App\Support\PinyinSearchNormalizer::umlautToV($filters['person_keyword']) . '%';
+            // #85 + §D-8：拼音欄位以 v／ü 展開集 OR 同查（中文欄位 no-op、單一形時行為不變）。
+            $keywordForms = array_map(
+                static fn ($f) => '%' . $f . '%',
+                \App\Support\PinyinSearchNormalizer::expand($filters['person_keyword'])
+            );
 
-            $query->where(function (Builder $builder) use ($keyword) {
-                $builder->where('bm.c_name_chn', 'like', $keyword)
-                    ->orWhere('bm.c_name', 'like', $keyword);
+            $query->where(function (Builder $builder) use ($keywordForms) {
+                foreach ($keywordForms as $kw) {
+                    $builder->orWhere('bm.c_name_chn', 'like', $kw)
+                        ->orWhere('bm.c_name', 'like', $kw);
+                }
 
                 if (Schema::hasTable('ALTNAME_DATA')) {
-                    $builder->orWhereExists(function (Builder $subquery) use ($keyword) {
+                    $builder->orWhereExists(function (Builder $subquery) use ($keywordForms) {
                         $subquery->select(DB::raw(1))
                             ->from('ALTNAME_DATA as alt')
                             ->whereColumn('alt.c_personid', 'bm.c_personid')
-                            ->where(function (Builder $altQuery) use ($keyword) {
-                                $altQuery->where('alt.c_alt_name_chn', 'like', $keyword)
-                                    ->orWhere('alt.c_alt_name', 'like', $keyword);
+                            ->where(function (Builder $altQuery) use ($keywordForms) {
+                                foreach ($keywordForms as $kw) {
+                                    $altQuery->orWhere('alt.c_alt_name_chn', 'like', $kw)
+                                        ->orWhere('alt.c_alt_name', 'like', $kw);
+                                }
                             });
                     });
                 }

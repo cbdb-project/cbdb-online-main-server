@@ -26,7 +26,10 @@ class PersonBrowserService {
      * @return array{data: array, pagination: array}
      */
     public function search(Request $request): array {
-        $q = \App\Support\PinyinSearchNormalizer::umlautToV(trim($request->input('q', '')));
+        // #85 + §D-8：$q 為主要形式（FTS／numeric），$qForms 為綁定用的 v／ü 展開集。
+        $rawQ = trim($request->input('q', ''));
+        $q = \App\Support\PinyinSearchNormalizer::umlautToV($rawQ);
+        $qForms = \App\Support\PinyinSearchNormalizer::expand($rawQ);
         $dynasty = $request->input('c_dy', '');
         $perPage = (int) $request->input('per_page', 20);
         $page = (int) $request->input('page', 1);
@@ -72,14 +75,16 @@ class PersonBrowserService {
                     $idQuery->whereIn('BIOG_MAIN.c_personid', $ftsIds)
                         ->orderBy('BIOG_MAIN.c_personid', $sortDirection);
                 } else {
-                    // 回退：多欄位 LIKE 搜尋
-                    $idQuery->where(function ($sub) use ($q) {
-                        $sub->where('BIOG_MAIN.c_name_chn', 'like', '%' . $q . '%')
-                            ->orWhere('BIOG_MAIN.c_name', 'like', '%' . $q . '%')
-                            ->orWhere('BIOG_MAIN.c_surname', 'like', $q)
-                            ->orWhere('BIOG_MAIN.c_mingzi', 'like', $q)
-                            ->orWhere('BIOG_MAIN.c_name_proper', 'like', '%' . $q . '%')
-                            ->orWhere('BIOG_MAIN.c_name_rm', 'like', '%' . $q . '%');
+                    // 回退：多欄位 LIKE 搜尋（§D-8：拼音欄位以展開集 OR 同查 v／ü 形）
+                    $idQuery->where(function ($sub) use ($qForms) {
+                        foreach ($qForms as $form) {
+                            $sub->orWhere('BIOG_MAIN.c_name_chn', 'like', '%' . $form . '%')
+                                ->orWhere('BIOG_MAIN.c_name', 'like', '%' . $form . '%')
+                                ->orWhere('BIOG_MAIN.c_surname', 'like', $form)
+                                ->orWhere('BIOG_MAIN.c_mingzi', 'like', $form)
+                                ->orWhere('BIOG_MAIN.c_name_proper', 'like', '%' . $form . '%')
+                                ->orWhere('BIOG_MAIN.c_name_rm', 'like', '%' . $form . '%');
+                        }
                     })
                         ->orderBy('BIOG_MAIN.c_personid', $sortDirection);
                 }
@@ -189,13 +194,19 @@ class PersonBrowserService {
                 if (!empty($ftsIds)) {
                     $query->whereIn('BIOG_MAIN.c_personid', $ftsIds);
                 } else {
-                    $query->where(function ($sub) use ($q) {
-                        $sub->where('BIOG_MAIN.c_name_chn', 'like', '%' . $q . '%')
-                            ->orWhere('BIOG_MAIN.c_name', 'like', '%' . $q . '%')
-                            ->orWhere('BIOG_MAIN.c_surname', 'like', $q)
-                            ->orWhere('BIOG_MAIN.c_mingzi', 'like', $q)
-                            ->orWhere('BIOG_MAIN.c_name_proper', 'like', '%' . $q . '%')
-                            ->orWhere('BIOG_MAIN.c_name_rm', 'like', '%' . $q . '%');
+                    // §D-8：與 search() 的主查詢同口徑——朝代分面同樣以 v／ü 展開集 OR 同查，
+                    // 否則 v 形輸入命中的 ü 資料會出現在人物列表、卻在朝代側欄漏計。
+                    // expand($q) 對已折疊的 $q 仍還原出 {v 形, ü 形} 集合，故無需改動呼叫端。
+                    $qForms = \App\Support\PinyinSearchNormalizer::expand($q);
+                    $query->where(function ($sub) use ($qForms) {
+                        foreach ($qForms as $form) {
+                            $sub->orWhere('BIOG_MAIN.c_name_chn', 'like', '%' . $form . '%')
+                                ->orWhere('BIOG_MAIN.c_name', 'like', '%' . $form . '%')
+                                ->orWhere('BIOG_MAIN.c_surname', 'like', $form)
+                                ->orWhere('BIOG_MAIN.c_mingzi', 'like', $form)
+                                ->orWhere('BIOG_MAIN.c_name_proper', 'like', '%' . $form . '%')
+                                ->orWhere('BIOG_MAIN.c_name_rm', 'like', '%' . $form . '%');
+                        }
                     });
                 }
             }

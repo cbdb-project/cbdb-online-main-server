@@ -21,15 +21,18 @@
 - Two tabs (public, directly CSV-exportable):
   - **ALTNAME_DATA**: `gid=1425535916`, CSV: `https://docs.google.com/spreadsheets/d/19SOyBtA8cKE9aq_hIkxRiT-e2i6f5bFDIY_TcNAn57I/export?format=csv&gid=1425535916`; 957 data rows; columns `table,field,id,wrong_pinyin,correct_pinyin,note_en,note_zh`.
   - **BIOG_MAIN**: `gid=248977087`, CSV: same URL with `gid=248977087`; 11,407 data rows (`c_name` 5,783 / `c_surname` 3,509 / `c_mingzi` 2,115); columns `table,field,id,wrong_pinyin,correct_pinyin`.
-- `id` = `c_personid`. **Western names are already human-excluded.** **The Sheet is authoritative — apply it row by row**; the scan command `cbdb:scan-pinyin-v` only cross-checks and reports diffs, and **must not override the Sheet**.
+- `id` = `c_personid`. **Western names are already human-excluded.** **The Sheet is the authoritative reconciliation baseline**; the scan command `cbdb:scan-pinyin-v` only cross-checks and reports diffs, and **must not override the Sheet**.
+- **Inventory approach (adopting Frank #1087@L83)**: the primary inventory can be run directly as a **one-off SQL query against last week's SQLite data dump**, with no need for a standing command; once stop-the-bleed (§D-7) is in place no new `v` records are generated, so only the "last week's newly-added data" needs another pass, and any stray leftovers afterward can be fixed individually. **M2's `cbdb:scan-pinyin-v` is merged and kept as a read-only standby during Phase A, but is NOT a must-run standing step; it will be removed when the whole Phase A wraps up (see §D-10 final step).**
 
-### D-3 BIOG_MAIN application
-- **Send only `c_surname` and/or `c_mingzi`** via `/api/v2/mutate`; `c_name` is recomputed by the system. **Ignore the Sheet's `c_name` rows** (the API blocks direct `c_name` writes).
+### D-3 BIOG_MAIN application (adopting Frank #1087@L104: regenerate + Sheet as oracle + pre-write drift check)
+- **Mechanism = re-synthesize, not apply Sheet values directly**: the pinyin generation library is already fixed by stop-the-bleed (§D-7), so for each affected `c_personid` **call `BiogMainRepository::auto_pinyin()` directly**, re-synthesizing `c_surname`/`c_mingzi`/`c_name` from the person's Chinese name (`c_name_chn`) — which naturally yields the canonical `ü`.
+- **Pre-write drift check (②a, mandatory)**: before applying, read the person's current value; if a field's current value **no longer equals** the Sheet's `wrong_pinyin` (meaning it was already changed / migrated), **skip and log** — avoids overwriting someone else's change and is naturally idempotent (safe to re-run).
+- **Oracle gate (②b, mandatory)**: the re-synthesized result **MUST equal** the Sheet's `correct_pinyin` to be written; **anything that does not reconcile is NOT written** — collect it into an exception list for Hongsu to decide.
+- **Send only `c_surname` and/or `c_mingzi`** via `/api/v2/mutate`; `c_name` is recomputed by the handler (§5.2). **Ignore the Sheet's direct `c_name` rows** (the API blocks direct `c_name` writes).
 
-### D-4 The 204 "orphan `c_name`" BIOG_MAIN rows — use "decompose into components" (approach A)
-- Definition: in the BIOG_MAIN tab, a `c_personid` that has a `c_name` change but **no** corresponding `c_surname`/`c_mingzi` row — **204** in total (detection: ids present in the `c_name` set but absent from the `c_surname ∪ c_mingzi` set).
-- Handling: for each, **read that person's actual `c_surname`/`c_mingzi`/`c_name`**, use the deterministic syllable rule (`lv/lve/nv/nve`) to decide which component holds the `v`, and **update only that component**.
-- **Verification gate (mandatory)**: after applying, the recomputed `c_name` MUST equal the Sheet's `correct_pinyin`. **Anything that does not reconcile is NOT written** — collect it into a small exception list for a human (Hongsu) to decide.
+### D-4 The 204 "orphan `c_name`" BIOG_MAIN rows — naturally covered by the §D-3 regenerate mechanism (the original "decompose into components" approach A is dropped)
+- Original problem: a `c_personid` with only a `c_name` change and **no** corresponding `c_surname`/`c_mingzi` row — **204** in total (ids present in the `c_name` set but absent from the `c_surname ∪ c_mingzi` set) — needed a decision on which component holds the `v`.
+- **With the §D-3 regenerate mechanism this problem disappears**: `auto_pinyin()` produces all components at once (surname/mingzi/name), so there is no `v`-placement decision. The §D-3 oracle gate (regenerated `c_name` == Sheet `correct_pinyin`) remains mandatory; non-reconciling rows go to the exception list.
 
 ### D-5 ALTNAME application (composite-PK resolution)
 - The Sheet's `id` = `c_personid`, but `ALTNAME_DATA` has a **3-column composite PK**. Locate the row by **`c_personid = id` AND `c_alt_name = wrong_pinyin`**, resolve the full PK (per `CompositePrimaryKey::SCHEMAS` / a read), then `/api/v2/mutate` to set `c_alt_name` = `correct_pinyin`.
@@ -37,7 +40,7 @@
 
 ### D-6 Execution method & cadence
 - Use the operator's Sanctum **Bearer token** (an active, non-crowdsourcing user with `canWriteDirectly()`; **the token is NOT written into any file / commit / PR / log**). Use `/api/v2/*`, `mode:"direct"`, audit automatic.
-- Flow: **(1) dry-run first**, producing the full planned change set as an artifact and self-asserting "nothing outside the Sheet, no `[OTHER-v]` slips in"; **(2) run all batches through** (BIOG_MAIN one surname per batch, ALTNAME in chunks); **(3) after completion, output a sample** for human spot-check.
+- Flow (per row): **(0) read current value → drift check** (skip and log if current ≠ Sheet `wrong_pinyin`); **(1)** BIOG_MAIN regenerates via `auto_pinyin()` (§D-3) / ALTNAME resolves the full PK by `wrong_pinyin` (§D-5); **(2) oracle gate** (proceed only if result == Sheet `correct_pinyin`, else exception list); **(3) dry-run** producing "the full planned change set + exception/skip lists" and self-asserting "nothing outside the Sheet, no `[OTHER-v]` slips in"; **(4) run all batches through** (BIOG_MAIN one surname per batch, ALTNAME in chunks); **(5) output a sample** for human spot-check.
 - Target = **production directly** (no staging). **Rollback**: every change is an audited mutation, so any erroneous record can be reversed via the same audited API / operations restore.
 
 ### D-7 Stop-the-bleed status
@@ -55,8 +58,9 @@
 - **D-9b `/codes` UI audit gap: fix it** (add `AuditLogService::write()` to the `CodesController` direct-write paths, consistent with the new API) — see the code-table API plan.
 - **D-9c `ADDRESSES` derived table:** after correcting `ADDR_CODES`, **rebuild** via `cbdb:regenerate-addresses-table` (production, MySQL-only).
 
-### D-10 Final step
-- Removing `'pinyin'` from `config/codes.php`'s `ui_hidden` (to re-expose the surname-pinyin table) is **part of the agreed plan** (done after the data is clean), **not a separate human decision**.
+### D-10 Final step (Phase A wrap-up, after the data is clean)
+- Removing `'pinyin'` from `config/codes.php`'s `ui_hidden` (to re-expose the surname-pinyin table) is **part of the agreed plan**, **not a separate human decision**.
+- **Remove the M2 scan command `cbdb:scan-pinyin-v`** (adopting Frank #1087@L83: the inventory is a one-off job and needs no standing command): delete `app/Console/Commands/ScanPinyinV.php`, `tests/Feature/ScanPinyinVTest.php`, and the registration line in `app/Console/Kernel.php`, as the **very last small step** of the whole Phase A. (`app/Support/PinyinUmlaut.php` is shared by stop-the-bleed and query expansion — **keep it**.)
 
 ## 0. Background and Agreed Decisions
 
@@ -159,6 +163,7 @@ Therefore **only these four substrings need conversion** (handle each case separ
 ### 5.2 Person-name pinyin correction
 - `BIOG_MAIN.c_surname` / `c_mingzi`: `/api/v2/mutate` **allows direct updates**, and the update path does **not** re-run `auto_pinyin` (it will not regenerate-from-Chinese and overwrite your supplied value). The script can supply the corrected pinyin directly.
 - **`c_name` is recomputed automatically (no open item)**: the handler's `buildMergedPayload()` first merges `changes` onto the full original record, then `updateById()` recomputes `c_name` from the merged `c_surname`+`c_mingzi` (along with `c_name_chn`/`c_name_proper`/`c_name_rm`). So the script **only needs to send the corrected `c_surname`/`c_mingzi`** and `c_name` follows correctly — no data-loss risk, no separate handling.
+- **Obtaining the corrected value = regenerate (§D-3, Frank #1087@L104)**: rather than copying Sheet values verbatim, call `auto_pinyin()` to re-synthesize `c_surname`/`c_mingzi` from the Chinese name (naturally producing `ü` after stop-the-bleed), guarded by a "pre-write drift check + Sheet `correct_pinyin` oracle gate". Since the update path does not re-run `auto_pinyin`, sending our regenerated value lands stably.
 - Suggested batch cadence: a few hundred records at a time, or **one surname per batch**; dry-run / sample-review before submitting for real.
 
 ### 5.3 Alias (**DROPPED — not executed; see §D-1**; kept below for record only)
@@ -168,7 +173,7 @@ Therefore **only these four substrings need conversion** (handle each case separ
 - If done, it is best added **after the data cleanup is complete**; whether it is mandatory is undecided.
 
 ### 5.4 Scan tool
-- A read-only artisan command `php artisan cbdb:scan-pinyin-v` is still recommended: scan the §4 candidate columns, classify by syllable rule (likely pinyin / likely Western name), and output a CSV for human review and alignment with Frank's Google Sheet. This command is **read-only** and safe to run against production.
+- The read-only artisan command `php artisan cbdb:scan-pinyin-v` (M2, merged): scan the §4 candidate columns, classify by syllable rule (likely pinyin / likely Western name), and output a CSV for human review and alignment with Frank's Google Sheet. It is **read-only** and safe to run against production. **However, per Frank #1087@L83 the inventory is a one-off job driven primarily by a one-off SQL query on the dump; this command is only a standby during Phase A and is removed at wrap-up (§D-2 / §D-10).**
 
 ## 6. Phased Execution Plan (adopting Frank's suggestion)
 
@@ -195,13 +200,14 @@ Therefore **only these four substrings need conversion** (handle each case separ
 
 - [ ] Phase 1 (stop the bleed): merge PR #1086 + update surnames in the DB `pinyin` table to `ü`
 - [ ] Phase 1 (stop the bleed): build a shared `v→ü` helper and hook it into the generation entry points (`auto_pinyin` + the three batch `buildPinyin` + `ApiController`) to prevent new `v`
-- [ ] Inventory: `cbdb:scan-pinyin-v` read-only scan + report; align with Frank's Google Sheet and the Western-name exclusion list
-- [ ] Phase 2 (person names): external script via `/api/v2/mutate` to batch-correct `c_surname`/`c_mingzi` (`c_name` is recomputed automatically by the system), in batches, dry-run reviewed first
-- [ ] **(Phase A, §D-8)** Search compatibility: implement query expansion on the pinyin LIKE query side (a typed `v` form searches both `v` and `ü`) (§3)
+- [x] Inventory: `cbdb:scan-pinyin-v` read-only scan + report (M2 merged); **primary inventory is a one-off SQL query on the dump, the command is a standby and is removed at Phase A wrap-up (§D-2 / §D-10, Frank #1087@L83)**
+- [ ] Phase 2 (person names): external script via `/api/v2/mutate` to batch-correct `c_surname`/`c_mingzi` — **using "regenerate + Sheet oracle + pre-write drift check" (§D-3, Frank #1087@L104)**, `c_name` recomputed by the system, in batches, dry-run reviewed first
+- [x] **(Phase A, §D-8)** Search compatibility: query expansion on the pinyin LIKE query side (a typed `v` searches both `v` and `ü`) (§3) — M3 PR #1099
 - [ ] ~~confirm/create `ALTNAME_CODES` code 22, then add aliases~~ **(not doing it — see §D-1)**
 - [ ] Communicate with downstream systems and the Access edition, recommending they match both `v` and `ü` forms at query time
 - [ ] Phase B prerequisite: build the code-table audited write API per the [Code-Table Audited Mutation API Construction Plan](./CODE_TABLE_MUTATION_API_PLAN.en.md)
 - [ ] Phase B: once the API is ready, scan and correct other pinyin fields in batches (including the `TEXT_INSTANCE_DATA` composite PK and the `ADDRESSES` rebuild; `SOCIAL_INSTITUTION_ALTNAME_DATA` is **SKIPPED, see §D-9a**)
 - [ ] Regression tests (generation / normalization / person-name correction / audit / Western-name exclusion; mind the SQLite collation difference)
 - [ ] Doc sync: `CHANGELOG.md`, and `DATABASE.md` / `README.md` as needed
-- [ ] **Final step**: remove `'pinyin'` from `ui_hidden` in `config/codes.php` to re-expose the surname-pinyin table in the codes UI
+- [ ] **Final step (§D-10)**: remove `'pinyin'` from `ui_hidden` in `config/codes.php` to re-expose the surname-pinyin table in the codes UI
+- [ ] **Very last Phase A step (§D-10)**: remove the M2 scan command `cbdb:scan-pinyin-v` (`ScanPinyinV.php` + test + Kernel registration; keep `PinyinUmlaut.php`)

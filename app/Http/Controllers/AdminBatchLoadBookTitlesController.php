@@ -8,6 +8,7 @@ use App\Models\TextCode;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
 use App\Services\VariantCharNormalizer;
+use App\Support\PinyinUmlaut;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -551,7 +552,8 @@ class AdminBatchLoadBookTitlesController extends Controller {
             return strtolower(trim(preg_replace('/\s+/u', ' ', $normalizedTitle)));
         }
 
-        return implode(' ', $syllables);
+        // 止血：把生成拼音中殘留的 v 代寫正規化為 ü。
+        return PinyinUmlaut::normalize(implode(' ', $syllables));
     }
 
     /**

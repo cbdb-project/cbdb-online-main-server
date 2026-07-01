@@ -23,16 +23,17 @@ use App\Models\Pinyin;
 use App\Models\SocialInst;
 use App\Models\SocialInstAddr;
 use App\Models\SocialInstCode;
-//20181112建安修改
 use App\Models\TextCode;
+//20181112建安修改
 use App\Repositories\Concerns\DetectsModelChanges;
+use App\Services\AuditLogService;
 //修改結束
 
 //20210625建安修改
-use App\Services\AuditLogService;
 use App\Services\BracketNormalizer;
 use App\Services\VariantCharNormalizer;
 use App\Support\CompositePrimaryKey;
+use App\Support\PinyinUmlaut;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -4001,7 +4002,8 @@ class BiogMainRepository {
             $row = $surnameRows->get($prefix);
             if (!empty($row?->lastname_pinyin)) {
                 $c_surname_chn = $prefix;
-                $c_surname = (string) $row->lastname_pinyin;
+                // 止血：姓氏拼音取自 pinyin 表；若表中仍殘留 v 代寫，正規化為 ü。
+                $c_surname = PinyinUmlaut::normalize((string) $row->lastname_pinyin);
 
                 break;
             }
@@ -4013,7 +4015,7 @@ class BiogMainRepository {
             $c_mingzi_chn = mb_substr($name, $surnameLength, null, 'utf-8');
             // 標準化異體字（僅用於拼音轉換，不修改原始名字）
             $normalizedMingzi = VariantCharNormalizer::normalize($c_mingzi_chn);
-            $c_mingzi = ucfirst(Pinyin::getPinyin($normalizedMingzi)) ?? '';
+            $c_mingzi = PinyinUmlaut::normalize(ucfirst(Pinyin::getPinyin($normalizedMingzi)) ?? '');
             $c_name = trim($c_surname.' '.$c_mingzi);
             $data['c_surname_chn'] = $c_surname_chn;
             $data['c_surname'] = $c_surname;
@@ -4024,7 +4026,7 @@ class BiogMainRepository {
             $c_mingzi_chn = $name;
             // 標準化異體字（僅用於拼音轉換，不修改原始名字）
             $normalizedMingzi = VariantCharNormalizer::normalize($c_mingzi_chn);
-            $c_mingzi = ucfirst(Pinyin::getPinyin($normalizedMingzi)) ?? '';
+            $c_mingzi = PinyinUmlaut::normalize(ucfirst(Pinyin::getPinyin($normalizedMingzi)) ?? '');
             $c_name = $c_mingzi;
             $data['c_surname_chn'] = '';
             $data['c_surname'] = '';

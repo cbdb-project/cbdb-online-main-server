@@ -26,6 +26,7 @@ use App\Repositories\EthnicityRepository;
 use App\Repositories\NianHaoRepository;
 use App\Repositories\YearRangeRepository;
 use App\Services\VariantCharNormalizer;
+use App\Support\PinyinUmlaut;
 use App\v1;
 use Illuminate\Http\Request;
 //20181017建安新增
@@ -607,7 +608,8 @@ class ApiController extends Controller {
         // 不拆分姓氏，僅做純拼音轉換
         $normalized = VariantCharNormalizer::normalize($word);
 
-        return ucfirst(Pinyin::getPinyin($normalized));
+        // 止血：生成後把殘留的 v 代寫正規化為 ü。
+        return PinyinUmlaut::normalize(ucfirst(Pinyin::getPinyin($normalized)));
     }
 
     private function buildRelationshipPinyin(string $word, int $split = 1): ?string {

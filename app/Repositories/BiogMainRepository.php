@@ -405,7 +405,7 @@ class BiogMainRepository {
             // 第二步：用這些 personid 去 JOIN 查詢完整資訊
             $personIds = $personIdsPaginator->pluck('c_personid')->toArray();
 
-            $detailedItems = BiogMain::select('BIOG_MAIN.c_personid', 'BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn', 'BIOG_MAIN.c_index_year', 'ADDR_CODES.c_name_chn AS ADDR_c_name_chn', 'A1.c_alt_name_chn as c_alt_name_chn_zi', 'A2.c_alt_name_chn as c_alt_name_chn_hao')
+            $detailedItems = BiogMain::select('BIOG_MAIN.c_personid', 'BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn', 'DYNASTIES.c_dynasty', 'BIOG_MAIN.c_index_year', 'ADDR_CODES.c_name_chn AS ADDR_c_name_chn', 'ADDR_CODES.c_name AS ADDR_c_name', 'A1.c_alt_name_chn as c_alt_name_chn_zi', 'A2.c_alt_name_chn as c_alt_name_chn_hao')
                 ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
                 ->leftJoin('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id')
                 ->leftJoin('ALTNAME_DATA as A1', function ($join) {
@@ -443,7 +443,7 @@ class BiogMainRepository {
 
         // 20251109優化：當輸入為純數字時，直接按 c_personid 精確查詢，避免複雜的多條件搜尋
         if (ctype_digit($request->q)) {
-            $names = BiogMain::select('BIOG_MAIN.c_personid', 'BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn', 'BIOG_MAIN.c_index_year', 'ADDR_CODES.c_name_chn AS ADDR_c_name_chn', 'A1.c_alt_name_chn as c_alt_name_chn_zi', 'A2.c_alt_name_chn as c_alt_name_chn_hao')
+            $names = BiogMain::select('BIOG_MAIN.c_personid', 'BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn', 'DYNASTIES.c_dynasty', 'BIOG_MAIN.c_index_year', 'ADDR_CODES.c_name_chn AS ADDR_c_name_chn', 'ADDR_CODES.c_name AS ADDR_c_name', 'A1.c_alt_name_chn as c_alt_name_chn_zi', 'A2.c_alt_name_chn as c_alt_name_chn_hao')
                 ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
                 ->leftJoin('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id')
                 ->leftJoin('ALTNAME_DATA as A1', function ($join) {
@@ -477,7 +477,7 @@ class BiogMainRepository {
 
         // 如果倒排索引查到結果，按找到的 personIds 查詢完整資訊
         if (!empty($personIds)) {
-            $query = BiogMain::select('BIOG_MAIN.c_personid', 'BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn', 'BIOG_MAIN.c_index_year', 'ADDR_CODES.c_name_chn AS ADDR_c_name_chn', 'A1.c_alt_name_chn as c_alt_name_chn_zi', 'A2.c_alt_name_chn as c_alt_name_chn_hao')
+            $query = BiogMain::select('BIOG_MAIN.c_personid', 'BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn', 'DYNASTIES.c_dynasty', 'BIOG_MAIN.c_index_year', 'ADDR_CODES.c_name_chn AS ADDR_c_name_chn', 'ADDR_CODES.c_name AS ADDR_c_name', 'A1.c_alt_name_chn as c_alt_name_chn_zi', 'A2.c_alt_name_chn as c_alt_name_chn_hao')
                 ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
                 ->leftJoin('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id')
                 ->leftJoin('ALTNAME_DATA as A1', function ($join) {
@@ -522,7 +522,7 @@ class BiogMainRepository {
         //20210827修改拼音檢索時以字為單位
         //$names = BiogMain::select(['c_personid', 'c_name_chn', 'c_name'])->where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_personid', $request->q)->paginate($num);
         //20211112註記，已得到查詢條件，維持SQL LeftJoin的特性，一次性提供完整資料。
-        $names = BiogMain::select('BIOG_MAIN.c_personid', 'BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn', 'BIOG_MAIN.c_index_year', 'ADDR_CODES.c_name_chn AS ADDR_c_name_chn', 'A1.c_alt_name_chn as c_alt_name_chn_zi', 'A2.c_alt_name_chn as c_alt_name_chn_hao');
+        $names = BiogMain::select('BIOG_MAIN.c_personid', 'BIOG_MAIN.c_name_chn', 'BIOG_MAIN.c_name', 'DYNASTIES.c_dynasty_chn', 'DYNASTIES.c_dynasty', 'BIOG_MAIN.c_index_year', 'ADDR_CODES.c_name_chn AS ADDR_c_name_chn', 'ADDR_CODES.c_name AS ADDR_c_name', 'A1.c_alt_name_chn as c_alt_name_chn_zi', 'A2.c_alt_name_chn as c_alt_name_chn_hao');
         $names = $names->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy'); //單筆
         $names = $names->leftJoin('ADDR_CODES', 'ADDR_CODES.c_addr_id', '=', 'BIOG_MAIN.c_index_addr_id'); //單筆
         $names = $names->leftJoin('ALTNAME_DATA as A1', function ($names) {
@@ -607,8 +607,8 @@ class BiogMainRepository {
                 ->whereIn('BIOG_MAIN.c_personid', $personIds)
                 ->whereNotNull('BIOG_MAIN.c_dy')
                 ->where('BIOG_MAIN.c_dy', '>', 0)
-                ->select('BIOG_MAIN.c_dy', 'DYNASTIES.c_dynasty_chn', DB::raw('COUNT(*) as count'))
-                ->groupBy('BIOG_MAIN.c_dy', 'DYNASTIES.c_dynasty_chn')
+                ->select('BIOG_MAIN.c_dy', 'DYNASTIES.c_dynasty_chn', 'DYNASTIES.c_dynasty', DB::raw('COUNT(*) as count'))
+                ->groupBy('BIOG_MAIN.c_dy', 'DYNASTIES.c_dynasty_chn', 'DYNASTIES.c_dynasty')
                 ->orderByDesc('count')
                 ->get();
 
@@ -643,8 +643,8 @@ class BiogMainRepository {
         $validDynasties = (clone $fallbackBaseQuery)
             ->whereNotNull('BIOG_MAIN.c_dy')
             ->where('BIOG_MAIN.c_dy', '>', 0)
-            ->select('BIOG_MAIN.c_dy', 'DYNASTIES.c_dynasty_chn', DB::raw('COUNT(*) as count'))
-            ->groupBy('BIOG_MAIN.c_dy', 'DYNASTIES.c_dynasty_chn')
+            ->select('BIOG_MAIN.c_dy', 'DYNASTIES.c_dynasty_chn', 'DYNASTIES.c_dynasty', DB::raw('COUNT(*) as count'))
+            ->groupBy('BIOG_MAIN.c_dy', 'DYNASTIES.c_dynasty_chn', 'DYNASTIES.c_dynasty')
             ->orderByDesc('count')
             ->get();
 

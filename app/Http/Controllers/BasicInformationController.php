@@ -153,8 +153,10 @@ class BasicInformationController extends Controller {
             'c_name_chn' => $item->c_name_chn,
             'c_name' => $item->c_name,
             'c_dynasty_chn' => $item->c_dynasty_chn ?? '',
+            'c_dynasty' => $item->c_dynasty ?? '',
             'c_index_year' => $item->c_index_year,
             'addr_name_chn' => $item->ADDR_c_name_chn ?? '',
+            'addr_name' => $item->ADDR_c_name ?? '',
             'zi' => $item->c_alt_name_chn_zi ?? '',
             'hao' => $item->c_alt_name_chn_hao ?? '',
         ], $names->items());
@@ -178,6 +180,7 @@ class BasicInformationController extends Controller {
             'dynasty_facets' => array_map(fn ($f) => [
                 'c_dy' => $f->c_dy,
                 'c_dynasty_chn' => $f->c_dynasty_chn,
+                'c_dynasty' => $f->c_dynasty ?? null,
                 'count' => $f->count,
             ], is_array($dynastyFacets) ? $dynastyFacets : $dynastyFacets->all()),
             'can_add' => Auth::check() && Auth::user()->isActive(),

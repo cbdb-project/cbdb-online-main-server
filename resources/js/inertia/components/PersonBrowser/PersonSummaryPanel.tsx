@@ -1,5 +1,6 @@
 import React from 'react';
 import AddressDisplayWithMap from './shared/AddressDisplayWithMap';
+import { formatBilingualLabel } from './shared/formatters';
 import { APP_THEME } from '../../theme';
 
 export interface PersonSummary {
@@ -76,7 +77,7 @@ export default function PersonSummaryPanel({ summary, loading, error }: Props) {
             <div style={tagRowStyle}>
                 <Tag label="ID" value={`#${summary.c_personid}`} />
                 <Tag label="性別" value={summary.gender} />
-                <Tag label="朝代" value={summary.dynasty_chn} />
+                <Tag label="朝代" value={formatBilingualLabel(summary.dynasty_chn, summary.dynasty)} />
                 <Tag
                     label="籍貫"
                     value={summary.index_addr_chn || summary.index_addr ? (

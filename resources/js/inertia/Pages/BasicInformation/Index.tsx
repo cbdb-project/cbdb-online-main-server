@@ -6,6 +6,7 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Pagination, type PaginationMeta } from '../../components/ui/Pagination';
 import { useTranslation } from '../../hooks/useTranslation';
+import { formatBilingualLabel } from '../../components/PersonBrowser/shared/formatters';
 import type { SharedProps } from '../../types/page';
 
 interface PersonRow {
@@ -13,8 +14,10 @@ interface PersonRow {
     c_name_chn: string | null;
     c_name: string | null;
     c_dynasty_chn: string;
+    c_dynasty?: string | null;
     c_index_year: number | string | null;
     addr_name_chn: string;
+    addr_name?: string | null;
     zi: string;
     hao: string;
 }
@@ -22,6 +25,7 @@ interface PersonRow {
 interface DynastyFacet {
     c_dy: number | string;
     c_dynasty_chn: string;
+    c_dynasty?: string | null;
     count: number;
 }
 
@@ -35,13 +39,15 @@ interface PersonIndexPageProps extends SharedProps {
     create_url: string;
 }
 
-const COLUMNS: { key: keyof PersonRow; label: string }[] = [
+// 部分欄位以「中文 / 英文（拼音）」雙語呈現（對齊全站 formatBilingualLabel 慣例）；
+// 其餘欄位沿用 row[key] 直接顯示。
+const COLUMNS: { key: keyof PersonRow; label: string; render?: (row: PersonRow) => React.ReactNode }[] = [
     { key: 'c_personid', label: 'c_personid' },
     { key: 'c_name_chn', label: 'c_name_chn' },
     { key: 'c_name', label: 'c_name' },
-    { key: 'c_dynasty_chn', label: 'dynasty' },
+    { key: 'c_dynasty_chn', label: 'dynasty', render: (row) => formatBilingualLabel(row.c_dynasty_chn, row.c_dynasty ?? null) ?? '' },
     { key: 'c_index_year', label: 'index year' },
-    { key: 'addr_name_chn', label: 'index address' },
+    { key: 'addr_name_chn', label: 'index address', render: (row) => formatBilingualLabel(row.addr_name_chn, row.addr_name ?? null) ?? '' },
     { key: 'zi', label: 'zi' },
     { key: 'hao', label: 'hao' },
 ];
@@ -80,7 +86,7 @@ export default function PersonIndex() {
                             </option>
                             {dynasty_facets.map((f) => (
                                 <option key={String(f.c_dy)} value={String(f.c_dy)}>
-                                    {f.c_dynasty_chn} ({f.count})
+                                    {formatBilingualLabel(f.c_dynasty_chn, f.c_dynasty ?? null) ?? f.c_dynasty_chn} ({f.count})
                                 </option>
                             ))}
                         </Select>
@@ -121,7 +127,7 @@ export default function PersonIndex() {
                                     {COLUMNS.map((c) => (
                                         <td key={c.label} className="px-3 py-1.5">
                                             <a href={editUrl(row.c_personid)} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-                                                {row[c.key] ?? ''}
+                                                {c.render ? c.render(row) : (row[c.key] ?? '')}
                                             </a>
                                         </td>
                                     ))}

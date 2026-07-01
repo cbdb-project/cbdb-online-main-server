@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from '@inertiajs/react';
 import DashboardLayout from '../../Layouts/DashboardLayout';
+import { Input } from '../../components/ui/Input';
 import { useTranslation } from '../../hooks/useTranslation';
 
 interface ViewDefinition {
@@ -50,37 +51,21 @@ export default function List({ views }: Props) {
                     <h2 style={{ margin: 0, fontSize: '1.55rem', fontWeight: 700 }}>{t('views_overview_title')}</h2>
                 </div>
 
-                <div style={sectionStyle}>
-                    <div style={sectionBodyStyle}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-                            <div style={{ color: 'var(--muted-foreground)', fontSize: '0.85rem' }}>
-                                {t('views_count_summary', { total: String(views.length), shown: String(filteredViews.length) })}
-                            </div>
-                            <div style={filterBarStyle}>
-                                <input
-                                    type="text"
-                                    value={query}
-                                    onChange={(event) => setQuery(event.target.value)}
-                                    placeholder={t('search_placeholder')}
-                                    style={searchInputStyle}
-                                />
-                                {query !== '' && (
-                                    <button type="button" onClick={() => setQuery('')} style={clearButtonStyle}>
-                                        {t('clear')}
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div style={sectionStyle}>
-                    <div style={sectionHeaderStyle}>{t('view_list')}</div>
-                    <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                {/* 結構／搜尋框與 app/codes 列表完全對齊：外層卡片（rounded-lg border p-4）+ 內層圓角邊框表格盒
+                    （overflow-x-auto rounded-md border）；搜尋框改用共用 Input 組件（同樣式）。 */}
+                <div className="mt-4 rounded-lg border border-border bg-card p-4">
+                    <Input
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder={t('search_placeholder')}
+                        className="mb-3 max-w-md"
+                        autoComplete="off"
+                    />
+                    <div className="overflow-x-auto rounded-md border border-border">
                         <table style={{
                             width: '100%',
                             borderCollapse: 'collapse',
-                            fontSize: '0.9rem',
+                            fontSize: '1rem',
                             minWidth: 860,
                         }}>
                             <thead>
@@ -92,13 +77,6 @@ export default function List({ views }: Props) {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredViews.length === 0 && (
-                                    <tr>
-                                        <td colSpan={4} style={{ ...tdStyle, textAlign: 'center', color: 'var(--muted-foreground)', padding: '28px 12px' }}>
-                                            {t('no_views_found')}
-                                        </td>
-                                    </tr>
-                                )}
                                 {filteredViews.map((view, index) => (
                                     <tr
                                         key={view.key}
@@ -131,6 +109,9 @@ export default function List({ views }: Props) {
                             </tbody>
                         </table>
                     </div>
+                    {filteredViews.length === 0 && (
+                        <p className="py-2 text-sm text-muted-foreground">{t('no_views_found')}</p>
+                    )}
                 </div>
             </div>
         </DashboardLayout>
@@ -141,7 +122,8 @@ const thStyle: React.CSSProperties = {
     padding: '10px 12px',
     textAlign: 'left',
     fontWeight: 600,
-    fontSize: '0.85rem',
+    // 表頭字號與 app/codes 列表對齊：0.92rem。
+    fontSize: '0.92rem',
     color: 'var(--muted-foreground)',
     borderBottom: '2px solid var(--border)',
     whiteSpace: 'nowrap',
@@ -151,51 +133,4 @@ const tdStyle: React.CSSProperties = {
     padding: '8px 12px',
     borderBottom: '1px solid var(--border)',
     verticalAlign: 'top',
-};
-
-const sectionStyle: React.CSSProperties = {
-    backgroundColor: 'var(--card)',
-    border: '1px solid var(--border)',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 16,
-};
-
-const sectionHeaderStyle: React.CSSProperties = {
-    padding: '10px 14px',
-    borderBottom: '1px solid var(--border)',
-    backgroundColor: 'var(--muted)',
-    color: 'var(--muted-foreground)',
-    fontSize: '0.9rem',
-    fontWeight: 600,
-};
-
-const sectionBodyStyle: React.CSSProperties = {
-    padding: 14,
-};
-
-const filterBarStyle: React.CSSProperties = {
-    display: 'flex',
-    gap: 8,
-    alignItems: 'center',
-    flexWrap: 'wrap',
-};
-
-const searchInputStyle: React.CSSProperties = {
-    width: 320,
-    maxWidth: '100%',
-    padding: '8px 12px',
-    border: '1px solid var(--input)',
-    borderRadius: 4,
-    fontSize: '0.9rem',
-};
-
-const clearButtonStyle: React.CSSProperties = {
-    padding: '8px 14px',
-    border: '1px solid var(--border)',
-    borderRadius: 4,
-    backgroundColor: 'var(--card)',
-    color: 'var(--muted-foreground)',
-    cursor: 'pointer',
-    fontSize: '0.9rem',
 };

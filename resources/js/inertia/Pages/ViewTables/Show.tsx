@@ -175,19 +175,8 @@ export default function Show({
                     </div>
                 </div>
 
-                <div style={sectionStyle}>
-                    <div style={sectionHeaderStyle}>{t('current_status')}</div>
-                    <div style={summaryGridStyle}>
-                        {summaryCards.map((card) => (
-                            <div key={card.label} style={summaryItemStyle}>
-                                <div style={summaryLabelStyle}>{card.label}</div>
-                                <div style={summaryValueStyle}>{card.value}</div>
-                                <div style={summaryHelpStyle}>{card.help}</div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
+                {/* 檢視內容（搜尋＋表格）移到摘要卡片之前：開頁即可看到搜尋框與資料，
+                    對齊 app/codes 把搜尋放在最上方、方便視線的設計。 */}
                 <div style={sectionStyle}>
                     <div style={sectionHeaderStyle}>{t('view_content')}</div>
                     <div style={sectionBodyStyle}>
@@ -221,6 +210,19 @@ export default function Show({
                                 currentPage={debug.current_page}
                             />
                         </div>
+                    </div>
+                </div>
+
+                <div style={sectionStyle}>
+                    <div style={sectionHeaderStyle}>{t('current_status')}</div>
+                    <div style={summaryGridStyle}>
+                        {summaryCards.map((card) => (
+                            <div key={card.label} style={summaryItemStyle}>
+                                <div style={summaryLabelStyle}>{card.label}</div>
+                                <div style={summaryValueStyle}>{card.value}</div>
+                                <div style={summaryHelpStyle}>{card.help}</div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>

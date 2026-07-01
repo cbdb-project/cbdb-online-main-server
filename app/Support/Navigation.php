@@ -265,19 +265,16 @@ class Navigation {
      */
     protected static function viewsChildren(): array {
         return [
+            // 只保留新版 React 總覽入口（→ app.view.index）；舊 Blade /view 已翻 flag=new，
+            // 側邊欄不再列出其連結（舊路由仍保留、可直接訪問作為回退）。標籤還原為「檢視表總覽」。
             self::item(
                 'views-overview-new',
-                'nav.views_overview_new',
+                'nav.views_overview',
                 'fas fa-layer-group',
                 self::routeUrl('app.view.index'),
-                ['pages' => [], 'patterns' => ['app.view.*']]
-            ),
-            self::item(
-                'views-overview',
-                'nav.views_overview',
-                'fas fa-list-ul',
-                self::routeUrl('view.index'),
-                ['pages' => ['檢視表總覽'], 'patterns' => []]
+                // 同時涵蓋新版 route（app.view.*）與舊 Blade /view 頁（page_title '檢視表總覽'）的 active 狀態，
+                // 讓直接訪問舊頁時仍會高亮此總覽節點。
+                ['pages' => ['檢視表總覽'], 'patterns' => ['app.view.*']]
             ),
             self::viewItem('altname-data', 'views.view_altname_data', 'fas fa-user-tag', '別名資料檢視'),
             self::viewItem('assoc-data', 'views.view_assoc_data', 'fas fa-project-diagram', '社會關係資料檢視'),

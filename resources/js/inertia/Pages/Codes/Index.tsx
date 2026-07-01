@@ -71,13 +71,15 @@ export default function CodesIndex() {
                     autoComplete="off"
                 />
                 <div className="overflow-x-auto rounded-md border border-border">
-                    <table className="w-full text-sm">
-                        <thead className="bg-muted/50">
+                    {/* 字號／內距與 app/view 的 DataTable 對齊（同一套設計語言）：body 1rem、表頭 0.92rem/600、cell px-3 py-2。 */}
+                    <table className="w-full text-base">
+                        {/* 表頭樣式／配色與 app/view 列表對齊：實色 muted 底、灰字、2px 底線、0.92rem/600（保留排序）。 */}
+                        <thead className="bg-muted">
                             <tr>
                                 {(['name', 'description'] as const).map((col) => (
                                     <th
                                         key={col}
-                                        className="cursor-pointer select-none px-3 py-2 text-left font-medium hover:bg-muted"
+                                        className="cursor-pointer select-none border-b-2 border-border px-3 py-2.5 text-left text-[0.92rem] font-semibold text-muted-foreground hover:bg-muted"
                                         onClick={() => toggleSort(col)}
                                     >
                                         {col === 'name' ? t('table_name') : t('description')}{' '}
@@ -89,14 +91,21 @@ export default function CodesIndex() {
                             </tr>
                         </thead>
                         <tbody>
-                            {visible.map((row) => (
-                                <tr key={row.name} className={cn('border-t border-border hover:bg-muted/30')}>
-                                    <td className="px-3 py-1.5">
+                            {visible.map((row, i) => (
+                                <tr
+                                    key={row.name}
+                                    className={cn(
+                                        'border-t border-border',
+                                        // 斑馬紋間隔色：與 app/view 列表用完全相同的 token（偶數列 --card、奇數列 --surface-sunken）。
+                                        i % 2 === 1 && 'bg-[var(--surface-sunken)]'
+                                    )}
+                                >
+                                    <td className="px-3 py-2">
                                         <a href={row.url} className="text-primary hover:underline">
                                             {row.name}
                                         </a>
                                     </td>
-                                    <td className="px-3 py-1.5">{row.description}</td>
+                                    <td className="px-3 py-2">{row.description}</td>
                                 </tr>
                             ))}
                         </tbody>

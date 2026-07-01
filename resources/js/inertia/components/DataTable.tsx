@@ -14,7 +14,7 @@ export default function DataTable({ columns, rows, emptyMessage = '無資料' }:
             <table style={{
                 width: '100%',
                 borderCollapse: 'collapse',
-                fontSize: '0.85rem',
+                fontSize: '1rem',
                 minWidth: Math.max(600, columnEntries.length * 120),
             }}>
                 <thead>
@@ -23,13 +23,13 @@ export default function DataTable({ columns, rows, emptyMessage = '無資料' }:
                             <th
                                 key={key}
                                 style={{
-                                    padding: '8px 10px',
+                                    padding: '10px 12px',
                                     borderBottom: '2px solid var(--border)',
                                     backgroundColor: 'var(--muted)',
                                     textAlign: 'left',
                                     whiteSpace: 'nowrap',
                                     fontWeight: 600,
-                                    fontSize: '0.8rem',
+                                    fontSize: '0.92rem',
                                     color: 'var(--muted-foreground)',
                                 }}
                             >
@@ -63,7 +63,7 @@ export default function DataTable({ columns, rows, emptyMessage = '無資料' }:
                                     <td
                                         key={key}
                                         style={{
-                                            padding: '6px 10px',
+                                            padding: '8px 12px',
                                             borderBottom: '1px solid var(--border)',
                                             maxWidth: 300,
                                             overflow: 'hidden',

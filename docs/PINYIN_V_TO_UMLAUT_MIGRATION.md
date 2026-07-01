@@ -1,9 +1,62 @@
 # 拼音 v → ü 全庫正規化遷移計畫
 
-> 狀態：計畫草案（提交討論）
-> 分支：`feature/pinyin-v-to-umlaut-migration`
+> 狀態：**決策定案（可直接執行；本文 §D「決策定案」為權威，與其下較早敘述衝突時以 §D 為準）**
+> 分支：`feature/pinyin-v-to-umlaut-migration`（本分支＝「計畫 PR」#1087；**實作每個小環節各起描述性新分支、各自開 PR**）
 > 相關 PR：[#1086](https://github.com/cbdb-project/cbdb-online-main-server/pull/1086)（生成字典修正，已併入 #1087）
 > English version: [PINYIN_V_TO_UMLAUT_MIGRATION.en.md](./PINYIN_V_TO_UMLAUT_MIGRATION.en.md)
+
+## §D. 決策定案（LLM 照此執行，勿再確認、勿再重議）
+
+> 以下為團隊郵件討論後**已拍板**的決策，可直接執行；不需再向人類確認。**Token 等機密不寫入本文。**
+
+### D-0 範圍與流程
+- **拆成兩個獨立 goal**：本計畫的 **Phase A 先做**＝止血 + 只讀掃描 + 查詢展開 + 人名審計批量修正；**Phase B（其他 code 表拼音）為之後另一個 goal**，且以先建好 [Code 表受審計寫入 API](./CODE_TABLE_MUTATION_API_PLAN.md) 為前置。
+- **工作流（每個小環節）**：先派一組「讀代碼＋讀修改」的 review agent 檢查，反覆到無嚴重 issue；再用 **codex（終端指令，非 agent）** 檢查到無嚴重 issue；才推進下一環節。**未經人類明確指示不得合併。**
+- **每個小環節＝各自的描述性新分支＋各自 PR**（例：`feature/pinyin-stop-the-bleed`、`feature/pinyin-scan-command`、`feature/pinyin-query-expansion`、`feature/pinyin-names-migration`）。
+
+### D-1 不做 code 22 別名
+- **不建立 `ALTNAME_DATA` 代碼 22「alternative romanization」別名**（團隊確認：查詢展開已滿足搜尋，code 22 冗餘）。以下文中所有「code 22 / 別名」段落一律視為**不執行**。
+
+### D-2 權威來源＝公開 Google Sheet（逐條清單），掃描命令僅交叉核對
+- 兩個分頁（公開、可直接 CSV 匯出）：
+  - **ALTNAME_DATA**：`gid=1425535916`，CSV：`https://docs.google.com/spreadsheets/d/19SOyBtA8cKE9aq_hIkxRiT-e2i6f5bFDIY_TcNAn57I/export?format=csv&gid=1425535916`；957 資料列；欄位 `table,field,id,wrong_pinyin,correct_pinyin,note_en,note_zh`。
+  - **BIOG_MAIN**：`gid=248977087`，CSV：同上網址改 `gid=248977087`；11,407 資料列（`c_name` 5,783／`c_surname` 3,509／`c_mingzi` 2,115）；欄位 `table,field,id,wrong_pinyin,correct_pinyin`。
+- `id` ＝ `c_personid`。**西文名已人工排除**。**Sheet 為權威、逐條照改**；掃描命令 `cbdb:scan-pinyin-v` 只做交叉核對與差異報告，**不得覆蓋 Sheet**。
+
+### D-3 BIOG_MAIN 套用法
+- **只送 `c_surname` 與／或 `c_mingzi`** 走 `/api/v2/mutate`；`c_name` 由系統自動重算。**忽略 Sheet 的 `c_name` 列**（API 封鎖直寫 c_name）。
+
+### D-4 BIOG_MAIN 的 204 條「孤兒 c_name」——用「拆分量」法（approach A）
+- 定義：在 BIOG_MAIN 分頁中，某 `c_personid` 有 `c_name` 改動、但**沒有**對應的 `c_surname`／`c_mingzi` 列——共 **204** 個（偵測：出現在 `c_name` 集合、卻不在 `c_surname ∪ c_mingzi` 集合的 id）。
+- 處理：逐一**讀該人真實的 `c_surname`／`c_mingzi`／`c_name`**，以確定性音節規則（`lv/lve/nv/nve`）判定 v 落在哪個分量、**只改那個分量**。
+- **驗證閘（必做）**：套用後「重算的 `c_name` 必須等於 Sheet 的 `correct_pinyin`」。**對不上的不寫**，收進一份小小的例外清單交人類（Hongsu）裁決。
+
+### D-5 ALTNAME 套用法（複合主鍵定位）
+- Sheet 的 `id` ＝ `c_personid`，但 `ALTNAME_DATA` 為 **3-鍵複合主鍵**。以 **`c_personid = id` 且 `c_alt_name = wrong_pinyin`** 定位該列、解析完整 PK（依 `CompositePrimaryKey::SCHEMAS`／讀取），再 `/api/v2/mutate` 將 `c_alt_name` 改為 `correct_pinyin`。
+- 若某 `(c_personid, c_alt_name)` 命中 **>1 列**（歧義）→ **跳過並列入例外清單**。
+
+### D-6 執行方式與節奏
+- 使用操作者的 Sanctum **Bearer token**（active、非 crowdsourcing、可 `canWriteDirectly()` 的使用者；**Token 不寫入任何檔案／commit／PR／log**）。走 `/api/v2/*`、`mode:"direct"`，audit 自動。
+- 流程：**(1) 先 dry-run**，產出「完整預定變更集」為產物，並自檢「無 Sheet 以外項、無 `[OTHER-v]` 混入」；**(2) 分批跑完**（BIOG_MAIN 一姓氏一批、ALTNAME 分塊）；**(3) 跑完後輸出抽樣**供人類抽查。
+- 目標＝**直接生產**（無 staging）。**回退**：每筆皆審計 mutation，抽查發現錯的可經同一審計路徑／operations restore 逐筆回退。
+
+### D-7 止血現況
+- 生成字典 `app/Models/Pinyin.php`（29 處）**已完成**（commit d4ad265）。
+- **待建**：共用 `v→ü` helper，掛入生成入口（`BiogMainRepository::auto_pinyin()`、三個批次 `buildPinyin()`、`ApiController::buildPinyinWord()`/`searchPinyin()`）。
+- DB `pinyin` 表 4 個姓氏 **Frank 已在生產改好** → **只讀校驗、不重寫**（如需，可自 `https://input.cbdb.fas.harvard.edu/app/basicinformation` 對照）。
+
+### D-8 搜尋
+- `u` 已由 collation 摺疊命中 `ü`（無需改）。**查詢展開**（輸入 `lv/lve/nv/nve` 時以 OR 同查 v 與 ü 形式）**列入 Phase A**。SQLite 測試不摺疊，撰測需注意。
+
+### D-9 Phase B 前瞻（於之後的 Phase B goal 執行）
+- **實測結論：code 表基本是純拼音，不需 Phase-A 那種人工 Sheet。** 佐證：`ETHNICITY_TRIBE_CODES.c_name` 498 列中 11 條含 v、**全為真拼音、0 西文**；`CHORONYM_CODES.c_choronym_desc` 173 列中 1 條 `Vietnam`——**不含 `lv/nv` 音節簇、規則天然不動它**。
+- 作法：**專用拼音欄與 romanized-name 欄一律以確定性音節規則直接替換**；掃描命令另出一份 `[OTHER-v]`（含 v 但非 `lv/lve/nv/nve`，如 `Vietnam`）小清單供人類 30 秒瞄一眼（安全網、非逐條審）。`ADDR_CODES`（最大、無法公開全掃）於 Phase B 起步時以只讀掃描命令實錘後再寫。
+- **D-9a 無主鍵表 `SOCIAL_INSTITUTION_ALTNAME_DATA`：直接 SKIP**（無編輯入口，排除於 API 與遷移之外）。
+- **D-9b `/codes` 管理介面審計缺口：補上**（於 `CodesController` 直寫路徑加 `AuditLogService::write()`，與新 API 審計一致）——詳見 code 表 API 計畫。
+- **D-9c `ADDRESSES` 派生表：** 改完 `ADDR_CODES` 後以 `cbdb:regenerate-addresses-table`（生產、MySQL-only）**重建**。
+
+### D-10 最後一步
+- 自 `config/codes.php` 的 `ui_hidden` **移除 `'pinyin'`**（重新顯示姓氏拼音表）為**既定計畫的一環**（資料清乾淨後執行），**非另需人工決定**。
 
 ## 0. 背景與決議
 
@@ -11,7 +64,7 @@ CBDB 拼音規範長期以 `v` 代替 `ü`（如 `呂 = Lv`、`閭丘 = Lvqiu`�
 
 1. **`ü` 為唯一正字（canonical）**，全庫拼音欄位不再以 `v` 代替（依《漢語拼音方案》）。
 2. **輸入時接受 `v`**：手動錄入／拼音生成時將 `v` 正規化為 `ü`（儲存正字）；搜尋時則讓使用者輸入的 `v` 形式同時匹配 `v` 與 `ü`（查詢展開，見 §3），方便鍵盤輸入。
-3. **舊 `v` 形式可選擇性保留為「另一種羅馬化」別名**（Michael 提出的 `ALTNAME_DATA` 代碼 **22 alternative romanization**）；惟搜尋兼容改以查詢展開達成（§3），故此別名對搜尋並非必要，純為可選。
+3. ~~舊 `v` 形式可選擇性保留為「另一種羅馬化」別名（`ALTNAME_DATA` 代碼 22）~~ **（作廢：不做，見 §D-1；查詢展開已滿足搜尋）**。
 4. **所有資料修改必須有 audit 記錄**，**不得使用繞過 audit 的集中式 SQL**；以受審計的 mutation API（外部腳本）執行最為安全。
 
 ## 1. 規劃原則（依後續討論調整）
@@ -85,7 +138,7 @@ CBDB 拼音規範長期以 `v` 代替 `ü`（如 `呂 = Lv`、`閭丘 = Lvqiu`�
 | `ADMIN_CAT_CODES` | `c_admin_cat_py` | 單鍵 `c_admin_cat_code` |
 
 > 掃描階段以「凡欄位名以 `_py` / `_pinyin` 結尾，或經 schema 標註為 romanized」為準則自動列舉，避免日後遺漏新欄位。
-> **無主鍵特例**：`SOCIAL_INSTITUTION_ALTNAME_DATA` 沒有 PRIMARY KEY（僅兩個普通索引、欄位皆 nullable）。因審計需要逐列定位鍵，此表不可走逐列審計修改；須另定合成識別或人工處理。
+> **無主鍵特例**：`SOCIAL_INSTITUTION_ALTNAME_DATA` 沒有 PRIMARY KEY。**依 §D-9a 直接 SKIP、不處理**（無編輯入口，排除於 API 與遷移之外）。
 > **階段 B 的審計路徑（已評估，需先建 API）**：mutation API（`/api/v2/*`）目前以人物及其子資源為主，code 表中**僅 `NIAN_HAO` 有 handler**；`/codes` UI 雖通用但只寫 `operations`、不寫 `audit_log`，且為 CSRF web 路由不適合外部腳本。因此階段 B 動工前需先建立 code 表的受審計寫入 API——詳見 [Code 表受審計寫入 API 建設計畫](./CODE_TABLE_MUTATION_API_PLAN.md)。不得用繞過 audit 的 SQL。
 
 ### 不轉換的欄位
@@ -108,7 +161,7 @@ CBDB 拼音規範長期以 `v` 代替 `ü`（如 `呂 = Lv`、`閭丘 = Lvqiu`�
 - **`c_name` 自動重算（無待解項）**：handler 的 `buildMergedPayload()` 會先把 `changes` 併入整筆原紀錄，`updateById()` 再由合併後的 `c_surname`+`c_mingzi` 重算 `c_name`（連同 `c_name_chn`/`c_name_proper`/`c_name_rm`）。因此腳本**只需送修正後的 `c_surname`/`c_mingzi`**，`c_name` 會自動跟著正確，無資料遺失風險、無需另行處理。
 - 建議批量節奏：一次數百筆，或**一個姓氏一批**，先 dry-run / 取樣複核再正式送出。
 
-### 5.3 別名（可選；搜尋兼容已由查詢展開達成）
+### 5.3 別名（**作廢，不執行 —— 見 §D-1**；以下僅存檔說明）
 - 搜尋兼容已由查詢展開（§3）達成，**代碼 22 別名並非搜尋所需**。以下僅在「基於搜尋以外的理由」仍要保留舊 `v` 形式為別名時適用。
 - 作法：以 `POST /api/v2/create`、`resource: "altnames"`、`c_alt_name_type_code: 22`、`c_alt_name: <v 形式>`、並附 `c_alt_name_chn`（PK 需要中文名）建立別名列。
 - **前置條件**：`ALTNAME_CODES` 目前無 seed，須先確認/建立代碼 22「alternative romanization」（含中英說明），否則 FK 會拒絕未知代碼。
@@ -124,7 +177,7 @@ CBDB 拼音規範長期以 `v` 代替 `ü`（如 `呂 = Lv`、`閭丘 = Lvqiu`�
    - 在「漢字→拼音」生成入口加 `v → ü` 正規化（已核實入口）：`BiogMainRepository::auto_pinyin()`、`ApiController::buildPinyinWord()` / `searchPinyin()`、三個批次匯入各自的 `buildPinyin()`（`AdminBatchLoadOfficesController`、`AdminBatchLoadBookTitlesController`、`AdminBatchLoadSocialInstitutesController`）；這些路徑生成前已呼叫 `VariantCharNormalizer::normalize()`，是自然掛點。需新建共用 `v→ü` helper（目前 repo 無此 helper）。
    - 註：`nve` 在生成字典中本就不存在；`nve → nüe` 僅在輸入正規化端有意義。
 2. **修正高可見人名拼音**：透過審計 mutation API 批次修正（§5.2），分批（數百筆／一姓氏一批）。
-3. **（可選、可延後）搜尋兼容**：以查詢展開讓使用者輸入的 `v` 形式同時匹配 `v` 與 `ü`（§3）；`ALTNAME_DATA` 代碼 22 別名對搜尋並非必要，如需保留純為其他目的（§5.3）。
+3. **搜尋兼容（Phase A 執行，見 §D-8）**：以查詢展開讓使用者輸入的 `v` 形式同時匹配 `v` 與 `ü`（§3）。（code 22 別名不做，見 §D-1。）
 4. **建議下游系統與 Access 版**適時加上查詢兼容——查詢時同時匹配 `v` 與 `ü` 形式（溝通、非阻塞）。
 5. **持續掃描、修正其他非人名拼音欄位**（階段 B，§4）。
 
@@ -132,9 +185,9 @@ CBDB 拼音規範長期以 `v` 代替 `ü`（如 `呂 = Lv`、`閭丘 = Lvqiu`�
 
 - **西文名誤傷**（Silva/Calvin…）：靠音節規則 + 人工複核；`c_*_proper`、`c_*_rm`、譯名欄位不動。
 - **搜尋現況**：`u` 已能命中 `ü`（collation 折疊）；僅 `v` 需兼容，採查詢展開（輸入 `v` 同時查 `v` 與 `ü`），且可延後（§3）。SQLite 測試不折疊，撰寫測試須注意。
-- **代碼 22 FK 前置**：寫代碼 22 前須先於 `ALTNAME_CODES` 建立該代碼（§5.3）。
+- ~~代碼 22 FK 前置~~ **（不適用：不做 code 22，見 §D-1）**。
 - **階段 B 審計路徑**：code 表目前僅 `NIAN_HAO` 有 mutation handler，需先建受審計寫入 API（見 [Code 表受審計寫入 API 建設計畫](./CODE_TABLE_MUTATION_API_PLAN.md)）才動工（§4）。
-- **無主鍵表**：`SOCIAL_INSTITUTION_ALTNAME_DATA` 須特例處理（§4）。
+- **無主鍵表**：`SOCIAL_INSTITUTION_ALTNAME_DATA` **SKIP、不處理**（見 §D-9a）。
 - **派生表一致性**：`ADDRESSES` 只改源頭 `ADDR_CODES` 後以 `cbdb:regenerate-addresses-table` 重建（該指令為 MySQL 限定，SQLite 不可跑）。
 - **禁止繞過 audit 的集中式 SQL**：所有資料修改走 mutation API 或受審計流程。
 
@@ -144,11 +197,11 @@ CBDB 拼音規範長期以 `v` 代替 `ü`（如 `呂 = Lv`、`閭丘 = Lvqiu`�
 - [ ] 階段一（止血）：新建共用 `v→ü` helper，掛入生成入口（`auto_pinyin` + 三批次 `buildPinyin` + `ApiController`）防止新 `v`
 - [ ] 盤點：`cbdb:scan-pinyin-v` 唯讀掃描 + 報告，對齊 Frank 的 Google Sheet 與西文名排除清單
 - [ ] 階段二（人名）：外部腳本走 `/api/v2/mutate` 批次修正 `c_surname`/`c_mingzi`（`c_name` 由系統自動重算），分批、先 dry-run 複核
-- [ ] （可選、可延後）搜尋兼容：於拼音 LIKE 查詢端實作查詢展開（輸入 `v` 形式時同時查 `v` 與 `ü`）（§3）
-- [ ] （可選，搜尋以外目的）確認／建立 `ALTNAME_CODES` 代碼 22，再以 `/api/v2/create` 補別名（資料清理完成後）
+- [ ] **（Phase A，§D-8）** 搜尋兼容：於拼音 LIKE 查詢端實作查詢展開（輸入 `v` 形式時同時查 `v` 與 `ü`）（§3）
+- [ ] ~~確認／建立 `ALTNAME_CODES` 代碼 22 並補別名~~ **（不做，見 §D-1）**
 - [ ] 溝通下游系統與 Access 版，建議查詢時同時匹配 `v` 與 `ü` 形式
 - [ ] 階段 B 前置：依 [Code 表受審計寫入 API 建設計畫](./CODE_TABLE_MUTATION_API_PLAN.md) 建立 code 表受審計寫入 API
-- [ ] 階段 B：API 就緒後，分批掃描修正其他拼音欄位（含 `TEXT_INSTANCE_DATA` 複合主鍵、`SOCIAL_INSTITUTION_ALTNAME_DATA` 無主鍵特例、`ADDRESSES` 重建）
+- [ ] 階段 B：API 就緒後，分批掃描修正其他拼音欄位（含 `TEXT_INSTANCE_DATA` 複合主鍵、`ADDRESSES` 重建；`SOCIAL_INSTITUTION_ALTNAME_DATA` **SKIP，見 §D-9a**）
 - [ ] 回歸測試（生成 / 正規化 / 人名修正 / audit / 西文名排除；注意 SQLite collation 差異）
 - [ ] 文件同步：`CHANGELOG.md`、必要時 `DATABASE.md` / `README.md`
 - [ ] **最後環節**：自 `config/codes.php` 的 `ui_hidden` 移除 `'pinyin'`，於 codes 介面重新顯示姓氏拼音對照表

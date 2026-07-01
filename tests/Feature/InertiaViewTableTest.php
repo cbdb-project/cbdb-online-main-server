@@ -145,6 +145,46 @@ class InertiaViewTableTest extends TestCase {
         );
     }
 
+    #[Test]
+    public function test_app_view_index_description_follows_locale(): void {
+        // Register localized _desc translations for the test view (langKey: views.view_test_items).
+        app('translator')->addLines(['views.view_test_items_desc' => 'Aggregated English description.'], 'en');
+        app('translator')->addLines(['views.view_test_items_desc' => '中文說明覆寫。'], 'zh-TW');
+
+        // English locale → English translation is used (not the raw Chinese config description).
+        $this->actingAs($this->user)
+            ->withSession(['locale' => 'en'])
+            ->get(route('app.view.index'))
+            ->assertInertia(
+                fn (Assert $page) => $page
+                    ->where('views.1.key', 'test-items')
+                    ->where('views.1.description', 'Aggregated English description.')
+            );
+
+        // Chinese locale → Chinese translation is used.
+        $this->actingAs($this->user)
+            ->withSession(['locale' => 'zh-TW'])
+            ->get(route('app.view.index'))
+            ->assertInertia(
+                fn (Assert $page) => $page
+                    ->where('views.1.key', 'test-items')
+                    ->where('views.1.description', '中文說明覆寫。')
+            );
+    }
+
+    #[Test]
+    public function test_app_view_show_description_follows_locale(): void {
+        app('translator')->addLines(['views.view_test_items_desc' => 'Aggregated English description.'], 'en');
+
+        $this->actingAs($this->user)
+            ->withSession(['locale' => 'en'])
+            ->get(route('app.view.show', 'test-items'))
+            ->assertInertia(
+                fn (Assert $page) => $page
+                    ->where('description', 'Aggregated English description.')
+            );
+    }
+
     // -------------------------------------------------------
     // /app/view/{key} (show)
     // -------------------------------------------------------

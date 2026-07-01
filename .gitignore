@@ -29,3 +29,7 @@ database/database.sqlite3
 /storage/app/chgis/*.version
 /storage/app/chgis/*.part.*
 /storage/app/chgis/*.bak.*
+
+# 臨時人名孤兒清單，不入版控
+pinyin-orphans-*.xlsx
+~$*.xlsx

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\CodesTableDescription;
 use Illuminate\Support\Facades\Schema;
 
 class QueryPlaygroundService {
@@ -27,7 +28,7 @@ class QueryPlaygroundService {
         return array_map(function ($table) {
             return [
                 'name' => $table,
-                'description' => config("codes.tables.{$table}", ''),
+                'description' => CodesTableDescription::for($table),
                 'internal' => self::isInternalTable($table),
             ];
         }, $allowedTables);
@@ -105,13 +106,13 @@ class QueryPlaygroundService {
                 }
 
                 $tableSchemas[$tableName] = [
-                    'description' => config("codes.tables.{$tableName}", ''),
+                    'description' => CodesTableDescription::for($tableName),
                     'columns' => $columnEntries,
                     'error' => null,
                 ];
             } catch (\Throwable $exception) {
                 $tableSchemas[$tableName] = [
-                    'description' => config("codes.tables.{$tableName}", ''),
+                    'description' => CodesTableDescription::for($tableName),
                     'columns' => [],
                     'error' => $exception->getMessage(),
                 ];

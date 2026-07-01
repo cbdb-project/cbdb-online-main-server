@@ -54,11 +54,13 @@ class BiogMainNameSearchTest extends TestCase {
         Schema::create('DYNASTIES', function ($table) {
             $table->integer('c_dy')->primary();
             $table->string('c_dynasty_chn')->nullable();
+            $table->string('c_dynasty')->nullable();
         });
 
         Schema::create('ADDR_CODES', function ($table) {
             $table->integer('c_addr_id')->primary();
             $table->string('c_name_chn')->nullable();
+            $table->string('c_name')->nullable();
         });
 
         Schema::create('ALTNAME_DATA', function ($table) {

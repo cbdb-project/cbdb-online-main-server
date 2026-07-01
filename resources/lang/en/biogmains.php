@@ -136,6 +136,16 @@ return [
     'person_name_chn_label' => 'Name (Chinese)',
     'search_placeholder' => 'Search Person (ID / Name / Pinyin)',
     'all_dynasties_opt' => 'All Dynasties',
+
+    // Person Records list (/app/basicinformation) table column headers.
+    'col_personid' => 'Person ID',
+    'col_name_chn' => 'Name (CHN)',
+    'col_name' => 'Name (Pinyin)',
+    'col_dynasty' => 'Dynasty',
+    'col_index_year' => 'Index Year',
+    'col_index_address' => 'Index Address',
+    'col_zi' => 'Courtesy Name (Zi)',
+    'col_hao' => 'Style Name (Hao)',
     'basicinfo_check_alert' => 'Before leaving: please confirm that [Given Name] and [Ming] are filled in.',
     'basicinfo_pinyin_alert' => 'Pinyin generation complete.',
 

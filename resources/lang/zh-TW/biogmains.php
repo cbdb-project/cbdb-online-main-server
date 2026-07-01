@@ -136,6 +136,16 @@ return [
     'person_name_chn_label' => '姓名（中）',
     'search_placeholder' => '搜尋人物（ID / 姓名 / 拼音）',
     'all_dynasties_opt' => '全部朝代',
+
+    // 人物記錄清單（/app/basicinformation）表格欄位標題。
+    'col_personid' => '人物 ID',
+    'col_name_chn' => '姓名（中）',
+    'col_name' => '姓名（拼音）',
+    'col_dynasty' => '朝代',
+    'col_index_year' => '指數年',
+    'col_index_address' => '指數地址',
+    'col_zi' => '字',
+    'col_hao' => '號',
     'basicinfo_check_alert' => '訊息提示：要離開視窗了，請您確認[名]和[Ming]是否填寫。',
     'basicinfo_pinyin_alert' => '訊息提示：「生成拼音」已經完成。',
 

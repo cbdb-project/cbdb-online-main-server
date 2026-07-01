@@ -39,17 +39,17 @@ interface PersonIndexPageProps extends SharedProps {
     create_url: string;
 }
 
-// 部分欄位以「中文 / 英文（拼音）」雙語呈現（對齊全站 formatBilingualLabel 慣例）；
-// 其餘欄位沿用 row[key] 直接顯示。
-const COLUMNS: { key: keyof PersonRow; label: string; render?: (row: PersonRow) => React.ReactNode }[] = [
-    { key: 'c_personid', label: 'c_personid' },
-    { key: 'c_name_chn', label: 'c_name_chn' },
-    { key: 'c_name', label: 'c_name' },
-    { key: 'c_dynasty_chn', label: 'dynasty', render: (row) => formatBilingualLabel(row.c_dynasty_chn, row.c_dynasty ?? null) ?? '' },
-    { key: 'c_index_year', label: 'index year' },
-    { key: 'addr_name_chn', label: 'index address', render: (row) => formatBilingualLabel(row.addr_name_chn, row.addr_name ?? null) ?? '' },
-    { key: 'zi', label: 'zi' },
-    { key: 'hao', label: 'hao' },
+// 欄位標題以 biogmains 翻譯 key（labelKey）呈現，隨語系切換；部分欄位以
+// 「中文 / 英文（拼音）」雙語呈現（對齊全站 formatBilingualLabel 慣例），其餘沿用 row[key]。
+const COLUMNS: { key: keyof PersonRow; labelKey: string; render?: (row: PersonRow) => React.ReactNode }[] = [
+    { key: 'c_personid', labelKey: 'col_personid' },
+    { key: 'c_name_chn', labelKey: 'col_name_chn' },
+    { key: 'c_name', labelKey: 'col_name' },
+    { key: 'c_dynasty_chn', labelKey: 'col_dynasty', render: (row) => formatBilingualLabel(row.c_dynasty_chn, row.c_dynasty ?? null) ?? '' },
+    { key: 'c_index_year', labelKey: 'col_index_year' },
+    { key: 'addr_name_chn', labelKey: 'col_index_address', render: (row) => formatBilingualLabel(row.addr_name_chn, row.addr_name ?? null) ?? '' },
+    { key: 'zi', labelKey: 'col_zi' },
+    { key: 'hao', labelKey: 'col_hao' },
 ];
 
 export default function PersonIndex() {
@@ -110,7 +110,7 @@ export default function PersonIndex() {
                     <thead className="bg-muted/50">
                         <tr>
                             {COLUMNS.map((c) => (
-                                <th key={c.label} className="px-3 py-2 text-left font-medium">{c.label}</th>
+                                <th key={c.key} className="px-3 py-2 text-left font-medium">{t(c.labelKey)}</th>
                             ))}
                         </tr>
                     </thead>
@@ -125,7 +125,7 @@ export default function PersonIndex() {
                             names.data.map((row) => (
                                 <tr key={row.c_personid} className="border-t border-border hover:bg-muted/30">
                                     {COLUMNS.map((c) => (
-                                        <td key={c.label} className="px-3 py-1.5">
+                                        <td key={c.key} className="px-3 py-1.5">
                                             <a href={editUrl(row.c_personid)} target="_blank" rel="noreferrer" className="text-primary hover:underline">
                                                 {c.render ? c.render(row) : (row[c.key] ?? '')}
                                             </a>

@@ -45,63 +45,156 @@ class PinyinMigrationPlannerTest extends TestCase {
     }
 
     #[Test]
-    public function it_plans_biog_regenerate_with_oracle_and_drift(): void {
+    public function it_uses_sheet_correct_with_drift_and_confidence(): void {
         DB::table('BIOG_MAIN')->insert([
-            ['c_personid' => 1, 'c_name_chn' => '呂坤', 'c_surname' => 'Lv', 'c_mingzi' => 'Kun', 'c_name' => 'Lv Kun'],   // 待遷移
-            ['c_personid' => 2, 'c_name_chn' => '呂坤', 'c_surname' => 'Lü', 'c_mingzi' => 'Kun', 'c_name' => 'Lü Kun'],   // 已遷移
-            ['c_personid' => 3, 'c_name_chn' => '王安', 'c_surname' => 'Wang', 'c_mingzi' => 'An', 'c_name' => 'Wang An'], // 漂移（現值既非 wrong 也非 correct）
-            ['c_personid' => 4, 'c_name_chn' => '呂坤', 'c_surname' => 'Lv', 'c_mingzi' => 'Kun', 'c_name' => 'Lv Kun'],   // oracle 不過
+            // person 1：surname 行 + c_name 行 → 由完整名推導 mingzi；regen 一致 → high。
+            ['c_personid' => 1, 'c_name_chn' => '呂坤', 'c_surname' => 'Lv', 'c_mingzi' => 'Kun', 'c_name' => 'Lv Kun'],
+            // person 2：已遷移
+            ['c_personid' => 2, 'c_name_chn' => '呂坤', 'c_surname' => 'Lü', 'c_mingzi' => 'Kun', 'c_name' => 'Lü Kun'],
+            // person 3：漂移（現值既非 wrong 也非 correct）
+            ['c_personid' => 3, 'c_name_chn' => '王安', 'c_surname' => 'Wang', 'c_mingzi' => 'An', 'c_name' => 'Wang An'],
+            // person 4：生僻字 regen 對不上 Sheet → 仍寫 Sheet 值、confidence=low。
+            ['c_personid' => 4, 'c_name_chn' => '呂搢', 'c_surname' => 'Lv', 'c_mingzi' => 'Jin', 'c_name' => 'Lv Jin'],
         ]);
-
-        // 重生：呂坤→Lü Kun（正確）；person 4 用另一中文名，重生給錯值以觸發 oracle 不過。
         $this->regenMap['呂坤'] = ['c_surname' => 'Lü', 'c_mingzi' => 'Kun', 'c_name' => 'Lü Kun'];
-        $this->regenMap['歪坤'] = ['c_surname' => 'Xx', 'c_mingzi' => 'Kun', 'c_name' => 'Xx Kun'];
-        DB::table('BIOG_MAIN')->where('c_personid', 4)->update(['c_name_chn' => '歪坤']);
+        $this->regenMap['呂搢'] = ['c_surname' => 'Lü', 'c_mingzi' => '搢', 'c_name' => 'Lü 搢']; // auto_pinyin 轉不出生僻字
 
         $rows = [
             ['id' => 1, 'field' => 'c_surname', 'wrong_pinyin' => 'Lv', 'correct_pinyin' => 'Lü'],
+            ['id' => 1, 'field' => 'c_name', 'wrong_pinyin' => 'Lv Kun', 'correct_pinyin' => 'Lü Kun'],
             ['id' => 2, 'field' => 'c_surname', 'wrong_pinyin' => 'Lv', 'correct_pinyin' => 'Lü'],
             ['id' => 3, 'field' => 'c_surname', 'wrong_pinyin' => 'Lv', 'correct_pinyin' => 'Lü'],
             ['id' => 4, 'field' => 'c_surname', 'wrong_pinyin' => 'Lv', 'correct_pinyin' => 'Lü'],
+            ['id' => 4, 'field' => 'c_name', 'wrong_pinyin' => 'Lv Jin', 'correct_pinyin' => 'Lü Jin'],
             ['id' => 99, 'field' => 'c_surname', 'wrong_pinyin' => 'Lv', 'correct_pinyin' => 'Lü'], // 查無此人
         ];
 
         $plan = $this->planner()->planBiogMain($rows);
+        $byId = [];
+        foreach ($plan['mutations'] as $m) {
+            $byId[$m['pk']['c_personid']] = $m;
+        }
 
-        // person 1：預定變更，changes 只送 c_surname，值取自重生。
-        $this->assertCount(1, $plan['mutations']);
-        $mut = $plan['mutations'][0];
-        $this->assertSame(['c_personid' => 1], $mut['pk']);
-        $this->assertSame('basicinformation', $mut['resource']);
-        $this->assertSame(['c_surname' => 'Lü'], $mut['changes']);
-        $this->assertSame('Lü Kun', $mut['preview']['to']);
+        // person 1：Sheet surname 'Lü' + 由完整名 'Lü Kun' 推導 mingzi 'Kun'；regen 一致 → high。
+        $this->assertSame(['c_surname' => 'Lü', 'c_mingzi' => 'Kun'], $byId[1]['changes']);
+        $this->assertSame('high', $byId[1]['confidence']);
+        // person 4：regen('Lü 搢') != 最終('Lü Jin') → 仍寫 Sheet 值、low。
+        $this->assertSame(['c_surname' => 'Lü', 'c_mingzi' => 'Jin'], $byId[4]['changes']);
+        $this->assertSame('low', $byId[4]['confidence']);
 
-        // person 2：已遷移
+        // person 2 已遷移、person 3 漂移、person 99 查無此人
         $this->assertSame([2], array_column($plan['alreadyDone'], 'id'));
-        // person 3：漂移跳過
-        $this->assertSame(3, $plan['skipped'][0]['id']);
         $this->assertSame('drift', $plan['skipped'][0]['reason']);
-        // person 4 oracle 不過 + person 99 查無此人 → 兩個例外
-        $reasons = array_column($plan['exceptions'], 'reason');
-        $this->assertContains('regenerate-mismatch', $reasons);
-        $this->assertContains('person-not-found', $reasons);
+        $this->assertSame('person-not-found', $plan['exceptions'][0]['reason']);
     }
 
     #[Test]
-    public function it_sends_both_components_when_c_name_row_present_else_respects_scoping(): void {
+    public function it_derives_missing_component_and_flags_orphan(): void {
         DB::table('BIOG_MAIN')->insert([
-            // person 5：surname 列 + c_name 列、無 mingzi 列；mingzi 仍殘留 v → 必須兩分量一併送出。
-            ['c_personid' => 5, 'c_name_chn' => '呂綠', 'c_surname' => 'Lv', 'c_mingzi' => 'Lv', 'c_name' => 'Lv Lv'],
-            // person 6：只有 surname 列、無 c_name 列；mingzi 無 v → 只送 surname，尊重 scoping。
+            // person 5：mingzi 行 + c_name 行（「之妻」注釋類）→ 由完整名扣尾推導 surname 'Lü'。
+            ['c_personid' => 5, 'c_name_chn' => '呂氏', 'c_surname' => 'Lv', 'c_mingzi' => 'Shi(x)', 'c_name' => 'Lv Shi(x)'],
+            // person 6：兩分量行都有 → 直接採用。
             ['c_personid' => 6, 'c_name_chn' => '呂坤', 'c_surname' => 'Lv', 'c_mingzi' => 'Kun', 'c_name' => 'Lv Kun'],
+            // person 7：只有 surname 行、無 c_name → 只改 surname，mingzi 維持現值。
+            ['c_personid' => 7, 'c_name_chn' => '呂坤', 'c_surname' => 'Lv', 'c_mingzi' => 'Kun', 'c_name' => 'Lv Kun'],
+            // person 8：孤兒（只有 c_name 行）→ 例外。
+            ['c_personid' => 8, 'c_name_chn' => '呂坤', 'c_surname' => 'Lv', 'c_mingzi' => 'Kun', 'c_name' => 'Lv Kun'],
         ]);
-        $this->regenMap['呂綠'] = ['c_surname' => 'Lü', 'c_mingzi' => 'Lü', 'c_name' => 'Lü Lü'];
+        $this->regenMap['呂氏'] = ['c_surname' => 'Lü', 'c_mingzi' => 'Shi', 'c_name' => 'Lü Shi'];
         $this->regenMap['呂坤'] = ['c_surname' => 'Lü', 'c_mingzi' => 'Kun', 'c_name' => 'Lü Kun'];
 
         $plan = $this->planner()->planBiogMain([
-            ['id' => 5, 'field' => 'c_surname', 'wrong_pinyin' => 'Lv', 'correct_pinyin' => 'Lü'],
-            ['id' => 5, 'field' => 'c_name', 'wrong_pinyin' => 'Lv Lv', 'correct_pinyin' => 'Lü Lü'],
+            ['id' => 5, 'field' => 'c_mingzi', 'wrong_pinyin' => 'Shi(x)', 'correct_pinyin' => 'Shi (Wife of X )'],
+            ['id' => 5, 'field' => 'c_name', 'wrong_pinyin' => 'Lv Shi(x)', 'correct_pinyin' => 'Lü Shi (Wife of X )'],
             ['id' => 6, 'field' => 'c_surname', 'wrong_pinyin' => 'Lv', 'correct_pinyin' => 'Lü'],
+            ['id' => 6, 'field' => 'c_mingzi', 'wrong_pinyin' => 'Kun', 'correct_pinyin' => 'Kun'],
+            ['id' => 7, 'field' => 'c_surname', 'wrong_pinyin' => 'Lv', 'correct_pinyin' => 'Lü'],
+            ['id' => 8, 'field' => 'c_name', 'wrong_pinyin' => 'Lv Kun', 'correct_pinyin' => 'Lü Kun'],
+        ]);
+        $byId = [];
+        foreach ($plan['mutations'] as $m) {
+            $byId[$m['pk']['c_personid']] = $m;
+        }
+
+        // person 5：由 'Lü Shi (Wife of X )' 扣尾 mingzi → surname 'Lü'，兩分量送出。
+        $this->assertSame(['c_surname' => 'Lü', 'c_mingzi' => 'Shi (Wife of X )'], $byId[5]['changes']);
+        // person 6：兩分量行 → 直接採用。
+        $this->assertSame(['c_surname' => 'Lü', 'c_mingzi' => 'Kun'], $byId[6]['changes']);
+        // person 7：只 surname 行 → 只改 surname。
+        $this->assertSame(['c_surname' => 'Lü'], $byId[7]['changes']);
+        // person 8：孤兒（單姓）→ 用現庫姓的詞數自動拆（原 §D-4 approach A）。
+        $this->assertSame(['c_surname' => 'Lü', 'c_mingzi' => 'Kun'], $byId[8]['changes']);
+    }
+
+    #[Test]
+    public function it_splits_orphan_by_sheet_first_space(): void {
+        DB::table('BIOG_MAIN')->insert([
+            // 30：現庫姓髒（Lu9＝Lü）、c_name 也髒 → 姓取自 Sheet correct（第一空格前），不信現庫拼寫
+            ['c_personid' => 30, 'c_name_chn' => '呂建中', 'c_surname' => 'Lu9', 'c_mingzi' => 'Jianzhong', 'c_name' => 'Lv Jianzhong'],
+            // 31：現庫無姓（描述性）→ 整名為 mingzi
+            ['c_personid' => 31, 'c_name_chn' => '女子', 'c_surname' => '', 'c_mingzi' => 'nv zi', 'c_name' => 'nv zi'],
+            // 32：完整名含括號（消歧）→ 保守交人工
+            ['c_personid' => 32, 'c_name_chn' => '呂洵', 'c_surname' => 'Lv', 'c_mingzi' => 'Xun', 'c_name' => 'Lv Xun'],
+            // 33：現庫姓含空格（帶空格複姓/描述性）→ 第一空格拆不可靠、交人工
+            ['c_personid' => 33, 'c_name_chn' => '桃花石女', 'c_surname' => 'Tao hua', 'c_mingzi' => 'shi nv', 'c_name' => 'Tao hua shi nv'],
+        ]);
+        $this->regenMap['呂建中'] = ['c_surname' => 'Lü', 'c_mingzi' => 'Jianzhong', 'c_name' => 'Lü Jianzhong'];
+
+        $plan = $this->planner()->planBiogMain([
+            ['id' => 30, 'field' => 'c_name', 'wrong_pinyin' => 'Lv Jianzhong', 'correct_pinyin' => 'Lü Jianzhong'],
+            ['id' => 31, 'field' => 'c_name', 'wrong_pinyin' => 'nv zi', 'correct_pinyin' => 'nü zi'],
+            ['id' => 32, 'field' => 'c_name', 'wrong_pinyin' => 'Lv Xun', 'correct_pinyin' => 'Lü Xun (2)'],
+            ['id' => 33, 'field' => 'c_name', 'wrong_pinyin' => 'Tao hua shi nv', 'correct_pinyin' => 'Tao hua shi nü'],
+        ]);
+        $byId = [];
+        foreach ($plan['mutations'] as $m) {
+            $byId[$m['pk']['c_personid']] = $m;
+        }
+        $reasons = [];
+        foreach ($plan['exceptions'] as $e) {
+            $reasons[$e['id']] = $e['reason'];
+        }
+
+        // 30：現庫髒姓也拆對——姓取自 Sheet correct 'Lü Jianzhong' 第一空格前
+        $this->assertSame(['c_surname' => 'Lü', 'c_mingzi' => 'Jianzhong'], $byId[30]['changes']);
+        // 31：無姓 → 只改 mingzi 為整名
+        $this->assertSame(['c_mingzi' => 'nü zi'], $byId[31]['changes']);
+        // 32：含括號 → 交人工（orphan-cname）
+        $this->assertSame('orphan-cname', $reasons[32]);
+        // 33：現庫姓含空格 → 交人工
+        $this->assertSame('orphan-cname', $reasons[33]);
+    }
+
+    #[Test]
+    public function it_flags_derived_empty_instead_of_blanking(): void {
+        // trim(c_name) 後完整名其實等於 surname，但現庫仍有 mingzi 殘值 → 應視為 blocking 矛盾，不得靜默清空。
+        DB::table('BIOG_MAIN')->insert([
+            ['c_personid' => 20, 'c_name_chn' => '呂', 'c_surname' => 'Lv', 'c_mingzi' => 'Kun', 'c_name' => 'Lv Kun'],
+        ]);
+        $this->regenMap['呂'] = ['c_surname' => 'Lü', 'c_mingzi' => '', 'c_name' => 'Lü'];
+
+        $plan = $this->planner()->planBiogMain([
+            ['id' => 20, 'field' => 'c_surname', 'wrong_pinyin' => 'Lv', 'correct_pinyin' => 'Lü'],
+            ['id' => 20, 'field' => 'c_name', 'wrong_pinyin' => 'Lv Kun', 'correct_pinyin' => 'Lü '],
+        ]);
+
+        $this->assertSame([], $plan['mutations'], '推導出空分量不得產生變更');
+        $this->assertSame('name-is-surname-but-mingzi-present', $plan['exceptions'][0]['reason']);
+    }
+
+    #[Test]
+    public function it_trims_c_name_before_name_matching_and_split(): void {
+        DB::table('BIOG_MAIN')->insert([
+            ['c_personid' => 24, 'c_name_chn' => '呂坤', 'c_surname' => 'Lv', 'c_mingzi' => '', 'c_name' => 'Lv'],
+            ['c_personid' => 25, 'c_name_chn' => '呂坤', 'c_surname' => '', 'c_mingzi' => 'Kun', 'c_name' => 'Kun'],
+        ]);
+        $this->regenMap['呂坤'] = ['c_surname' => 'Lü', 'c_mingzi' => 'Kun', 'c_name' => 'Lü Kun'];
+
+        $plan = $this->planner()->planBiogMain([
+            ['id' => 24, 'field' => 'c_surname', 'wrong_pinyin' => 'Lv', 'correct_pinyin' => 'Lü'],
+            ['id' => 24, 'field' => 'c_name', 'wrong_pinyin' => 'Lv', 'correct_pinyin' => '  Lü  '],
+            ['id' => 25, 'field' => 'c_mingzi', 'wrong_pinyin' => 'Kun', 'correct_pinyin' => 'Kun'],
+            ['id' => 25, 'field' => 'c_name', 'wrong_pinyin' => 'Kun', 'correct_pinyin' => '  Kun  '],
         ]);
 
         $byId = [];
@@ -109,10 +202,46 @@ class PinyinMigrationPlannerTest extends TestCase {
             $byId[$m['pk']['c_personid']] = $m;
         }
 
-        // person 5：有 c_name 列 → 兩分量都送，重算 c_name 才會等於已驗證的 correct。
-        $this->assertSame(['c_surname' => 'Lü', 'c_mingzi' => 'Lü'], $byId[5]['changes']);
-        // person 6：無 c_name 列 → 只送標記的 surname。
-        $this->assertSame(['c_surname' => 'Lü'], $byId[6]['changes']);
+        $this->assertSame(['c_surname' => 'Lü'], $byId[24]['changes']);
+        $this->assertSame(['c_mingzi' => 'Kun'], $byId[25]['changes']);
+    }
+
+    #[Test]
+    public function it_flags_conflicts_and_inconsistencies(): void {
+        DB::table('BIOG_MAIN')->insert([
+            ['c_personid' => 21, 'c_name_chn' => '呂坤', 'c_surname' => 'Lv', 'c_mingzi' => 'Kun', 'c_name' => 'Lv Kun'],
+            ['c_personid' => 22, 'c_name_chn' => '呂', 'c_surname' => 'Lv', 'c_mingzi' => 'Kun', 'c_name' => 'Lv Kun'],
+            ['c_personid' => 23, 'c_name_chn' => '呂坤', 'c_surname' => 'Lv', 'c_mingzi' => 'Kun', 'c_name' => 'Lv Kun'],
+            ['c_personid' => 24, 'c_name_chn' => '呂坤', 'c_surname' => 'Lv', 'c_mingzi' => 'Kun', 'c_name' => 'Lv Kun'],
+        ]);
+        $this->regenMap['呂坤'] = ['c_surname' => 'Lü', 'c_mingzi' => 'Kun', 'c_name' => 'Lü Kun'];
+        $this->regenMap['呂'] = ['c_surname' => 'Lü', 'c_mingzi' => '', 'c_name' => 'Lü'];
+
+        $plan = $this->planner()->planBiogMain([
+            // 21：同一欄重複且值不同 → duplicate-field
+            ['id' => 21, 'field' => 'c_surname', 'wrong_pinyin' => 'Lv', 'correct_pinyin' => 'Lü'],
+            ['id' => 21, 'field' => 'c_surname', 'wrong_pinyin' => 'Lv', 'correct_pinyin' => 'Lu'],
+            // 22：完整名即姓、但現庫 mingzi 非空 → 矛盾
+            ['id' => 22, 'field' => 'c_surname', 'wrong_pinyin' => 'Lv', 'correct_pinyin' => 'Lü'],
+            ['id' => 22, 'field' => 'c_name', 'wrong_pinyin' => 'Lv Kun', 'correct_pinyin' => 'Lü'],
+            // 23：兩分量+完整名，但 surname+' '+mingzi != 完整名 → sheet-inconsistent
+            ['id' => 23, 'field' => 'c_surname', 'wrong_pinyin' => 'Lv', 'correct_pinyin' => 'Lü'],
+            ['id' => 23, 'field' => 'c_mingzi', 'wrong_pinyin' => 'Kun', 'correct_pinyin' => 'Kun'],
+            ['id' => 23, 'field' => 'c_name', 'wrong_pinyin' => 'Lv Kun', 'correct_pinyin' => 'Lü Wrong'],
+            // 24：同一欄位 correct 相同但 wrong 不同，也要視為 duplicate-field
+            ['id' => 24, 'field' => 'c_surname', 'wrong_pinyin' => 'Lv', 'correct_pinyin' => 'Lü'],
+            ['id' => 24, 'field' => 'c_surname', 'wrong_pinyin' => 'Lyu', 'correct_pinyin' => 'Lü'],
+        ]);
+
+        $reasons = [];
+        foreach ($plan['exceptions'] as $e) {
+            $reasons[$e['id']] = $e['reason'];
+        }
+        $this->assertSame('duplicate-field', $reasons[21]);
+        $this->assertSame('name-is-surname-but-mingzi-present', $reasons[22]);
+        $this->assertSame('sheet-inconsistent', $reasons[23]);
+        $this->assertSame('duplicate-field', $reasons[24]);
+        $this->assertSame([], $plan['mutations'], '衝突/不一致不得產生變更');
     }
 
     #[Test]

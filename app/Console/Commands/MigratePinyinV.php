@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\Http;
 /**
  * 人名拼音 v→ü 遷移執行指令（預設 dry-run，只計算不寫入）。
  *
- * 機制見 docs/PINYIN_V_TO_UMLAUT_MIGRATION.md §D-3/§D-5/§D-6（重生 + Sheet oracle + 寫入前漂移檢查）。
+ * 機制見 docs/PINYIN_V_TO_UMLAUT_MIGRATION.md §D-2/§D-3/§D-5/§D-6（Sheet 權威優先 + 寫入前漂移檢查；
+ * auto_pinyin 重生僅作 high/low 信心標記，不決定寫不寫）。
  * 權威來源為 Frank 的 Google Sheet（兩分頁 CSV）。本指令**只有加 --execute 才會寫入**，
  * 且寫入一律走受審計的 /api/v2/mutate（mode:direct），逐筆有 audit / operations 可回退。
  *
@@ -33,15 +34,22 @@ class MigratePinyinV extends Command {
                             {--limit=0 : 最多處理筆數（抽樣，0＝不限）}
                             {--out-dir= : 產物輸出目錄（預設 storage/app/pinyin-migration）}
                             {--execute : 實際寫入（走 /api/v2/mutate）；省略＝dry-run 只計算}
+                            {--confidence=all : 寫入時只送指定信心（all|high|low）；high 另含無信心的 ALTNAME、跳過 BIOG low，low 僅送 BIOG low}
                             {--base-url=http://localhost : --execute 時的 API base URL}';
 
     /** @var string */
-    protected $description = '人名拼音 v→ü 遷移：Sheet 驅動、重生+oracle+漂移檢查，預設 dry-run。--execute 才寫入（走審計 API）。';
+    protected $description = '人名拼音 v→ü 遷移：Sheet 權威、寫入前漂移檢查、重生僅作信心標記，預設 dry-run。--execute 才寫入（走審計 API）。';
 
     public function handle(): int {
         $table = (string) $this->option('table');
         if (!in_array($table, ['both', 'biog', 'altname'], true)) {
             $this->error('--table 只能是 both|biog|altname');
+
+            return self::FAILURE;
+        }
+        $confidence = (string) $this->option('confidence');
+        if (!in_array($confidence, ['all', 'high', 'low'], true)) {
+            $this->error('--confidence 只能是 all|high|low');
 
             return self::FAILURE;
         }
@@ -111,8 +119,14 @@ class MigratePinyinV extends Command {
             $totalMutations += count($plan['mutations']);
             $totalExceptions += count($plan['exceptions']);
 
-            if ($execute && $plan['mutations'] !== []) {
-                $applyFailures += $this->applyMutations($plan['mutations'], (string) $this->option('base-url'), (string) $token, $outDir, $side);
+            if ($execute) {
+                $toApply = $this->filterByConfidence($plan['mutations'], $confidence);
+                if ($confidence !== 'all') {
+                    $this->line("  依 --confidence={$confidence} 篩選：本批送出 ".count($toApply).' / 共 '.count($plan['mutations']).' 筆');
+                }
+                if ($toApply !== []) {
+                    $applyFailures += $this->applyMutations($toApply, (string) $this->option('base-url'), (string) $token, $outDir, $side);
+                }
             }
         }
 
@@ -233,10 +247,32 @@ class MigratePinyinV extends Command {
         return $rows;
     }
 
+    /**
+     * 依 --confidence 篩選要送出的 mutation。
+     * - all：全部；high：high + 無信心欄位（ALTNAME），跳過 BIOG low；low：僅 BIOG low。
+     *
+     * @param  array<int, array>  $mutations
+     * @return array<int, array>
+     */
+    public static function filterByConfidence(array $mutations, string $confidence): array {
+        if ($confidence === 'all') {
+            return array_values($mutations);
+        }
+        if ($confidence === 'high') {
+            // high 或無信心欄位（ALTNAME）；明確排除 low 及未來可能新增的其它信心值。
+            return array_values(array_filter($mutations, static fn ($m) => !array_key_exists('confidence', $m) || $m['confidence'] === 'high'));
+        }
+
+        return array_values(array_filter($mutations, static fn ($m) => ($m['confidence'] ?? null) === 'low'));
+    }
+
     /** @param array{mutations:array,exceptions:array,skipped:array,alreadyDone:array} $plan */
     private function reportPlan(string $side, array $plan, string $outDir): void {
         $this->newLine();
-        $this->info(strtoupper($side).'：預定變更 '.count($plan['mutations'])
+        $hi = count(array_filter($plan['mutations'], static fn ($m) => ($m['confidence'] ?? null) === 'high'));
+        $lo = count(array_filter($plan['mutations'], static fn ($m) => ($m['confidence'] ?? null) === 'low'));
+        $conf = ($hi + $lo) > 0 ? "（信心 high {$hi}／low {$lo}）" : '';
+        $this->info(strtoupper($side).'：預定變更 '.count($plan['mutations']).$conf
             .'、例外 '.count($plan['exceptions'])
             .'、跳過(漂移/落空) '.count($plan['skipped'])
             .'、已遷移 '.count($plan['alreadyDone']));
@@ -256,6 +292,13 @@ class MigratePinyinV extends Command {
             $file = $outDir.DIRECTORY_SEPARATOR."{$side}-{$bucket}.json";
             file_put_contents($file, json_encode($plan[$bucket], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         }
+        // 另出一份 low-confidence（重生對不上 Sheet）供寫入前人工抽查（如生僻字/多音字/「之妻」英譯）。
+        // 一律重寫（空則寫 []），避免重用 out-dir 時殘留上一輪過期清單而誤判。
+        $low = array_values(array_filter($plan['mutations'], static fn ($m) => ($m['confidence'] ?? null) === 'low'));
+        file_put_contents(
+            $outDir.DIRECTORY_SEPARATOR."{$side}-low-confidence.json",
+            json_encode($low, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+        );
     }
 
     /**

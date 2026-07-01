@@ -69,6 +69,21 @@ class MigratePinyinVCommandTest extends TestCase {
     }
 
     #[Test]
+    public function dry_run_rewrites_low_confidence_file_even_when_empty(): void {
+        @mkdir($this->outDir, 0775, true);
+        file_put_contents($this->outDir.'/altname-low-confidence.json', '[{"stale":true}]');
+
+        $this->artisan('cbdb:migrate-pinyin-v', [
+            '--table' => 'altname',
+            '--altname-csv' => $this->csv,
+            '--out-dir' => $this->outDir,
+        ])->assertSuccessful();
+
+        $low = json_decode((string) file_get_contents($this->outDir.'/altname-low-confidence.json'), true);
+        $this->assertSame([], $low);
+    }
+
+    #[Test]
     public function it_tolerates_blank_and_short_csv_rows(): void {
         // Sheet 匯出常見的空白行/短行不得使指令崩潰（PHP 8 array_combine 會擲 ValueError）。
         file_put_contents(
@@ -123,6 +138,32 @@ class MigratePinyinVCommandTest extends TestCase {
         ])->assertFailed();
 
         @unlink($biogCsv);
+    }
+
+    #[Test]
+    public function it_filters_mutations_by_confidence(): void {
+        $muts = [
+            ['confidence' => 'high', 'pk' => 1],
+            ['confidence' => 'low', 'pk' => 2],
+            ['pk' => 3],   // 無信心（ALTNAME）
+        ];
+        $this->assertCount(3, \App\Console\Commands\MigratePinyinV::filterByConfidence($muts, 'all'));
+        // high → high + 無信心，跳過 low
+        $high = \App\Console\Commands\MigratePinyinV::filterByConfidence($muts, 'high');
+        $this->assertSame([1, 3], array_column($high, 'pk'));
+        // low → 僅 low
+        $low = \App\Console\Commands\MigratePinyinV::filterByConfidence($muts, 'low');
+        $this->assertSame([2], array_column($low, 'pk'));
+    }
+
+    #[Test]
+    public function it_rejects_invalid_confidence(): void {
+        $this->artisan('cbdb:migrate-pinyin-v', [
+            '--table' => 'altname',
+            '--altname-csv' => $this->csv,
+            '--out-dir' => $this->outDir,
+            '--confidence' => 'medium',
+        ])->assertFailed();
     }
 
     #[Test]

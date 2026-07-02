@@ -72,6 +72,24 @@
 - **Execution result (2026-07-01)**: batch 1 (high+ALTNAME) 5146 successful, batch 2 (low) 1506 successful — **6652 total written to production, spot-verified online** (incl. rare char `呂搢→Lü Jin`, compound-surname orphan `閭丘陞→Lüqiu Sheng`).
 - **Pending human (not yet written)**: multi-word orphans (~47, awaiting the "kinship-female splittable" rule), parenthesized orphans 9, ALTNAME ambiguities 27 (>1 match), and **24 name-less records whose Chinese given-name component is NULL** (e.g. `鄭履正`, rejected by the handler's "name cannot be empty" check — API can't update them, needs another route). Lists are in the manual-review xlsx (not version-controlled).
 
+### D-12 Auto-normalize v→ü on save (manual-input paths; "stop-the-bleed 2.0")
+> **Gap (found by Hongsu 2026-07-02)**: M1 stop-the-bleed only hooks the **generation paths** (pinyin auto-generated from Chinese: `auto_pinyin` / the three batch `buildPinyin` / `buildPinyinWord`). But pinyin a user **manually types** in an edit form / batch page (e.g. typing `lv` directly) goes through the **save path, not generation**, so the raw `v` is stored as-is and never becomes `ü` — and would re-pollute the data after the migration.
+
+- **Prerequisite**: `App\Support\PinyinUmlaut::normalize()` (rule `l/n`+`v` not followed by a/i/o/u → `lü/nü/lüe/nüe`) was **built by M1 on develop**; this docs branch is older and doesn't have it yet, so ensure the target branch (develop) includes M1 before implementing.
+- **To do**: on **every pinyin-field save/write path**, normalize with `PinyinUmlaut::normalize()` before writing. **Two hook classes** (corrected after verification):
+  - **4 already call `BracketNormalizer`** (BiogMainMutationHandler, AltnameMutationHandler, AltnameCreateHandler, BiogMainRepository) → add PinyinUmlaut at that same preprocessing hook.
+  - **Those with no reusable hook** (`AdminBatchLoadBookTitlesController::updatePinyin` uses its own whitespace/case-only `normalizePinyinInput`; `CodesController`'s write methods are generic `DB::table()->insert/update` with **no pre-save normalizer at all**) → need one **added** at their write point.
+  - **Safest: extract a shared "normalize pinyin before save" helper** applied uniformly. Note `BracketNormalizer`'s altname field list is only `c_alt_name`, **NOT the `c_alt_name_pinyin*` numeric columns** — so you may reuse its hook *location* but **not its field list**; the helper must carry its own complete pinyin-column list.
+- **Entry points (Explore + codex map; all manual-input, currently gapped)**:
+  - `app/Services/Mutations/BiogMainMutationHandler.php` (`/api/v2/mutate`, direct/proposal): c_surname, c_mingzi, c_name_rm, c_surname_rm, c_mingzi_rm, c_*_proper (calls BracketNormalizer)
+  - `app/Services/Mutations/AltnameMutationHandler.php` (`/api/v2/mutate`) + `AltnameCreateHandler.php` (`/api/v2/create`): c_alt_name, c_alt_name_pinyin/2/3 (BracketNormalizer only covers c_alt_name)
+  - `app/Http/Controllers/AdminBatchLoadBookTitlesController.php::updatePinyin()` (inline edit of c_title book-title pinyin; no BracketNormalizer)
+  - `app/Http/Controllers/CodesController.php` `store()`/`update()`/`proposalStore()`/`proposalUpdate()`/**`proposalUpdateExisting()`** (code-table pinyin cols: c_office_pinyin, c_inst_name_py, TEXT_CODES.c_title, ADDR_CODES.c_name, etc.; generic writes, no normalizer; the proposal ones write the payload — normalize at submission)
+  - `app/Repositories/BiogMainRepository.php` `updateById()` (basic-info form direct-edit) + `store()` (person create) — same gap (`auto_pinyin` only regenerates c_surname/c_mingzi from Chinese, never touches manually-typed `_rm`/`_proper`; calls BracketNormalizer)
+- **Scope limits**: normalize **pinyin/romanized columns only**, **never Chinese columns (`c_*_chn`)**. The rule is a no-op for Western names where `lv/nv` is followed by a vowel (Silva/Calvin); but Western words where `lv/nv` is followed by e/consonant (e.g. `solve`→`solüe`) WOULD be converted — negligible for person-name romanization columns, but watch out before applying to code-table English columns. For proposal paths, normalize **at submission** (so the approved value is already canonical).
+- **Relation to the migration**: this is "stop-the-bleed 2.0" — M1 covers **generation**, this covers **manual input**; together they guarantee no new `v` is produced afterward. Should be added **before** the Phase A wrap-up (§D-10).
+- **Tests**: per entry point (typing `lv`/`Nv` reads back as `lü`/`Nü`; Western names `Silva`/`Calvin` unchanged; Chinese columns unaffected; proposal payload normalized on submit).
+
 ## 0. Background and Agreed Decisions
 
 The CBDB pinyin convention has long used `v` in place of `ü` (e.g. `呂 = Lv`, `閭丘 = Lvqiu`, `耶律 = Yelv`). Following the email discussion among Frank Lin, Song Chen, Hongsu, Michael Fuller, and Peter Bol, the following decisions were reached:

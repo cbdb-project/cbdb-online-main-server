@@ -90,6 +90,21 @@ class RebuildNameSearchIndexTest extends TestCase {
     }
 
     #[Test]
+    public function test_normalizeName_removes_spaces_around_parentheses(): void {
+        // 帶空白的半角括號：空白與括號皆移除，與 NameSearchIndexService 一致
+        // 避免全量重建覆蓋增量流程已修正的無空白索引
+        $this->assertEquals('李白青蓮', $this->invokeNormalizeName('李白 (青蓮)'));
+        $this->assertEquals('李白青蓮', $this->invokeNormalizeName('李白（青蓮）'));
+        $this->assertEquals('李白青蓮', $this->invokeNormalizeName('李白( 青蓮 )'));
+        // 全形空白 U+3000
+        $this->assertEquals('李白青蓮', $this->invokeNormalizeName('李白　(青蓮)'));
+        // 不斷行空白 U+00A0
+        $this->assertEquals('李白青蓮', $this->invokeNormalizeName("李白\u{00A0}(青蓮)"));
+        // 非括號的內部空白亦移除（中文姓名不含有意義空白）
+        $this->assertEquals('李白', $this->invokeNormalizeName('李 白'));
+    }
+
+    #[Test]
     public function test_normalizeName_handles_nested_parentheses(): void {
         // 嵌套括號（雖然實際數據中不太可能出現）
         $result = $this->invokeNormalizeName('王氏（李（白）妻）');

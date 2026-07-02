@@ -271,9 +271,10 @@ class NameSearchIndexService {
             return null;
         }
 
-        // 移除括號符號本身，但保留內容以便搜尋
-        // 例如："宗氏（李白妻）" → "宗氏李白妻"
-        $name = preg_replace('/[()（）]/u', '', $name);
+        // 移除括號符號本身，並移除所有空白（含全形／不斷行空白），但保留內容以便搜尋。
+        // 中文姓名不含有意義的空白；若殘留空白會破壞後綴索引與搜尋比對。
+        // 例如："宗氏（李白妻）" → "宗氏李白妻"、"李白 (青蓮)" → "李白青蓮"
+        $name = preg_replace('/[()（）\s\p{Zs}]/u', '', $name);
         $name = trim($name);
 
         return $name ?: null;

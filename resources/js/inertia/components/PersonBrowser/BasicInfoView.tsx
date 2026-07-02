@@ -118,6 +118,8 @@ export default function BasicInfoView({
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
     const [generatingPinyin, setGeneratingPinyin] = useState(false);
+    // 非阻塞提示：生成拼音時偵測到關係稱謂，但括號內之人不在此人親屬名單中（後端已改用一般拼音轉換）。
+    const [pinyinKinshipHint, setPinyinKinshipHint] = useState(false);
 
     const initialState = useMemo(() => buildInitialState(form), [form]);
     const dirty = useMemo(
@@ -139,6 +141,7 @@ export default function BasicInfoView({
         setFieldErrors({});
         setMessage(null);
         setError(null);
+        setPinyinKinshipHint(false); // 切換人物／重新初始化時清掉提示，避免殘留上一人的親屬提示。
     }, [initialState, personId, startEditing, canEdit]);
 
     useEffect(() => {
@@ -200,6 +203,7 @@ export default function BasicInfoView({
         setFieldErrors({});
         setMessage(null);
         setError(null);
+        setPinyinKinshipHint(false); // 取消編輯時一併清掉提示，避免回到檢視態仍殘留警示。
     }, [initialState]);
 
 
@@ -222,15 +226,20 @@ export default function BasicInfoView({
         setGeneratingPinyin(true);
         setMessage(null);
         setError(null);
+        setPinyinKinshipHint(false);
 
         try {
             const [surname, mingzi] = await Promise.all([
-                fetchPinyinValue(pinyinEndpoint, formState.c_surname_chn ?? ''),
-                fetchPinyinValue(pinyinEndpoint, formState.c_mingzi_chn ?? '', false),
+                fetchPinyinValue(pinyinEndpoint, formState.c_surname_chn ?? '', true, personId),
+                fetchPinyinValue(pinyinEndpoint, formState.c_mingzi_chn ?? '', false, personId),
             ]);
 
-            setFormState((prev) => applyGeneratedPinyin(prev, initialState, surname, mingzi));
+            setFormState((prev) => applyGeneratedPinyin(prev, initialState, surname.text, mingzi.text));
             setMessage(t('pinyin_generated'));
+            // 非阻塞提示：任一欄位偵測到「關係稱謂但查無此親屬」（後端已改用一般拼音轉換）。
+            if (surname.kinshipUnmatched || mingzi.kinshipUnmatched) {
+                setPinyinKinshipHint(true);
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : t('pinyin_failed'));
         } finally {
@@ -346,6 +355,7 @@ export default function BasicInfoView({
             ) : null}
 
             {message ? <div style={successMessageStyle}>{message}</div> : null}
+            {pinyinKinshipHint ? <div style={warningMessageStyle}>{t('pinyin_kinship_unmatched_hint')}</div> : null}
             {error ? <div style={errorMessageStyle}>{error}</div> : null}
 
             {editing && form ? renderEditor(
@@ -1438,13 +1448,15 @@ function joinWithSpace(left?: string, right?: string): string {
         .join(' ');
 }
 
-async function fetchPinyinValue(endpoint: string, query: string, split: boolean = true): Promise<string> {
+async function fetchPinyinValue(endpoint: string, query: string, split: boolean = true, personId?: number | null): Promise<{ text: string; kinshipUnmatched: boolean }> {
     if (!query.trim()) {
-        return '';
+        return { text: '', kinshipUnmatched: false };
     }
 
     const splitParam = split ? '' : '&split=0';
-    const response = await fetch(`${endpoint}?q=${encodeURIComponent(query)}${splitParam}`, {
+    // 帶 person_id 以啟用後端「親屬關係守衛」；回傳 X-Pinyin-Kinship-Unmatched 標頭代表偵測到關係稱謂但查無此親屬。
+    const pid = personId != null ? `&person_id=${personId}` : '';
+    const response = await fetch(`${endpoint}?q=${encodeURIComponent(query)}${splitParam}${pid}`, {
         headers: {
             'Accept': 'text/plain',
             'X-Requested-With': 'XMLHttpRequest',
@@ -1456,7 +1468,7 @@ async function fetchPinyinValue(endpoint: string, query: string, split: boolean 
         throw new Error(`生成拼音失敗（HTTP ${response.status}）`);
     }
 
-    return (await response.text()).trim();
+    return { text: (await response.text()).trim(), kinshipUnmatched: response.headers.get('X-Pinyin-Kinship-Unmatched') === '1' };
 }
 
 function getCsrfToken(): string {
@@ -1723,6 +1735,16 @@ const errorMessageStyle: React.CSSProperties = {
     backgroundColor: 'var(--danger-subtle)',
     border: '1px solid var(--danger-border)',
     color: 'var(--danger-subtle-foreground)',
+    fontSize: '0.88rem',
+};
+
+const warningMessageStyle: React.CSSProperties = {
+    margin: '16px 20px 0',
+    padding: '10px 12px',
+    borderRadius: 8,
+    backgroundColor: 'var(--warning-subtle)',
+    border: '1px solid var(--warning-border)',
+    color: 'var(--warning-subtle-foreground)',
     fontSize: '0.88rem',
 };
 

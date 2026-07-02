@@ -148,6 +148,7 @@ return [
     'col_hao' => 'Style Name (Hao)',
     'basicinfo_check_alert' => 'Before leaving: please confirm that [Given Name] and [Ming] are filled in.',
     'basicinfo_pinyin_alert' => 'Pinyin generation complete.',
+    'pinyin_kinship_unmatched_hint' => 'Detected a kinship term, but this person has no such kin — used general pinyin conversion instead.',
 
     // ─── Addresses module ─────────────────────────────────────────
     'addresses_list' => 'Addresses',

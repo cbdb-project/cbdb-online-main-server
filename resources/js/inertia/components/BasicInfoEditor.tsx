@@ -88,6 +88,8 @@ export default function BasicInfoEditor({
     const [message, setMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pinyinDone, setPinyinDone] = useState(false);
+    // 非阻塞提示：生成拼音時偵測到關係稱謂，但括號內之人不在此人親屬名單中（後端已改用一般拼音轉換）。
+    const [pinyinKinshipHint, setPinyinKinshipHint] = useState(false);
     const [comment, setComment] = useState('');
     const [deleting, setDeleting] = useState(false);
 
@@ -174,23 +176,29 @@ export default function BasicInfoEditor({
     // 注意：此端點回傳「純文字字串」（如 "An Shi"、"(Wife of Li Bai)"），不是 {data:[...]} 自動完成結構，
     // 故以 r.text() 讀取（舊版 Blade 編輯器亦直接取用字串）。誤用 r.json() 會在解析純文字時拋錯 → 一律「生成拼音失敗」。
     const generatePinyin = async () => {
-        setError(null); setMessage(null); // 清掉前次錯誤/訊息，避免本次成功時頂部殘留舊 error alert。
+        setError(null); setMessage(null); setPinyinKinshipHint(false); // 清掉前次錯誤/訊息/提示，避免殘留。
         try {
             // 不再吞掉 HTTP 失敗：!r.ok 即拋出，落到下方 catch 顯示 generate_pinyin_failed（否則 500/422 會被誤當成功）。
-            const fetchPinyin = async (q: string, split: boolean): Promise<string> => {
-                const r = await fetch(`${pinyinEndpoint}?q=${encodeURIComponent(q)}${split ? '' : '&split=0'}`, {
+            // 帶 person_id 以啟用後端「親屬關係守衛」；回傳 X-Pinyin-Kinship-Unmatched 標頭時代表偵測到關係稱謂但查無此親屬。
+            const fetchPinyin = async (q: string, split: boolean): Promise<{ text: string; kinshipUnmatched: boolean }> => {
+                const pid = personId != null ? `&person_id=${personId}` : '';
+                const r = await fetch(`${pinyinEndpoint}?q=${encodeURIComponent(q)}${split ? '' : '&split=0'}${pid}`, {
                     headers: { Accept: 'text/plain', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin',
                 });
                 if (!r.ok) throw new Error(`HTTP ${r.status}`);
-                return (await r.text()).trim();
+                return { text: (await r.text()).trim(), kinshipUnmatched: r.headers.get('X-Pinyin-Kinship-Unmatched') === '1' };
             };
             // 姓氏走預設 split=1（已知姓氏後插空格）；名走 split=0（整體轉換、不再拆姓）。
             const sp = await fetchPinyin(fields.c_surname_chn ?? '', true);
             const mp = await fetchPinyin(fields.c_mingzi_chn ?? '', false);
             // 回填拼音姓/名後，同步重算派生「拼音全名」(c_name)，使下方自動生成框即時更新（資料流收尾）。
-            setFields((p) => { const next = { ...p, c_surname: sp || p.c_surname, c_mingzi: mp || p.c_mingzi }; return { ...next, ...deriveNames(next) }; });
+            setFields((p) => { const next = { ...p, c_surname: sp.text || p.c_surname, c_mingzi: mp.text || p.c_mingzi }; return { ...next, ...deriveNames(next) }; });
             setPinyinDone(true);
             window.setTimeout(() => setPinyinDone(false), 4000);
+            // 任一欄位偵測到「關係稱謂但查無此親屬」→ 顯示非阻塞提示（不自動消失，供使用者留意並修正資料）。
+            if (sp.kinshipUnmatched || mp.kinshipUnmatched) {
+                setPinyinKinshipHint(true);
+            }
         } catch {
             setError(tr('generate_pinyin_failed', '生成拼音失敗'));
         }
@@ -357,6 +365,7 @@ export default function BasicInfoEditor({
             {message ? <div style={gOkStyle}>{message}</div> : null}
             {error ? <div style={gErrStyle}>{error}</div> : null}
             {pinyinDone ? <div style={gOkStyle}>{tr('basicinfo_pinyin_alert', '「生成拼音」已完成')}</div> : null}
+            {pinyinKinshipHint ? <div style={gWarnStyle}>{tr('pinyin_kinship_unmatched_hint', '偵測到親屬關係詞，但此人親屬名單中查無此人，已改用一般拼音轉換。')}</div> : null}
             {nameWarning ? <div style={gWarnStyle}>{tr('name_required_warning', '請確認「名（中）」與「拼音名」是否填寫。')}</div> : null}
 
             {/* 區塊一：姓名（資料流分組）。自上而下一條線、按鈕作橋：中文姓名 →〔生成姓名拼音〕→ 拼音 → 外文/羅馬字 → 自動生成框。 */}

@@ -582,25 +582,39 @@ class ApiController extends Controller {
     public function searchPinyin(Request $request) {
         $word = trim((string) $request->q);
         $split = (int) $request->input('split', 1);
-        if (!empty($word)) {
-            $res = $this->buildRelationshipPinyin($word, $split) ?? $this->buildPinyinWord($word, $split);
-
-            // 全角括號轉半角，並確保括號前與文字之間有一個空格
-            $res = str_replace(['（', '）'], ['(', ')'], $res);
-            $res = preg_replace('/\s*\(/u', ' (', $res);
-            $res = preg_replace('/^\s+\(/u', '(', $res);
-            $res = trim($res);
-
-            // 左括號後第一個字母大寫（與人名各段首字母大寫慣例一致）。
-            // 僅針對小寫字母，故已為大寫的關係片語（如 "(Wife of ...)"）不受影響。
-            $res = preg_replace_callback('/\((\p{Ll})/u', static function (array $m): string {
-                return '('.mb_strtoupper($m[1], 'UTF-8');
-            }, $res);
-
-            return $res;
-        } else {
+        if (empty($word)) {
             return '';
         }
+
+        // 可選 person_id：提供時啟用「親屬關係守衛」——偵測到關係稱謂（如「（靖江女）」），
+        // 但括號內之人不在此人親屬名單中時，改走一般拼音轉換，並帶提示標頭供前端非阻塞提示。
+        $personId = ($request->filled('person_id') && is_numeric($request->input('person_id')))
+            ? (int) $request->input('person_id')
+            : null;
+
+        $kinshipUnmatched = false;
+        $res = $this->buildRelationshipPinyin($word, $split, $personId, $kinshipUnmatched)
+            ?? $this->buildPinyinWord($word, $split);
+
+        // 全角括號轉半角，並確保括號前與文字之間有一個空格
+        $res = str_replace(['（', '）'], ['(', ')'], $res);
+        $res = preg_replace('/\s*\(/u', ' (', $res);
+        $res = preg_replace('/^\s+\(/u', '(', $res);
+        $res = trim($res);
+
+        // 左括號後第一個字母大寫（與人名各段首字母大寫慣例一致）。
+        // 僅針對小寫字母，故已為大寫的關係片語（如 "(Wife of ...)"）不受影響。
+        $res = preg_replace_callback('/\((\p{Ll})/u', static function (array $m): string {
+            return '('.mb_strtoupper($m[1], 'UTF-8');
+        }, $res);
+
+        // 偵測到關係稱謂但親屬名單查無此人時：本體仍回傳純文字拼音（向後相容 r.text()），
+        // 另帶一個 ASCII 標頭讓前端顯示非阻塞小提示。
+        if ($kinshipUnmatched) {
+            return response($res)->header('X-Pinyin-Kinship-Unmatched', '1');
+        }
+
+        return $res;
     }
 
     private function buildPinyinWord(string $word, int $split = 1): string {
@@ -623,12 +637,19 @@ class ApiController extends Controller {
         return PinyinUmlaut::normalize(ucfirst(Pinyin::getPinyin($normalized)));
     }
 
-    private function buildRelationshipPinyin(string $word, int $split = 1): ?string {
+    private function buildRelationshipPinyin(string $word, int $split = 1, ?int $personId = null, bool &$kinshipUnmatched = false): ?string {
         $titlesPattern = implode('|', array_map('preg_quote', array_keys($this->relationshipPhrases())));
 
         // 特例 1：例如「（李白妻）」→「(Wife of Li Bai)」
         if (preg_match('/^\s*[（(]\s*(.+?)\s*('.$titlesPattern.')\s*[）)]\s*$/u', $word, $matches) === 1) {
-            $target = $this->buildPinyinWord($matches[1] ?? '', $split);
+            $targetChn = $matches[1] ?? '';
+            // 親屬守衛：括號內之人不在此人親屬名單中 → 判為別名，退回一般轉換並標記提示。
+            if (!$this->personHasKinNamed($personId, $targetChn)) {
+                $kinshipUnmatched = true;
+
+                return null;
+            }
+            $target = $this->buildPinyinWord($targetChn, $split);
             $phrase = $this->relationshipPhrases()[$matches[2]] ?? null;
 
             return $phrase ? '('.$phrase.' '.trim($target).')' : null;
@@ -636,14 +657,46 @@ class ApiController extends Controller {
 
         // 特例 2：例如「宗氏（李白妻）」→「Zong Shi (Wife of Li Bai)」
         if (preg_match('/^(.*?)[（(]\s*(.+?)\s*('.$titlesPattern.')\s*[）)]\s*$/u', $word, $matches) === 1) {
+            $targetChn = $matches[2] ?? '';
+            if (!$this->personHasKinNamed($personId, $targetChn)) {
+                $kinshipUnmatched = true;
+
+                return null;
+            }
             $prefix = $this->buildPinyinWord($matches[1] ?? '', $split);
-            $target = $this->buildPinyinWord($matches[2] ?? '', $split);
+            $target = $this->buildPinyinWord($targetChn, $split);
             $phrase = $this->relationshipPhrases()[$matches[3]] ?? null;
 
             return $phrase ? trim($prefix).' ('.$phrase.' '.trim($target).')' : null;
         }
 
         return null;
+    }
+
+    /**
+     * 快速判斷此人（$personId）的親屬名單中，是否有「中文姓名等於 $targetNameChn」的親屬。
+     * 供關係拼音守衛使用：偵測到關係稱謂（如「（靖江女）」）時，若括號內之人不在此人親屬中，
+     * 多半是別名而非真實親屬關係，應改走一般拼音轉換。
+     *
+     * 無 person 上下文（$personId 為 null）或空目標時回傳 true（不做守衛，維持既有行為、向後相容）。
+     *
+     * 限制（刻意的「快速匹配」）：僅比對親屬中文姓名是否相等，不驗證關係方向／稱謂互逆
+     * （如「（靖江女）」代表本人為靖江之女，靖江在本人親屬中應記為「父」）。因此：
+     *   - 偽陰性（真親屬但存檔姓名寫法不同）→ 退回一般轉換並提示，屬保守可接受；
+     *   - 偽陽性（同名親屬但實際關係不符，或同名多人）→ 仍會套用關係轉換。
+     * 這符合使用者「親屬名單中查無此人才不套用」的訴求；若日後需更精準，可加入互逆稱謂比對。
+     */
+    private function personHasKinNamed(?int $personId, string $targetNameChn): bool {
+        $target = trim($targetNameChn);
+        if ($personId === null || $target === '') {
+            return true;
+        }
+
+        return DB::table('KIN_DATA')
+            ->join('BIOG_MAIN', 'BIOG_MAIN.c_personid', '=', 'KIN_DATA.c_kin_id')
+            ->where('KIN_DATA.c_personid', $personId)
+            ->where('BIOG_MAIN.c_name_chn', $target)
+            ->exists();
     }
 
     /**

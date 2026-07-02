@@ -24,9 +24,24 @@ class ApiSearchPinyinTest extends TestCase {
             $table->string('lastname_chn')->primary();
             $table->string('lastname_pinyin')->nullable();
         });
+
+        // 親屬關係守衛（person_id）測試用最小表：KIN_DATA + BIOG_MAIN（僅需 c_name_chn 供姓名比對）。
+        Schema::dropIfExists('KIN_DATA');
+        Schema::create('KIN_DATA', function (Blueprint $table) {
+            $table->integer('c_personid');
+            $table->integer('c_kin_id');
+            $table->smallInteger('c_kin_code')->default(0);
+        });
+        Schema::dropIfExists('BIOG_MAIN');
+        Schema::create('BIOG_MAIN', function (Blueprint $table) {
+            $table->integer('c_personid')->primary();
+            $table->string('c_name_chn')->nullable();
+        });
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('KIN_DATA');
+        Schema::dropIfExists('BIOG_MAIN');
         Schema::dropIfExists('pinyin');
         parent::tearDown();
     }
@@ -223,5 +238,47 @@ class ApiSearchPinyinTest extends TestCase {
         $content = trim($response->getContent());
 
         $this->assertSame('Zong Shi (Mother of Li Bai)', $content);
+    }
+
+    #[Test]
+    public function search_pinyin_applies_relationship_when_target_is_a_kin(): void {
+        DB::table('pinyin')->insert(['lastname_chn' => '李', 'lastname_pinyin' => 'Li']);
+        // 100 的親屬名單中確有「李白」（id 200）→ 關係守衛通過，維持關係轉換。
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 200, 'c_name_chn' => '李白']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 100, 'c_kin_id' => 200, 'c_kin_code' => 1]);
+
+        $response = $this->get('/api/select/search/pinyin?q='.urlencode('（李白妻）').'&person_id=100');
+
+        $response->assertOk();
+        $this->assertSame('(Wife of Li Bai)', trim($response->getContent()));
+        $response->assertHeaderMissing('X-Pinyin-Kinship-Unmatched');
+    }
+
+    #[Test]
+    public function search_pinyin_falls_back_to_general_when_target_not_a_kin(): void {
+        // 100 的親屬只有「李白」；括號內「靖江」並非其親屬 → 判為別名，
+        // 退回一般拼音轉換（不出現「Daughter of」），並帶非阻塞提示標頭。
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 200, 'c_name_chn' => '李白']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 100, 'c_kin_id' => 200, 'c_kin_code' => 1]);
+
+        $response = $this->get('/api/select/search/pinyin?q='.urlencode('張氏（靖江女）').'&person_id=100');
+
+        $response->assertOk();
+        $content = trim($response->getContent());
+        $this->assertStringNotContainsString(' of ', $content);          // 未套用「Daughter of」
+        $this->assertStringNotContainsString('女', $content);            // 已轉為拼音
+        $response->assertHeader('X-Pinyin-Kinship-Unmatched', '1');
+    }
+
+    #[Test]
+    public function search_pinyin_without_person_id_keeps_relationship_conversion(): void {
+        // 向後相容：未帶 person_id 時不做親屬守衛，維持既有關係轉換、且不帶提示標頭。
+        DB::table('pinyin')->insert(['lastname_chn' => '李', 'lastname_pinyin' => 'Li']);
+
+        $response = $this->get('/api/select/search/pinyin?q='.urlencode('（李白妻）'));
+
+        $response->assertOk();
+        $this->assertSame('(Wife of Li Bai)', trim($response->getContent()));
+        $response->assertHeaderMissing('X-Pinyin-Kinship-Unmatched');
     }
 }

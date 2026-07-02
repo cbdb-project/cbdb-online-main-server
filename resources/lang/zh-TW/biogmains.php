@@ -148,6 +148,7 @@ return [
     'col_hao' => '號',
     'basicinfo_check_alert' => '訊息提示：要離開視窗了，請您確認[名]和[Ming]是否填寫。',
     'basicinfo_pinyin_alert' => '訊息提示：「生成拼音」已經完成。',
+    'pinyin_kinship_unmatched_hint' => '偵測到親屬關係詞，但此人親屬名單中查無此人，已改用一般拼音轉換。',
 
     // ─── Addresses module ─────────────────────────────────────────
     'addresses_list' => '地址清單',

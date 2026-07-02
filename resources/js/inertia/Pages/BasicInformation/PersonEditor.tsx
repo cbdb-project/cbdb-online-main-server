@@ -190,9 +190,26 @@ export default function PersonEditor() {
         pendingNavigationRef.current = null;
     }, []);
 
+    // 標題（h1）改以 summary 為準：summary 於基本資料儲存後會重新抓取（handleBasicInfoSaved 觸發 summaryRefreshKey），
+    // 故改名存檔後標題即時更新，不再停留在頁面初載的舊 person_label（切分頁再切回仍是舊值、須整頁重載才更新的問題）。
+    // summary 未載入（初載中／載入失敗）時退回伺服器提供的 person_label。
+    // 格式須與後端 buildPersonViewProps 的 person_label 一致：「{id} · {中文名} ({拼音}) · {朝代}」。
+    const displayLabel = (() => {
+        if (!summary) return person_label;
+        let label = String(summary.c_personid ?? personId);
+        const nameChn = summary.c_name_chn ?? '';
+        const name = summary.c_name ?? '';
+        if (nameChn || name) {
+            label += ' · ' + nameChn;
+            if (name) label += ' (' + name + ')';
+        }
+        if (summary.dynasty_chn) label += ' · ' + summary.dynasty_chn;
+        return label;
+    })();
+
     return (
         <DashboardLayout
-            title={person_label}
+            title={displayLabel}
             headerAlign="center"
             breadcrumbs={[
                 // 首段「人物記錄」連到「這個人的基本資料」（詳情中樞，預設 basic_info 分頁），

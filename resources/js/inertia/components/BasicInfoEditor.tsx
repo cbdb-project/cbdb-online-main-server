@@ -36,6 +36,9 @@ interface Props {
     saveasUrl?: string;
     t?: (k: string) => string;   // person/biogmains 翻譯
     onSaved?: () => void;        // 儲存成功後回呼（供上層刷新分頁快取，避免切分頁回來看到舊值）
+    // 供上層（PersonEditor）在切分頁／離頁時偵測未存變更並跳窗提示（所見即所保存）。
+    onEditorStateChange?: (state: { editing: boolean; dirty: boolean }) => void;
+    onRegisterSaveHandler?: (handler: (() => Promise<boolean>) | null) => void;
 }
 
 const READONLY_DERIVED = ['c_name_chn', 'c_name', 'c_name_proper', 'c_name_rm'];
@@ -65,6 +68,7 @@ export default function BasicInfoEditor({
     personId, initialFields, initialLabels = {},
     canEdit, canPropose, mutateEndpoint, deleteEndpoint, pinyinEndpoint = '/api/select/search/pinyin',
     indexUrl = '/basicinformation', duplicateCollateralUrl, saveasUrl, t, onSaved,
+    onEditorStateChange, onRegisterSaveHandler,
 }: Props) {
     // useTranslation 在缺 key 時回傳 key 本身；故須在 t(k)===k（未翻譯）時退回中文 fallback，
     // 否則按鈕/標籤會顯示原始 key（如 save_directly）而非中文。
@@ -117,6 +121,18 @@ export default function BasicInfoEditor({
         window.addEventListener('beforeunload', handler);
         return () => window.removeEventListener('beforeunload', handler);
     }, [dirty]);
+
+    // 向上層回報編輯狀態：本編輯器落地即進入編輯（editing 恆為 true），dirty 反映是否有未存變更。
+    // PersonEditor 據此在切分頁／離頁時跳窗提示「未儲存」。
+    useEffect(() => {
+        onEditorStateChange?.({ editing: true, dirty });
+    }, [dirty, onEditorStateChange]);
+
+    // 卸載時（切離 basic_info 分頁）重置上層狀態並解除 save handler，避免殘留 dirty 誤觸其他分頁的提示。
+    useEffect(() => () => {
+        onRegisterSaveHandler?.(null);
+        onEditorStateChange?.({ editing: false, dirty: false });
+    }, [onEditorStateChange, onRegisterSaveHandler]);
 
     // 卸載時清掉成功訊息自動消失計時器。
     useEffect(() => () => { if (msgTimer.current) window.clearTimeout(msgTimer.current); }, []);
@@ -204,16 +220,17 @@ export default function BasicInfoEditor({
         }
     };
 
-    const save = async (mode: 'direct' | 'proposal') => {
+    // 回傳 boolean：成功 true、驗證失敗／無變更／出錯 false。供切分頁「儲存並繼續」判斷是否可放行導航。
+    const save = async (mode: 'direct' | 'proposal'): Promise<boolean> => {
         setSaving(true); setError(null); setMessage(null);
         // 名（中）／拼音名必填（僅 direct：proposal 時後端會清掉這兩欄，故不擋提案）。空白即阻擋並提示。
         if (mode === 'direct') {
-            if (!(fields.c_mingzi_chn ?? '').trim()) { setSaving(false); setError(tr('mingzi_chn_required', '「名（中）」為必填')); return; }
-            if (!(fields.c_mingzi ?? '').trim()) { setSaving(false); setError(tr('mingzi_required', '「拼音名」為必填')); return; }
+            if (!(fields.c_mingzi_chn ?? '').trim()) { setSaving(false); setError(tr('mingzi_chn_required', '「名（中）」為必填')); return false; }
+            if (!(fields.c_mingzi ?? '').trim()) { setSaving(false); setError(tr('mingzi_required', '「拼音名」為必填')); return false; }
         }
         // 朝代 c_dy 必填（僅此基本資料編輯頁；其他編輯器的朝代維持非必填）。空（''/'0'）即阻擋並提示。
         if (!fields.c_dy || fields.c_dy === '0') {
-            setSaving(false); setError(tr('dynasty_required', '朝代為必填欄位，請先選擇朝代')); return;
+            setSaving(false); setError(tr('dynasty_required', '朝代為必填欄位，請先選擇朝代')); return false;
         }
         // 只送與初始不同、且非唯讀派生的欄位。
         const initial: Fields = JSON.parse(savedSnapshot);
@@ -222,7 +239,7 @@ export default function BasicInfoEditor({
             if (READONLY_DERIVED.includes(k)) continue;
             if ((initial[k] ?? '') !== (v ?? '')) changes[k] = v === '' ? null : v;
         }
-        if (Object.keys(changes).length === 0) { setSaving(false); setError(tr('no_change', '沒有變更')); return; }
+        if (Object.keys(changes).length === 0) { setSaving(false); setError(tr('no_change', '沒有變更')); return false; }
         try {
             const res = await fetch(mutateEndpoint, {
                 method: 'POST',
@@ -259,10 +276,22 @@ export default function BasicInfoEditor({
             // 通知上層儲存成功：上層據此刷新分頁快取，使「切分頁再切回」時載入到已存的新值，
             // 而非最初載入時的舊快照（本元件仍保持掛載、不重載，成功提示不受影響）。
             onSaved?.();
+
+            return true;
         } catch (e) {
             setError(e instanceof Error ? e.message : tr('save_failed', '儲存失敗'));
+
+            return false;
         } finally { setSaving(false); }
     };
+
+    // 註冊「儲存並繼續」處理器供上層在切分頁時呼叫：canEdit → direct；否則可提案者 → proposal。
+    // save 每次 render 重建，故此 effect 每次都以最新 closure（含最新 fields）重新註冊，避免舊值。
+    useEffect(() => {
+        onRegisterSaveHandler?.(
+            (canEdit || canPropose) ? (() => save(canEdit ? 'direct' : 'proposal')) : null,
+        );
+    }, [onRegisterSaveHandler, save, canEdit, canPropose]);
 
     // 刪除（軟刪除）走 /api/v2/delete（對齊 legacy delete-form）。僅 canEdit 顯示。
     const doDelete = async () => {

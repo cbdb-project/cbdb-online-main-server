@@ -373,8 +373,8 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         DB::table('BIOG_MAIN')->insert(['c_personid' => 205, 'c_dy' => '8']);
         DB::table('TEXT_CODES')->insert(['c_textid' => 704, 'c_title_chn' => '來源']);
 
-        // 靑 (U+9751) is unmapped in the Pinyin dict, which fails the pinyin check.
-        $entries = "205\t合法書名\t704\n205\t靑瑣稿\t704";
+        // 龘 (U+9F98) is unmapped in the Pinyin dict, which fails the pinyin check.
+        $entries = "205\t合法書名\t704\n205\t龘瑣稿\t704";
 
         $response = $this->post(route('admin.batch-load-book-titles.store'), [
             'entries' => $entries,
@@ -396,17 +396,17 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         DB::table('BIOG_MAIN')->insert(['c_personid' => 260, 'c_dy' => '6']);
         DB::table('TEXT_CODES')->insert(['c_textid' => 760, 'c_title_chn' => '來源']);
 
-        // 靑 (U+9751) is a valid Han character but not in the Pinyin dict, so without
-        // this check it would survive untranslated in c_title (e.g. "靑 suo xian na gao").
+        // 龘 (U+9F98) is a valid Han character but not in the Pinyin dict, so without
+        // this check it would survive untranslated in c_title (e.g. "龘 suo xian na gao").
         $response = $this->post(route('admin.batch-load-book-titles.store'), [
-            'entries' => "260\t靑瑣獻納稿\t760",
+            'entries' => "260\t龘瑣獻納稿\t760",
         ]);
 
         $response->assertRedirect(route('admin.batch-load-book-titles'));
         $errors = $response->getSession()->get('batch_errors', []);
         $this->assertNotEmpty($errors);
         $this->assertStringContainsString('無拼音對應', implode("\n", $errors));
-        $this->assertStringContainsString('靑', implode("\n", $errors));
+        $this->assertStringContainsString('龘', implode("\n", $errors));
         $this->assertSame(1, DB::table('TEXT_CODES')->count());
         $this->assertSame(0, DB::table('operations')->count());
     }
@@ -514,6 +514,56 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $this->assertSame('東坡集峰卷一', $record->c_title_chn);
         $this->assertStringNotContainsString('峯', $record->c_title_chn);
         $this->assertSame('dong po ji feng juan yi', $record->c_title);
+    }
+
+    #[Test]
+    public function test_variant_glyph_qing_is_standardized_in_stored_title(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 293, 'c_dy' => '6']);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 793, 'c_title_chn' => '來源']);
+
+        // 靑（U+9751）一律標準化為標準字形青（U+9752）。標準化發生在 parseEntries，
+        // 因此「存入的中文書名」本身就被改寫，拼音也據此轉為 qing，不會被無拼音檢查擋下。
+        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "293\t靑瑣稿\t793",
+        ]);
+
+        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $this->assertEmpty($response->getSession()->get('batch_errors', []));
+
+        $record = DB::table('TEXT_CODES')->where('c_textid', '>', 793)->orderByDesc('c_textid')->first();
+        $this->assertNotNull($record);
+        // 存入的書名本身已標準化：靑 → 青
+        $this->assertSame('青瑣稿', $record->c_title_chn);
+        $this->assertStringNotContainsString('靑', $record->c_title_chn);
+        $this->assertSame('qing suo gao', $record->c_title);
+    }
+
+    #[Test]
+    public function test_variant_glyph_ying_is_standardized_in_stored_title(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 294, 'c_dy' => '6']);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 794, 'c_title_chn' => '來源']);
+
+        // 頴（U+9834）一律標準化為標準字形穎（U+7A4E）。標準化發生在 parseEntries，
+        // 因此「存入的中文書名」本身就被改寫，拼音也據此轉為 ying，不會被無拼音檢查擋下。
+        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "294\t頴集\t794",
+        ]);
+
+        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $this->assertEmpty($response->getSession()->get('batch_errors', []));
+
+        $record = DB::table('TEXT_CODES')->where('c_textid', '>', 794)->orderByDesc('c_textid')->first();
+        $this->assertNotNull($record);
+        // 存入的書名本身已標準化：頴 → 穎
+        $this->assertSame('穎集', $record->c_title_chn);
+        $this->assertStringNotContainsString('頴', $record->c_title_chn);
+        $this->assertSame('ying ji', $record->c_title);
     }
 
     #[Test]

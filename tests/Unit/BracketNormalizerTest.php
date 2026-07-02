@@ -28,6 +28,24 @@ class BracketNormalizerTest extends TestCase {
     }
 
     /**
+     * 中文欄位：移除半角括號前後緊鄰的空白
+     *
+     * 使用者若輸入「李白 (青蓮)」（半角括號帶空格），
+     * 應標準化為「李白(青蓮)」，避免搜尋索引殘留空白。
+     */
+    public function test_chinese_removes_spaces_around_brackets(): void {
+        $this->assertSame('李白(青蓮)', BracketNormalizer::normalizeChineseField('李白 (青蓮)'));
+        $this->assertSame('李白(青蓮)', BracketNormalizer::normalizeChineseField('李白（青蓮）'));
+        $this->assertSame('李白(青蓮)', BracketNormalizer::normalizeChineseField('李白 （青蓮）'));
+        $this->assertSame('李白(青蓮)', BracketNormalizer::normalizeChineseField('李白( 青蓮 )'));
+        $this->assertSame('李白(青蓮)', BracketNormalizer::normalizeChineseField('李白 ( 青蓮 ) '));
+        // 全形空白 U+3000
+        $this->assertSame('李白(青蓮)', BracketNormalizer::normalizeChineseField('李白　(青蓮)'));
+        // 括號後仍有內容
+        $this->assertSame('升卿(一作陞卿)號', BracketNormalizer::normalizeChineseField('升卿 (一作陞卿) 號'));
+    }
+
+    /**
      * 中文欄位：空值與空字串
      */
     public function test_chinese_null_and_empty(): void {
@@ -214,5 +232,21 @@ class BracketNormalizerTest extends TestCase {
         // 搜尋索引結果應完全一致
         $this->assertSame($originalIndexed, $normalizedIndexed);
         $this->assertSame('宗氏李白妻', $normalizedIndexed);
+    }
+
+    /**
+     * 驗證使用者輸入帶空白的半角括號時，正規化後不會破壞搜尋索引。
+     *
+     * 若未移除空白：「李白 (青蓮)」→ 去括號後「李白 青蓮」（殘留空白，破壞搜尋）。
+     * 正規化後：「李白(青蓮)」→ 去括號後「李白青蓮」（連續 token，可正常搜尋）。
+     */
+    public function test_chinese_space_removal_preserves_search_index_compatibility(): void {
+        $strip = fn ($s) => preg_replace('/[()（）]/u', '', $s);
+
+        $normalized = BracketNormalizer::normalizeChineseField('李白 (青蓮)');
+        $indexed = $strip($normalized);
+
+        $this->assertSame('李白(青蓮)', $normalized);
+        $this->assertSame('李白青蓮', $indexed);
     }
 }

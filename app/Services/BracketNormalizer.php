@@ -48,10 +48,16 @@ class BracketNormalizer {
     ];
 
     /**
-     * 僅將全角括號轉為半角，不加空格
+     * 中文欄位括號正規化：全角轉半角，並移除括號內外緊鄰的空白
      *
-     * 適用於中文欄位，避免在中文字之間插入空格，
-     * 同時保持與 NameSearchIndexService 搜尋索引的相容性。
+     * 適用於中文欄位。中文字與括號之間不應留空白，
+     * 否則 NameSearchIndexService::normalizeName() 去除括號符號後會殘留空白，
+     * 破壞搜尋索引（例如「李白 (青蓮)」→ 索引「李白 青蓮」而非「李白青蓮」）。
+     *
+     * 規則：
+     * 1. 全角括號（、）轉為半角括號 (、)
+     * 2. 移除半角括號前後緊鄰的空白（含全形／不斷行空白）
+     *    例如："李白 (青蓮)" → "李白(青蓮)"、"李白( 青蓮 )" → "李白(青蓮)"
      *
      * @param string|null $value 原始值
      * @return string|null 正規化後的值
@@ -61,7 +67,13 @@ class BracketNormalizer {
             return $value;
         }
 
-        return str_replace(['（', '）'], ['(', ')'], $value);
+        // Step 1: 全角括號轉半角
+        $value = str_replace(['（', '）'], ['(', ')'], $value);
+
+        // Step 2: 移除括號內外緊鄰的空白（避免破壞搜尋索引與中文閱讀習慣）
+        $value = preg_replace('/[\s\p{Zs}]*([()])[\s\p{Zs}]*/u', '$1', $value);
+
+        return $value;
     }
 
     /**

@@ -440,6 +440,57 @@ class NameSearchIndexAutoSyncTest extends TestCase {
     }
 
     #[Test]
+    public function test_person_with_spaced_parentheses_creates_space_free_index(): void {
+        // 使用者輸入帶空白的半角括號（例："李白 (青蓮)"）。
+        // BiogMain::create 走 Eloquent + Observer → NameSearchIndexService，
+        // 索引應與「李白(青蓮)」一致：移除括號與空白後為「李白青蓮」。
+        $person = BiogMain::create([
+            'c_personid' => 3002,
+            'c_name_chn' => '李白 (青蓮)',
+        ]);
+
+        $searchTerms = DB::table('CBDB__NAME_FTS')
+            ->where('c_personid', 3002)
+            ->pluck('search_term')
+            ->toArray();
+
+        $this->assertContains('李白青蓮', $searchTerms, '應包含移除括號與空白後的完整名稱');
+        $this->assertContains('青蓮', $searchTerms, '應包含括號內容的後綴');
+
+        foreach ($searchTerms as $term) {
+            $this->assertStringNotContainsString(' ', $term, '搜尋詞不應殘留半形空白');
+            $this->assertStringNotContainsString("\u{3000}", $term, '搜尋詞不應殘留全形空白');
+        }
+    }
+
+    #[Test]
+    public function test_altname_with_spaced_parentheses_creates_space_free_index(): void {
+        // 別名路徑（indexAltname → normalizeName）：帶空白的半角括號輸入
+        // 應與「太白(青蓮)」一致，索引移除括號與空白後為「太白青蓮」。
+        BiogMain::create([
+            'c_personid' => 3003,
+            'c_name_chn' => '李白',
+        ]);
+
+        app(\App\Services\NameSearchIndexService::class)
+            ->indexAltname(3003, 4, '太白 (青蓮)');
+
+        $searchTerms = DB::table('CBDB__NAME_FTS')
+            ->where('c_personid', 3003)
+            ->where('name_type_code', 4)
+            ->pluck('search_term')
+            ->toArray();
+
+        $this->assertContains('太白青蓮', $searchTerms, '別名索引應移除括號與空白後的完整名稱');
+        $this->assertContains('青蓮', $searchTerms, '別名索引應包含括號內容的後綴');
+
+        foreach ($searchTerms as $term) {
+            $this->assertStringNotContainsString(' ', $term, '別名搜尋詞不應殘留半形空白');
+            $this->assertStringNotContainsString("\u{3000}", $term, '別名搜尋詞不應殘留全形空白');
+        }
+    }
+
+    #[Test]
     public function test_index_table_does_not_exist_gracefully_handles(): void {
         // 刪除索引表
         Schema::dropIfExists('CBDB__NAME_FTS');

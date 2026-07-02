@@ -35,6 +35,7 @@ interface Props {
     duplicateCollateralUrl?: string;
     saveasUrl?: string;
     t?: (k: string) => string;   // person/biogmains 翻譯
+    onSaved?: () => void;        // 儲存成功後回呼（供上層刷新分頁快取，避免切分頁回來看到舊值）
 }
 
 const READONLY_DERIVED = ['c_name_chn', 'c_name', 'c_name_proper', 'c_name_rm'];
@@ -63,7 +64,7 @@ interface DateGroup {
 export default function BasicInfoEditor({
     personId, initialFields, initialLabels = {},
     canEdit, canPropose, mutateEndpoint, deleteEndpoint, pinyinEndpoint = '/api/select/search/pinyin',
-    indexUrl = '/basicinformation', duplicateCollateralUrl, saveasUrl, t,
+    indexUrl = '/basicinformation', duplicateCollateralUrl, saveasUrl, t, onSaved,
 }: Props) {
     // useTranslation 在缺 key 時回傳 key 本身；故須在 t(k)===k（未翻譯）時退回中文 fallback，
     // 否則按鈕/標籤會顯示原始 key（如 save_directly）而非中文。
@@ -247,6 +248,9 @@ export default function BasicInfoEditor({
             }
             const baseline: Fields = { ...fields, ...patch };
             setSavedSnapshot(JSON.stringify(baseline));
+            // 通知上層儲存成功：上層據此刷新分頁快取，使「切分頁再切回」時載入到已存的新值，
+            // 而非最初載入時的舊快照（本元件仍保持掛載、不重載，成功提示不受影響）。
+            onSaved?.();
         } catch (e) {
             setError(e instanceof Error ? e.message : tr('save_failed', '儲存失敗'));
         } finally { setSaving(false); }
@@ -331,8 +335,24 @@ export default function BasicInfoEditor({
     const flEarly: DateGroup = { year: 'c_fl_earliest_year', nhCode: 'c_fl_ey_nh_code', nhYear: 'c_fl_ey_nh_year', notes: 'c_fl_ey_notes' };
     const flLate: DateGroup = { year: 'c_fl_latest_year', nhCode: 'c_fl_ly_nh_code', nhYear: 'c_fl_ly_nh_year', notes: 'c_fl_ly_notes' };
 
+    // 回車保存（復刻舊版 Blade：表單內於單行輸入框按 Enter 觸發提交）。以原生 <form> 實現，
+    // 因此 textarea 換行、輸入法（IME）選字用的 Enter 皆為瀏覽器原生行為、不會誤觸提交；
+    // 表單內按鈕皆為 type="button" 不隱式提交。canEdit → 直接保存；否則可提案者 → 提交建議。
+    const onFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        if (saving || deleting || !dirty) return;
+        if (canEdit) {
+            void save('direct');
+        } else if (canPropose) {
+            void save('proposal');
+        }
+    };
+
     return (
-        <div style={gridCardStyle}>
+        <form style={gridCardStyle} onSubmit={onFormSubmit}>
+            {/* 隱藏提交鈕：讓表單具備「預設提交按鈕」，使單行輸入框按 Enter 觸發原生隱式提交（→ onFormSubmit）。
+                可見動作按鈕皆為 type="button"（點擊行為不變）；此鈕僅供 Enter，並以 tabIndex=-1／aria-hidden 排除於鍵盤焦點與無障礙。 */}
+            <button type="submit" aria-hidden="true" tabIndex={-1} style={hiddenSubmitStyle} />
             {/* 不再重複「人物基本資料 — {人物}」標題：詳情中樞 banner 已顯示人物、分頁標籤已示「基本資料」。 */}
             {message ? <div style={gOkStyle}>{message}</div> : null}
             {error ? <div style={gErrStyle}>{error}</div> : null}
@@ -477,9 +497,12 @@ export default function BasicInfoEditor({
                     </div>
                 ) : null}
             </div>
-        </div>
+        </form>
     );
 }
+
+// 隱藏提交按鈕：畫面外但仍為可提交候選（不可用 display:none／hidden，否則部分瀏覽器不觸發隱式提交）。
+const hiddenSubmitStyle: React.CSSProperties = { position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, border: 0, overflow: 'hidden', clip: 'rect(0 0 0 0)' };
 
 // BasicInfo 專屬（非版面）樣式：唯讀派生子區塊、生成拼音按鈕列。
 // 唯讀派生子區塊：虛線框 + 淡背景，明確標示「自動生成」。

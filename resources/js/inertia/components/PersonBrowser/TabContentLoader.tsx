@@ -176,6 +176,28 @@ export default function TabContentLoader({
         setFetchSeq((s) => s + 1);
     };
 
+    // 靜默刷新指定分頁的快取資料：於背景重新抓取並就地更新 cache[tabKey].data，
+    // 不觸發 loading 態、不卸載當前掛載的元件（其 state 為當前真相），
+    // 以便使用者切換分頁後再回來時「重新掛載」讀到最新資料，而非最初載入的舊快照。
+    // 失敗時保留既有快取，避免把已顯示的資料清成錯誤態。
+    const refreshTabCache = (tabKey: string) => {
+        if (personId == null || !tabKey) return;
+        const url = tabEndpoint
+            .replace('__PERSON_ID__', String(personId))
+            .replace('__TAB_KEY__', tabKey);
+        fetch(url)
+            .then((res) => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            })
+            .then((data) => {
+                setCache((prev) => ({ ...prev, [tabKey]: { loading: false, error: null, data } }));
+            })
+            .catch(() => {
+                /* 保留既有快取 */
+            });
+    };
+
     if (personId == null) {
         return null;
     }
@@ -237,6 +259,12 @@ export default function TabContentLoader({
                     duplicateCollateralUrl={`/basicinformation/${personId}/Duplicate_Collateral_Info`}
                     saveasUrl={`/basicinformation/${personId}/saveas`}
                     t={tEditor}
+                    onSaved={() => {
+                        // 儲存成功後靜默刷新 basic_info 快取（修：切分頁再切回顯示舊值），
+                        // 並通知上層刷新摘要計數。
+                        refreshTabCache('basic_info');
+                        onBasicInfoSaved?.();
+                    }}
                 />
             );
         }

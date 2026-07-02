@@ -1,7 +1,7 @@
 import React from 'react';
 import { usePage } from '@inertiajs/react';
 import type { NavNode, SharedProps } from '../../types/page';
-import SidebarNode from './SidebarNode';
+import SidebarNode, { buildActiveContext } from './SidebarNode';
 
 interface SidebarProps {
     collapsed: boolean;
@@ -16,7 +16,8 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     const nav: NavNode[] = page.props.nav ?? [];
     // 與舊 Blade 側邊欄（sidebar-v3）一致：讀 config('app.name')，未設定時回退 'CBDB'。
     const appName = page.props.app?.name ?? 'CBDB';
-    const currentPath = (page.url.split('?')[0] || '/').replace(/\/$/, '') || '/';
+    // active 比對上下文：路徑 + 顯著 query 簽章（讓僅以 query 區分的同路徑選單項不再同時高亮，#1109）。
+    const ctx = buildActiveContext(nav, page.url);
 
     return (
         <aside
@@ -34,7 +35,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
             <nav className="sidebar-scroll flex-1 overflow-y-auto px-2 py-3">
                 <ul className="space-y-1">
                     {nav.map((node) => (
-                        <SidebarNode key={node.key} node={node} currentPath={currentPath} />
+                        <SidebarNode key={node.key} node={node} ctx={ctx} />
                     ))}
                 </ul>
             </nav>

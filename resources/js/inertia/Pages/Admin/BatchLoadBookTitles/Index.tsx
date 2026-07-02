@@ -5,6 +5,7 @@ import { Button } from '../../../components/ui/Button';
 import { FormField } from '../../../components/ui/FormField';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import { useTranslation } from '../../../hooks/useTranslation';
+import { getCsrfToken } from '../../../components/PersonBrowser/shared/csrf';
 import type { SharedProps } from '../../../types/page';
 import { cn } from '../../../lib/utils';
 
@@ -32,7 +33,7 @@ interface BatchBooksPageProps extends SharedProps {
     batch_errors: string[];
     batch_id: string | null;
     toast: Toast | null;
-    urls: { store: string; undo: string; reset: string };
+    urls: { store: string; undo: string; reset: string; update_pinyin: string };
 }
 
 export default function BatchLoadBookTitles() {
@@ -46,6 +47,13 @@ export default function BatchLoadBookTitles() {
     const [confirmUndo, setConfirmUndo] = useState(false);
     const [toastShown, setToastShown] = useState<Toast | null>(toast);
 
+    // 逐列拼音就地編輯狀態（重建舊 Blade 版的直接編輯拼音功能）。
+    const [rows, setRows] = useState<ResultRow[]>(results);
+    const [editId, setEditId] = useState<number | null>(null);
+    const [draft, setDraft] = useState('');
+    const [busyId, setBusyId] = useState<number | null>(null);
+    const [rowStatus, setRowStatus] = useState<{ id: number; msg: string; kind: 'success' | 'error' } | null>(null);
+
     useEffect(() => {
         setToastShown(toast);
         if (toast) {
@@ -53,6 +61,79 @@ export default function BatchLoadBookTitles() {
             return () => clearTimeout(id);
         }
     }, [toast]);
+
+    // 重新匯入/回退後 props.results 會變，同步本地列並清空編輯狀態。
+    useEffect(() => {
+        setRows(results);
+        setEditId(null);
+        setDraft('');
+        setRowStatus(null);
+    }, [results]);
+
+    const flashToast = (tt: Toast) => {
+        setToastShown(tt);
+        setTimeout(() => setToastShown(null), 3000);
+    };
+
+    const startEdit = (r: ResultRow) => {
+        setEditId(r.c_textid);
+        setDraft(r.title_pinyin ?? '');
+        setRowStatus(null);
+    };
+    const cancelEdit = () => {
+        setEditId(null);
+        setDraft('');
+        setRowStatus(null);
+    };
+
+    const savePinyin = async (r: ResultRow) => {
+        if (busyId !== null) {
+            return; // 防止進行中重複送出（避免重複審計記錄）
+        }
+        const value = draft.trim();
+        if (value === '') {
+            setRowStatus({ id: r.c_textid, msg: t('batch_pinyin_empty'), kind: 'error' });
+            return;
+        }
+        if (!batch_id) {
+            return;
+        }
+        setBusyId(r.c_textid);
+        setRowStatus(null);
+        try {
+            const res = await fetch(urls.update_pinyin, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({ c_textid: r.c_textid, batch_id, pinyin: value }),
+            });
+            const json = await res.json().catch(() => null);
+            if (!res.ok || !json || json.ok === false) {
+                const msg = (json && json.message) || t('batch_pinyin_save_failed');
+                setRowStatus({ id: r.c_textid, msg, kind: 'error' });
+                flashToast({ msg, type: 'error' });
+                return;
+            }
+            // 以伺服器實際存回的值更新該列（可能經正規化/截斷）。
+            const stored = String(json.c_title ?? '');
+            setRows((prev) => prev.map((x) => (x.c_textid === r.c_textid ? { ...x, title_pinyin: stored } : x)));
+            setEditId(null);
+            setDraft('');
+            setRowStatus({ id: r.c_textid, msg: t('batch_pinyin_saved') + stored, kind: 'success' });
+            flashToast({ msg: t('batch_pinyin_updated') + json.c_textid, type: 'success' });
+            // 成功狀態 4 秒後自動清除（對齊舊版行為）。
+            setTimeout(() => setRowStatus((cur) => (cur?.id === r.c_textid && cur.kind === 'success' ? null : cur)), 4000);
+        } catch {
+            setRowStatus({ id: r.c_textid, msg: t('batch_network_error'), kind: 'error' });
+        } finally {
+            setBusyId(null);
+        }
+    };
 
     const submit = (force: boolean) => {
         form.transform((d) => (force ? { entries: d.entries, force: '1' } : { entries: d.entries }));
@@ -66,7 +147,7 @@ export default function BatchLoadBookTitles() {
     };
 
     const copyResults = () => {
-        const payload = results.map((r) => `${r.c_textid}\t${r.title}`).join('\n');
+        const payload = rows.map((r) => `${r.c_textid}\t${r.title}`).join('\n');
         navigator.clipboard?.writeText(payload);
     };
 
@@ -126,7 +207,7 @@ export default function BatchLoadBookTitles() {
                     </div>
                 </form>
 
-                {results.length > 0 && (
+                {rows.length > 0 && (
                     <>
                         <div className="mt-5 flex items-center gap-2">
                             <Button type="button" variant="outline" size="sm" onClick={copyResults}>{t('batch_copy_textid_btn')}</Button>
@@ -146,12 +227,67 @@ export default function BatchLoadBookTitles() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {results.map((r) => (
+                                    {rows.map((r) => (
                                         <tr key={`${r.line}-${r.c_textid}`} className="border-t border-border">
                                             <td className="px-3 py-1.5">{r.line}</td>
                                             <td className="px-3 py-1.5">{r.author_id}</td>
                                             <td className="px-3 py-1.5">{r.title}</td>
-                                            <td className="px-3 py-1.5">{r.title_pinyin}</td>
+                                            <td className="px-3 py-1.5">
+                                                {batch_id && editId === r.c_textid ? (
+                                                    <div className="flex flex-col gap-1">
+                                                        <div className="flex items-center gap-1">
+                                                            <input
+                                                                autoFocus
+                                                                value={draft}
+                                                                spellCheck={false}
+                                                                disabled={busyId === r.c_textid}
+                                                                onFocus={(e) => e.target.select()}
+                                                                onChange={(e) => setDraft(e.target.value)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') { e.preventDefault(); savePinyin(r); }
+                                                                    if (e.key === 'Escape') { cancelEdit(); }
+                                                                }}
+                                                                className="w-44 rounded border border-input bg-background px-2 py-1 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                            />
+                                                            <Button type="button" size="sm" disabled={busyId === r.c_textid} onClick={() => savePinyin(r)}>
+                                                                {t('batch_pinyin_save')}
+                                                            </Button>
+                                                            <Button type="button" size="sm" variant="secondary" disabled={busyId === r.c_textid} onClick={cancelEdit}>
+                                                                {tc('cancel')}
+                                                            </Button>
+                                                        </div>
+                                                        {(busyId === r.c_textid || rowStatus?.id === r.c_textid) && (
+                                                            <span
+                                                                className={cn(
+                                                                    'text-xs',
+                                                                    busyId === r.c_textid ? 'text-muted-foreground'
+                                                                        : rowStatus?.kind === 'error' ? 'text-red-600' : 'text-green-600'
+                                                                )}
+                                                            >
+                                                                {busyId === r.c_textid ? t('batch_pinyin_saving') : rowStatus?.msg}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-2">
+                                                        <span>{r.title_pinyin}</span>
+                                                        {batch_id && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => startEdit(r)}
+                                                                title={t('batch_pinyin_edit_title')}
+                                                                aria-label={t('batch_pinyin_edit_title')}
+                                                                className="text-muted-foreground hover:text-primary"
+                                                            >
+                                                                <i className="fas fa-pen text-xs" aria-hidden="true" />
+                                                            </button>
+                                                        )}
+                                                        {rowStatus?.id === r.c_textid && rowStatus.kind === 'success' && (
+                                                            <span className="text-xs text-green-600">{rowStatus.msg}</span>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </td>
                                             <td className="px-3 py-1.5">{r.source}</td>
                                             <td className="px-3 py-1.5">{r.dynasty}</td>
                                             <td className="px-3 py-1.5">{r.text_type}</td>

@@ -79,6 +79,7 @@ class AdminBatchLoadBookTitlesController extends Controller {
                 'store' => route('app.admin.batch-load-book-titles.store', [], false),
                 'undo' => route('app.admin.batch-load-book-titles.undo', [], false),
                 'reset' => route('app.admin.batch-load-book-titles', [], false),
+                'update_pinyin' => route('app.admin.batch-load-book-titles.update-pinyin', [], false),
             ],
             'page_translations' => [
                 'admin' => is_array($t = trans('admin')) ? $t : [],

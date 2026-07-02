@@ -591,6 +591,12 @@ class ApiController extends Controller {
             $res = preg_replace('/^\s+\(/u', '(', $res);
             $res = trim($res);
 
+            // 左括號後第一個字母大寫（與人名各段首字母大寫慣例一致）。
+            // 僅針對小寫字母，故已為大寫的關係片語（如 "(Wife of ...)"）不受影響。
+            $res = preg_replace_callback('/\((\p{Ll})/u', static function (array $m): string {
+                return '('.mb_strtoupper($m[1], 'UTF-8');
+            }, $res);
+
             return $res;
         } else {
             return '';

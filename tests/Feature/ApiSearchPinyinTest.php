@@ -183,6 +183,34 @@ class ApiSearchPinyinTest extends TestCase {
     }
 
     #[Test]
+    public function search_pinyin_capitalizes_first_letter_after_left_parenthesis(): void {
+        // 人名含括號（非關係稱謂，如別名/字號）時，左括號後首字母應大寫，
+        // 與人名各段首字母大寫慣例一致。split=0 模擬基本資料編輯器「名」欄的生成拼音。
+        $response = $this->get('/api/select/search/pinyin?q='.urlencode('李白（青蓮）').'&split=0');
+
+        $response->assertOk();
+        $content = trim($response->getContent());
+
+        $this->assertSame('Libai (Qinglian)', $content);
+        $this->assertStringNotContainsString('（', $content);
+        $this->assertStringNotContainsString('）', $content);
+    }
+
+    #[Test]
+    public function search_pinyin_keeps_relationship_phrase_capitalization_unchanged(): void {
+        DB::table('pinyin')->insert([
+            'lastname_chn' => '李',
+            'lastname_pinyin' => 'Li',
+        ]);
+
+        // 關係片語括號內已為大寫英文（(Wife of ...)），大寫化不得誤傷或重覆處理。
+        $response = $this->get('/api/select/search/pinyin?q='.urlencode('（李白妻）'));
+
+        $response->assertOk();
+        $this->assertSame('(Wife of Li Bai)', trim($response->getContent()));
+    }
+
+    #[Test]
     public function search_pinyin_converts_prefixed_relationship_patterns_to_english_phrases(): void {
         DB::table('pinyin')->insert([
             ['lastname_chn' => '宗', 'lastname_pinyin' => 'Zong'],

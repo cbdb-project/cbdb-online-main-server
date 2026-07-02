@@ -259,6 +259,8 @@ export default function TabContentLoader({
                     duplicateCollateralUrl={`/basicinformation/${personId}/Duplicate_Collateral_Info`}
                     saveasUrl={`/basicinformation/${personId}/saveas`}
                     t={tEditor}
+                    onEditorStateChange={onBasicInfoEditorStateChange}
+                    onRegisterSaveHandler={onRegisterBasicInfoSaveHandler}
                     onSaved={() => {
                         // 儲存成功後靜默刷新 basic_info 快取（修：切分頁再切回顯示舊值），
                         // 並通知上層刷新摘要計數。

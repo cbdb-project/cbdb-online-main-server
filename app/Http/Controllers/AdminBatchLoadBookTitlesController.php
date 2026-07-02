@@ -25,6 +25,8 @@ class AdminBatchLoadBookTitlesController extends Controller {
      */
     private const TITLE_VARIANT_MAP = [
         '峯' => '峰',
+        '靑' => '青',
+        '頴' => '穎',
     ];
 
     /**

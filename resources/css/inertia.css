@@ -230,7 +230,7 @@
     --radius-md: var(--radius);
     --radius-lg: calc(var(--radius) + 2px);
 
-    /* 字體：沿用主站 Source Sans Pro / Noto Sans TC（見近期 commit） */
+    /* 字體：Source Sans Pro / Noto Sans TC 由模板走 Google Fonts 載入，不進 Vite bundle。 */
     --font-sans: 'Source Sans Pro', 'Noto Sans TC', -apple-system, BlinkMacSystemFont,
         'Segoe UI', Roboto, sans-serif;
 

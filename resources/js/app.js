@@ -8,11 +8,6 @@
 // Import AdminLTE v3 CSS from NPM
 import 'admin-lte/dist/css/adminlte.min.css';
 
-// Self-hosted Noto Sans TC (weights matching Source Sans Pro) — no Google CDN dependency
-import '@fontsource/noto-sans-tc/300.css';
-import '@fontsource/noto-sans-tc/400.css';
-import '@fontsource/noto-sans-tc/700.css';
-
 // Import jQuery and expose globally before any plugins run
 import $ from './jquery-global';
 

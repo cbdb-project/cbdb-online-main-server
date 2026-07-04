@@ -10,6 +10,8 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=fallback" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600&family=Noto+Serif+TC:wght@400;600&display=fallback" rel="stylesheet">
+    <link rel="stylesheet" href="https://jigmo.digitalhumanities.dev/jigmo-tc.css">
 
     <style>
         * {
@@ -131,6 +133,11 @@
 
         .info-value {
             color: #333;
+        }
+
+        .cbdb-database-text {
+            font-family: 'Source Serif 4', 'Source Han Serif TC', 'Noto Serif TC', 'Jigmo', serif;
+            font-variant-east-asian: traditional;
         }
 
         .item-box {
@@ -299,7 +306,7 @@
             <div>
                 @foreach($searchResults as $result)
                     <a href="#" class="person-link person-search-result" data-person-id="{{ $result['id'] }}">
-                        {{ e($result['label']) }} <span class="badge">{{ $result['id'] }}</span>
+                        <span class="cbdb-database-text">{{ e($result['label']) }}</span> <span class="badge">{{ $result['id'] }}</span>
                     </a>
                 @endforeach
             </div>
@@ -442,14 +449,26 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
             .replace(/'/g, '&#39;');
     }
 
+    function dbHtml(value) {
+        return '<span class="cbdb-database-text">' + (value || '') + '</span>';
+    }
+
+    function dbText(value) {
+        return dbHtml(escapeHtml(value));
+    }
+
+    function dbStrong(value) {
+        return '<strong class="cbdb-database-text">' + escapeHtml(value) + '</strong>';
+    }
+
     function formatIdLabel(label, id) {
         if (!label && !id) {
             return '';
         }
         if (label && id) {
-            return escapeHtml(label) + ' <span class="badge">ID: ' + escapeHtml(id) + '</span>';
+            return dbText(label) + ' <span class="badge">ID: ' + escapeHtml(id) + '</span>';
         }
-        return escapeHtml(label || id || '');
+        return dbText(label || id || '');
     }
 
     function joinParts(parts, separator) {
@@ -458,7 +477,11 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
     }
 
     function line(label, value) {
-        return '<div class="info-row"><span class="info-label">' + label + '：</span><span class="info-value">' + (value || '<span class="empty">' + cbdbI18n.empty + '</span>') + '</span></div>';
+        var output = value || '<span class="empty">' + cbdbI18n.empty + '</span>';
+        if (value && value !== cbdbI18n.unknown && String(value).indexOf('<') === -1) {
+            output = dbHtml(value);
+        }
+        return '<div class="info-row"><span class="info-label">' + label + '：</span><span class="info-value">' + output + '</span></div>';
     }
 
     function isValidValue(val) {
@@ -473,7 +496,7 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
         html += line(cbdbI18n.fieldIndexYear, isValidValue(info.IndexYear) ? escapeHtml(info.IndexYear) : cbdbI18n.unknown);
         var indexAddrHtml = '';
         if (info.IndexAddr) {
-            indexAddrHtml = escapeHtml(info.IndexAddr);
+            indexAddrHtml = dbText(info.IndexAddr);
         }
         if (info.IndexAddrId) {
             indexAddrHtml += ' <a href="/codes/ADDR_CODES?search=' + encodeURIComponent(info.IndexAddrId) + '" target="_blank" rel="noopener noreferrer">';
@@ -514,8 +537,8 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
             }
             if (info.Source || info.SourcePages) {
                 html += line(cbdbI18n.fieldSourceLink,
-                    (info.Source ? escapeHtml(info.Source) : '<span class="empty">' + cbdbI18n.empty + '</span>') +
-                    (info.SourcePages ? cbdbI18n.pagesComma + escapeHtml(info.SourcePages) : ''));
+                    (info.Source ? dbText(info.Source) : '<span class="empty">' + cbdbI18n.empty + '</span>') +
+                    (info.SourcePages ? cbdbI18n.pagesComma + dbText(info.SourcePages) : ''));
             }
         }
 
@@ -532,7 +555,7 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
             var itemHtml = '<div class="item-box">';
             var pieces = [];
             if (item.Source) {
-                var sourceLabel = escapeHtml(item.Source);
+                var sourceLabel = dbText(item.Source);
                 if (item.SourceId) {
                     sourceLabel += ' <span class="badge">ID: ' + escapeHtml(item.SourceId) + '</span>';
                 }
@@ -542,14 +565,14 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
                 if (item.UrlApi) {
                     var urlPart = encodeURIComponent(item.Pages);
                     var fullUrl = item.UrlApi + urlPart + (item.UrlApiCoda || '');
-                    pieces.push(cbdbI18n.pagesPrefix + '<a href="' + escapeHtml(fullUrl) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(item.Pages) + '</a>');
+                    pieces.push(cbdbI18n.pagesPrefix + '<a href="' + escapeHtml(fullUrl) + '" target="_blank" rel="noopener noreferrer">' + dbText(item.Pages) + '</a>');
                 } else {
-                    pieces.push(cbdbI18n.pagesPrefix + escapeHtml(item.Pages));
+                    pieces.push(cbdbI18n.pagesPrefix + dbText(item.Pages));
                 }
             }
             itemHtml += (pieces.length ? pieces.join('，') : '<span class="empty">' + cbdbI18n.empty + '</span>');
             if (item.Notes) {
-                itemHtml += '<div class="small-text mt-1">' + cbdbI18n.noteLabel + escapeHtml(item.Notes) + '</div>';
+                itemHtml += '<div class="small-text mt-1">' + cbdbI18n.noteLabel + dbText(item.Notes) + '</div>';
             }
             itemHtml += '</div>';
             html += itemHtml;
@@ -566,14 +589,14 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
         items.forEach(function (item) {
             var parts = [];
             if (item.AliasType) {
-                var aliasType = '<strong>' + escapeHtml(item.AliasType) + '</strong>';
+                var aliasType = dbStrong(item.AliasType);
                 if (item.AliasTypeId) {
                     aliasType += ' <span class="badge">ID: ' + escapeHtml(item.AliasTypeId) + '</span>';
                 }
                 parts.push(aliasType);
             }
             if (item.AliasName) {
-                parts.push(escapeHtml(item.AliasName));
+                parts.push(dbText(item.AliasName));
             }
             if (parts.length > 0) {
                 html += '<div class="item-box">' + parts.join('：') + '</div>';
@@ -589,7 +612,7 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
         }
         var addr = '';
         if (item.AddrName) {
-            addr = escapeHtml(item.AddrName);
+            addr = dbText(item.AddrName);
         }
         if (item.AddrId) {
             var addrLink = '<a href="/codes/ADDR_CODES?search=' + encodeURIComponent(item.AddrId) + '" target="_blank" rel="noopener noreferrer">';
@@ -607,7 +630,7 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
         items.forEach(function (item) {
             var itemHtml = '<div class="item-box">';
             if (item.AddrType) {
-                var typeLabel = '<strong>' + escapeHtml(item.AddrType) + '</strong>';
+                var typeLabel = dbStrong(item.AddrType);
                 if (item.AddrTypeId !== undefined) {
                     typeLabel += ' <span class="badge">ID: ' + escapeHtml(item.AddrTypeId) + '</span>';
                 }
@@ -619,26 +642,26 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
             }
             var extra = [];
             if (item.MoveCount) {
-                extra.push(cbdbI18n.sequenceLabel + escapeHtml(item.MoveCount));
+                extra.push(cbdbI18n.sequenceLabel + dbText(item.MoveCount));
             }
             if (item.FirstYear && isValidValue(item.FirstYear)) {
-                extra.push(cbdbI18n.startYearLabel + escapeHtml(item.FirstYear));
+                extra.push(cbdbI18n.startYearLabel + dbText(item.FirstYear));
             }
             if (item.LastYear && isValidValue(item.LastYear)) {
-                extra.push(cbdbI18n.endYearLabel + escapeHtml(item.LastYear));
+                extra.push(cbdbI18n.endYearLabel + dbText(item.LastYear));
             }
             if (extra.length) {
                 itemHtml += '<div class="small-text mt-2">' + extra.join('，') + '</div>';
             }
             if (item.Source) {
-                var src = cbdbI18n.sourceLabel + escapeHtml(item.Source);
+                var src = cbdbI18n.sourceLabel + dbText(item.Source);
                 if (item.Pages) {
-                    src += cbdbI18n.pagesComma + escapeHtml(item.Pages);
+                    src += cbdbI18n.pagesComma + dbText(item.Pages);
                 }
                 itemHtml += '<div class="small-text mt-1">' + src + '</div>';
             }
             if (item.Notes) {
-                itemHtml += '<div class="small-text mt-1">' + cbdbI18n.noteLabel + escapeHtml(item.Notes) + '</div>';
+                itemHtml += '<div class="small-text mt-1">' + cbdbI18n.noteLabel + dbText(item.Notes) + '</div>';
             }
             itemHtml += '</div>';
             html += itemHtml;
@@ -656,14 +679,14 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
             var itemHtml = '<div class="item-box">';
             var pieces = [];
             if (item.EntryType) {
-                var entry = '<strong>' + escapeHtml(item.EntryType) + '</strong>';
+                var entry = dbStrong(item.EntryType);
                 if (item.EntryTypeId) {
                     entry += ' <span class="badge">ID: ' + escapeHtml(item.EntryTypeId) + '</span>';
                 }
                 pieces.push(entry);
             }
             if (item.EntryCode) {
-                var code = escapeHtml(item.EntryCode);
+                var code = dbText(item.EntryCode);
                 if (item.EntryCodeId) {
                     code += ' <span class="badge">' + escapeHtml(item.EntryCodeId) + '</span>';
                 }
@@ -672,23 +695,23 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
             itemHtml += pieces.join('：');
             var tail = [];
             if (item.RuShiYear && isValidValue(item.RuShiYear)) {
-                tail.push(cbdbI18n.yearLabel + escapeHtml(item.RuShiYear));
+                tail.push(cbdbI18n.yearLabel + dbText(item.RuShiYear));
             }
             if (item.RuShiAge && isValidValue(item.RuShiAge)) {
-                tail.push(cbdbI18n.ageLabel + escapeHtml(item.RuShiAge));
+                tail.push(cbdbI18n.ageLabel + dbText(item.RuShiAge));
             }
             if (tail.length) {
                 itemHtml += '<div class="small-text mt-2">' + tail.join('，') + '</div>';
             }
             if (item.Source) {
-                itemHtml += '<div class="small-text mt-1">' + cbdbI18n.sourceLabel + escapeHtml(item.Source);
+                itemHtml += '<div class="small-text mt-1">' + cbdbI18n.sourceLabel + dbText(item.Source);
                 if (item.Pages) {
-                    itemHtml += cbdbI18n.pagesComma + escapeHtml(item.Pages);
+                    itemHtml += cbdbI18n.pagesComma + dbText(item.Pages);
                 }
                 itemHtml += '</div>';
             }
             if (item.Notes) {
-                itemHtml += '<div class="small-text mt-1">' + cbdbI18n.noteLabel + escapeHtml(item.Notes) + '</div>';
+                itemHtml += '<div class="small-text mt-1">' + cbdbI18n.noteLabel + dbText(item.Notes) + '</div>';
             }
             itemHtml += '</div>';
             html += itemHtml;
@@ -708,7 +731,7 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
 
             // 官职名称
             if (item.OfficeName) {
-                itemHtml += '<strong>' + escapeHtml(item.OfficeName) + '</strong>';
+                itemHtml += dbStrong(item.OfficeName);
             }
 
             var details = [];
@@ -716,42 +739,42 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
             // 起始年
             var startParts = [];
             if (item.FirstYearNianhao && isValidValue(item.FirstYearNianhao)) {
-                startParts.push(escapeHtml(item.FirstYearNianhao));
+                startParts.push(dbText(item.FirstYearNianhao));
             }
             if (item.FirstYearNiaohaoYear && isValidValue(item.FirstYearNiaohaoYear)) {
-                startParts.push(escapeHtml(item.FirstYearNiaohaoYear) + cbdbI18n.yearSuffix);
+                startParts.push(dbText(item.FirstYearNiaohaoYear) + cbdbI18n.yearSuffix);
             }
             if (item.FirstYear && isValidValue(item.FirstYear)) {
-                startParts.push('(' + escapeHtml(item.FirstYear) + ')');
+                startParts.push('(' + dbText(item.FirstYear) + ')');
             }
             var startYearText = startParts.length > 0 ? startParts.join(' ') : cbdbI18n.unknown;
             // 只有当年份不是未詳时，才添加年份限定詞
             if (startParts.length > 0 && item.FirstYearRange && isValidValue(item.FirstYearRange)) {
-                startYearText += '   ' + cbdbI18n.yearQualifierLabel + escapeHtml(item.FirstYearRange);
+                startYearText += '   ' + cbdbI18n.yearQualifierLabel + dbText(item.FirstYearRange);
             }
             details.push(cbdbI18n.startYearLabel + startYearText);
 
             // 終止年
             var endParts = [];
             if (item.LastYearNianhao && isValidValue(item.LastYearNianhao)) {
-                endParts.push(escapeHtml(item.LastYearNianhao));
+                endParts.push(dbText(item.LastYearNianhao));
             }
             if (item.LastYearNianhaoYear && isValidValue(item.LastYearNianhaoYear)) {
-                endParts.push(escapeHtml(item.LastYearNianhaoYear) + cbdbI18n.yearSuffix);
+                endParts.push(dbText(item.LastYearNianhaoYear) + cbdbI18n.yearSuffix);
             }
             if (item.LastYear && isValidValue(item.LastYear)) {
-                endParts.push('(' + escapeHtml(item.LastYear) + ')');
+                endParts.push('(' + dbText(item.LastYear) + ')');
             }
             var endYearText = endParts.length > 0 ? endParts.join(' ') : cbdbI18n.unknown;
             // 只有当年份不是未詳时，才添加年份限定詞
             if (endParts.length > 0 && item.LastYearRange && isValidValue(item.LastYearRange)) {
-                endYearText += '   ' + cbdbI18n.yearQualifierLabel + escapeHtml(item.LastYearRange);
+                endYearText += '   ' + cbdbI18n.yearQualifierLabel + dbText(item.LastYearRange);
             }
             details.push(cbdbI18n.endYearLabel + endYearText);
 
             // 地點
             if (item.AddrName || item.AddrId) {
-                var addrHtml = cbdbI18n.locationLabel + '<strong>' + escapeHtml(item.AddrName || '') + '</strong>';
+                var addrHtml = cbdbI18n.locationLabel + dbStrong(item.AddrName || '');
                 if (item.AddrId) {
                     addrHtml += ' <a href="/codes/ADDR_CODES?search=' + encodeURIComponent(item.AddrId) + '" target="_blank" rel="noopener noreferrer">';
                     addrHtml += '<span class="badge">' + escapeHtml(item.AddrId) + '</span></a>';
@@ -761,16 +784,16 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
 
             // 出處
             if (item.Source) {
-                var src = cbdbI18n.sourceLabel + escapeHtml(item.Source);
+                var src = cbdbI18n.sourceLabel + dbText(item.Source);
                 if (item.Pages) {
-                    src += cbdbI18n.pagesComma + escapeHtml(item.Pages);
+                    src += cbdbI18n.pagesComma + dbText(item.Pages);
                 }
                 details.push(src);
             }
 
             // 註
             if (item.Notes) {
-                details.push(cbdbI18n.noteLabel + escapeHtml(item.Notes));
+                details.push(cbdbI18n.noteLabel + dbText(item.Notes));
             }
 
             itemHtml += '<div class="small-text mt-2">' + details.join('<br>') + '</div>';
@@ -789,17 +812,17 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
         items.forEach(function (item) {
             var text = [];
             if (item.StatusName) {
-                var label = '<strong>' + escapeHtml(item.StatusName) + '</strong>';
+                var label = dbStrong(item.StatusName);
                 if (item.StatusId) {
                     label += ' <span class="badge">ID: ' + escapeHtml(item.StatusId) + '</span>';
                 }
                 text.push(label);
             }
             if (item.FirstYear && isValidValue(item.FirstYear)) {
-                text.push(cbdbI18n.startYearLabel + escapeHtml(item.FirstYear));
+                text.push(cbdbI18n.startYearLabel + dbText(item.FirstYear));
             }
             if (item.LastYear && isValidValue(item.LastYear)) {
-                text.push(cbdbI18n.endYearLabel + escapeHtml(item.LastYear));
+                text.push(cbdbI18n.endYearLabel + dbText(item.LastYear));
             }
             html += '<div class="item-box">' + (text.length ? text.join('，') : '<span class="empty">' + cbdbI18n.empty + '</span>') + '</div>';
         });
@@ -816,17 +839,17 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
             var itemHtml = '<div class="item-box">';
             var relation = item.KinRelName || item.KinRel || cbdbI18n.kinshipDefault;
             var person = item.KinPersonName || '';
-            itemHtml += '<strong>' + escapeHtml(relation) + '：</strong>' + escapeHtml(person);
+            itemHtml += dbStrong(relation) + '：' + (person ? dbText(person) : '');
             var extras = [];
             if (item.Source) {
-                var src = cbdbI18n.sourceLabel + escapeHtml(item.Source);
+                var src = cbdbI18n.sourceLabel + dbText(item.Source);
                 if (item.Pages) {
-                    src += '（' + cbdbI18n.pagesPrefix + escapeHtml(item.Pages) + '）';
+                    src += '（' + cbdbI18n.pagesPrefix + dbText(item.Pages) + '）';
                 }
                 extras.push(src);
             }
             if (item.Notes) {
-                extras.push(cbdbI18n.noteLabel + escapeHtml(item.Notes));
+                extras.push(cbdbI18n.noteLabel + dbText(item.Notes));
             }
             if (extras.length) {
                 itemHtml += '<div class="small-text mt-1">' + extras.join('； ') + '</div>';
@@ -847,13 +870,13 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
             var itemHtml = '<div class="item-box">';
             var base = [];
             if (item.AssocName) {
-                base.push('<strong>' + escapeHtml(item.AssocName) + '</strong>');
+                base.push(dbStrong(item.AssocName));
             }
             if (item.AssocPersonName) {
-                base.push(escapeHtml(item.AssocPersonName));
+                base.push(dbText(item.AssocPersonName));
             }
             if (item.TextTitle) {
-                base.push('【' + escapeHtml(item.TextTitle) + '】');
+                base.push('【' + dbText(item.TextTitle) + '】');
             }
             if (item.Year && isValidValue(item.Year)) {
                 base.push('<span class="badge">' + cbdbI18n.yearLabel + escapeHtml(item.Year) + '</span>');
@@ -861,14 +884,14 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
             itemHtml += base.join(' ');
             var extras = [];
             if (item.Source) {
-                var src = cbdbI18n.sourceLabel + escapeHtml(item.Source);
+                var src = cbdbI18n.sourceLabel + dbText(item.Source);
                 if (item.Pages) {
-                    src += '（' + cbdbI18n.pagesPrefix + escapeHtml(item.Pages) + '）';
+                    src += '（' + cbdbI18n.pagesPrefix + dbText(item.Pages) + '）';
                 }
                 extras.push(src);
             }
             if (item.Notes) {
-                extras.push(cbdbI18n.noteLabel + escapeHtml(item.Notes));
+                extras.push(cbdbI18n.noteLabel + dbText(item.Notes));
             }
             if (extras.length) {
                 itemHtml += '<div class="small-text mt-1">' + extras.join('； ') + '</div>';
@@ -889,28 +912,28 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
             var itemHtml = '<div class="item-box">';
             var line = [];
             if (item.TextName) {
-                var name = '<strong>' + escapeHtml(item.TextName) + '</strong>';
+                var name = dbStrong(item.TextName);
                 if (item.TextId) {
                     name += ' <span class="badge">ID: ' + escapeHtml(item.TextId) + '</span>';
                 }
                 line.push(name);
             }
             if (item.Year && isValidValue(item.Year)) {
-                line.push(cbdbI18n.workYearLabel + escapeHtml(item.Year));
+                line.push(cbdbI18n.workYearLabel + dbText(item.Year));
             }
             if (item.Role) {
-                line.push(cbdbI18n.roleLabel + escapeHtml(item.Role));
+                line.push(cbdbI18n.roleLabel + dbText(item.Role));
             }
             itemHtml += line.join('，');
             if (item.Source) {
-                itemHtml += '<div class="small-text mt-1">' + cbdbI18n.sourceLabel + escapeHtml(item.Source);
+                itemHtml += '<div class="small-text mt-1">' + cbdbI18n.sourceLabel + dbText(item.Source);
                 if (item.Pages) {
-                    itemHtml += cbdbI18n.pagesComma + escapeHtml(item.Pages);
+                    itemHtml += cbdbI18n.pagesComma + dbText(item.Pages);
                 }
                 itemHtml += '</div>';
             }
             if (item.Notes) {
-                itemHtml += '<div class="small-text mt-1">' + cbdbI18n.noteLabel + escapeHtml(item.Notes) + '</div>';
+                itemHtml += '<div class="small-text mt-1">' + cbdbI18n.noteLabel + dbText(item.Notes) + '</div>';
             }
             itemHtml += '</div>';
             html += itemHtml;
@@ -949,7 +972,7 @@ var hasValidationErrors = @json(isset($validationErrors) && !empty($validationEr
                     return;
                 }
                 var label = key;
-                segments.push(escapeHtml(label) + '：' + escapeHtml(value));
+                segments.push(escapeHtml(label) + '：' + dbText(value));
             });
             html += '<div class="item-box">' + (segments.length ? segments.join('； ') : '<span class="empty">' + cbdbI18n.empty + '</span>') + '</div>';
         });

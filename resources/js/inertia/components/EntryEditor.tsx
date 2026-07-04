@@ -218,7 +218,7 @@ export default function EntryEditor({
     };
 
     const textRow = (key: string, label: string, code?: string, highlight = false, hint?: string) => (
-        gridCell(label, { code, hint }, gridInput({ value: fields[key] ?? '', onChange: (v) => set(key, v), disabled: !editable, highlight }))
+        gridCell(label, { code, hint }, gridInput({ value: fields[key] ?? '', onChange: (v) => set(key, v), disabled: !editable, highlight, name: key }))
     );
 
     return (
@@ -235,7 +235,7 @@ export default function EntryEditor({
 
                 {/* 次序非重點，置於入仕途徑右側（#102）；label 用「次序」而非地址用語「遷徙次序」 */}
                 {gridCell(tr('sequence', '次序'), { code: 'c_sequence', required: mode === 'create' },
-                    <input type="number" value={fields.c_sequence ?? ''} disabled={!editable} required maxLength={4}
+                    <input type="number" name="c_sequence" id="c_sequence" value={fields.c_sequence ?? ''} disabled={!editable} required maxLength={4}
                         onChange={(e) => set('c_sequence', e.target.value)} style={{ ...gInputStyle, ...(!editable ? gReadonlyStyle : {}) }} />)}
 
                 {gridCell(tr('entry_year_field', '入仕年'), { code: 'c_year', full: true },
@@ -293,7 +293,7 @@ export default function EntryEditor({
                     {textRow('c_pages', tr('pages_entries', '頁碼'), 'c_pages', sourceHighlight)}
                 </div>
                 {gridCell(tr('notes_field', '備註'), { code: 'c_notes', full: true },
-                    <textarea value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
+                    <textarea name="c_notes" id="c_notes" value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
             </div>
 
             <TextpersonPair personId={personId} label={tr('candidate_source_title', '候選出處')} onPick={onPickTextperson} disabled={!editable} />
@@ -313,7 +313,7 @@ export default function EntryEditor({
             {(canEdit || canPropose) && (
                 <div style={{ marginBottom: 16 }}>
                     <GridLabel label={tr('modification_note_label', '修改說明')} />
-                    <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...gInputStyle, height: 'auto' }}
+                    <textarea name="modification_note" id="modification_note" value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...gInputStyle, height: 'auto' }}
                         placeholder={tr('modification_note_placeholder', '提案時請說明修改原因')} />
                 </div>
             )}

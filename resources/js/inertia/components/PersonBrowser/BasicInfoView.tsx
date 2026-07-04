@@ -810,6 +810,8 @@ function renderInputControl(
     if (field.input === 'textarea') {
         return (
             <textarea
+                name={field.key}
+                id={field.key}
                 value={value}
                 style={{
                     ...textareaStyle,
@@ -840,6 +842,8 @@ function renderInputControl(
             }}>
                 <input
                     type="checkbox"
+                    name={field.key}
+                    id={field.key}
                     checked={value === '1'}
                     style={checkboxInputStyle}
                     onChange={(event) => onChange(field.key, event.target.checked ? '1' : '0')}
@@ -852,6 +856,8 @@ function renderInputControl(
     return (
         <input
             type={field.input === 'number' ? 'number' : 'text'}
+            name={field.key}
+            id={field.key}
             value={value}
             style={{
                 ...inputStyle,

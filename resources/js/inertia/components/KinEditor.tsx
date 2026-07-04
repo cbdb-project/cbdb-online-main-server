@@ -323,13 +323,13 @@ export default function KinEditor({
                     <CodeAutocomplete mode="search" endpoint="/api/select/search/text" value={fields.c_source ?? '0'} initialLabel={labels.c_source ?? ''} disabled={!editable} onChange={(v, l) => { set('c_source', v || '0'); setLabel('c_source', l); }} />)}
 
                 {gridCell(tr('pages_entries', '頁碼'), { code: 'c_pages' },
-                    gridInput({ value: fields.c_pages ?? '', onChange: (v) => set('c_pages', v), disabled: !editable, highlight: sourceHighlight }))}
+                    gridInput({ value: fields.c_pages ?? '', onChange: (v) => set('c_pages', v), disabled: !editable, highlight: sourceHighlight, name: 'c_pages' }))}
 
                 {gridCell(tr('notes_field', '備註'), { code: 'c_notes', full: true },
-                    <textarea value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
+                    <textarea name="c_notes" id="c_notes" value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
 
                 {gridCell('c_autogen_notes', { full: true },
-                    <textarea value={fields.c_autogen_notes ?? ''} disabled={!editable} onChange={(e) => set('c_autogen_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
+                    <textarea name="c_autogen_notes" id="c_autogen_notes" value={fields.c_autogen_notes ?? ''} disabled={!editable} onChange={(e) => set('c_autogen_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
             </div>
 
             <TextpersonPair personId={personId} label={tr('candidate_source_title', '候選出處')} onPick={onPickTextperson} disabled={!editable} />
@@ -349,7 +349,7 @@ export default function KinEditor({
             {(canEdit || canPropose) && (
                 <div style={{ marginBottom: 16 }}>
                     <GridLabel label={tr('modification_note_label', '修改說明')} />
-                    <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...gInputStyle, height: 'auto' }} placeholder={tr('modification_note_placeholder', '提案時請說明修改原因')} />
+                    <textarea name="modification_note" id="modification_note" value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...gInputStyle, height: 'auto' }} placeholder={tr('modification_note_placeholder', '提案時請說明修改原因')} />
                 </div>
             )}
 

@@ -186,7 +186,7 @@ export default function PossessionEditor({
     };
 
     const textRow = (key: string, label: string, code?: string) => (
-        gridCell(label, { code }, gridInput({ value: fields[key] ?? '', onChange: (v) => set(key, v), disabled: !editable }))
+        gridCell(label, { code }, gridInput({ value: fields[key] ?? '', onChange: (v) => set(key, v), disabled: !editable, name: key }))
     );
 
     return (
@@ -209,7 +209,7 @@ export default function PossessionEditor({
 
                 {gridCell(tr('quantity', '數量'), { code: 'c_quantity', full: true },
                     <div style={{ display: 'flex', gap: 8 }}>
-                        <input type="text" value={fields.c_quantity ?? ''} disabled={!editable} onChange={(e) => set('c_quantity', e.target.value)} style={{ ...gInputStyle, width: 100, ...(!editable ? gReadonlyStyle : {}) }} />
+                        <input type="text" name="c_quantity" id="c_quantity" value={fields.c_quantity ?? ''} disabled={!editable} onChange={(e) => set('c_quantity', e.target.value)} style={{ ...gInputStyle, width: 100, ...(!editable ? gReadonlyStyle : {}) }} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                             <CodeAutocomplete mode="list" model="measure" idKey="c_measure_code" labelKeys={['c_measure_desc_chn', 'c_measure_desc']}
                                 value={fields.c_measure_code ?? ''} initialLabel={labels.c_measure_code ?? ''} disabled={!editable} placeholder={tr('unit', '單位')}
@@ -245,10 +245,10 @@ export default function PossessionEditor({
                         onChange={(v, l) => { set('c_source', v); setLabel('c_source', l); }} />)}
 
                 {gridCell(tr('pages_entries', '頁碼'), {},
-                    gridInput({ value: fields.c_pages ?? '', onChange: (v) => set('c_pages', v), disabled: !editable, highlight: sourceHighlight }))}
+                    gridInput({ value: fields.c_pages ?? '', onChange: (v) => set('c_pages', v), disabled: !editable, highlight: sourceHighlight, name: 'c_pages' }))}
 
                 {gridCell(tr('notes_field', '備註'), { code: 'c_notes', full: true },
-                    <textarea value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
+                    <textarea name="c_notes" id="c_notes" value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
             </div>
 
             <TextpersonPair personId={personId} label={tr('candidate_source_title', '候選出處')} onPick={onPickTextperson} disabled={!editable} />
@@ -268,7 +268,7 @@ export default function PossessionEditor({
             {(canEdit || canPropose) && (
                 <div style={{ marginBottom: 16 }}>
                     <GridLabel label={tr('modification_note_label', '修改說明')} />
-                    <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...gInputStyle, height: 'auto' }}
+                    <textarea name="modification_note" id="modification_note" value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...gInputStyle, height: 'auto' }}
                         placeholder={tr('modification_note_placeholder', '提案時請說明修改原因')} />
                 </div>
             )}

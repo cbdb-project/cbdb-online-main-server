@@ -158,7 +158,7 @@ export default function TextEditor({
     };
 
     const textRow = (key: string, label: string, code?: string, highlight = false) => (
-        gridCell(label, { code }, gridInput({ value: fields[key] ?? '', onChange: (v) => set(key, v), disabled: !editable, highlight }))
+        gridCell(label, { code }, gridInput({ value: fields[key] ?? '', onChange: (v) => set(key, v), disabled: !editable, highlight, name: key }))
     );
 
     return (
@@ -188,7 +188,7 @@ export default function TextEditor({
                     {textRow('c_pages', tr('pages_entries', '頁碼'), 'c_pages', sourceHighlight)}
                 </div>
                 {gridCell(tr('notes_field', '備註'), { code: 'c_notes', full: true },
-                    <textarea value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
+                    <textarea name="c_notes" id="c_notes" value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
             </div>
 
             <TextpersonPair personId={personId} label={tr('candidate_source_title', '候選出處')} onPick={onPickTextperson} disabled={!editable} />
@@ -208,7 +208,7 @@ export default function TextEditor({
             {(canEdit || canPropose) && (
                 <div style={{ marginBottom: 16 }}>
                     <GridLabel label={tr('modification_note_label', '修改說明')} />
-                    <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...gInputStyle, height: 'auto' }}
+                    <textarea name="modification_note" id="modification_note" value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...gInputStyle, height: 'auto' }}
                         placeholder={tr('modification_note_placeholder', '提案時請說明修改原因')} />
                 </div>
             )}

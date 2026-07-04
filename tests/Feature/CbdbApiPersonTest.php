@@ -360,7 +360,7 @@ class CbdbApiPersonTest extends TestCase {
         $response->assertStatus(200);
         $response->assertSee('person-content');
         $response->assertSee('cbdb-database-text');
-        $response->assertSee("font-family: 'Source Serif 4', 'Source Han Serif TC', 'Noto Serif TC', 'Jigmo', serif", false);
+        $response->assertSee("font-family: 'Source Serif 4', 'Source Han Serif TC', 'Noto Serif TC', 'Jigmo TC', serif", false);
     }
 
     #[Test]

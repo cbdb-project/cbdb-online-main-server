@@ -233,7 +233,7 @@
     /* 字體：Source Sans Pro / Noto Sans TC 由模板走 Google Fonts 載入，不進 Vite bundle。 */
     --font-sans: 'Source Sans Pro', 'Noto Sans TC', -apple-system, BlinkMacSystemFont,
         'Segoe UI', Roboto, sans-serif;
-    --font-historical-serif: 'Source Serif 4', 'Source Han Serif TC', 'Jigmo', serif;
+    --font-historical-serif: 'Source Serif 4', 'Source Han Serif TC', 'Jigmo TC', serif;
     --font-body: var(--font-sans);
 
     /*

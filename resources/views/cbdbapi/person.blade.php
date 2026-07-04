@@ -136,7 +136,7 @@
         }
 
         .cbdb-database-text {
-            font-family: 'Source Serif 4', 'Source Han Serif TC', 'Noto Serif TC', 'Jigmo', serif;
+            font-family: 'Source Serif 4', 'Source Han Serif TC', 'Noto Serif TC', 'Jigmo TC', serif;
             font-variant-east-asian: traditional;
         }
 

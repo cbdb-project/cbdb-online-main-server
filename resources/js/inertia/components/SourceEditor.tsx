@@ -208,7 +208,7 @@ export default function SourceEditor({
                         onChange={(v, l) => { set('c_textid', v); setLabel('c_textid', l); }} />)}
 
                 {gridCell(tr('pages_entries', '頁數/條目'), { code: 'c_pages' },
-                    gridInput({ value: fields.c_pages ?? '', onChange: (v) => set('c_pages', v), disabled: !editable }))}
+                    gridInput({ value: fields.c_pages ?? '', onChange: (v) => set('c_pages', v), disabled: !editable, name: 'c_pages' }))}
 
                 {gridCell(tr('options', '選項'), { full: true },
                     <>
@@ -225,7 +225,7 @@ export default function SourceEditor({
                     </>)}
 
                 {gridCell(tr('notes_field', '備註'), { code: 'c_notes', full: true },
-                    <textarea value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={5}
+                    <textarea name="c_notes" id="c_notes" value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={5}
                         style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
             </div>
 
@@ -244,7 +244,7 @@ export default function SourceEditor({
             {(canEdit || canPropose) && (
                 <div style={{ marginBottom: 16 }}>
                     <GridLabel label={tr('modification_note_label', '修改說明')} />
-                    <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...gInputStyle, height: 'auto' }}
+                    <textarea name="modification_note" id="modification_note" value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...gInputStyle, height: 'auto' }}
                         placeholder={tr('modification_note_placeholder', '提案時請說明修改原因')} />
                 </div>
             )}

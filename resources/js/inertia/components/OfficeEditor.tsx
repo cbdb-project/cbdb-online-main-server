@@ -288,7 +288,7 @@ export default function OfficeEditor({
     };
 
     const textRow = (key: string, label: string, code: string, highlight = false, hint?: string) => (
-        gridCell(label, { code, hint }, gridInput({ value: fields[key] ?? '', onChange: (v) => set(key, v), disabled: !editable, highlight }))
+        gridCell(label, { code, hint }, gridInput({ value: fields[key] ?? '', onChange: (v) => set(key, v), disabled: !editable, highlight, name: key }))
     );
     const listRow = (key: string, label: string, code: string, model: string, idKey: string, labelKeys: string[]) => (
         gridCell(label, { code },
@@ -359,7 +359,7 @@ export default function OfficeEditor({
                 {listRow('c_dy', tr('dynasty', '朝代'), 'dy', 'dynasty', 'c_dy', ['c_dynasty_chn', 'c_dynasty'])}
 
                 {gridCell(tr('notes_field', '備註'), { code: 'c_notes', full: true },
-                    <textarea value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
+                    <textarea name="c_notes" id="c_notes" value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
 
                 {/* 出處 / 頁碼（與下方「候選出處與頁數」對應）（#101） */}
                 {gridCell(tr('source_field', '出處'), { code: 'c_source' },
@@ -387,7 +387,7 @@ export default function OfficeEditor({
             {(canEdit || canPropose) && (
                 <div style={{ marginBottom: 16 }}>
                     <GridLabel label={tr('modification_note_label', '修改說明')} />
-                    <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...gInputStyle, height: 'auto' }}
+                    <textarea name="modification_note" id="modification_note" value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...gInputStyle, height: 'auto' }}
                         placeholder={tr('modification_note_placeholder', '提案時請說明修改原因')} />
                 </div>
             )}

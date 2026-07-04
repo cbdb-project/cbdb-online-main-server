@@ -188,12 +188,12 @@ export default function AddressEditor({
 
     const numRow = (key: string, label: string, code?: string, required = false, maxLength?: number) => (
         gridCell(label, { code, required }, (
-            <input type="number" value={fields[key] ?? ''} disabled={!editable} required={required} maxLength={maxLength}
+            <input type="number" name={key} id={key} value={fields[key] ?? ''} disabled={!editable} required={required} maxLength={maxLength}
                 onChange={(e) => set(key, e.target.value)} style={{ ...gInputStyle, ...(!editable ? gReadonlyStyle : {}) }} />
         ))
     );
     const textRow = (key: string, label: string, code?: string, highlight = false) => (
-        gridCell(label, { code }, gridInput({ value: fields[key] ?? '', onChange: (v) => set(key, v), disabled: !editable, highlight }))
+        gridCell(label, { code }, gridInput({ value: fields[key] ?? '', onChange: (v) => set(key, v), disabled: !editable, highlight, name: key }))
     );
 
     return (
@@ -229,7 +229,7 @@ export default function AddressEditor({
                         onChange={(v, l) => { set('c_source', v); setLabel('c_source', l); }} />)}
                 {textRow('c_pages', tr('pages_entries', '頁碼'), 'c_pages', sourceHighlight)}
                 {gridCell(tr('notes_field', '備註'), { code: 'c_notes', full: true },
-                    <textarea value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
+                    <textarea name="c_notes" id="c_notes" value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
 
                 {gridCell(tr('maiden_addr', '祖籍'), { code: 'c_natal' },
                     <select value={fields.c_natal ?? ''} onChange={(e) => set('c_natal', e.target.value)} disabled={!editable} style={gInputStyle}>
@@ -256,7 +256,7 @@ export default function AddressEditor({
             {(canEdit || canPropose) && (
                 <div style={{ marginBottom: 16 }}>
                     <GridLabel label={tr('modification_note_label', '修改說明')} />
-                    <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...gInputStyle, height: 'auto' }}
+                    <textarea name="modification_note" id="modification_note" value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...gInputStyle, height: 'auto' }}
                         placeholder={tr('modification_note_placeholder', '提案時請說明修改原因')} />
                 </div>
             )}

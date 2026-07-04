@@ -332,7 +332,7 @@ export default function BasicInfoEditor({
     const gText = (key: string, label: string, code?: string, opts: { readonly?: boolean; hint?: string; full?: boolean; required?: boolean } = {}) => (
         <div style={opts.full ? gFull : undefined}>
             {fLabel(label, code, opts.required)}
-            <input type="text" value={fields[key] ?? ''} readOnly={opts.readonly} disabled={opts.readonly}
+            <input type="text" name={key} id={key} value={fields[key] ?? ''} readOnly={opts.readonly} disabled={opts.readonly}
                 onChange={(e) => set(key, e.target.value)}
                 style={{ ...gInputStyle, ...(opts.readonly ? gReadonlyStyle : {}) }} />
             {opts.hint ? <span style={gHintStyle}>{opts.hint}</span> : null}
@@ -490,7 +490,7 @@ export default function BasicInfoEditor({
             {block(tr('block_notes', '備註'), (
                 <div style={gGrid}>
                     <div style={gFull}>{fLabel(tr('notes_field', '備註'), 'c_notes')}
-                        <textarea value={fields.c_notes ?? ''} disabled={!canEdit && !canPropose} rows={5}
+                        <textarea name="c_notes" id="c_notes" value={fields.c_notes ?? ''} disabled={!canEdit && !canPropose} rows={5}
                             onChange={(e) => set('c_notes', e.target.value)} style={{ ...gInputStyle, height: 'auto' }} /></div>
                 </div>
             ))}
@@ -499,7 +499,7 @@ export default function BasicInfoEditor({
             {(canEdit || canPropose) ? (
                 <div style={{ marginBottom: 16 }}>
                     {fLabel(tr('modification_note_label', '修改說明'))}
-                    <textarea value={comment} rows={3} onChange={(e) => setComment(e.target.value)}
+                    <textarea name="modification_note" id="modification_note" value={comment} rows={3} onChange={(e) => setComment(e.target.value)}
                         placeholder={tr('modification_note_placeholder', '請說明修改原因')} style={{ ...gInputStyle, height: 'auto' }} />
                     <span style={gHintStyle}>{tr('modification_note_hint', '此說明將記錄於操作歷史中（提交建議時附帶）')}</span>
                 </div>

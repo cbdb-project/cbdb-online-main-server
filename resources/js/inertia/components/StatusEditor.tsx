@@ -218,7 +218,7 @@ export default function StatusEditor({
     };
 
     const textRow = (key: string, label: string, code?: string, highlight = false, placeholder?: string) => (
-        gridCell(label, { code }, gridInput({ value: fields[key] ?? '', onChange: (v) => set(key, v), disabled: !editable, highlight, placeholder }))
+        gridCell(label, { code }, gridInput({ value: fields[key] ?? '', onChange: (v) => set(key, v), disabled: !editable, highlight, placeholder, name: key }))
     );
 
     return (
@@ -250,7 +250,7 @@ export default function StatusEditor({
 
                 {/* 次序非重點，置於社會區分右側（#103） */}
                 {gridCell(tr('sequence', '次序'), { code: 'c_sequence', required: true },
-                    <input type="number" value={fields.c_sequence ?? ''} disabled={!editable} required maxLength={4}
+                    <input type="number" name="c_sequence" id="c_sequence" value={fields.c_sequence ?? ''} disabled={!editable} required maxLength={4}
                         onChange={(e) => set('c_sequence', e.target.value)} style={{ ...gInputStyle, ...(!editable ? gReadonlyStyle : {}) }} />)}
 
                 {textRow('c_supplement', tr('supplement_text', '補充說明'), 'c_supplement', false, tr('supplement_placeholder', ''))}
@@ -268,7 +268,7 @@ export default function StatusEditor({
                         onChange={(v, l) => { set('c_source', v || '0'); setLabel('c_source', l); }} />)}
                 {textRow('c_pages', tr('pages_entries', '頁碼'), 'c_pages', sourceHighlight)}
                 {gridCell(tr('notes_field', '備註'), { code: 'c_notes', full: true },
-                    <textarea value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
+                    <textarea name="c_notes" id="c_notes" value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
             </div>
 
             <TextpersonPair personId={personId} label={tr('candidate_source_title', '候選出處')} onPick={onPickTextperson} disabled={!editable} />
@@ -288,7 +288,7 @@ export default function StatusEditor({
             {(canEdit || canPropose) && (
                 <div style={{ marginBottom: 16 }}>
                     <GridLabel label={tr('modification_note_label', '修改說明')} />
-                    <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...gInputStyle, height: 'auto' }}
+                    <textarea name="modification_note" id="modification_note" value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...gInputStyle, height: 'auto' }}
                         placeholder={tr('modification_note_placeholder', '提案時請說明修改原因')} />
                 </div>
             )}

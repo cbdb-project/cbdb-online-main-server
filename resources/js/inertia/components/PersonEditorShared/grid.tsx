@@ -85,6 +85,9 @@ export interface GridInputOpts {
     highlight?: boolean;
     placeholder?: string;
     maxLength?: number;
+    /** 欄位技術碼（如 c_pages）。傳入後同時設為 input 的 name/id，讓瀏覽器原生表單記憶
+     * （點擊即彈出曾手動輸入過的值）能以此為 key 生效；不傳則維持匿名 input（如僅供單次輸入的欄位）。 */
+    name?: string;
 }
 
 /** 純文字/數字輸入（取代各編輯器的 textRow/numRow 內層 input）。value/onChange 由呼叫端綁定其 fields/set。 */
@@ -92,6 +95,8 @@ export function gridInput(o: GridInputOpts): React.ReactElement {
     return (
         <input
             type={o.type ?? 'text'}
+            name={o.name}
+            id={o.name}
             value={o.value}
             disabled={o.disabled || o.readonly}
             readOnly={o.readonly}

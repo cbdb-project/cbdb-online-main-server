@@ -431,7 +431,7 @@ export default function AssocEditor({
     };
 
     const textRow = (key: string, label: string, code: string, highlight = false, hint?: string) => (
-        gridCell(label, { code, hint }, gridInput({ value: fields[key] ?? '', onChange: (v) => set(key, v), disabled: !editable, highlight }))
+        gridCell(label, { code, hint }, gridInput({ value: fields[key] ?? '', onChange: (v) => set(key, v), disabled: !editable, highlight, name: key }))
     );
     const searchRow = (key: string, label: string, code: string, endpoint: string, highlight = false, sentinel = '0', required = false, sentinelLabel?: string, extraQuery?: Record<string, string>) => (
         gridCell(label, { code, required },
@@ -563,12 +563,12 @@ export default function AssocEditor({
                 <div style={gGrid}>
                     {/* 作品標題自成一行（與「出處＋頁碼」非同類）；出處與頁碼成對同行（#121） */}
                     {gridCell(tr('text_title_field', '作品標題'), { code: 'c_text_title', full: true },
-                        gridInput({ value: fields.c_text_title ?? '', onChange: (v) => set('c_text_title', v), disabled: !editable }))}
+                        gridInput({ value: fields.c_text_title ?? '', onChange: (v) => set('c_text_title', v), disabled: !editable, name: 'c_text_title' }))}
                     {gridCell(tr('source_field', '出處'), { code: 'c_source' },
                         <CodeAutocomplete mode="search" endpoint="/api/select/search/text" value={fields.c_source ?? '0'} initialLabel={labels.c_source ?? ''} disabled={!editable} onChange={(v, l) => { set('c_source', v || '0'); setLabel('c_source', l); }} />)}
                     {textRow('c_pages', tr('pages_entries', '頁碼'), 'c_pages', sourceHighlight)}
                     {gridCell(tr('notes_field', '備註'), { code: 'c_notes', full: true },
-                        <textarea value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
+                        <textarea name="c_notes" id="c_notes" value={fields.c_notes ?? ''} disabled={!editable} onChange={(e) => set('c_notes', e.target.value)} rows={4} style={{ ...gInputStyle, height: 'auto', ...(!editable ? gReadonlyStyle : {}) }} />)}
                 </div>
                 <TextpersonPair personId={personId} label={tr('candidate_source_title', '候選出處')} onPick={onPickTextperson} disabled={!editable} />
             </GridSection>
@@ -588,7 +588,7 @@ export default function AssocEditor({
             {(canEdit || canPropose) && (
                 <div style={{ marginBottom: 16 }}>
                     <GridLabel label={tr('modification_note_label', '修改說明')} />
-                    <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...gInputStyle, height: 'auto' }} placeholder={tr('modification_note_placeholder', '提案時請說明修改原因')} />
+                    <textarea name="modification_note" id="modification_note" value={comment} onChange={(e) => setComment(e.target.value)} rows={3} style={{ ...gInputStyle, height: 'auto' }} placeholder={tr('modification_note_placeholder', '提案時請說明修改原因')} />
                 </div>
             )}
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { usePage } from '@inertiajs/react';
 import type { SharedProps } from '../types/page';
 import { useDarkMode } from '../hooks/useDarkMode';
+import { useFontMode } from '../hooks/useFontMode';
 import Sidebar from '../components/shell/Sidebar';
 import Navbar from '../components/shell/Navbar';
 import FlashMessages from '../components/shell/FlashMessages';
@@ -38,6 +39,7 @@ interface DashboardLayoutProps {
 export default function DashboardLayout({ children, title, description, breadcrumbs, disableContentPadding, headerAlign = 'left' }: DashboardLayoutProps) {
     const { app } = usePage<SharedProps>().props;
     const { isDark, toggle } = useDarkMode();
+    const { fontMode, toggle: toggleFontMode } = useFontMode();
     const [collapsed, setCollapsed] = useState(false);
     const version = app?.version ?? 'unknown';
 
@@ -50,6 +52,8 @@ export default function DashboardLayout({ children, title, description, breadcru
                     onToggleSidebar={() => setCollapsed((v) => !v)}
                     isDark={isDark}
                     onToggleDark={toggle}
+                    fontMode={fontMode}
+                    onToggleFontMode={toggleFontMode}
                     breadcrumbs={breadcrumbs}
                 />
 
@@ -57,7 +61,7 @@ export default function DashboardLayout({ children, title, description, breadcru
                     {/* 麵包屑改渲染於頂部導覽列「首頁」同一行（見 Navbar，#113）；此處僅保留標題/描述。 */}
                     {(title || description) && (
                         <div className="mb-4 flex flex-col gap-1 border-b border-border pb-3">
-                            {title && <h1 className={`text-xl font-semibold${headerAlign === 'center' ? ' text-center' : ''}`}>{title}</h1>}
+                            {title && <h1 className={`text-xl font-semibold${headerAlign === 'center' ? ' text-center cbdb-historical-name' : ''}`}>{title}</h1>}
                             {description && <p className={`text-sm text-muted-foreground${headerAlign === 'center' ? ' text-center' : ''}`}>{description}</p>}
                         </div>
                     )}

@@ -238,6 +238,7 @@ export default function CodeAutocomplete(props: Props) {
     return (
         <div ref={containerRef} style={wrapStyle}>
             <input
+                className="cbdb-historical-text"
                 id={id}
                 type="text"
                 disabled={disabled}

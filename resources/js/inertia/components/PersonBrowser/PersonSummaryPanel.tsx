@@ -64,11 +64,11 @@ export default function PersonSummaryPanel({ summary, loading, error }: Props) {
         <div style={boxStyle}>
             <div style={headerStyle}>
                 <div style={nameRowStyle}>
-                    <div style={mainNameStyle}>{summary.c_name_chn || '—'}</div>
+                    <div className="cbdb-historical-name" style={mainNameStyle}>{summary.c_name_chn || '—'}</div>
                     {secondaryNames.length > 0 && (
                         <div style={secondaryNameBlockStyle}>
                             {secondaryNames.map((name) => (
-                                <div key={name} style={secondaryNameStyle}>{name}</div>
+                                <div key={name} className="cbdb-historical-text" style={secondaryNameStyle}>{name}</div>
                             ))}
                         </div>
                     )}
@@ -105,7 +105,7 @@ function Tag({ label, value }: { label: string; value: React.ReactNode }) {
     return (
         <span style={tagStyle}>
             <span style={tagLabelStyle}>{label}</span>
-            <span style={tagValueStyle}>{value}</span>
+            <span className="cbdb-historical-text" style={tagValueStyle}>{value}</span>
         </span>
     );
 }

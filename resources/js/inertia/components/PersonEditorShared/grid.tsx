@@ -94,6 +94,7 @@ export interface GridInputOpts {
 export function gridInput(o: GridInputOpts): React.ReactElement {
     return (
         <input
+            className="cbdb-historical-text"
             type={o.type ?? 'text'}
             name={o.name}
             id={o.name}

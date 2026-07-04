@@ -126,7 +126,7 @@ export default function PersonIndex() {
                                 <tr key={row.c_personid} className="border-t border-border hover:bg-muted/30">
                                     {COLUMNS.map((c) => (
                                         <td key={c.key} className="px-3 py-1.5">
-                                            <a href={editUrl(row.c_personid)} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                                            <a href={editUrl(row.c_personid)} target="_blank" rel="noreferrer" className="cbdb-historical-text text-primary hover:underline">
                                                 {c.render ? c.render(row) : (row[c.key] ?? '')}
                                             </a>
                                         </td>

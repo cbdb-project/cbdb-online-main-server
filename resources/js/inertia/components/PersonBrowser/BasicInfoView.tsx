@@ -1341,6 +1341,7 @@ function ReadOnlyField({
         >
             <div style={{ ...fieldLabelStyle, ...(dirty ? dirtyFieldLabelStyle : {}) }}>{label}</div>
             <div
+                className="cbdb-historical-text"
                 style={{
                     ...fieldValueBoxStyle,
                     ...(muted ? mutedValueBoxStyle : {}),

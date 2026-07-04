@@ -10,6 +10,8 @@ interface NavbarProps {
     onToggleSidebar: () => void;
     isDark: boolean;
     onToggleDark: () => void;
+    fontMode: 'sans' | 'serif';
+    onToggleFontMode: () => void;
     /** 麵包屑：渲染於頂部導覽列「首頁」之後（同一行），對齊 legacy header-v3 的頂端麵包屑。 */
     breadcrumbs?: Crumb[];
 }
@@ -18,7 +20,7 @@ interface NavbarProps {
  * 頂部導覽列：pushmenu 切換、首頁、深色模式、語言切換、使用者下拉/登入註冊。
  * 對齊舊 header-v3.blade.php 的功能與行為（含語言切換的未存變更確認）。
  */
-export default function Navbar({ onToggleSidebar, isDark, onToggleDark, breadcrumbs }: NavbarProps) {
+export default function Navbar({ onToggleSidebar, isDark, onToggleDark, fontMode, onToggleFontMode, breadcrumbs }: NavbarProps) {
     const { auth, locale, locale_url, shell } = usePage<SharedProps>().props;
     const tNav = useTranslation('nav');
     const tCommon = useTranslation('common');
@@ -43,6 +45,9 @@ export default function Navbar({ onToggleSidebar, isDark, onToggleDark, breadcru
     const langLabel = currentLocale === 'zh-TW'
         ? tNav('language_switch_to_en')
         : tNav('language_switch_to_zh');
+    const fontToggleTitle = currentLocale === 'zh-TW'
+        ? (fontMode === 'serif' ? '切換為無襯線字體' : '切換為襯線字體')
+        : (fontMode === 'serif' ? 'Switch to sans serif' : 'Switch to serif');
 
     return (
         <nav className="flex h-14 items-center gap-2 border-b border-border bg-card px-3 text-card-foreground">
@@ -86,6 +91,17 @@ export default function Navbar({ onToggleSidebar, isDark, onToggleDark, breadcru
                     onClick={onToggleDark}
                 >
                     <i className={cn('fas', isDark ? 'fa-sun' : 'fa-moon')} aria-hidden />
+                </button>
+                <button
+                    type="button"
+                    className="flex items-center gap-1 rounded px-2 py-1 text-sm font-semibold hover:bg-muted"
+                    title={fontToggleTitle}
+                    aria-label={fontToggleTitle}
+                    aria-pressed={fontMode === 'serif'}
+                    onClick={onToggleFontMode}
+                >
+                    <i className="fas fa-font" aria-hidden />
+                    <span className="hidden sm:inline">{fontMode === 'serif' ? 'Serif' : 'Sans'}</span>
                 </button>
                 <button
                     type="button"

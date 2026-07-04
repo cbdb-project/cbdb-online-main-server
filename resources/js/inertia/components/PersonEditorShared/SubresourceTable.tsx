@@ -44,7 +44,7 @@ export default function SubresourceTable<T>({ columns, items, rowKey, actions, a
                         items.map((item, i) => (
                             <tr key={rowKey(item, i)}>
                                 {columns.map((c, ci) => (
-                                    <td key={ci} style={tdStyle}>{c.render(item, i)}</td>
+                                    <td key={ci} className="cbdb-historical-text" style={tdStyle}>{c.render(item, i)}</td>
                                 ))}
                                 {actions ? <td style={tdStyle}>{actions(item)}</td> : null}
                             </tr>

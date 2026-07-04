@@ -79,8 +79,8 @@ export default function PeopleList({ people, pagination, selectedId, loading, so
                         <div style={topRowStyle}>
                             <span style={idBadgeStyle}>#{p.c_personid}</span>
                             <div style={nameBlockStyle}>
-                                <strong style={chnNameStyle}>{p.c_name_chn || '—'}</strong>
-                                {p.c_name && <span style={romanNameStyle}>{p.c_name}</span>}
+                                <strong className="cbdb-historical-name" style={chnNameStyle}>{p.c_name_chn || '—'}</strong>
+                                {p.c_name && <span className="cbdb-historical-text" style={romanNameStyle}>{p.c_name}</span>}
                             </div>
                         </div>
                         <div style={tagRowStyle}>
@@ -144,7 +144,7 @@ function MiniTag({ label, value }: { label: string; value: string | null | undef
     return (
         <span style={miniTagStyle}>
             <span style={miniTagLabelStyle}>{label}</span>
-            <span style={miniTagValueStyle}>{value}</span>
+            <span className="cbdb-historical-text" style={miniTagValueStyle}>{value}</span>
         </span>
     );
 }

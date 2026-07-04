@@ -39,7 +39,7 @@ export default function AddressDisplayWithMap({
     if (latitude !== null && longitude !== null && personId != null) {
         return (
             <a
-                className="chgis-place-link"
+                className="chgis-place-link cbdb-historical-text"
                 role="button"
                 tabIndex={0}
                 data-person-id={personId}
@@ -53,5 +53,5 @@ export default function AddressDisplayWithMap({
         );
     }
 
-    return <span>{label}</span>;
+    return <span className="cbdb-historical-text">{label}</span>;
 }

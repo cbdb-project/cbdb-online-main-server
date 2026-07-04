@@ -342,7 +342,7 @@ export default function BasicInfoEditor({
     const gRO = (key: string, label: string, code?: string, opts: { hint?: string; full?: boolean } = {}) => (
         <div style={opts.full ? gFull : undefined}>
             {fLabel(label, code)}
-            <input type="text" value={labels[key] || fields[key] || ''} readOnly disabled style={{ ...gInputStyle, ...gReadonlyStyle }} />
+            <input className="cbdb-historical-text" type="text" value={labels[key] || fields[key] || ''} readOnly disabled style={{ ...gInputStyle, ...gReadonlyStyle }} />
             {opts.hint ? <span style={gHintStyle}>{opts.hint}</span> : null}
         </div>
     );
@@ -434,7 +434,7 @@ export default function BasicInfoEditor({
                 <div style={gGrid}>
                     <div>
                         {fLabel(tr('gender', '性別'), 'c_female')}
-                        <select value={fields.c_female ?? ''} disabled={!canEdit && !canPropose}
+                        <select className="cbdb-historical-text" value={fields.c_female ?? ''} disabled={!canEdit && !canPropose}
                             onChange={(e) => set('c_female', e.target.value)} style={gInputStyle}>
                             <option value="">{tr('please_select', 'NULL')}</option>
                             <option value="0">0-{tr('male', '男')}</option>
@@ -511,10 +511,10 @@ export default function BasicInfoEditor({
                     <div style={gridSectionHeadStyle}>{tr('create_or_modify', '建檔 / 更新資訊')}</div>
                     <div style={gGrid}>
                         <div>{fLabel(tr('audit_created', '建檔'))}
-                            <input type="text" readOnly disabled style={{ ...gInputStyle, ...gReadonlyStyle }}
+                            <input className="cbdb-historical-text" type="text" readOnly disabled style={{ ...gInputStyle, ...gReadonlyStyle }}
                                 value={auditValue(fields.c_created_by, fields.c_created_date)} /></div>
                         <div>{fLabel(tr('audit_updated', '更新'))}
-                            <input type="text" readOnly disabled style={{ ...gInputStyle, ...gReadonlyStyle }}
+                            <input className="cbdb-historical-text" type="text" readOnly disabled style={{ ...gInputStyle, ...gReadonlyStyle }}
                                 value={auditValue(fields.c_modified_by, fields.c_modified_date)} /></div>
                     </div>
                 </div>

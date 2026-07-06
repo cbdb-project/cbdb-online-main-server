@@ -172,6 +172,31 @@ class ApiV2CreateAltnameTest extends TestCase {
     }
 
     #[Test]
+    public function testDirectAltnameCreateNormalizesPinyinVToUmlaut(): void {
+        $this->actingAs($this->makeUser(email: 'altname-create-umlaut@example.com'));
+
+        // Tier 1：c_alt_name_pinyin/2/3 靜默轉；Tier 2：c_alt_name 交前端、後端不轉。
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'target' => ['pk' => ['c_alt_name_chn' => '呂名']],
+            'changes' => [
+                'c_alt_name' => 'Lv Meng',
+                'c_alt_name_pinyin' => 'lv',
+                'c_alt_name_pinyin2' => 'Nve',
+                'c_alt_name_pinyin3' => 'Silva',
+            ],
+        ]))->assertOk()->assertJson(['ok' => true]);
+
+        $this->assertDatabaseHas('ALTNAME_DATA', [
+            'c_personid' => 1000,
+            'c_alt_name_chn' => '呂名',
+            'c_alt_name_pinyin' => 'lü',   // Tier 1 靜默轉
+            'c_alt_name_pinyin2' => 'Nüe',
+            'c_alt_name_pinyin3' => 'Silva', // 西文 no-op
+            'c_alt_name' => 'Lv Meng',     // 後端刻意不轉（Tier 2 前端負責）
+        ]);
+    }
+
+    #[Test]
     public function testAltnameCreateCodeFieldSentinelFullyIdempotent(): void {
         // #71：create c_source 完全幂等——null/''/'-999'/-999/'0'/0 落庫皆 0、永不寫 null/''；合法非 0 保留。
         // 每案用不同 c_alt_name_chn 取獨立 PK。≥10 案例。

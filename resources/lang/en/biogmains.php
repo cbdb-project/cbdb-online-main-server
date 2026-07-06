@@ -449,6 +449,12 @@ return [
     'altname_required' => 'Please enter the alternative name (Chinese)',
     'altname_pinyin_required' => 'Please enter the alternative name (Pinyin)',
     'sequence_required' => 'Please enter a sequence number',
+    // Save-time pinyin v→ü confirmation dialog (Tier 2; alt names may contain Western text).
+    'pinyin_umlaut_title' => 'Pinyin v → ü detected',
+    'pinyin_umlaut_hint' => 'The alternative name (Pinyin) may contain "v" written for "ü". Convert per Hanyu Pinyin rules? For a Western alias (e.g. Denver), choose "Keep as-is".',
+    'pinyin_umlaut_preview' => 'After conversion: ',
+    'pinyin_umlaut_keep' => 'Keep as-is & save',
+    'pinyin_umlaut_convert' => 'Convert & save',
     'pk_required' => 'Primary key fields cannot be empty',
     'please_select_source' => 'Please select a source',
     'please_fill_sequence' => 'Please enter a sequence number',

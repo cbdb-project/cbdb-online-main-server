@@ -258,6 +258,9 @@ class BiogMainRepository {
         // 括號正規化：全角轉半角、括號前後補空格
         $data = BracketNormalizer::normalizeBiogMain($data);
 
+        // 保存時拼音 v→ü 歸一化（Tier 1；僅 c_surname/c_mingzi/c_name，不碰 _rm/_proper）
+        $data = PinyinUmlaut::normalizeFields($data, PinyinUmlaut::BIOG_MAIN_PINYIN_V_FIELDS);
+
         $female = $data['c_female'] ?? null;
         $data['c_female'] = ($female === null || $female === '' || $female === 'NULL')
             ? null
@@ -353,6 +356,9 @@ class BiogMainRepository {
         $data = $this->auto_pinyin($data);
         // 括號正規化：全角轉半角、括號前後補空格
         $data = BracketNormalizer::normalizeBiogMain($data);
+
+        // 保存時拼音 v→ü 歸一化（Tier 1；冪等防禦：auto_pinyin 已先歸一化 c_surname/c_mingzi）
+        $data = PinyinUmlaut::normalizeFields($data, PinyinUmlaut::BIOG_MAIN_PINYIN_V_FIELDS);
 
         return DB::transaction(function () use ($data) {
             $flight = BiogMain::create($data);

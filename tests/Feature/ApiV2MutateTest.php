@@ -428,6 +428,70 @@ class ApiV2MutateTest extends TestCase {
     }
 
     #[Test]
+    public function testDirectBiogMainUpdateNormalizesPinyinVToUmlaut() {
+        $user = $this->makeUser(email: 'biog-main-umlaut@example.com');
+        $this->actingAs($user);
+        $this->seedBiogMain();
+
+        // Tier 1：c_surname/c_mingzi/c_name 靜默轉；_rm（Wade-Giles）與 _proper（母語拉丁名）不可轉。
+        $response = $this->postJson('/api/v2/mutate', [
+            'resource' => 'biogmain',
+            'person_id' => 138841,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_personid' => 138841]],
+            'changes' => [
+                'c_surname' => 'Lv',
+                'c_mingzi' => 'Meng',
+                'c_surname_rm' => 'Lv',
+                'c_surname_proper' => 'Silva',
+            ],
+        ]);
+
+        $response->assertOk();
+
+        $this->assertDatabaseHas('BIOG_MAIN', [
+            'c_personid' => 138841,
+            'c_surname' => 'Lü',        // Tier 1 靜默轉
+            'c_mingzi' => 'Meng',
+            'c_name' => 'Lü Meng',      // 由分量重算、同步為 ü
+            'c_surname_rm' => 'Lv',     // Wade-Giles：不轉
+            'c_surname_proper' => 'Silva', // 母語拉丁名：不轉
+        ]);
+    }
+
+    #[Test]
+    public function testProposalBiogMainUpdateNormalizesPinyinVToUmlautInPayload() {
+        $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'biog-proposal-umlaut@example.com');
+        $this->actingAs($user);
+        $this->seedBiogMain();
+
+        // 提案於提交時歸一化（核准逐字套用）；_rm 不轉。
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'basicinformation',
+            'person_id' => 138841,
+            'mode' => 'proposal',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_personid' => 138841]],
+            'changes' => [
+                'c_surname' => 'Lv',
+                'c_surname_rm' => 'Lv',
+            ],
+            'meta' => ['comment' => '提案修正姓氏拼音'],
+        ])->assertOk();
+
+        $operation = DB::table('operations')
+            ->where('resource', 'BIOG_MAIN')
+            ->where('op_type', Operation::TYPE_PROPOSAL_UPDATE)
+            ->first();
+        $payload = json_decode($operation->resource_data, true);
+
+        $this->assertSame('Lü', $payload['c_surname']);    // 提交時歸一化
+        $this->assertSame('Lü Zhong', $payload['c_name']); // c_name 由分量重算後亦為 ü
+        $this->assertSame('Lv', $payload['c_surname_rm']); // Wade-Giles：不轉
+    }
+
+    #[Test]
     public function testProposalBiogMainUpdateCreatesPendingOperationWithoutChangingRow() {
         $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'biog-main-proposal@example.com');
         $this->actingAs($user);

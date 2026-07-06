@@ -71,25 +71,21 @@
 - **指令**：`cbdb:migrate-pinyin-v {--table=both|biog|altname} {--fetch} {--confidence=all|high|low} {--execute} {--base-url=}`；預設 dry-run；`--confidence` 分批（high 批＝BIOG high + ALTNAME、跳過 BIOG low；low 批＝BIOG low）。Token 只從環境變數 `CBDB_MIGRATE_TOKEN` 讀。
 - **執行結果（2026-07-01）**：第一批 high+ALTNAME 成功 5146、第二批 low 成功 1506，**累計 6652 筆寫入生產、線上抽樣驗證正確**（含生僻字 `呂搢→Lü Jin`、複姓孤兒 `閭丘陞→Lüqiu Sheng`）。
 - **待人工（尚未寫）**：孤兒多空格（~47，等「親屬女可拆」規則）、括號孤兒 9、ALTNAME 歧義 27（>1 命中）、**分量中文名 NULL 的無名記錄 24**（如 `鄭履正`，handler 校驗「名不能為空」拒絕、API 無法更新，需另途）。清單見人工複核 xlsx（不入版控）。
-- **✅ Phase A 完成（2026-07-06）**：上述待人工項由 Hongsu 在錄入系統修訂完成，殘留 v 由 58 降至 0（5 個 BIOG 為 `<待删除>` 記錄、直接 skip）。§D-10 收尾已執行並合併 develop（#1126）：從 `config/codes.php` 的 `ui_hidden` 移除 `'pinyin'`（重新顯示姓氏拼音對照表）、移除 M2 掃描指令 `cbdb:scan-pinyin-v`（保留 `PinyinUmlaut` 與 `MigratePinyinV`）。服務器 token 檔已刪、提醒 rotate。**唯 §D-12（保存時 v→ü 歸一化，手動輸入路徑）尚未實作**——建議儘早補上以閉環止血，否則手動錄入/批量匯入的 `v` 會重新累積。
+- **✅ Phase A 完成（2026-07-06）**：上述待人工項由 Hongsu 在錄入系統修訂完成，殘留 v 由 58 降至 0（5 個 BIOG 為 `<待删除>` 記錄、直接 skip）。§D-10 收尾已執行並合併 develop（#1126）：從 `config/codes.php` 的 `ui_hidden` 移除 `'pinyin'`（重新顯示姓氏拼音對照表）、移除 M2 掃描指令 `cbdb:scan-pinyin-v`（保留 `PinyinUmlaut` 與 `MigratePinyinV`）。服務器 token 檔已刪、提醒 rotate。**§D-12（保存時 v→ü 歸一化，手動輸入路徑）已實作**（兩層機制：後端靜默轉定義上即拼音的欄＋前端對可能含西文的 `c_alt_name` 彈窗確認；見 [PINYIN_SAVE_NORMALIZE_DESIGN.md](./PINYIN_SAVE_NORMALIZE_DESIGN.md)），與 M1 生成守衛合起來閉環止血。
 
-### D-12 保存時自動 v→ü 歸一化（手動輸入路徑；止血 2.0）
-> **缺口（2026-07-02 Hongsu 發現）**：M1 止血只掛在**生成路徑**（從中文自動生成拼音：`auto_pinyin`／三批次 `buildPinyin`／`buildPinyinWord`）。使用者在編輯頁／批量頁**手動輸入**的拼音（如直接打 `lv`）走的是**保存路徑、不經生成**，故 `v` 原樣入庫、不轉 `ü`——遷移後仍會被手動輸入重新污染。
+### D-12 保存時自動 v→ü 歸一化（手動輸入路徑；止血 2.0）✅ 已實作
+> **缺口（2026-07-02 Hongsu 發現）**：M1 止血只掛在**生成路徑**（從中文自動生成拼音：`auto_pinyin`／三批次 `buildPinyin`／`buildPinyinWord`）。使用者在編輯頁**手動輸入**的拼音（如直接打 `lv`）走的是**保存路徑、不經生成**，故 `v` 原樣入庫、不轉 `ü`——遷移後仍會被手動輸入重新污染。
 
-- **前置**：`App\Support\PinyinUmlaut::normalize()`（規則 `l/n`+`v` 且後非 a/i/o/u → `lü/nü/lüe/nüe`）由 **M1 建於 develop**；本 docs 分支較舊、尚無此檔，故實作前須確保目標分支（develop）已含 M1。
-- **要做**：在**所有保存拼音欄位的寫入路徑**，於寫入前以 `PinyinUmlaut::normalize()` 自動歸一化。**掛點分兩類**（實測校正）：
-  - **已呼叫 `BracketNormalizer` 的 4 條**（BiogMainMutationHandler、AltnameMutationHandler、AltnameCreateHandler、BiogMainRepository）→ 可於同一前處理掛點加 PinyinUmlaut。
-  - **無可沿用掛點者**（`AdminBatchLoadBookTitlesController::updatePinyin` 用自有 `normalizePinyinInput`、僅空白/大小寫；`CodesController` 各寫入方法為泛型 `DB::table()->insert/update`、**無任何保存前歸一化**）→ 需在其寫入點**新增**。
-  - **最穩妥：抽一個共用「保存前拼音歸一化」helper 統一套用**。注意 `BracketNormalizer` 的 altname 欄位列僅含 `c_alt_name`、**不含 `c_alt_name_pinyin*` 數字欄**，故沿用其掛點「位置」可以、但**不可沿用其欄位列**——helper 須自帶完整拼音欄清單。
-- **涉及入口（Explore + codex 盤點，均為手動輸入、目前有缺口）**：
-  - `app/Services/Mutations/BiogMainMutationHandler.php`（`/api/v2/mutate`，direct/proposal）：c_surname、c_mingzi、c_name_rm、c_surname_rm、c_mingzi_rm、c_*_proper（已呼叫 BracketNormalizer）
-  - `app/Services/Mutations/AltnameMutationHandler.php`（`/api/v2/mutate`）＋ `AltnameCreateHandler.php`（`/api/v2/create`）：c_alt_name、c_alt_name_pinyin/2/3（BracketNormalizer 僅覆蓋 c_alt_name）
-  - `app/Http/Controllers/AdminBatchLoadBookTitlesController.php::updatePinyin()`（inline 編輯 c_title 書名拼音；無 BracketNormalizer）
-  - `app/Http/Controllers/CodesController.php` 的 `store()`／`update()`／`proposalStore()`／`proposalUpdate()`／**`proposalUpdateExisting()`**（code 表拼音欄：c_office_pinyin、c_inst_name_py、TEXT_CODES.c_title、ADDR_CODES.c_name 等；泛型寫入、無歸一化；後三者寫入 proposal payload，於提交時歸一化）
-  - `app/Repositories/BiogMainRepository.php` 的 `updateById()`（basic-info 表單直改）＋ `store()`（新建人物）——兩者同缺口（`auto_pinyin` 只從中文重生 c_surname/c_mingzi，不碰手打的 `_rm`／`_proper` 欄；已呼叫 BracketNormalizer）
-- **範圍限制**：只歸一化**拼音／羅馬字欄**，**不動中文欄（`c_*_chn`）**。規則對「`lv/nv` 後接母音」的西文名（Silva/Calvin）為 no-op；惟「`lv/nv` 後接 e／子音」的西文詞（如 `solve`→`solüe`）會被轉——人名羅馬字欄幾乎不遇，但套用到 code 表英文欄前應留意。proposal 路徑於**提交時**歸一化即可（核准時已是正字）。
-- **與遷移的關係**：此為「止血 2.0」——M1 覆蓋**生成**、本項覆蓋**手動輸入**，兩者合起來才能保證日後不再產生新的 `v`。應於 Phase A 收尾（§D-10）**之前**補上。
-- **測試**：每個入口補回歸（手打 `lv`/`Nv` 保存後讀回為 `lü`/`Nü`；西文名 `Silva`/`Calvin` 不變；中文欄不受影響；proposal 提交後 payload 已正規化）。
+**實作設計與最終定案見 [PINYIN_SAVE_NORMALIZE_DESIGN.md](./PINYIN_SAVE_NORMALIZE_DESIGN.md)**（經 review agent + codex 兩輪審查）。要點與**對本節舊草稿的修正**：
+
+- **前置**：`App\Support\PinyinUmlaut::normalize()`（規則 `l/n`+`v` 且後非 a/i/o/u → `lü/nü/lüe/nüe`）由 M1 建於 develop；本項新增 `PinyinUmlaut::normalizeFields()` + 兩組 allowlist 常數統一套用。
+- **⚠️ 修正舊草稿的欄位錯誤**：本節原列 `c_name_rm`／`c_surname_rm`／`c_mingzi_rm`／`c_*_proper` 為歸一化目標——**錯誤**。這些是 Wade-Giles 羅馬字與母語拉丁名（可能含**真** `v`，如 Silva），**一律不轉**（與 §4「不轉換的欄位」一致）。v→ü 專用 allowlist **不可沿用 `BracketNormalizer` 欄位列**（後者含 `_rm`／`_proper`）。
+- **兩層機制（Hongsu 定案）**：
+  - **Tier 1｜後端靜默轉**——定義上即漢語拼音的欄：BIOG `c_surname`／`c_mingzi`／`c_name`、ALTNAME `c_alt_name_pinyin`/`2`/`3`。
+  - **Tier 2｜前端互動確認**——可能含西文別名的 `c_alt_name`（如 Denver，`nve` 為真實西文）：React `AltnameEditor` 保存時用同一規則偵測，命中才彈窗由使用者「轉換／保留」；後端**不**靜默轉 `c_alt_name`。
+- **實作掛點（僅 active React／`/api/v2` 人工輸入面）**：`BiogMainRepository::updateById`／`store`、`BiogMainMutationHandler::prepareProposalPayload`、`AltnameMutationHandler`／`AltnameCreateHandler` 的 `preprocess*`；前端 `resources/js/inertia/utils/pinyinUmlaut.ts` + `AltnameEditor` 彈窗。
+- **範圍決策**：Code 表（`CodesController`／書名內聯）留 **Phase B**（需先建「表→漢語拼音欄」白名單，避免誤傷 Wade-Giles／譯名欄）；舊 Blade 控制器不改（遵 AGENTS.md）；legacy `/api/v1`、提案核准落庫為有意排除的殘留。詳見設計文件 §5／§9。
+- **測試**：`PinyinUmlautTest`（normalizeFields + 前後端規則位元一致契約）、`ApiV2Mutate*/Create*` 各掛點回歸、前端 `pinyinUmlaut.test.ts`（vitest）。
 
 ## 0. 背景與決議
 

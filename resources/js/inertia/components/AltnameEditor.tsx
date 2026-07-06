@@ -4,6 +4,8 @@ import { redirectAfterSubresourceCreate } from './PersonEditorShared/afterCreate
 import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import TextpersonPair from './PersonEditorShared/TextpersonPair';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
+import { detectUmlautConversions, applyUmlaut } from '../utils/pinyinUmlaut';
+import type { UmlautConversion } from '../utils/pinyinUmlaut';
 import {
     gridCardStyle, gGrid, gPairRow, gInputStyle, gReadonlyStyle, gOkStyle, gErrStyle,
     gSubmitRow, gBtnGroupRight, gPrimaryBtn, gInfoBtn, gDangerBtn, gCancelBtn,
@@ -83,34 +85,52 @@ export default function AltnameEditor({
         setMessage(tr('update_source_success', '已自動回填出處與頁碼'));
     };
 
+    // Tier 2：c_alt_name 可能含西文別名，保存時偵測是否命中 v→ü 規則；命中才彈窗由使用者決定。
+    // 待確認的保存意圖（sm 模式、命中清單、依規則轉換後的值）；null 表示無待確認。
+    const [umlautPrompt, setUmlautPrompt] = useState<{ sm: 'direct' | 'proposal'; conversions: UmlautConversion[]; converted: string } | null>(null);
+
     const save = async (sm: 'direct' | 'proposal') => {
-        setSaving(true); setError(null); setMessage(null);
         // 別名（拼音）c_alt_name 必填：建立與編輯皆不可為空（使用者指定，較 legacy 嚴格）。
-        if ((fields.c_alt_name ?? '') === '') { setSaving(false); setError(tr('altname_pinyin_required', '請輸入別名（拼音）')); return; }
+        if ((fields.c_alt_name ?? '') === '') { setError(tr('altname_pinyin_required', '請輸入別名（拼音）')); return; }
+        // Tier 2 閘：唯有依「我們的規則」（l/n+v 且後非 a/i/o/u）命中時，才彈窗；否則照舊直接提交。
+        // 有命中即代表字串會改變（如 Lv→Lü），故直接開窗由使用者決定轉換／保留。
+        const conversions = detectUmlautConversions(fields.c_alt_name);
+        if (conversions.length > 0) {
+            setError(null); setMessage(null);
+            setUmlautPrompt({ sm, conversions, converted: applyUmlaut(fields.c_alt_name) });
+            return;
+        }
+        await doSubmit(sm, fields.c_alt_name ?? '');
+    };
+
+    // 實際送出（altName 為 Tier 2 確認後採用的別名拼音值：轉換版或保留原值）。
+    const doSubmit = async (sm: 'direct' | 'proposal', altName: string) => {
+        setSaving(true); setError(null); setMessage(null);
+        const effFields: Fields = { ...fields, c_alt_name: altName };
         let changes: Record<string, string | null>;
         let target: Record<string, string | number>;
         let endpoint: string;
         let operation: string;
         if (mode === 'create') {
             // 別名(中) 為主鍵，必填；c_sequence 對齊 legacy create 為必填。
-            if ((fields.c_alt_name_chn ?? '') === '') { setSaving(false); setError(tr('altname_required', '請輸入別名（中文）')); return; }
-            if ((fields.c_sequence ?? '') === '') { setSaving(false); setError(tr('sequence_required', '請輸入序號')); return; }
+            if ((effFields.c_alt_name_chn ?? '') === '') { setSaving(false); setError(tr('altname_required', '請輸入別名（中文）')); return; }
+            if ((effFields.c_sequence ?? '') === '') { setSaving(false); setError(tr('sequence_required', '請輸入序號')); return; }
             endpoint = createEndpoint; operation = 'create';
-            target = Object.fromEntries(PK.map((k) => [k, pkVal(k, fields[k] ?? '', personId)]));
+            target = Object.fromEntries(PK.map((k) => [k, pkVal(k, effFields[k] ?? '', personId)]));
             changes = {};
-            for (const k of NON_PK) { const v = fields[k] ?? ''; if (v !== '') changes[k] = v; }
+            for (const k of NON_PK) { const v = effFields[k] ?? ''; if (v !== '') changes[k] = v; }
         } else {
             endpoint = mutateEndpoint; operation = 'update'; target = originalPk.current;
             // 主鍵欄（別名(中)/類型）不可清空：清空會讓送出的 changes 略過該欄，導致 DB 仍為舊鍵、
             // 但 client snapshot/PK 已失準（後續 save/delete 命中錯誤記錄）。對齊 legacy 直接擋下。
             for (const k of EDITABLE_PK) {
-                if ((fields[k] ?? '') === '') { setSaving(false); setError(tr('pk_required', '主鍵欄位不可為空')); return; }
+                if ((effFields[k] ?? '') === '') { setSaving(false); setError(tr('pk_required', '主鍵欄位不可為空')); return; }
             }
             const initial: Fields = JSON.parse(savedSnapshot);
             changes = {};
-            for (const k of NON_PK) { const v = fields[k] ?? ''; if ((initial[k] ?? '') !== v) changes[k] = v === '' ? null : v; }
+            for (const k of NON_PK) { const v = effFields[k] ?? ''; if ((initial[k] ?? '') !== v) changes[k] = v === '' ? null : v; }
             // 可改主鍵（別名(中)/類型）：對齊 legacy，後端據此改鍵（上方已保證非空）。
-            for (const k of EDITABLE_PK) { const v = fields[k] ?? ''; if ((initial[k] ?? '') !== v) changes[k] = v; }
+            for (const k of EDITABLE_PK) { const v = effFields[k] ?? ''; if ((initial[k] ?? '') !== v) changes[k] = v; }
             if (Object.keys(changes).length === 0) { setSaving(false); setError(tr('no_change', '沒有變更')); return; }
         }
         try {
@@ -127,8 +147,9 @@ export default function AltnameEditor({
             const auditRow = (sm === 'direct' && json?.result?.row && typeof json.result.row === 'object') ? json.result.row as Record<string, unknown> : null;
             const auditPatch: Fields = {};
             if (auditRow) { for (const k of ['c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date']) { if (auditRow[k] != null) auditPatch[k] = String(auditRow[k]); } }
-            if (Object.keys(auditPatch).length > 0) setFields((prev) => ({ ...prev, ...auditPatch }));
-            setSavedSnapshot(JSON.stringify({ ...fields, ...auditPatch }));
+            // 同步 c_alt_name（若 Tier 2 採用轉換值）與稽核欄，使 UI 與 baseline 皆等於實際入庫值。
+            setFields((prev) => ({ ...prev, c_alt_name: altName, ...auditPatch }));
+            setSavedSnapshot(JSON.stringify({ ...effFields, ...auditPatch }));
             if (mode === 'create') { redirectAfterSubresourceCreate(indexUrl, json, sm === 'direct'); }
             // 直接儲存若改了主鍵：以「實際送出的 PK 變更」覆寫 originalPk（字串 PK 保留字串）。
             // 不可用 fields 重建（清空欄位會讓 client/DB PK 失準）。
@@ -189,6 +210,30 @@ export default function AltnameEditor({
             {message ? <div style={gOkStyle}>{message}</div> : null}
             {error ? <div style={gErrStyle}>{error}</div> : null}
 
+            {umlautPrompt ? (
+                <div style={umlautBackdropStyle} role="dialog" aria-modal="true" aria-label={tr('pinyin_umlaut_title', '偵測到拼音 v → ü')}>
+                    <div style={umlautCardStyle}>
+                        <div style={{ fontWeight: 700, marginBottom: 8 }}>{tr('pinyin_umlaut_title', '偵測到拼音 v → ü')}</div>
+                        <div style={{ marginBottom: 8, fontSize: '0.9rem', color: '#444' }}>
+                            {tr('pinyin_umlaut_hint', '「別名（拼音）」可能含以 v 代寫的 ü。是否依漢語拼音規則轉換？若為西文別名（如 Denver）請選「保留原樣」。')}
+                        </div>
+                        <ul style={{ margin: '0 0 10px', paddingLeft: 18 }}>
+                            {umlautPrompt.conversions.map((c, i) => (
+                                <li key={`${c.index}-${i}`}><code>{c.from}</code> → <code>{c.to}</code></li>
+                            ))}
+                        </ul>
+                        <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: 14, wordBreak: 'break-all' }}>
+                            {tr('pinyin_umlaut_preview', '轉換後：')}<code>{umlautPrompt.converted}</code>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                            <button type="button" style={gCancelBtn} onClick={() => setUmlautPrompt(null)}>{tr('cancel', '取消')}</button>
+                            <button type="button" style={gInfoBtn} onClick={() => { const p = umlautPrompt; setUmlautPrompt(null); void doSubmit(p.sm, fields.c_alt_name ?? ''); }}>{tr('pinyin_umlaut_keep', '保留原樣並儲存')}</button>
+                            <button type="button" style={gPrimaryBtn} onClick={() => { const p = umlautPrompt; setUmlautPrompt(null); void doSubmit(p.sm, p.converted); }}>{tr('pinyin_umlaut_convert', '轉換並儲存')}</button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+
             <div style={gGrid}>
                 {/* 類型置最左（首位，使用者指定）；其後別名(中)+拼音相鄰，次序去強調置後 */}
                 {gridCell(tr('altname_type', '類型'), { code: 'c_alt_name_type_code' },
@@ -247,3 +292,12 @@ export default function AltnameEditor({
 }
 
 const titleStyle: React.CSSProperties = { fontSize: '1.1rem', fontWeight: 700, marginBottom: 12 };
+
+const umlautBackdropStyle: React.CSSProperties = {
+    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 1050,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+};
+const umlautCardStyle: React.CSSProperties = {
+    background: '#fff', borderRadius: 6, padding: 20, maxWidth: 480, width: '100%',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
+};

@@ -23,6 +23,23 @@ class PinyinUmlaut {
     /** l/n 之後、其後非 a/i/o/u 的 v（保留大小寫）。'e' 不在排除集，故 lve/nve 亦會命中。 */
     private const PATTERN = '/([LlNn])([Vv])(?![aiouAIOU])/u';
 
+    /**
+     * 保存時「靜默」歸一化的 BIOG_MAIN 漢語拼音欄（Tier 1）。
+     *
+     * 僅列**定義上即漢語拼音**的欄：`c_surname`/`c_mingzi`（其他羅馬化另存於 `c_*_rm`／`c_*_proper`）、
+     * 以及由二者組出的 `c_name`。**刻意不含** `c_*_rm`（Wade-Giles）／`c_*_proper`（母語拉丁名，
+     * 可能含真 `v`）。設計見 docs/PINYIN_SAVE_NORMALIZE_DESIGN.md。
+     */
+    public const BIOG_MAIN_PINYIN_V_FIELDS = ['c_surname', 'c_mingzi', 'c_name'];
+
+    /**
+     * 保存時「靜默」歸一化的 ALTNAME_DATA 拼音欄（Tier 1）。
+     *
+     * 僅列明確標為「拼音」的欄。**刻意不含** `c_alt_name`——後者為泛用別名羅馬字、可能含西文別名
+     * （如 Denver），改由前端 Tier 2 互動確認（見設計文件 §3/§4.2）。
+     */
+    public const ALTNAME_PINYIN_V_FIELDS = ['c_alt_name_pinyin', 'c_alt_name_pinyin2', 'c_alt_name_pinyin3'];
+
     /** 將字串中作為 ü 代寫的 v 正規化為 ü。null/空字串原樣返回。 */
     public static function normalize(?string $value): string {
         if ($value === null || $value === '') {
@@ -34,5 +51,24 @@ class PinyinUmlaut {
             static fn (array $m): string => $m[1] . ($m[2] === 'V' ? 'Ü' : 'ü'),
             $value
         ) ?? $value;
+    }
+
+    /**
+     * 對 $data 中列於 $fields 的字串欄套用 normalize()；非字串／缺欄／null 原樣略過。
+     *
+     * 保存前歸一化用：搭配 self::BIOG_MAIN_PINYIN_V_FIELDS／ALTNAME_PINYIN_V_FIELDS。冪等。
+     *
+     * @param array<string,mixed> $data
+     * @param list<string>        $fields
+     * @return array<string,mixed>
+     */
+    public static function normalizeFields(array $data, array $fields): array {
+        foreach ($fields as $field) {
+            if (array_key_exists($field, $data) && is_string($data[$field])) {
+                $data[$field] = self::normalize($data[$field]);
+            }
+        }
+
+        return $data;
     }
 }

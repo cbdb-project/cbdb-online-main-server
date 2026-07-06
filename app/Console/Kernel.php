@@ -23,7 +23,6 @@ class Kernel extends ConsoleKernel {
         \App\Console\Commands\RebuildIndexAddress::class,
         \App\Console\Commands\FetchChgisMap::class,
         \App\Console\Commands\RebuildPersonChangeIndex::class,
-        \App\Console\Commands\ScanPinyinV::class,
         \App\Console\Commands\MigratePinyinV::class,
     ];
 

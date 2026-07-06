@@ -71,6 +71,7 @@
 - **指令**：`cbdb:migrate-pinyin-v {--table=both|biog|altname} {--fetch} {--confidence=all|high|low} {--execute} {--base-url=}`；預設 dry-run；`--confidence` 分批（high 批＝BIOG high + ALTNAME、跳過 BIOG low；low 批＝BIOG low）。Token 只從環境變數 `CBDB_MIGRATE_TOKEN` 讀。
 - **執行結果（2026-07-01）**：第一批 high+ALTNAME 成功 5146、第二批 low 成功 1506，**累計 6652 筆寫入生產、線上抽樣驗證正確**（含生僻字 `呂搢→Lü Jin`、複姓孤兒 `閭丘陞→Lüqiu Sheng`）。
 - **待人工（尚未寫）**：孤兒多空格（~47，等「親屬女可拆」規則）、括號孤兒 9、ALTNAME 歧義 27（>1 命中）、**分量中文名 NULL 的無名記錄 24**（如 `鄭履正`，handler 校驗「名不能為空」拒絕、API 無法更新，需另途）。清單見人工複核 xlsx（不入版控）。
+- **✅ Phase A 完成（2026-07-06）**：上述待人工項由 Hongsu 在錄入系統修訂完成，殘留 v 由 58 降至 0（5 個 BIOG 為 `<待删除>` 記錄、直接 skip）。§D-10 收尾已執行並合併 develop（#1126）：從 `config/codes.php` 的 `ui_hidden` 移除 `'pinyin'`（重新顯示姓氏拼音對照表）、移除 M2 掃描指令 `cbdb:scan-pinyin-v`（保留 `PinyinUmlaut` 與 `MigratePinyinV`）。服務器 token 檔已刪、提醒 rotate。**唯 §D-12（保存時 v→ü 歸一化，手動輸入路徑）尚未實作**——建議儘早補上以閉環止血，否則手動錄入/批量匯入的 `v` 會重新累積。
 
 ### D-12 保存時自動 v→ü 歸一化（手動輸入路徑；止血 2.0）
 > **缺口（2026-07-02 Hongsu 發現）**：M1 止血只掛在**生成路徑**（從中文自動生成拼音：`auto_pinyin`／三批次 `buildPinyin`／`buildPinyinWord`）。使用者在編輯頁／批量頁**手動輸入**的拼音（如直接打 `lv`）走的是**保存路徑、不經生成**，故 `v` 原樣入庫、不轉 `ü`——遷移後仍會被手動輸入重新污染。

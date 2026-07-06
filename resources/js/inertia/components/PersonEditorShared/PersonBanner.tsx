@@ -127,9 +127,14 @@ const historyLinkStyle: React.CSSProperties = {
     borderRadius: 4, border: '1px solid var(--border)', background: 'var(--secondary)', color: 'var(--secondary-foreground)', textDecoration: 'none',
 };
 const navStyle: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 2, borderBottom: '1px solid var(--border)', paddingBottom: 0 };
+// 用 border 長寫（borderColor 而非 border 簡寫）：active 樣式只覆寫 borderColor，
+// 若基底用 `border` 簡寫、active 用 `borderColor` 長寫，React 在分頁由 active→inactive
+// 時只會「移除」borderColor 長寫而非重設為 transparent，導致曾選過的分頁殘留邊框（只剩
+// 當前選中／未選中兩態才對）。基底顯式給 borderColor: 'transparent' 可讓 React 乾淨重設。
 const tabStyle: React.CSSProperties = {
     display: 'inline-flex', alignItems: 'center', gap: 2, padding: '8px 12px',
-    border: '1px solid transparent', borderTopLeftRadius: 6, borderTopRightRadius: 6,
+    borderWidth: '1px', borderStyle: 'solid', borderColor: 'transparent',
+    borderTopLeftRadius: 6, borderTopRightRadius: 6,
     background: 'none', color: 'var(--primary)', fontSize: '0.95rem', cursor: 'pointer',
     marginBottom: -1, textDecoration: 'none',
 };

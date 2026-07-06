@@ -91,7 +91,7 @@ export default function PersonIndex() {
                             ))}
                         </Select>
                     )}
-                    <Button type="submit" variant="secondary" size="sm">
+                    <Button type="submit" variant="secondary" size="icon" title={tc('search')} aria-label={tc('search')}>
                         <i className="fas fa-search" aria-hidden />
                     </Button>
                 </form>

@@ -77,4 +77,92 @@ class PinyinUmlautTest extends TestCase {
         $once = PinyinUmlaut::normalize('Lv Yelv nve Lvzhai');
         $this->assertSame($once, PinyinUmlaut::normalize($once));
     }
+
+    /**
+     * 標準樣本（input → expected）——**必須與前端 resources/js/inertia/utils/pinyinUmlaut.test.ts 的
+     * CANONICAL 完全一致**。此組樣本即前後端規則的位元一致契約（設計 §7）；任一端修改都要同步另一端。
+     *
+     * @return array<int, array{0:string,1:string}>
+     */
+    public static function canonicalFixtures(): array {
+        return [
+            ['Lv', 'Lü'],
+            ['lv', 'lü'],
+            ['LV', 'LÜ'],
+            ['lV', 'lÜ'],
+            ['Nv', 'Nü'],
+            ['Lve', 'Lüe'],
+            ['nve', 'nüe'],
+            ['Yelv', 'Yelü'],
+            ['Lv Meng', 'Lü Meng'],
+            ['Lvzhai', 'Lüzhai'],
+            ['Silva', 'Silva'],
+            ['Calvin', 'Calvin'],
+            ['Melville', 'Melville'],
+            ['Sylvia', 'Sylvia'],
+            ['David', 'David'],
+            ['Vasco', 'Vasco'],
+            ['Denver', 'Denüer'],
+            ['Lü', 'Lü'],
+            ['', ''],
+        ];
+    }
+
+    #[Test]
+    #[DataProvider('canonicalFixtures')]
+    public function it_matches_the_shared_frontend_backend_contract(string $input, string $expected): void {
+        $this->assertSame($expected, PinyinUmlaut::normalize($input));
+    }
+
+    #[Test]
+    public function normalize_fields_only_touches_biog_pinyin_columns(): void {
+        $data = [
+            'c_surname' => 'Lv',
+            'c_mingzi' => 'Meng',
+            'c_name' => 'Lv Meng',
+            'c_surname_rm' => 'Lv',       // Wade-Giles：不可轉
+            'c_surname_proper' => 'Silva', // 母語拉丁名：不可轉（且本就 no-op）
+            'c_name_proper' => 'Denver',   // 母語拉丁名：即使踩 nve 亦不可轉
+            'c_surname_chn' => '呂',        // 中文：不轉
+        ];
+        $out = PinyinUmlaut::normalizeFields($data, PinyinUmlaut::BIOG_MAIN_PINYIN_V_FIELDS);
+
+        $this->assertSame('Lü', $out['c_surname']);
+        $this->assertSame('Meng', $out['c_mingzi']);
+        $this->assertSame('Lü Meng', $out['c_name']);
+        // 排除欄一律原樣
+        $this->assertSame('Lv', $out['c_surname_rm']);
+        $this->assertSame('Silva', $out['c_surname_proper']);
+        $this->assertSame('Denver', $out['c_name_proper']);
+        $this->assertSame('呂', $out['c_surname_chn']);
+    }
+
+    #[Test]
+    public function normalize_fields_altname_covers_pinyin_columns_but_not_c_alt_name(): void {
+        $data = [
+            'c_alt_name' => 'Lv Meng',     // 走前端 Tier 2，後端不在此轉
+            'c_alt_name_pinyin' => 'lv',
+            'c_alt_name_pinyin2' => 'Nve',
+            'c_alt_name_pinyin3' => 'Silva', // 西文：no-op
+            'c_alt_name_chn' => '呂蒙',       // 中文：不轉
+        ];
+        $out = PinyinUmlaut::normalizeFields($data, PinyinUmlaut::ALTNAME_PINYIN_V_FIELDS);
+
+        $this->assertSame('Lv Meng', $out['c_alt_name']); // 後端刻意不轉
+        $this->assertSame('lü', $out['c_alt_name_pinyin']);
+        $this->assertSame('Nüe', $out['c_alt_name_pinyin2']);
+        $this->assertSame('Silva', $out['c_alt_name_pinyin3']);
+        $this->assertSame('呂蒙', $out['c_alt_name_chn']);
+    }
+
+    #[Test]
+    public function normalize_fields_skips_missing_null_and_non_string(): void {
+        $data = ['c_mingzi' => null, 'c_name' => 123, 'other' => 'Lv'];
+        $out = PinyinUmlaut::normalizeFields($data, PinyinUmlaut::BIOG_MAIN_PINYIN_V_FIELDS);
+
+        $this->assertNull($out['c_mingzi']);       // null 略過
+        $this->assertSame(123, $out['c_name']);    // 非字串略過
+        $this->assertSame('Lv', $out['other']);    // 不在 allowlist、不動
+        $this->assertArrayNotHasKey('c_surname', $out); // 缺欄不新增
+    }
 }

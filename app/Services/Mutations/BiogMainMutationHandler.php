@@ -11,6 +11,7 @@ use App\Repositories\ToolsRepository;
 use App\Services\BracketNormalizer;
 use App\Services\NameSearchIndexService;
 use App\Support\CompositePrimaryKey;
+use App\Support\PinyinUmlaut;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -199,6 +200,9 @@ class BiogMainMutationHandler extends AbstractMutationHandler {
         $payload['c_name_rm'] = trim(($payload['c_mingzi_rm'] ?? '').' '.($payload['c_surname_rm'] ?? ''));
 
         $payload = BracketNormalizer::normalizeBiogMain($payload);
+
+        // 保存時拼音 v→ü 歸一化（Tier 1；提案於提交時歸一化，核准逐字套用故此處為必要且充分）
+        $payload = PinyinUmlaut::normalizeFields($payload, PinyinUmlaut::BIOG_MAIN_PINYIN_V_FIELDS);
 
         $female = $payload['c_female'] ?? null;
         $payload['c_female'] = ($female === null || $female === '' || $female === 'NULL')

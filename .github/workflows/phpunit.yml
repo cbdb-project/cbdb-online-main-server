@@ -67,6 +67,9 @@ jobs:
           npm install
           npm run prod
 
+      - name: Run frontend unit tests (vitest)
+        run: npm run test
+
       - name: Display versions
         run: |
           php -v

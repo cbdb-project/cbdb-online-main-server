@@ -6,6 +6,7 @@ use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
 use App\Services\BracketNormalizer;
 use App\Services\NameSearchIndexService;
+use App\Support\PinyinUmlaut;
 use Illuminate\Support\Facades\Schema;
 
 class AltnameCreateHandler extends AbstractPersonSubresourceCreateHandler {
@@ -59,6 +60,9 @@ class AltnameCreateHandler extends AbstractPersonSubresourceCreateHandler {
 
     protected function preprocessCreateData(array $data): array {
         $data = BracketNormalizer::normalizeAltname($data);
+
+        // 保存時拼音 v→ü 歸一化（Tier 1；僅 c_alt_name_pinyin/2/3。c_alt_name 走前端 Tier 2、不在此轉）
+        $data = PinyinUmlaut::normalizeFields($data, PinyinUmlaut::ALTNAME_PINYIN_V_FIELDS);
 
         $data = $this->normalizeSentinelValues($data, ['c_alt_name_type_code', 'c_source']);
 

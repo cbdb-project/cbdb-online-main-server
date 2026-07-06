@@ -449,6 +449,12 @@ return [
     'altname_required' => '請輸入別名（中文）',
     'altname_pinyin_required' => '請輸入別名（拼音）',
     'sequence_required' => '請輸入序號',
+    // 保存時拼音 v→ü 確認彈窗（Tier 2；別名可能含西文）。
+    'pinyin_umlaut_title' => '偵測到拼音 v → ü',
+    'pinyin_umlaut_hint' => '「別名（拼音）」可能含以 v 代寫的 ü。是否依漢語拼音規則轉換？若為西文別名（如 Denver）請選「保留原樣」。',
+    'pinyin_umlaut_preview' => '轉換後：',
+    'pinyin_umlaut_keep' => '保留原樣並儲存',
+    'pinyin_umlaut_convert' => '轉換並儲存',
     'pk_required' => '主鍵欄位不可為空',
     'please_select_source' => '請選擇出處',
     'please_fill_sequence' => '請填寫序號',

@@ -208,6 +208,53 @@ class ApiV2MutateAltnameTest extends TestCase {
     }
 
     #[Test]
+    public function testDirectAltnameUpdateNormalizesPinyinVToUmlaut(): void {
+        $user = $this->makeUser(email: 'altname-umlaut@example.com');
+        $this->actingAs($user);
+        $this->seedAltname();
+
+        // Tier 1：後端靜默轉 c_alt_name_pinyin/2/3；Tier 2：c_alt_name 交前端、後端不轉。
+        $response = $this->postJson('/api/v2/mutate', $this->altnamePayload([
+            'changes' => [
+                'c_alt_name' => 'Lv Meng',
+                'c_alt_name_pinyin' => 'lv',
+                'c_alt_name_pinyin2' => 'Nve',
+                'c_alt_name_pinyin3' => 'Silva',
+            ],
+        ]));
+
+        $response->assertOk();
+
+        $this->assertDatabaseHas('ALTNAME_DATA', [
+            'c_personid' => 1000,
+            'c_alt_name_chn' => '子美',
+            'c_alt_name_pinyin' => 'lü',   // Tier 1 靜默轉
+            'c_alt_name_pinyin2' => 'Nüe',
+            'c_alt_name_pinyin3' => 'Silva', // 西文 no-op
+            'c_alt_name' => 'Lv Meng',     // 後端刻意不轉（Tier 2 前端負責）
+        ]);
+    }
+
+    #[Test]
+    public function testDirectAltnameUpdatePinyinNormalizationIsIdempotent(): void {
+        $user = $this->makeUser(email: 'altname-umlaut-idem@example.com');
+        $this->actingAs($user);
+        // 已是 ü 的資料再保存一次，值不變、不因重複套用而損壞。
+        $this->seedAltname(['c_alt_name_pinyin' => 'lü']);
+
+        $this->postJson('/api/v2/mutate', $this->altnamePayload([
+            'changes' => ['c_alt_name_pinyin' => 'lü', 'c_sequence' => 9],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('ALTNAME_DATA', [
+            'c_personid' => 1000,
+            'c_alt_name_chn' => '子美',
+            'c_alt_name_pinyin' => 'lü', // 冪等：仍為 lü，未被二次轉換破壞
+            'c_sequence' => 9,
+        ]);
+    }
+
+    #[Test]
     public function testDirectAltnameUpdateReturnsOperationIdAndRow(): void {
         $user = $this->makeUser(email: 'altname-result@example.com');
         $this->actingAs($user);

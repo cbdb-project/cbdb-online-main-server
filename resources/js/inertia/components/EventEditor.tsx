@@ -8,7 +8,7 @@ import { redirectAfterSubresourceCreate } from './PersonEditorShared/afterCreate
 import {
     gridCardStyle, gGrid, gInputStyle, gReadonlyStyle, gOkStyle, gErrStyle,
     gSubmitRow, gBtnGroupRight, gPrimaryBtn, gInfoBtn, gDangerBtn, gCancelBtn,
-    gAuditWrapStyle, gridSectionHeadStyle, GridLabel, gridCell, gridInput,
+    gAuditWrapStyle, gHiddenSubmitStyle, gridSectionHeadStyle, GridLabel, gridCell, gridInput,
 } from './PersonEditorShared/grid';
 
 /**
@@ -214,8 +214,22 @@ export default function EventEditor({
         gridCell(label, { code }, gridInput({ value: fields[key] ?? '', onChange: (v) => set(key, v), disabled: !editable, highlight, name: key }))
     );
 
+    // 回車保存（復刻舊版 Blade：表單內於單行輸入框按 Enter 觸發提交）。以原生 <form> 實現，
+    // 因此 textarea 換行、輸入法（IME）選字用的 Enter 皆為瀏覽器原生行為、不會誤觸提交；
+    // 表單內按鈕皆為 type="button" 不隱式提交。canEdit → 直接保存；否則可提案者 → 提交建議。
+    const onFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        if (saving || deleting || (mode === 'edit' && !dirty)) return;
+        if (canEdit) {
+            void save('direct');
+        } else if (canPropose) {
+            void save('proposal');
+        }
+    };
+
     return (
-        <div style={gridCardStyle}>
+        <form style={gridCardStyle} onSubmit={onFormSubmit}>
+            <button type="submit" aria-hidden="true" tabIndex={-1} style={gHiddenSubmitStyle} />
             <h3 style={titleStyle}>{mode === 'create' ? tr('event_create', '新增事件') : tr('event_edit', '編輯事件')}</h3>
             {message ? <div style={gOkStyle}>{message}</div> : null}
             {error ? <div style={gErrStyle}>{error}</div> : null}
@@ -299,7 +313,7 @@ export default function EventEditor({
                 </div>
             </div>
             {dirty ? <div style={{ marginTop: 8, color: 'var(--warning-subtle-foreground)', fontSize: '0.8rem' }}>{tr('unsaved_changes', '有未儲存的變更')}</div> : null}
-        </div>
+        </form>
     );
 }
 

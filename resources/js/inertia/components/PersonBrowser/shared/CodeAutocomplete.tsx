@@ -251,6 +251,22 @@ export default function CodeAutocomplete(props: Props) {
                     setQuery(e.target.value);
                     setOpen(true);
                 }}
+                // 編輯器根節點現為 <form>（支援 Enter 保存）：下拉開啟時本元件無「目前反白候選」概念，
+                // Enter 若不攔截會被表單當成隱式提交，使用者尚未點選候選就誤觸儲存。開啟中吞掉 Enter，
+                // 迫使使用者以滑鼠點選候選、或按 Esc 關閉下拉後再以 Enter 送出表單。
+                // isComposing 排除：中文輸入法選字用的 Enter 屬合成事件，不可攔截，否則無法確認候選字。
+                onKeyDown={(e) => {
+                    // keyCode 229 後備判斷：部分瀏覽器/輸入法組合在確認字詞當下 isComposing 已回報 false。
+                    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+                    if (e.key === 'Escape' && open) {
+                        e.preventDefault();
+                        setOpen(false);
+                        return;
+                    }
+                    if (e.key === 'Enter' && open) {
+                        e.preventDefault();
+                    }
+                }}
                 style={{
                     ...inputStyle,
                     ...(ariaInvalid ? invalidStyle : {}),

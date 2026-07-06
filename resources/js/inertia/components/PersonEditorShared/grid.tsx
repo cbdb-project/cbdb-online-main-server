@@ -26,6 +26,10 @@ export const gInputStyle: React.CSSProperties = { width: '100%', height: 40, pad
 export const gHintStyle: React.CSSProperties = { display: 'block', marginTop: 4, fontSize: '0.8rem', color: 'var(--muted-foreground)' };
 export const gReadonlyStyle: React.CSSProperties = { background: 'var(--muted)', cursor: 'not-allowed' };
 export const gAuditWrapStyle: React.CSSProperties = { marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border)' };
+// 隱藏提交鈕：讓編輯器根 <form> 具備「預設提交按鈕」，使單行輸入框按 Enter 觸發原生隱式提交（復刻 legacy Blade 行為）。
+// 可見動作按鈕皆為 type="button"（點擊行為不變）；此鈕僅供 Enter，並以 tabIndex=-1／aria-hidden 排除於鍵盤焦點與無障礙。
+// 不可用 display:none／hidden，否則部分瀏覽器不觸發隱式提交。
+export const gHiddenSubmitStyle: React.CSSProperties = { position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, border: 0, overflow: 'hidden', clip: 'rect(0 0 0 0)' };
 
 // 動作列：主要動作靠左、危險/另存靠右。
 export const gSubmitRow: React.CSSProperties = { display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap', alignItems: 'center' };

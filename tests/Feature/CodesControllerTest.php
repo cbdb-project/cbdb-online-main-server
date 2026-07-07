@@ -23,7 +23,7 @@ class CodesControllerTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
 
-        config(['codes.tables' => ['TEST_CODES', 'TEXT_CODES', 'POSSESSION_DATA', 'CBDB__NAME_FTS', 'APPOINTMENT_CODE_TYPE_REL', 'OFFICE_CODE_TYPE_REL', 'APPOINTMENT_TYPES']]);
+        config(['codes.tables' => ['TEST_CODES', 'TEXT_CODES', 'POSSESSION_DATA', 'CBDB__NAME_FTS', 'APPOINTMENT_CODE_TYPE_REL', 'OFFICE_CODE_TYPE_REL', 'APPOINTMENT_TYPES', 'ADDR_CODES']]);
         config(['codes.connection' => null]);
 
         $compiledPath = base_path('tests/storage/views');
@@ -42,10 +42,12 @@ class CodesControllerTest extends TestCase {
                 'APPOINTMENT_CODE_TYPE_REL' => [],
                 'OFFICE_CODE_TYPE_REL' => [],
                 'APPOINTMENT_TYPES' => [],
+                'ADDR_CODES' => [],
                 'operations' => [],
             ],
             [
                 'TEST_CODES' => ['code_id', 'code_sub', 'description'],
+                'ADDR_CODES' => ['c_addr_id', 'c_name', 'c_name_chn'],
                 'TEXT_CODES' => ['c_textid', 'c_title', 'c_title_chn', 'c_bibl_cat_code', 'c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date'],
                 'POSSESSION_DATA' => ['c_personid', 'c_possession_record_id', 'c_sequence', 'c_possession_act_code', 'c_possession_desc'],
                 'CBDB__NAME_FTS' => ['id', 'person_name'],
@@ -69,7 +71,7 @@ class CodesControllerTest extends TestCase {
 
         $this->app->instance(CodesRepository::class, new class () extends CodesRepository {
             public function allowedTables(): array {
-                return ['TEST_CODES', 'TEXT_CODES', 'POSSESSION_DATA', 'CBDB__NAME_FTS', 'APPOINTMENT_CODE_TYPE_REL', 'OFFICE_CODE_TYPE_REL', 'APPOINTMENT_TYPES'];
+                return ['TEST_CODES', 'TEXT_CODES', 'POSSESSION_DATA', 'CBDB__NAME_FTS', 'APPOINTMENT_CODE_TYPE_REL', 'OFFICE_CODE_TYPE_REL', 'APPOINTMENT_TYPES', 'ADDR_CODES'];
             }
 
             public function allowedTableMap(): array {
@@ -81,6 +83,7 @@ class CodesControllerTest extends TestCase {
                     'APPOINTMENT_CODE_TYPE_REL' => 'APPOINTMENT_CODE_TYPE_REL',
                     'OFFICE_CODE_TYPE_REL' => 'OFFICE_CODE_TYPE_REL',
                     'APPOINTMENT_TYPES' => 'APPOINTMENT_TYPES',
+                    'ADDR_CODES' => 'ADDR_CODES',
                 ];
             }
         });
@@ -265,6 +268,75 @@ class CodesControllerTest extends TestCase {
         $this->assertEquals(Carbon::now()->timestamp, $parsedTime->timestamp, '', 1);
 
         Carbon::setTestNow();
+    }
+
+    private function activeUser(string $name = 'active', int $id = 21): User {
+        $user = new User(['name' => $name, 'email' => $name.'@example.com', 'confirmation_token' => Str::random(32)]);
+        $user->id = $id;
+        $user->is_active = 1;
+
+        return $user;
+    }
+
+    #[Test]
+    public function testStoreNormalizesTier1PinyinColumn() {
+        // §D-6：TEXT_CODES.c_title 為 Tier 1，手打 lv 應靜默轉 lü
+        $this->actingAs($this->activeUser());
+
+        $this->post('/codes/TEXT_CODES', [
+            'c_textid' => 'T200',
+            'c_title' => 'Lvzhai Shier Bian',
+            'c_title_chn' => '呂齋十二辨',
+        ]);
+
+        $row = $this->fakeDb->tables['TEXT_CODES'][0];
+        $this->assertSame('Lüzhai Shier Bian', $row['c_title']);
+        $this->assertSame('呂齋十二辨', $row['c_title_chn']); // 中文欄不動
+    }
+
+    #[Test]
+    public function testUpdateNormalizesTier1PinyinColumn() {
+        $this->actingAs($this->activeUser());
+        $this->fakeDb->tables['TEXT_CODES'][] = ['c_textid' => 'T300', 'c_title' => 'old', 'c_title_chn' => '舊'];
+
+        $this->put('/codes/TEXT_CODES/T300', [
+            'c_textid' => 'T300',
+            'c_title' => 'Nvzhen Kao',
+            'c_title_chn' => '女真考',
+        ]);
+
+        $row = collect($this->fakeDb->tables['TEXT_CODES'])->firstWhere('c_textid', 'T300');
+        $this->assertSame('Nüzhen Kao', $row['c_title']);
+    }
+
+    #[Test]
+    public function testStoreDoesNotNormalizeTier2Column() {
+        // §D-6：ADDR_CODES.c_name 為 Tier 2（可能含西文），後端不轉——交前端彈窗
+        $this->actingAs($this->activeUser());
+
+        $this->post('/codes/ADDR_CODES', [
+            'c_addr_id' => '900',
+            'c_name' => 'Lvchuan',
+            'c_name_chn' => '呂川',
+        ]);
+
+        $row = $this->fakeDb->tables['ADDR_CODES'][0];
+        $this->assertSame('Lvchuan', $row['c_name']); // 原樣、後端不轉
+    }
+
+    #[Test]
+    public function testStoreLeavesNonPhaseBTableUntouched() {
+        // TEST_CODES 不在 code_table_mutations config → 任何欄皆不歸一化
+        $this->actingAs($this->activeUser());
+
+        $this->post('/codes/TEST_CODES', [
+            'code_id' => 'A9',
+            'code_sub' => 'B9',
+            'description' => 'lvzhai test',
+        ]);
+
+        $row = $this->fakeDb->tables['TEST_CODES'][0];
+        $this->assertSame('lvzhai test', $row['description']); // 不動
     }
 
     #[Test]
@@ -1079,6 +1151,41 @@ class CodesControllerTest extends TestCase {
         $this->assertSame('Updated info', $stored['__proposal_meta']['comment']);
 
         $this->assertSame('PX_._02', $row->resource_id);
+    }
+
+    #[Test]
+    public function testProposalUpdateExistingNormalizesTier1Pinyin() {
+        // §D-6：編輯既有提案時，Tier 1 欄（TEXT_CODES.c_title）亦須歸一化，避免核准落庫仍帶 v。
+        $user = $this->activeUser('proposal-edit', 15);
+        $this->actingAs($user);
+
+        DB::table('operations')->delete();
+        DB::table('operations')->insert([
+            'id' => 8,
+            'user_id' => 15,
+            'resource' => 'TEXT_CODES',
+            'resource_id' => 'T500',
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource_data' => json_encode([
+                'c_textid' => 'T500',
+                'c_title' => 'old',
+                '__key_columns' => ['c_textid'],
+                '__review_status' => 'rejected',
+                '__proposal_meta' => ['submitted_by' => $user->name, 'submitted_by_id' => 15, 'submitted_at' => Carbon::now()->subDay()->format('Y-m-d H:i:s')],
+            ]),
+            'resource_original' => json_encode([]),
+            'created_at' => Carbon::now()->subDay()->format('Y-m-d H:i:s'),
+            'updated_at' => Carbon::now()->subDay()->format('Y-m-d H:i:s'),
+        ]);
+
+        $this->from(route('codes.proposals.edit', ['table_name' => 'TEXT_CODES', 'operation' => 8]))
+            ->patch(route('codes.proposals.update', ['table_name' => 'TEXT_CODES', 'operation' => 8]), [
+                'c_textid' => 'T500',
+                'c_title' => 'Lvzhai',
+            ])->assertRedirect(route('operations.index', ['proposals_only' => 1]));
+
+        $stored = json_decode(DB::table('operations')->first()->resource_data, true);
+        $this->assertSame('Lüzhai', $stored['c_title']); // 提案 payload 已歸一化
     }
 
     #[Test]

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Operation;
 use App\Repositories\CodesRepository;
 use App\Repositories\OperationRepository;
+use App\Services\AuditLogService;
 use App\Support\ColumnFilterExpression;
 use App\Support\ColumnFilterParseException;
 use App\Support\PinyinUmlaut;
@@ -246,14 +247,18 @@ class CodesController extends Controller {
 
     protected ColumnFilterExpression $columnFilterExpression;
 
+    protected AuditLogService $auditLogService;
+
     public function __construct(
         CodesRepository $codesRepository,
         OperationRepository $operationRepository,
-        ?ColumnFilterExpression $columnFilterExpression = null
+        ?ColumnFilterExpression $columnFilterExpression = null,
+        ?AuditLogService $auditLogService = null
     ) {
         $this->codesrepostory = $codesRepository;
         $this->operationRepository = $operationRepository;
         $this->columnFilterExpression = $columnFilterExpression ?? new ColumnFilterExpression();
+        $this->auditLogService = $auditLogService ?? app(AuditLogService::class);
         $this->allowedTables = $this->codesrepostory->allowedTables();
 
         // 直接从配置构建大小写映射，避免 SHOW TABLES 查询
@@ -2047,7 +2052,7 @@ class CodesController extends Controller {
             $resourceId = $this->buildCompositeId($keyColumns, $original);
         }
 
-        $this->operationRepository->store(
+        $operation = $this->operationRepository->store(
             Auth::id(),
             0,
             $type,
@@ -2056,6 +2061,35 @@ class CodesController extends Controller {
             $data,
             $original
         );
+
+        // §D-2：/codes 直寫路徑補 audit_log，使 UI 與 v2 API 審計一致（先前只寫 operations）。
+        // 僅 direct 寫入（INSERT/UPDATE/DELETE）；提案（recordProposalOperation）不落表、於核准時才審計。
+        // 注意：performUpdate 傳的是 TYPE_UPDATE_FULL(2)（Put），非 TYPE_UPDATE(3)；兩者皆映射為 UPDATE。
+        $auditOp = match ($type) {
+            Operation::TYPE_CREATE => 'INSERT',
+            Operation::TYPE_UPDATE_FULL, Operation::TYPE_UPDATE => 'UPDATE',
+            Operation::TYPE_DELETE => 'DELETE',
+            default => null,
+        };
+        if ($auditOp !== null && Schema::hasTable('audit_log')) {
+            $pkSource = !empty($data) ? $data : $original;
+            $rowPk = [];
+            foreach ($keyColumns as $col) {
+                if (array_key_exists($col, $pkSource)) {
+                    $rowPk[$col] = $pkSource[$col];
+                }
+            }
+            $this->auditLogService->write(
+                $table,
+                $auditOp,
+                $rowPk,
+                $auditOp === 'INSERT' ? null : ($original ?: null),
+                $auditOp === 'DELETE' ? null : ($data ?: null),
+                'user',
+                (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+        }
     }
 
     protected function convertRowToArray($row): array {

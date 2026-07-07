@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { detectUmlautConversions, applyUmlaut } from './pinyinUmlaut';
+import { detectUmlautConversions, applyUmlaut, collectUmlautConversions } from './pinyinUmlaut';
 
 /**
  * 標準樣本（input → expected）——**必須與後端 tests/Unit/PinyinUmlautTest.php 的
@@ -76,5 +76,27 @@ describe('detectUmlautConversions — 只在規則命中時回傳', () => {
     it('多次呼叫無 regex lastIndex 殘留', () => {
         expect(detectUmlautConversions('Lv')).toHaveLength(1);
         expect(detectUmlautConversions('Lv')).toHaveLength(1);
+    });
+});
+
+describe('collectUmlautConversions — 通用 /codes 多欄 Tier 2', () => {
+    it('只回傳有命中的欄位、附整欄轉換值', () => {
+        const data = { c_name: 'Lvchuan', c_romanized: 'Kitan-Yelv', c_surname: 'Silva', c_notes: 'x' };
+        const hits = collectUmlautConversions(['c_name', 'c_romanized', 'c_surname'], data);
+        expect(hits).toEqual([
+            { field: 'c_name', conversions: [{ from: 'Lv', to: 'Lü', index: 0 }], converted: 'Lüchuan' },
+            { field: 'c_romanized', conversions: [{ from: 'lv', to: 'lü', index: 8 }], converted: 'Kitan-Yelü' },
+        ]);
+        // c_surname 'Silva'（lv+a）無命中 → 不列入
+        expect(hits.map((h) => h.field)).not.toContain('c_surname');
+    });
+
+    it('全無命中回傳空陣列（含西文/中文/空欄）', () => {
+        const data = { c_name: 'Vietnam', c_dynasty: 'Five Dynasties', c_chn: '呂', empty: '' };
+        expect(collectUmlautConversions(['c_name', 'c_dynasty', 'c_chn', 'empty', 'missing'], data)).toEqual([]);
+    });
+
+    it('空欄位清單回傳空陣列', () => {
+        expect(collectUmlautConversions([], { c_name: 'Lv' })).toEqual([]);
     });
 });

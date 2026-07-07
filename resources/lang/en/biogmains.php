@@ -452,6 +452,7 @@ return [
     // Save-time pinyin v→ü confirmation dialog (Tier 2; alt names may contain Western text).
     'pinyin_umlaut_title' => 'Pinyin v → ü detected',
     'pinyin_umlaut_hint' => 'The alternative name (Pinyin) may contain "v" written for "ü". Convert per Hanyu Pinyin rules? For a Western alias (e.g. Denver), choose "Keep as-is".',
+    'pinyin_umlaut_hint_codes' => 'The fields below may contain "v" written for "ü". Convert per Hanyu Pinyin rules? For Western text (e.g. Denver), choose "Keep as-is".',
     'pinyin_umlaut_preview' => 'After conversion: ',
     'pinyin_umlaut_keep' => 'Keep as-is & save',
     'pinyin_umlaut_convert' => 'Convert & save',

@@ -54,3 +54,30 @@ export function applyUmlaut(value: string | null | undefined): string {
     }
     return value.replace(new RegExp(PATTERN.source, 'g'), replaceUmlaut);
 }
+
+/** 一個 Tier 2 欄位的命中：欄名、命中清單、整欄轉換後的值。 */
+export interface Tier2UmlautHit {
+    field: string;
+    conversions: UmlautConversion[];
+    converted: string;
+}
+
+/**
+ * 對一組（Tier 2）欄位掃描，回傳「規則有命中」的欄位清單（供通用 /codes 編輯器彈窗）。
+ * 無命中的欄位不列入；全無命中回傳空陣列（呼叫端據此決定直接提交或彈窗）。
+ */
+export function collectUmlautConversions(
+    fields: string[],
+    data: Record<string, string | null | undefined>,
+): Tier2UmlautHit[] {
+    const out: Tier2UmlautHit[] = [];
+    for (const field of fields) {
+        const value = data[field];
+        const conversions = detectUmlautConversions(value);
+        if (conversions.length > 0) {
+            out.push({ field, conversions, converted: applyUmlaut(value) });
+        }
+    }
+
+    return out;
+}

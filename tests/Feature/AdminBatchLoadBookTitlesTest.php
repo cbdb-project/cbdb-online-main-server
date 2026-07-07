@@ -112,6 +112,23 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
     }
 
     #[Test]
+    public function testUpdatePinyinNormalizesVToUmlaut(): void {
+        // §D-6：inline 編輯書名拼音 c_title（Tier 1）應套 v→ü，修正與批次 buildPinyin 的不一致。
+        $this->actingAs($this->makeUser());
+        $batch = '20250101090000-ABCDEF';
+        DB::table('TEXT_CODES')->insert(['c_textid' => 7001, 'c_title_chn' => '呂齋', 'c_title' => null, 'c_notes' => '['.$batch.']']);
+
+        $this->postJson(route('admin.batch-load-book-titles.update-pinyin'), [
+            'c_textid' => 7001,
+            'batch_id' => $batch,
+            'pinyin' => 'Lvzhai',
+        ])->assertOk();
+
+        // normalizePinyinInput 先小寫，再 PinyinUmlaut：Lvzhai → lvzhai → lüzhai
+        $this->assertSame('lüzhai', DB::table('TEXT_CODES')->where('c_textid', 7001)->value('c_title'));
+    }
+
+    #[Test]
     public function test_non_admin_cannot_access_page(): void {
         $user = $this->makeUser(['is_admin' => 0]);
         $this->actingAs($user);

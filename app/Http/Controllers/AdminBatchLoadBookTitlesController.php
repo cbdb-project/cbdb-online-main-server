@@ -252,7 +252,9 @@ class AdminBatchLoadBookTitlesController extends Controller {
             return response()->json(['ok' => false, 'message' => '此筆資料不屬於指定批次，無法編輯。'], 422);
         }
 
-        $newPinyin = $this->normalizePinyinInput($data['pinyin']);
+        // §D-6 保存止血：書名拼音 c_title（TEXT_CODES）為 Tier 1，靜默套 v→ü（與批次 buildPinyin 一致，
+        // 修正 inline 編輯先前未歸一化的缺口）。
+        $newPinyin = PinyinUmlaut::normalize($this->normalizePinyinInput($data['pinyin']));
         if ($newPinyin === '') {
             return response()->json(['ok' => false, 'message' => '拼音內容不可為空。'], 422);
         }

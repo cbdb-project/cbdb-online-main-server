@@ -7,6 +7,7 @@ use App\Repositories\CodesRepository;
 use App\Repositories\OperationRepository;
 use App\Support\ColumnFilterExpression;
 use App\Support\ColumnFilterParseException;
+use App\Support\PinyinUmlaut;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -865,6 +866,7 @@ class CodesController extends Controller {
         }
         $data = Arr::except($request->all(), ['_method', '_token', '__proposal_comment']);
         $data = $this->enforceAuditFieldsForUpdate($data, $originalRow ?: []);
+        $data = $this->normalizeCodeTablePinyin($table, $data);
 
         try {
             $query->update($data);
@@ -992,6 +994,7 @@ class CodesController extends Controller {
         }
 
         $payload = $this->extractFormData($request);
+        $payload = $this->normalizeCodeTablePinyin($table, $payload);
         $keyColumns = $this->getKeyColumns($table);
 
         if (!$this->hasPrimaryKeyValues($keyColumns, $payload)) {
@@ -1100,6 +1103,7 @@ class CodesController extends Controller {
         $keyColumns = $payload['__key_columns'] ?? $this->getKeyColumns($table);
 
         $data = $this->extractFormData($request);
+        $data = $this->normalizeCodeTablePinyin($table, $data); // §D-6：編輯既有提案時亦歸一化 Tier 1，避免核准落庫仍帶 v
         $isCreate = (int) $operation['op_type'] === Operation::TYPE_PROPOSAL_CREATE;
 
         if ($isCreate) {
@@ -1240,6 +1244,7 @@ class CodesController extends Controller {
                 ->withErrors(['missing_keys' => '新增失敗：請確認主鍵欄位已填寫完整。']);
         }
         $data = $this->enforceAuditFieldsForCreate($table, $data);
+        $data = $this->normalizeCodeTablePinyin($table, $data);
 
         //20210323遮除「第一欄預設隱藏」
         //$id_ = $this->getIdName($table_name);
@@ -1312,6 +1317,7 @@ class CodesController extends Controller {
             $this->extractFormData($request),
             $originalRow
         );
+        $payload = $this->normalizeCodeTablePinyin($table, $payload);
 
         $diff = $this->operationRepository->getArrDiff($payload, $originalRow, $originalRow);
         if ($diff === null) {
@@ -1567,6 +1573,23 @@ class CodesController extends Controller {
      * @param array<string, mixed> $data
      * @return array<string, mixed>
      */
+    /**
+     * §D-6 保存止血：對本表的 **Tier 1** 拼音欄（config/code_table_mutations.php）靜默套 v→ü 歸一化。
+     *
+     * Tier 2（混西文，如 ADDR_CODES.c_name）**不**在此轉——由前端 altname 式彈窗讓使用者決定。
+     * 未登錄於 config 的表（非 Phase B 拼音表）不動任何欄。與 v2 API 的 ConfigCodeTableMutationHandler 一致。
+     */
+    protected function normalizeCodeTablePinyin(string $table, array $data): array {
+        $upper = strtoupper($table);
+        foreach ((array) config('code_table_mutations.tables', []) as $def) {
+            if (($def['table'] ?? null) === $upper) {
+                return PinyinUmlaut::normalizeFields($data, $def['tier1_fields'] ?? []);
+            }
+        }
+
+        return $data;
+    }
+
     protected function enforceAuditFieldsForCreate(string $table, array $data): array {
         $columns = $this->getTableColumns($table);
         $now = Carbon::now();

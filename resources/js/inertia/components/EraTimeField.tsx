@@ -209,7 +209,8 @@ export default function EraTimeField({
                         mode="list"
                         model="nianhao"
                         idKey="c_nianhao_id"
-                        labelKeys={['c_nianhao_chn']}
+                        // c_year_range（如 "(1264–1294)"）用於區分同朝代重複年號（如元朝兩筆「至元」）。
+                        labelKeys={['c_nianhao_chn', 'c_year_range']}
                         value={values.nhCode}
                         initialLabel={values.nhCodeLabel}
                         disabled={disabled}

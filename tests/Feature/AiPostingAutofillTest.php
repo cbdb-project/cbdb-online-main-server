@@ -440,6 +440,96 @@ class AiPostingAutofillTest extends TestCase {
     }
 
     /**
+     * 測試同朝代內重複年號（如元朝兩筆「至元」：1264–1294 與 1335–1340）：
+     * 有西元年提示時應正確消歧為對應的那一筆，而非靜默選錯（可能相差 70 年）。
+     */
+    public function test_duplicate_nianhao_in_same_dynasty_disambiguated_by_year_hint() {
+        DB::table('NIAN_HAO')->insert([
+            ['c_nianhao_id' => 623, 'c_dy' => 18, 'c_dynasty_chn' => '元', 'c_nianhao_chn' => '至元', 'c_firstyear' => 1264, 'c_lastyear' => 1294],
+            ['c_nianhao_id' => 635, 'c_dy' => 18, 'c_dynasty_chn' => '元', 'c_nianhao_chn' => '至元', 'c_firstyear' => 1335, 'c_lastyear' => 1340],
+        ]);
+
+        $user = User::factory()->create(['is_active' => 1, 'is_admin' => 1]);
+
+        Http::fake([
+            'https://example.com/api' => Http::response([
+                'choices' => [[
+                    'message' => [
+                        'content' => json_encode(['postings' => [[
+                            'title_str' => '知縣',
+                            'addr_str' => null,
+                            'c_firstyear' => 1336, // 落在第二筆「至元」(1335–1340) 範圍內
+                            'c_fy_nh_code' => '至元',
+                            'c_fy_nh_year' => 2,
+                            'c_fy_range' => null, 'c_fy_intercalary' => false,
+                            'c_fy_month' => null, 'c_fy_day' => null, 'c_fy_day_gz' => null,
+                            'c_lastyear' => null, 'c_ly_nh_code' => null, 'c_ly_nh_year' => null,
+                            'c_ly_range' => null, 'c_ly_intercalary' => null,
+                            'c_ly_month' => null, 'c_ly_day' => null, 'c_ly_day_gz' => null,
+                            'c_appt_code' => null, 'c_assume_office_code' => null,
+                        ]]]),
+                    ],
+                ]],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)->postJson('/api/ai/posting/extract', [
+            'source_text' => '至元二年知某縣',
+            'person_id' => 1,
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['success' => true])
+            ->assertJsonPath('data.matched_fields.c_fy_nh_code.value', 635)
+            ->assertJsonPath('data.matched_fields.c_fy_nh_code.text', '至元');
+    }
+
+    /**
+     * 測試同朝代內重複年號、且無西元年提示可消歧時：不可靜默選其中一筆，
+     * 應轉為 suggested（待人工確認），避免可能相差 70 年的錯誤資料被直接採用。
+     */
+    public function test_duplicate_nianhao_without_year_hint_falls_back_to_suggested() {
+        DB::table('NIAN_HAO')->insert([
+            ['c_nianhao_id' => 623, 'c_dy' => 18, 'c_dynasty_chn' => '元', 'c_nianhao_chn' => '至元', 'c_firstyear' => 1264, 'c_lastyear' => 1294],
+            ['c_nianhao_id' => 635, 'c_dy' => 18, 'c_dynasty_chn' => '元', 'c_nianhao_chn' => '至元', 'c_firstyear' => 1335, 'c_lastyear' => 1340],
+        ]);
+
+        $user = User::factory()->create(['is_active' => 1, 'is_admin' => 1]);
+
+        Http::fake([
+            'https://example.com/api' => Http::response([
+                'choices' => [[
+                    'message' => [
+                        'content' => json_encode(['postings' => [[
+                            'title_str' => '知縣',
+                            'addr_str' => null,
+                            'c_firstyear' => null, // 無西元年提示 → 無法消歧
+                            'c_fy_nh_code' => '至元',
+                            'c_fy_nh_year' => 2,
+                            'c_fy_range' => null, 'c_fy_intercalary' => false,
+                            'c_fy_month' => null, 'c_fy_day' => null, 'c_fy_day_gz' => null,
+                            'c_lastyear' => null, 'c_ly_nh_code' => null, 'c_ly_nh_year' => null,
+                            'c_ly_range' => null, 'c_ly_intercalary' => null,
+                            'c_ly_month' => null, 'c_ly_day' => null, 'c_ly_day_gz' => null,
+                            'c_appt_code' => null, 'c_assume_office_code' => null,
+                        ]]]),
+                    ],
+                ]],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)->postJson('/api/ai/posting/extract', [
+            'source_text' => '至元某年知某縣',
+            'person_id' => 1,
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['success' => true])
+            ->assertJsonMissingPath('data.matched_fields.c_fy_nh_code')
+            ->assertJsonPath('data.suggested_fields.c_fy_nh_code.ai_extracted', '至元');
+    }
+
+    /**
      * 測試無具體年份時，地址按朝代範圍交集過濾，且優先選重疊最多的同名地址
      *
      * 場景：明代人物，AI 提取「禹州」但無年份信息。

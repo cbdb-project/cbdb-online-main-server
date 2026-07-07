@@ -123,7 +123,7 @@
 - [x] `person_id` contract: §D-3 option b (handler forces 0 internally, **`MutationController` unchanged**)
 - [ ] No-PK table `SOCIAL_INSTITUTION_ALTNAME_DATA`: **SKIP — not handled** (§D-1)
 - [x] Tests (`ApiV2MutateCodeTablesTest`: single/multi/triple-column & composite-3-key update, audit, person_id=0, whitelist rejection, proposal, 404, 403; `ApiV2MutateNianHaoTest` 22 unchanged)
-- [ ] **(Required, §D-2)** add `AuditLogService::write()` to the `CodesController` direct-write paths, making UI and API auditing consistent
+- [x] **(§D-2)** add `AuditLogService::write()` to the `CodesController` direct-write paths, making UI and API auditing consistent
 - [x] **(§D-6)** "table → pinyin-column Tier" registry — lives in `config/code_table_mutations.php` as each table's `tier1_fields`/`tier2_fields` (subset of allowed_fields; same source as §D-5)
 - [x] **(§D-6)** save-time v→ü normalization — **all three backend hooks done**: (1) `AbstractCodeTableMutationHandler`/`ConfigCodeTableMutationHandler` (v2 API); (2) `CodesController` (`store`/`update` / proposal store+update+updateExisting; normalizes only config `tier1_fields`, leaves Tier 2, untouched for non-Phase-B tables); (3) `AdminBatchLoadBookTitlesController::updatePinyin()` (book-title `c_title`, Tier 1).
 - [x] **(§D-6)** **Frontend Tier-2 dialog done**: the generic `/codes` editor (`Codes/Create`, `Codes/Edit`) detects rule-hits in the table's `tier2_fields` (a controller-supplied prop) before save and pops a dialog (`PinyinUmlautConfirmDialog`, reusing `pinyinUmlaut.ts`) for convert/keep; `form.transform` guarantees the submit sends the chosen value.

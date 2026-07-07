@@ -124,7 +124,7 @@
 - [ ] 無主鍵表 `SOCIAL_INSTITUTION_ALTNAME_DATA`：**SKIP、不處理**（§D-1）
 - [x] 測試（`ApiV2MutateCodeTablesTest`：單鍵/多欄/三欄/複合三鍵 update・audit・person_id=0・白名單拒絕・proposal・404・403；`ApiV2MutateNianHaoTest` 22 項不變）
 - [ ] **（必做，§D-2）** `CodesController` 直寫路徑補 `AuditLogService::write()`，使 UI 與 API 審計一致
-- [ ] **（必做，§D-6）** 建立「表→漢語拼音欄」registry（與 §D-5 批次遷移共用同一份名單）
-- [ ] **（必做，§D-6）** 保存時 v→ü 歸一化加掛三處：`AbstractCodeTableMutationHandler`、`CodesController`（`store`/`update`＋proposal 方法；`store`/`update` 與 §D-2 掛點重疊）、`AdminBatchLoadBookTitlesController::updatePinyin()`；均依 registry 只轉命中欄
-- [ ] **（§D-6）** 測試：Tier 1 欄手打 `lv`→`lü` 回歸；**Tier 2 欄觸發彈窗、選轉/保留生效、選保留後端不覆寫（不 silent 轉）**；英文譯名／中文欄不受影響、registry 未列欄不轉、書名 inline 與 batch 一致
+- [x] **（§D-6）** 「表→拼音欄 Tier」registry——落於 `config/code_table_mutations.php` 每表的 `tier1_fields`／`tier2_fields`（與 allowed_fields 一致；與 §D-5 名單同源）
+- [~] **（§D-6）** 保存時 v→ü 歸一化三掛點：**(1) `AbstractCodeTableMutationHandler`／`ConfigCodeTableMutationHandler` 已加**（Tier 1 靜默轉、Tier 2 後端不轉）；(2) `CodesController`（`store`/`update`＋proposal，與 §D-2 掛點重疊）、(3) `AdminBatchLoadBookTitlesController::updatePinyin()` **待後續里程碑**
+- [~] **（§D-6）** 測試：**API handler 的 Tier 1 靜默轉／Tier 2 不轉／冪等（變更偵測前歸一化）已補**（`ApiV2MutateCodeTablesTest`）；`CodesController`／書名 inline／前端 Tier 2 彈窗測試待後續
 - [ ] 文件同步：`AGENTS.md` 模組入口、必要時 `CHANGELOG.md`

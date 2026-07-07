@@ -124,7 +124,7 @@
 - [ ] No-PK table `SOCIAL_INSTITUTION_ALTNAME_DATA`: **SKIP — not handled** (§D-1)
 - [x] Tests (`ApiV2MutateCodeTablesTest`: single/multi/triple-column & composite-3-key update, audit, person_id=0, whitelist rejection, proposal, 404, 403; `ApiV2MutateNianHaoTest` 22 unchanged)
 - [ ] **(Required, §D-2)** add `AuditLogService::write()` to the `CodesController` direct-write paths, making UI and API auditing consistent
-- [ ] **(Required, §D-6)** build the "table → Hanyu-pinyin columns" registry (shared with §D-5's batch migration)
-- [ ] **(Required, §D-6)** hook save-time v→ü normalization at three places: `AbstractCodeTableMutationHandler`, `CodesController` (`store`/`update` + proposal methods; `store`/`update` overlap §D-2's hook points), `AdminBatchLoadBookTitlesController::updatePinyin()`; each normalizes only registry-matched columns
-- [ ] **(§D-6)** Tests: Tier-1 columns typing `lv`→`lü` regression; **Tier-2 columns trigger the dialog, convert/keep both work, "keep" is not overwritten by the backend (no silent convert)**; English-translation/Chinese columns unaffected, non-registry columns unchanged, book-title inline consistent with batch
+- [x] **(§D-6)** "table → pinyin-column Tier" registry — lives in `config/code_table_mutations.php` as each table's `tier1_fields`/`tier2_fields` (subset of allowed_fields; same source as §D-5)
+- [~] **(§D-6)** save-time v→ü normalization at three hooks: **(1) `AbstractCodeTableMutationHandler`/`ConfigCodeTableMutationHandler` done** (Tier 1 silent, Tier 2 not converted by backend); (2) `CodesController` (`store`/`update` + proposal, overlapping §D-2) and (3) `AdminBatchLoadBookTitlesController::updatePinyin()` **in a later milestone**
+- [~] **(§D-6)** Tests: **API-handler Tier-1 silent / Tier-2 not-converted / idempotence (normalize before change detection) done** (`ApiV2MutateCodeTablesTest`); `CodesController` / book-title inline / frontend Tier-2 dialog tests pending
 - [ ] Doc sync: `AGENTS.md` module entry, and `CHANGELOG.md` as needed

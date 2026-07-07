@@ -20,8 +20,23 @@
     2. **`CodesController`** 寫入路徑（`store`/`update` 與各 proposal 方法；`destroy` 為刪除、無需歸一化）——其中 `store`/`update` **與 §D-2 補 `audit_log` 的掛點重疊**、可順手一起加，proposal 方法則為 §D-6 專屬（§D-2 未涵蓋、但會持久化欄位值故需歸一化）；
     3. **`AdminBatchLoadBookTitlesController::updatePinyin()`**（書名內聯編輯，現僅做大小寫／空白；其批次 `buildPinyin()` 已用 `PinyinUmlaut`——此為修正 inline 與 batch 的不一致）。
   - **每表拼音欄登錄（registry）＝與 §D-5 共用同一份名單**：v→ü 只能套在**確定是漢語拼音的欄**，須有「表→拼音欄」清單以排除英文譯名（如 `OFFICE_CODES.c_office_trans`）、中文欄（`c_*_chn`）、與語義存疑的另種羅馬化欄。此清單**即 §D-5 批次遷移所用的「專用拼音欄／romanized-name 欄」名單**——批次修正與保存止血**共用一個 registry**，避免兩份清單漂移。泛型直寫（`CodesController` 對任意表寫任意欄）**必須**先查 registry、只歸一化命中欄，嚴禁盲套（否則誤傷 Wade-Giles／譯名欄）。
-  - **多半不需 Tier 2 彈窗（與階段 A 的差異）**：階段 A 的 `c_alt_name` 因可能含西文別名而需前端彈窗（Tier 2）；但 §D-5 實測 code 表拼音欄「基本純拼音、無西文」，故 code 表以 **Tier 1 後端靜默轉**即可、一般不需彈窗。若某表某欄經 §D-5 掃描的 `[OTHER-v]` 清單發現確有西文夾雜，再個案評估；**預設 Tier 1**。
-  - **測試**：每個掛點回歸（手打 `lv` 讀回 `lü`；英文譯名／中文欄不受影響；registry 未列的欄不轉；書名 inline 與 batch 行為一致）。
+  - **Tier 分流（2026-07 以本機 CBDB 全量副本實測 + Hongsu 定案）**：多數 code 拼音欄為純拼音、走 **Tier 1 後端靜默轉**；另有**具名的「混合欄」**（拼音與西文/英文夾雜）走 **Tier 2 altname 式彈窗**——**復用 §D-12 已建的前端偵測+彈窗機制**（`resources/js/inertia/utils/pinyinUmlaut.ts` + 對話框），差別只在通用 `/codes` 編輯 UI 需依下方「(表,欄)→Tier」登錄表決定是否彈窗，且後端對 Tier 2 欄**不 silent 轉**（尊重使用者於彈窗的選擇）。此登錄表即上一條所述「與 §D-5 共用的拼音欄名單」的具體實現（多加一欄 Tier）。
+
+    | 表.欄 | Tier | 依據 |
+    |---|---|---|
+    | `OFFICE_CODES.c_office_pinyin`、`c_office_pinyin_alt` | Tier 1 | Hongsu：明確拼音（`_alt`＝別名拼音，非另種羅馬化） |
+    | `NIAN_HAO.c_nianhao_pin`、`GANZHI_CODES.c_ganzhi_py`、`TEXT_BIBLCAT_CODES.c_text_cat_pinyin`、`SOCIAL_INSTITUTION_NAME_CODES.c_inst_name_py`、`SOCIAL_INSTITUTION_TYPES.c_inst_type_py`、`ADMIN_CAT_CODES.c_admin_cat_py` | Tier 1 | 純拼音欄（`_py`／`_pinyin`） |
+    | `ETHNICITY_TRIBE_CODES.c_name` | Tier 1 | Hongsu：是拼音；§D-5 實測 498 列、11 個 v 全為真拼音、0 西文 |
+    | `TEXT_CODES.c_title`、`TEXT_INSTANCE_DATA.c_instance_title` | Tier 1 | 羅馬化書名（批載器 `buildPinyin` 已用 `PinyinUmlaut`）；`c_instance_title` 比照 `c_title`（同性質，未逐一實測、Phase B 起步時抽驗） |
+    | **`ADDR_CODES.c_name`** | **Tier 2** | 混英文地名+拼音（實測：`Lvchuan→Lüchuan` 等命中正確、`Soviet Far East`／`Vietnam` 規則不動）；Hongsu：手動錄入用 altname 提示 |
+    | **`ETHNICITY_TRIBE_CODES.c_romanized`** | **Tier 2** | 混拼音+西文（實測 206 列、含 v 3：`Kitan-Yelv`／`Kitan-Shulv`→ü 正確、`Bavard` 規則略過）；Hongsu：用 altname 提示 |
+    | **`ETHNICITY_TRIBE_CODES.c_surname`** | **Tier 2** | 實測 52 列、0 v；未來錄入用 altname 提示 |
+    | **`DYNASTIES.c_dynasty`** | **Tier 2** | 含英文朝代名（如 `Five Dynasties`）；保持原狀、未來錄入用 altname 提示 |
+    | **`CHORONYM_CODES.c_choronym_desc`** | **Tier 2** | 含外文（如 `Vietnam`）；保持原狀、未來錄入用 altname 提示 |
+    | `ADDR_CODES.c_alt_names` | **排除** | 實測 1516 非空、含拉丁字母 0＝純中文、無拼音，永不轉 |
+
+    > 批次遷移：Tier 1 直接套規則；Tier 2 亦套**同一規則**但**只轉命中且經人眼確認的列**（西文保持原狀），存量命中極少（`ADDR.c_name` 數十筆、`c_romanized` 2 筆〔含 v 共 3、其中 `Bavard` 為西文不轉〕、`c_surname`／`c_dynasty`／`c_choronym_desc` 皆 0）。故 Tier 2 對批次幾乎無額外負擔，主要價值在**擋未來手動錄入**。
+  - **測試**：每個掛點回歸（Tier 1 欄手打 `lv` 讀回 `lü`；Tier 2 欄手打 `lv` 觸發彈窗、選轉/保留生效、選保留後端不覆寫；英文譯名／中文欄不受影響；registry 未列的欄不轉；書名 inline 與 batch 行為一致）。
 - **範圍調整**：因 D-1，本 API 的目標表**移除 `SOCIAL_INSTITUTION_ALTNAME_DATA`**；因 D-2，**加入 `CodesController` 補審計**一項；因 D-6，**加入保存時 v→ü 歸一化**一項（掛於 `AbstractCodeTableMutationHandler` + `CodesController` + 書名內聯，依共用 registry）。
 
 ## 0. 背景與動機
@@ -110,5 +125,5 @@
 - [ ] **（必做，§D-2）** `CodesController` 直寫路徑補 `AuditLogService::write()`，使 UI 與 API 審計一致
 - [ ] **（必做，§D-6）** 建立「表→漢語拼音欄」registry（與 §D-5 批次遷移共用同一份名單）
 - [ ] **（必做，§D-6）** 保存時 v→ü 歸一化加掛三處：`AbstractCodeTableMutationHandler`、`CodesController`（`store`/`update`＋proposal 方法；`store`/`update` 與 §D-2 掛點重疊）、`AdminBatchLoadBookTitlesController::updatePinyin()`；均依 registry 只轉命中欄
-- [ ] **（§D-6）** 測試：每掛點手打 `lv`→`lü` 回歸、英文譯名／中文欄不受影響、registry 未列欄不轉、書名 inline 與 batch 一致
+- [ ] **（§D-6）** 測試：Tier 1 欄手打 `lv`→`lü` 回歸；**Tier 2 欄觸發彈窗、選轉/保留生效、選保留後端不覆寫（不 silent 轉）**；英文譯名／中文欄不受影響、registry 未列欄不轉、書名 inline 與 batch 一致
 - [ ] 文件同步：`AGENTS.md` 模組入口、必要時 `CHANGELOG.md`

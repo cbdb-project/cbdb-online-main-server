@@ -147,7 +147,7 @@ flag 已翻 `new`、真正在用的 React／`/api/v2` 人工輸入寫入面**。
 - 建立「表→漢語拼音欄」registry——與 §D-5 批次遷移**共用同一份名單**（該計畫實測 code 表拼音欄基本純拼音、無西文）。
 - `CodesController` 各寫入方法（`store`/`update` 與 §D-2 補 audit 掛點重疊，proposal 方法為額外）、新 `AbstractCodeTableMutationHandler`、`AdminBatchLoadBookTitlesController::updatePinyin()` 依 registry 加掛 v→ü。
 - 修正 `updatePinyin` 內聯編輯與其批次 `buildPinyin`（已用 PinyinUmlaut）行為不一致的問題。
-- 因 §D-5 code 表無西文，一般以 **Tier 1 後端靜默轉**即可、不需階段 A 的 Tier 2 彈窗（個案例外循 `[OTHER-v]` 清單評估）。
+- Tier 分流（實測定案，見 CODE_TABLE_MUTATION_API_PLAN §D-6 登錄表）：多數純拼音欄走 **Tier 1 後端靜默轉**；另有具名的混合欄（`ADDR_CODES.c_name`、`ETHNICITY_TRIBE_CODES.c_romanized`/`c_surname`、`DYNASTIES.c_dynasty`、`CHORONYM_CODES.c_choronym_desc`）含西文，走 **Tier 2 altname 式彈窗**——**復用本設計的前端機制**（`pinyinUmlaut.ts` + 對話框），差別在通用 `/codes` 編輯 UI 依「(表,欄)→Tier」登錄表決定是否彈窗。`ADDR_CODES.c_alt_names` 經實測純中文、排除。
 
 ## 6. Helper 設計
 

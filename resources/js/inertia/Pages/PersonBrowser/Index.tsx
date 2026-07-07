@@ -305,6 +305,13 @@ export default function PersonBrowserIndex() {
         [keyword, dynasty, doSearch, updateUrl],
     );
 
+    // 僅刷新摘要（tab_counts／header），不連動搜尋結果列表。
+    // 12 個子資源分頁新增/刪除記錄不會影響列表欄位顯示，無需重新搜尋（避免不必要的列表閃爍）。
+    const handleSubresourceChanged = useCallback(() => {
+        setSummaryRefreshKey((prev) => prev + 1);
+    }, []);
+
+    // 基本資料儲存後：除刷新摘要外，姓名/朝代等變更可能影響左側列表欄位顯示，需一併重新搜尋。
     const handleBasicInfoSaved = useCallback(() => {
         setSummaryRefreshKey((prev) => prev + 1);
         doSearch(keyword, page, dynasty, sortOrder);
@@ -575,6 +582,7 @@ export default function PersonBrowserIndex() {
                             postCE={summary?.dynasty_start != null && summary.dynasty_start > 0}
                             onSelectPerson={guardedHandleSelect}
                             onBasicInfoSaved={handleBasicInfoSaved}
+                            onSubresourceChanged={handleSubresourceChanged}
                             onBasicInfoEditorStateChange={setBasicInfoEditorState}
                             onRegisterBasicInfoSaveHandler={registerBasicInfoSaveHandler}
                         />

@@ -252,6 +252,7 @@ export default function PersonEditor() {
                         socialInstEditorIsNew={socialInstEditorIsNew}
                         postCE={summary?.dynasty_start != null && summary.dynasty_start > 0}
                         onBasicInfoSaved={handleBasicInfoSaved}
+                        onSubresourceChanged={handleBasicInfoSaved}
                         onBasicInfoEditorStateChange={setBasicInfoEditorState}
                         onRegisterBasicInfoSaveHandler={registerBasicInfoSaveHandler}
                     />

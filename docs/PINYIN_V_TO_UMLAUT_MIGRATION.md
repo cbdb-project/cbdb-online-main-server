@@ -230,8 +230,8 @@ CBDB 拼音規範長期以 `v` 代替 `ü`（如 `呂 = Lv`、`閭丘 = Lvqiu`�
 - [x] **（Phase A，§D-8）** 搜尋兼容：拼音 LIKE 查詢端查詢展開（輸入 `v` 同查 `v` 與 `ü`）（§3）——M3 PR #1099
 - [ ] ~~確認／建立 `ALTNAME_CODES` 代碼 22 並補別名~~ **（不做，見 §D-1）**
 - [ ] 溝通下游系統與 Access 版，建議查詢時同時匹配 `v` 與 `ü` 形式
-- [ ] 階段 B 前置：依 [Code 表受審計寫入 API 建設計畫](./CODE_TABLE_MUTATION_API_PLAN.md) 建立 code 表受審計寫入 API
-- [ ] 階段 B：API 就緒後，分批掃描修正其他拼音欄位（含 `TEXT_INSTANCE_DATA` 複合主鍵、`ADDRESSES` 重建；`SOCIAL_INSTITUTION_ALTNAME_DATA` **SKIP，見 §D-9a**）
+- [x] 階段 B 前置：code 表受審計寫入 API 已建（[計畫](./CODE_TABLE_MUTATION_API_PLAN.md) 里程碑 1-3：基底＋config 驅動 13 表 update＋§D-6 保存歸一化）
+- [~] 階段 B：批次遷移工具已建（`cbdb:migrate-code-pinyin-v`：掃描 Tier 1/2 拼音欄、確定性規則、預設 dry-run、`--execute` 走審計 API）。**本機 CBDB 副本 dry-run 實測：預定變更約 1460 筆**（Tier 1 為主：`TEXT_CODES.c_title` 824、`OFFICE_CODES` 522、`TEXT_INSTANCE_DATA` 77、`SOCIAL_INSTITUTION_NAME_CODES` 8…；Tier 2：`ADDR_CODES.c_name` 16、`ETHNICITY.c_romanized` 2），`[OTHER-v]` 安全網 393 筆。**生產 `--execute` 為人工把關步驟**（Tier 1 可自動、Tier 2 需先複核 `[OTHER-v]`／命中）；`ADDRESSES` 於 `ADDR_CODES` 改後重建；`SOCIAL_INSTITUTION_ALTNAME_DATA` **SKIP**（§D-9a）
 - [ ] 回歸測試（生成 / 正規化 / 人名修正 / audit / 西文名排除；注意 SQLite collation 差異）
 - [ ] 文件同步：`CHANGELOG.md`、必要時 `DATABASE.md` / `README.md`
 - [ ] **最後環節（§D-10）**：自 `config/codes.php` 的 `ui_hidden` 移除 `'pinyin'`，於 codes 介面重新顯示姓氏拼音對照表

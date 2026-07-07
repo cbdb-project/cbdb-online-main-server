@@ -230,8 +230,8 @@ Therefore **only these four substrings need conversion** (handle each case separ
 - [x] **(Phase A, §D-8)** Search compatibility: query expansion on the pinyin LIKE query side (a typed `v` searches both `v` and `ü`) (§3) — M3 PR #1099
 - [ ] ~~confirm/create `ALTNAME_CODES` code 22, then add aliases~~ **(not doing it — see §D-1)**
 - [ ] Communicate with downstream systems and the Access edition, recommending they match both `v` and `ü` forms at query time
-- [ ] Phase B prerequisite: build the code-table audited write API per the [Code-Table Audited Mutation API Construction Plan](./CODE_TABLE_MUTATION_API_PLAN.en.md)
-- [ ] Phase B: once the API is ready, scan and correct other pinyin fields in batches (including the `TEXT_INSTANCE_DATA` composite PK and the `ADDRESSES` rebuild; `SOCIAL_INSTITUTION_ALTNAME_DATA` is **SKIPPED, see §D-9a**)
+- [x] Phase B prerequisite: the code-table audited write API is built ([plan](./CODE_TABLE_MUTATION_API_PLAN.en.md) milestones 1-3: base + config-driven 13-table update + §D-6 save normalization)
+- [~] Phase B: the batch migration tool is built (`cbdb:migrate-code-pinyin-v`: scans Tier 1/2 pinyin columns, deterministic rule, dry-run by default, `--execute` goes through the audited API). **Local CBDB-copy dry-run: ~1460 planned changes** (mostly Tier 1: `TEXT_CODES.c_title` 824, `OFFICE_CODES` 522, `TEXT_INSTANCE_DATA` 77, `SOCIAL_INSTITUTION_NAME_CODES` 8…; Tier 2: `ADDR_CODES.c_name` 16, `ETHNICITY.c_romanized` 2), plus 393 `[OTHER-v]` safety-net rows. **Production `--execute` is a human-gated step** (Tier 1 automatic; Tier 2 needs prior review of `[OTHER-v]`/hits); rebuild `ADDRESSES` after `ADDR_CODES`; `SOCIAL_INSTITUTION_ALTNAME_DATA` is **SKIPPED** (§D-9a)
 - [ ] Regression tests (generation / normalization / person-name correction / audit / Western-name exclusion; mind the SQLite collation difference)
 - [ ] Doc sync: `CHANGELOG.md`, and `DATABASE.md` / `README.md` as needed
 - [ ] **Final step (§D-10)**: remove `'pinyin'` from `ui_hidden` in `config/codes.php` to re-expose the surname-pinyin table in the codes UI

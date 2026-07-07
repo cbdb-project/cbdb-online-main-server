@@ -24,6 +24,7 @@ class Kernel extends ConsoleKernel {
         \App\Console\Commands\FetchChgisMap::class,
         \App\Console\Commands\RebuildPersonChangeIndex::class,
         \App\Console\Commands\MigratePinyinV::class,
+        \App\Console\Commands\MigrateCodeTablePinyinV::class,
     ];
 
     /**

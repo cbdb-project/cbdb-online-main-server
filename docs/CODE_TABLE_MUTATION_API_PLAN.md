@@ -77,8 +77,9 @@
 
 ## 4. 設計
 
-- **共用基底 `AbstractCodeTableMutationHandler`**：整合交易、`audit_log`、`operations`、PK 驗證、欄位白名單、變更偵測等樣板邏輯；具體每表 handler 只需實作 `tableName()`、`resourceAliases()`、`keyColumns()`、`allowedFields()` 等少量方法（將 `NianHaoMutationHandler` 重構為此基底的第一個使用者，消除其「傳了 person_id 卻忽略」的設計異味）。
-- **`person_id` 契約**：`MutationController` 目前對所有 resource 都要求 `person_id`。對 code 表 resource 應**讓 `person_id` 可選**（或提供 code 表專用解析路徑），避免硬塞無意義的 `person_id`。此調整需確保既有 person sub-resource handler 行為不變。
+- **共用基底 `AbstractCodeTableMutationHandler`**：整合交易、`audit_log`、`operations`、PK 驗證、欄位白名單、變更偵測等樣板邏輯（含防呆：`keyColumns()` 必須與 `CompositePrimaryKey::SCHEMAS` 一致，否則 500，杜絕部分鍵 UPDATE 命中多列）。
+  - **實作定案：改用單一 config 驅動的 `ConfigCodeTableMutationHandler` + `config/code_table_mutations.php`**，而非每表寫子類——13 張表（NIAN_HAO ＋ 12 張新表）高度均質（只差表名/主鍵/白名單常數），config 驅動可免去 handler／registry 樣板膨脹，且此 config 之後可原地承載 §D-6 的「表→拼音欄 Tier」登錄。基底仍保留抽象方法設計，**需要客製驗證等特殊行為的表可另寫子類**。`NIAN_HAO` 已併入此 config（原 `NianHaoMutationHandler` 子類刪除，22 個 API 測試行為不變）。
+- **`person_id` 契約（採 §D-3 選項 b：零控制器改動）**：code 表 handler 內部一律把 `operations.c_personid` 設為 0、忽略呼叫端傳入值；呼叫端仍依 `MutationController` 契約傳 `person_id`（通常 0）。**不改 `MutationController`**——避免動到既有 person 子資源的必填校驗與交叉檢查。
 - **主鍵**：
   - 單鍵與複合鍵（如 `TEXT_INSTANCE_DATA` 3 鍵）登錄 `CompositePrimaryKey::SCHEMAS`。
   - **無主鍵表 `SOCIAL_INSTITUTION_ALTNAME_DATA`：直接 SKIP、不處理**（見 §D-1；不建合成識別鍵）。
@@ -114,14 +115,14 @@
 
 ## 8. 待辦帳本
 
-- [ ] 登錄 code 表主鍵於 `CompositePrimaryKey::SCHEMAS`
-- [ ] `MutationReadService` 新增 code 表 resource 定義（`person_id_column: null`）
-- [ ] 新建 `AbstractCodeTableMutationHandler` 共用基底
-- [ ] 各 code 表 concrete handler（`update` 起步），重構 `NianHaoMutationHandler` 至新基底
-- [ ] `MutationHandlerRegistry` 註冊
-- [ ] `MutationController`：code resource 的 `person_id` 改為可選（並回歸既有 handler）
+- [x] 登錄 code 表主鍵於 `CompositePrimaryKey::SCHEMAS`（＋同步 `OperationsController::resourceKeyColumns()`）
+- [~] `MutationReadService` 新增 code 表 resource 定義（`person_id_column: null`）——**update 路徑不需**（`store()` 只用 registry）；待 GET/create/delete 才補
+- [x] 新建 `AbstractCodeTableMutationHandler` 共用基底（M1）
+- [x] code 表 update handler——改以 config 驅動 `ConfigCodeTableMutationHandler` + `config/code_table_mutations.php`（13 表＝ `NIAN_HAO` ＋ 12 新表）；原 `NianHaoMutationHandler` 子類刪除
+- [x] `MutationHandlerRegistry` 註冊（以 `ConfigCodeTableMutationHandler` 取代 `NianHaoMutationHandler`）
+- [x] `person_id` 契約：採 §D-3 選項 b（handler 內部固定 0、**`MutationController` 零改動**）
 - [ ] 無主鍵表 `SOCIAL_INSTITUTION_ALTNAME_DATA`：**SKIP、不處理**（§D-1）
-- [ ] 測試（update / audit / 複合主鍵 / 授權 / 模式 / 相容）
+- [x] 測試（`ApiV2MutateCodeTablesTest`：單鍵/多欄/三欄/複合三鍵 update・audit・person_id=0・白名單拒絕・proposal・404・403；`ApiV2MutateNianHaoTest` 22 項不變）
 - [ ] **（必做，§D-2）** `CodesController` 直寫路徑補 `AuditLogService::write()`，使 UI 與 API 審計一致
 - [ ] **（必做，§D-6）** 建立「表→漢語拼音欄」registry（與 §D-5 批次遷移共用同一份名單）
 - [ ] **（必做，§D-6）** 保存時 v→ü 歸一化加掛三處：`AbstractCodeTableMutationHandler`、`CodesController`（`store`/`update`＋proposal 方法；`store`/`update` 與 §D-2 掛點重疊）、`AdminBatchLoadBookTitlesController::updatePinyin()`；均依 registry 只轉命中欄

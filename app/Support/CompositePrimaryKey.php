@@ -125,6 +125,43 @@ class CompositePrimaryKey {
         'TEXT_CODES' => [
             'c_textid',
         ],
+        // Phase B code 表（受審計寫入 API）——主鍵取自生產 DB 實際 PRIMARY KEY。
+        // 與 config/code_table_mutations.php 的 key_columns 及 OperationsController::resourceKeyColumns() 必須一致。
+        'OFFICE_CODES' => [
+            'c_office_id',
+        ],
+        'DYNASTIES' => [
+            'c_dy',
+        ],
+        'CHORONYM_CODES' => [
+            'c_choronym_code',
+        ],
+        'ETHNICITY_TRIBE_CODES' => [
+            'c_ethnicity_code',
+        ],
+        'TEXT_INSTANCE_DATA' => [
+            'c_textid',
+            'c_text_edition_id',
+            'c_text_instance_id',
+        ],
+        'TEXT_BIBLCAT_CODES' => [
+            'c_text_cat_code',
+        ],
+        'GANZHI_CODES' => [
+            'c_ganzhi_code',
+        ],
+        'SOCIAL_INSTITUTION_NAME_CODES' => [
+            'c_inst_name_code',
+        ],
+        'SOCIAL_INSTITUTION_TYPES' => [
+            'c_inst_type_code',
+        ],
+        'ADMIN_CAT_CODES' => [
+            'c_admin_cat_code',
+        ],
+        'ADDR_CODES' => [
+            'c_addr_id',
+        ],
     ];
 
     /**

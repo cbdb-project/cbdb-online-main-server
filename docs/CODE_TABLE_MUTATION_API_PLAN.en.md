@@ -77,8 +77,9 @@
 
 ## 4. Design
 
-- **Shared base `AbstractCodeTableMutationHandler`**: consolidates the boilerplate (transaction, `audit_log`, `operations`, PK validation, field whitelist, change detection); each concrete per-table handler only implements a few methods such as `tableName()`, `resourceAliases()`, `keyColumns()`, `allowedFields()` (refactor `NianHaoMutationHandler` to be the first user of this base, removing its "passes a `person_id` that is then ignored" design smell).
-- **The `person_id` contract**: `MutationController` currently requires `person_id` for every resource. For code-table resources, `person_id` should be **made optional** (or a code-table-specific resolution path provided), to avoid stuffing in a meaningless `person_id`. This change must ensure existing person sub-resource handlers are unaffected.
+- **Shared base `AbstractCodeTableMutationHandler`**: consolidates the boilerplate (transaction, `audit_log`, `operations`, PK validation, field whitelist, change detection; plus a guard — `keyColumns()` must match `CompositePrimaryKey::SCHEMAS`, else 500, preventing a partial-key multi-row UPDATE).
+  - **Implementation decision: a single config-driven `ConfigCodeTableMutationHandler` + `config/code_table_mutations.php`** instead of one subclass per table — the 13 tables (NIAN_HAO + 12 new) are highly uniform (only table/PK/whitelist constants differ), so config-driving avoids handler/registry boilerplate and the same config can later host §D-6's "table → pinyin-column Tier" registry. The base keeps its abstract-method design, so a table needing custom validation can still be a subclass. `NIAN_HAO` is folded into this config (the old `NianHaoMutationHandler` subclass is deleted; its 22 API tests pass unchanged).
+- **The `person_id` contract (§D-3 option b: zero controller change)**: code-table handlers set `operations.c_personid` to 0 internally and ignore the caller's value; callers still pass `person_id` per the `MutationController` contract (usually 0). **`MutationController` is not modified** — avoiding any change to the existing person sub-resources' required-field validation and cross-checks.
 - **Primary keys**:
   - Register single and composite keys (e.g. `TEXT_INSTANCE_DATA` 3-key) in `CompositePrimaryKey::SCHEMAS`.
   - **No-PK table `SOCIAL_INSTITUTION_ALTNAME_DATA`: SKIP — not handled** (see §D-1; do not build a synthetic key).
@@ -114,14 +115,14 @@
 
 ## 8. To-do Ledger
 
-- [ ] Register code-table PKs in `CompositePrimaryKey::SCHEMAS`
-- [ ] Add code-table resource definitions in `MutationReadService` (`person_id_column: null`)
-- [ ] Create the `AbstractCodeTableMutationHandler` shared base
-- [ ] Per-code-table concrete handlers (starting with `update`); refactor `NianHaoMutationHandler` onto the new base
-- [ ] Register handlers in `MutationHandlerRegistry`
-- [ ] `MutationController`: make `person_id` optional for code resources (and regress existing handlers)
+- [x] Register code-table PKs in `CompositePrimaryKey::SCHEMAS` (+ sync `OperationsController::resourceKeyColumns()`)
+- [~] Add code-table resource definitions in `MutationReadService` (`person_id_column: null`) — **not needed for update** (`store()` uses only the registry); add when GET/create/delete are built
+- [x] Create the `AbstractCodeTableMutationHandler` shared base (M1)
+- [x] Code-table update handler — realized as config-driven `ConfigCodeTableMutationHandler` + `config/code_table_mutations.php` (13 tables = `NIAN_HAO` + 12 new); old `NianHaoMutationHandler` subclass deleted
+- [x] Register handlers in `MutationHandlerRegistry` (`ConfigCodeTableMutationHandler` replaces `NianHaoMutationHandler`)
+- [x] `person_id` contract: §D-3 option b (handler forces 0 internally, **`MutationController` unchanged**)
 - [ ] No-PK table `SOCIAL_INSTITUTION_ALTNAME_DATA`: **SKIP — not handled** (§D-1)
-- [ ] Tests (update / audit / composite PK / authorization / modes / compatibility)
+- [x] Tests (`ApiV2MutateCodeTablesTest`: single/multi/triple-column & composite-3-key update, audit, person_id=0, whitelist rejection, proposal, 404, 403; `ApiV2MutateNianHaoTest` 22 unchanged)
 - [ ] **(Required, §D-2)** add `AuditLogService::write()` to the `CodesController` direct-write paths, making UI and API auditing consistent
 - [ ] **(Required, §D-6)** build the "table → Hanyu-pinyin columns" registry (shared with §D-5's batch migration)
 - [ ] **(Required, §D-6)** hook save-time v→ü normalization at three places: `AbstractCodeTableMutationHandler`, `CodesController` (`store`/`update` + proposal methods; `store`/`update` overlap §D-2's hook points), `AdminBatchLoadBookTitlesController::updatePinyin()`; each normalizes only registry-matched columns

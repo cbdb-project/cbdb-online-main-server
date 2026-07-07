@@ -143,10 +143,11 @@ flag 已翻 `new`、真正在用的 React／`/api/v2` 人工輸入寫入面**。
 3. **無「重新污染」急迫性**：止血 2.0 的目的是保護 **Phase A 已清乾淨**的資料（人名）。code 表尚未清理，
    談不上「被重新污染」；等 Phase B 一併清理＋建立 API＋建欄位白名單時再納入，最安全。
 
-**於 Phase B 待辦記錄**（並補進 §D-12／CODE_TABLE_MUTATION_API_PLAN）：
-- 建立「表→漢語拼音欄」白名單（隨掃描＋人工複核產出）。
-- `CodesController` 各寫入方法與 `AdminBatchLoadBookTitlesController::updatePinyin()` 依白名單加掛 v→ü。
+**於 Phase B 待辦記錄**（✅ 已鎖進 [CODE_TABLE_MUTATION_API_PLAN.md](./CODE_TABLE_MUTATION_API_PLAN.md) §D-6）：
+- 建立「表→漢語拼音欄」registry——與 §D-5 批次遷移**共用同一份名單**（該計畫實測 code 表拼音欄基本純拼音、無西文）。
+- `CodesController` 各寫入方法（`store`/`update` 與 §D-2 補 audit 掛點重疊，proposal 方法為額外）、新 `AbstractCodeTableMutationHandler`、`AdminBatchLoadBookTitlesController::updatePinyin()` 依 registry 加掛 v→ü。
 - 修正 `updatePinyin` 內聯編輯與其批次 `buildPinyin`（已用 PinyinUmlaut）行為不一致的問題。
+- 因 §D-5 code 表無西文，一般以 **Tier 1 後端靜默轉**即可、不需階段 A 的 Tier 2 彈窗（個案例外循 `[OTHER-v]` 清單評估）。
 
 ## 6. Helper 設計
 

@@ -14,7 +14,15 @@
   - (b) **零控制器改動**：外部腳本對 code 表照送 `person_id: 0`（沿用 `NianHaoMutationHandler` 既有做法）。
 - **D-4 `ADDRESSES` 派生表：** 改完 `ADDR_CODES` 後以 `cbdb:regenerate-addresses-table`（生產、MySQL-only）**重建**。
 - **D-5 Phase B 的「改哪些」以掃描規則為準、不需人工 Sheet：** code 表基本純拼音（實測：`ETHNICITY.c_name` 498 列 11 條含 v 全為真拼音、0 西文；`CHORONYM` 173 列 1 條 `Vietnam` 不含 `lv/nv` 音節、規則天然排除）。故**專用拼音欄與 romanized-name 欄一律以確定性 `lv/lve/nv/nve` 音節規則直接替換**；掃描命令另出 `[OTHER-v]` 小清單供人類瞄一眼（安全網）。`ADDR_CODES` 於 Phase B 起步以只讀掃描實錘後再寫。
-- **範圍調整**：因 D-1，本 API 的目標表**移除 `SOCIAL_INSTITUTION_ALTNAME_DATA`**；因 D-2，**加入 `CodesController` 補審計**一項。
+- **D-6 保存時拼音 v→ü 歸一化（止血 2.0，比照階段 A §D-12）：本計畫一併納入。** 階段 A 已對人名**保存路徑**補上手動輸入止血（`PinyinUmlaut::normalizeFields()`，見 [PINYIN_SAVE_NORMALIZE_DESIGN.md](./PINYIN_SAVE_NORMALIZE_DESIGN.md)）；code 表批次清乾淨後，其**手動輸入面**與**外部 API** 同樣會重新累積 `v`，故一併加掛，否則批次修正的成果會被日後錄入重新污染。
+  - **掛點（三處）**：
+    1. 新建的 **`AbstractCodeTableMutationHandler`**（一次覆蓋所有 code 表 API 寫入，最省事）；
+    2. **`CodesController`** 寫入路徑（`store`/`update` 與各 proposal 方法；`destroy` 為刪除、無需歸一化）——其中 `store`/`update` **與 §D-2 補 `audit_log` 的掛點重疊**、可順手一起加，proposal 方法則為 §D-6 專屬（§D-2 未涵蓋、但會持久化欄位值故需歸一化）；
+    3. **`AdminBatchLoadBookTitlesController::updatePinyin()`**（書名內聯編輯，現僅做大小寫／空白；其批次 `buildPinyin()` 已用 `PinyinUmlaut`——此為修正 inline 與 batch 的不一致）。
+  - **每表拼音欄登錄（registry）＝與 §D-5 共用同一份名單**：v→ü 只能套在**確定是漢語拼音的欄**，須有「表→拼音欄」清單以排除英文譯名（如 `OFFICE_CODES.c_office_trans`）、中文欄（`c_*_chn`）、與語義存疑的另種羅馬化欄。此清單**即 §D-5 批次遷移所用的「專用拼音欄／romanized-name 欄」名單**——批次修正與保存止血**共用一個 registry**，避免兩份清單漂移。泛型直寫（`CodesController` 對任意表寫任意欄）**必須**先查 registry、只歸一化命中欄，嚴禁盲套（否則誤傷 Wade-Giles／譯名欄）。
+  - **多半不需 Tier 2 彈窗（與階段 A 的差異）**：階段 A 的 `c_alt_name` 因可能含西文別名而需前端彈窗（Tier 2）；但 §D-5 實測 code 表拼音欄「基本純拼音、無西文」，故 code 表以 **Tier 1 後端靜默轉**即可、一般不需彈窗。若某表某欄經 §D-5 掃描的 `[OTHER-v]` 清單發現確有西文夾雜，再個案評估；**預設 Tier 1**。
+  - **測試**：每個掛點回歸（手打 `lv` 讀回 `lü`；英文譯名／中文欄不受影響；registry 未列的欄不轉；書名 inline 與 batch 行為一致）。
+- **範圍調整**：因 D-1，本 API 的目標表**移除 `SOCIAL_INSTITUTION_ALTNAME_DATA`**；因 D-2，**加入 `CodesController` 補審計**一項；因 D-6，**加入保存時 v→ü 歸一化**一項（掛於 `AbstractCodeTableMutationHandler` + `CodesController` + 書名內聯，依共用 registry）。
 
 ## 0. 背景與動機
 
@@ -87,6 +95,7 @@
 - 本計畫是 [拼音遷移計畫](./PINYIN_V_TO_UMLAUT_MIGRATION.md) **階段 B（其他非人名拼音欄位）的前置依賴**。
 - 完成本 API 後，階段 B 的 code 表拼音修正即可比照階段 A 人名，以**外部腳本 + 受審計 mutation API** 進行。
 - 階段 A（人名）**不依賴**本計畫——人名走既有的 `basicinformation` / `altnames` mutation handler 即可。
+- **止血兩半在此對齊**：階段 A 的「保存時止血」由 [PINYIN_SAVE_NORMALIZE_DESIGN.md](./PINYIN_SAVE_NORMALIZE_DESIGN.md) 覆蓋人名保存路徑；code 表的對應一半（§D-6）內建於本計畫（新 handler + `CodesController` + 書名內聯），與批次修正共用 §D-5 的每表拼音欄 registry。兩者合起來，code 表在階段 B 之後也不再產生新的 `v`。
 
 ## 8. 待辦帳本
 
@@ -99,4 +108,7 @@
 - [ ] 無主鍵表 `SOCIAL_INSTITUTION_ALTNAME_DATA`：**SKIP、不處理**（§D-1）
 - [ ] 測試（update / audit / 複合主鍵 / 授權 / 模式 / 相容）
 - [ ] **（必做，§D-2）** `CodesController` 直寫路徑補 `AuditLogService::write()`，使 UI 與 API 審計一致
+- [ ] **（必做，§D-6）** 建立「表→漢語拼音欄」registry（與 §D-5 批次遷移共用同一份名單）
+- [ ] **（必做，§D-6）** 保存時 v→ü 歸一化加掛三處：`AbstractCodeTableMutationHandler`、`CodesController`（`store`/`update`＋proposal 方法；`store`/`update` 與 §D-2 掛點重疊）、`AdminBatchLoadBookTitlesController::updatePinyin()`；均依 registry 只轉命中欄
+- [ ] **（§D-6）** 測試：每掛點手打 `lv`→`lü` 回歸、英文譯名／中文欄不受影響、registry 未列欄不轉、書名 inline 與 batch 一致
 - [ ] 文件同步：`AGENTS.md` 模組入口、必要時 `CHANGELOG.md`

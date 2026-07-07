@@ -267,6 +267,59 @@ class ApiV2MutateCodeTablesTest extends TestCase {
         $this->assertDatabaseHas('TEXT_INSTANCE_DATA', ['c_textid' => 100, 'c_text_instance_id' => 9, 'c_instance_title' => 'other']);
     }
 
+    // ── §D-6 保存止血：Tier 1 靜默轉、Tier 2 後端不轉 ────────
+
+    #[Test]
+    public function testTier1ColumnSilentlyNormalizedOnSave(): void {
+        $this->actingAs($this->makeUser(email: 'ethnicity-tier1@example.com'));
+        DB::table('ETHNICITY_TRIBE_CODES')->insert(['c_ethnicity_code' => 20, 'c_name_chn' => '女真', 'c_name' => null, 'c_romanized' => null, 'c_surname' => null]);
+
+        // c_name 為 Tier 1：手打 Nvzhen（nv+z）→ 靜默轉 Nüzhen
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'ethnicity_tribe_codes',
+            'person_id' => 0,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_ethnicity_code' => 20]],
+            'changes' => ['c_name' => 'Nvzhen'],
+        ])->assertOk();
+        $this->assertDatabaseHas('ETHNICITY_TRIBE_CODES', ['c_ethnicity_code' => 20, 'c_name' => 'Nüzhen']);
+    }
+
+    #[Test]
+    public function testTier2ColumnNotNormalizedByBackend(): void {
+        $this->actingAs($this->makeUser(email: 'ethnicity-tier2@example.com'));
+        DB::table('ETHNICITY_TRIBE_CODES')->insert(['c_ethnicity_code' => 21, 'c_name_chn' => '契丹', 'c_name' => null, 'c_romanized' => null, 'c_surname' => null]);
+
+        // c_romanized 為 Tier 2（可能含西文）：後端原樣寫入、不轉（交前端 altname 式彈窗）
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'ethnicity_tribe_codes',
+            'person_id' => 0,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_ethnicity_code' => 21]],
+            'changes' => ['c_romanized' => 'Kitan-Yelv'],
+        ])->assertOk();
+        $this->assertDatabaseHas('ETHNICITY_TRIBE_CODES', ['c_ethnicity_code' => 21, 'c_romanized' => 'Kitan-Yelv']);
+    }
+
+    #[Test]
+    public function testTier1NormalizationIsIdempotentWithChangeDetection(): void {
+        $this->actingAs($this->makeUser(email: 'ganzhi-idem@example.com'));
+        // 現庫已是 ü；手打 lv 經歸一化＝lü＝原值→無實質變更→422（證明歸一化在變更偵測之前、冪等）
+        DB::table('GANZHI_CODES')->insert(['c_ganzhi_code' => 30, 'c_ganzhi_chn' => '呂', 'c_ganzhi_py' => 'lü']);
+
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'ganzhi_codes',
+            'person_id' => 0,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_ganzhi_code' => 30]],
+            'changes' => ['c_ganzhi_py' => 'lv'],
+        ])->assertStatus(422);
+        $this->assertDatabaseHas('GANZHI_CODES', ['c_ganzhi_code' => 30, 'c_ganzhi_py' => 'lü']);
+    }
+
     // ── proposal 模式 ───────────────────────────────────────
 
     #[Test]

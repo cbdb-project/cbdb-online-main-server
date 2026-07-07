@@ -118,6 +118,9 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
             return $this->errorResponse('參數校驗失敗', 422, $validationErrors);
         }
 
+        // 保存前處理（如 §D-6 Tier 1 拼音 v→ü 歸一化）；於變更偵測前，確保冪等（已是 ü→不觸發更新）。
+        $updateData = $this->preprocessUpdateData($updateData);
+
         // 檢查是否有實際變更
         $originalArray = $this->auditLogService->normalizeRow($original);
         $hasEffectiveChange = false;
@@ -257,6 +260,17 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
         }
 
         return $errors;
+    }
+
+    /**
+     * 寫入前對 updateData 的最後加工（預設為 no-op）。
+     * 子類可覆寫以套用 §D-6 保存時拼音 v→ü 歸一化等。於變更偵測前呼叫。
+     *
+     * @param array<string,mixed> $updateData
+     * @return array<string,mixed>
+     */
+    protected function preprocessUpdateData(array $updateData): array {
+        return $updateData;
     }
 
     /** 以主鍵定位單列。 */

@@ -4,6 +4,7 @@ namespace App\Services\Mutations;
 
 use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
+use App\Support\PinyinUmlaut;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -83,5 +84,15 @@ class ConfigCodeTableMutationHandler extends AbstractCodeTableMutationHandler {
 
     protected function allowedFields(): array {
         return $this->active['allowed_fields'];
+    }
+
+    /**
+     * §D-6 保存止血：對本表的 **Tier 1** 拼音欄靜默套用 v→ü 歸一化。
+     * Tier 2（混西文）欄**不**在此轉——由前端 altname 式彈窗讓使用者決定（後端原樣寫入）。
+     */
+    protected function preprocessUpdateData(array $updateData): array {
+        $tier1 = $this->active['tier1_fields'] ?? [];
+
+        return PinyinUmlaut::normalizeFields($updateData, $tier1);
     }
 }

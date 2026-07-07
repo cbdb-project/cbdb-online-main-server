@@ -442,7 +442,7 @@ export default function BasicInfoEditor({
                         </select>
                     </div>
                     {gCode('c_ethnicity_code', tr('tribe', '族群/部族'), 'c_ethnicity_code', 'ethnicity', 'c_ethnicity_code', ['c_ethnicity_code', 'c_name_chn', 'c_name'])}
-                    {gCode('c_dy', tr('dynasty', '朝代'), 'c_dy', 'dynasty', 'c_dy', ['c_dy', 'c_dynasty_chn', 'c_dynasty'], true)}
+                    {gCode('c_dy', tr('dynasty', '朝代'), 'c_dy', 'dynasty', 'c_dy', ['c_dy', 'c_dynasty_chn', 'c_dynasty', 'c_year_range'], true)}
                 </div>
             ))}
 

@@ -10,6 +10,7 @@
 namespace App\Repositories;
 
 use App\Models\NianHao;
+use App\Support\HistoricalYearRangeFormatter;
 
 class NianHaoRepository {
     public function nianhaos() {
@@ -22,6 +23,8 @@ class NianHaoRepository {
                 'c_str' => "[".$item->c_firstyear."]~[".$item->c_lastyear."]",
                 'c_firstyear' => $item->c_firstyear,
                 'c_lastyear' => $item->c_lastyear,
+                // 供下拉選單標示起止年以區分同朝代重複年號（如元朝兩筆「至元」）；c_str 保留給既有解析邏輯用。
+                'c_year_range' => HistoricalYearRangeFormatter::format($item->c_firstyear, $item->c_lastyear),
             ];
         });
     }

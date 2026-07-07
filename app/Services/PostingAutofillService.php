@@ -523,42 +523,28 @@ class PostingAutofillService {
 
                 // 特殊處理：年號欄位可能返回名稱而非 ID，需要轉換
                 if (in_array($fieldName, ['c_fy_nh_code', 'c_ly_nh_code']) && !is_numeric($value)) {
-                    // AI 返回的是年號名稱（如"雍正"），需要查詢 ID
+                    // AI 返回的是年號名稱（如"雍正"），需要查詢 ID。
+                    // 同一朝代內可能有同名年號重複（如元朝兩筆「至元」：1264–1294 與 1335–1340），
+                    // 以同一欄位群組已提取的西元年（c_firstyear/c_lastyear）作為 tiebreaker 消歧，
+                    // 避免同名但年份差距懸殊時靜默選錯（見 resolveNianhaoId）。
+                    $yearHintKey = $fieldName === 'c_fy_nh_code' ? 'c_firstyear' : 'c_lastyear';
+                    $yearHint = $aiData[$yearHintKey] ?? null;
+
                     Log::info("[AI Autofill] 查詢年號", [
                         'field' => $fieldName,
                         'name' => $value,
                         'dynasty' => $effectiveDynasty,
+                        'year_hint' => $yearHint,
                     ]);
 
-                    $nianhaoQuery = DB::table('NIAN_HAO')
-                        ->where('c_nianhao_chn', $value);
+                    $nianhaoId = $this->resolveNianhaoId((string) $value, $effectiveDynasty, $yearHint);
 
-                    // 按朝代過濾（避免跨朝代的同名年號混淆）
-                    if ($effectiveDynasty !== null) {
-                        $nianhaoQuery->where('c_dy', $effectiveDynasty);
-                    }
-
-                    $nianhaoId = $nianhaoQuery->value('c_nianhao_id');
-
-                    Log::info("[AI Autofill] 年號查詢結果（按朝代過濾）", [
+                    Log::info("[AI Autofill] 年號查詢結果", [
                         'field' => $fieldName,
                         'name' => $value,
                         'dynasty' => $effectiveDynasty,
                         'found_id' => $nianhaoId,
                     ]);
-
-                    // 如果沒找到，嘗試不限制朝代再查一次
-                    if (!$nianhaoId) {
-                        $nianhaoId = DB::table('NIAN_HAO')
-                            ->where('c_nianhao_chn', $value)
-                            ->value('c_nianhao_id');
-
-                        Log::info("[AI Autofill] 年號查詢結果（不限朝代）", [
-                            'field' => $fieldName,
-                            'name' => $value,
-                            'found_id' => $nianhaoId,
-                        ]);
-                    }
 
                     if ($nianhaoId) {
                         $value = $nianhaoId;
@@ -1440,6 +1426,59 @@ class PostingAutofillService {
         }
 
         return $dynastyRangesCache[$dynastyCode] ?? null;
+    }
+
+    /**
+     * 依年號中文名解析出 c_nianhao_id。同一朝代內可能有同名年號重複
+     * （如元朝「至元」：c_nianhao_id=623 為 1264–1294，=635 為 1335–1340），
+     * 僅按名稱＋朝代過濾無法消歧，須靠西元年 tiebreaker，否則兩者相差 70 年、
+     * 選錯會寫入明顯錯誤的資料。
+     *
+     * 策略：
+     *   1. 按朝代過濾候選；若無候選且有指定朝代，退而不限朝代重試（沿用既有行為，
+     *      因朝代判斷本身可能不準）。
+     *   2. 候選恰好 1 筆 → 直接採用（絕大多數年號皆屬此情況）。
+     *   3. 候選 > 1 筆（真正重複）→ 若有西元年提示（$yearHint，來自同一欄位群組已提取的
+     *      c_firstyear/c_lastyear），優先取「西元年落在該筆 [c_firstyear, c_lastyear] 範圍內」
+     *      者；篩選後恰好剩 1 筆才採用。
+     *   4. 其餘情況（無候選、或候選 >1 且年份提示無法唯一消歧）→ 回傳 null，
+     *      交由呼叫端轉入 suggested（不可靜默猜一筆）。
+     *
+     * @param string $name 年號中文名
+     * @param int|null $dynasty 朝代代碼（$effectiveDynasty）
+     * @param int|null $yearHint 同一欄位群組已提取的西元年（c_fy_nh_code 對應 c_firstyear，
+     *                           c_ly_nh_code 對應 c_lastyear），用於候選 >1 時消歧
+     * @return int|null 解析出的 c_nianhao_id；無法確定時回傳 null
+     */
+    protected function resolveNianhaoId(string $name, ?int $dynasty, ?int $yearHint): ?int {
+        $query = DB::table('NIAN_HAO')->where('c_nianhao_chn', $name);
+        if ($dynasty !== null) {
+            $query->where('c_dy', $dynasty);
+        }
+        $candidates = $query->get(['c_nianhao_id', 'c_firstyear', 'c_lastyear']);
+
+        if ($candidates->isEmpty() && $dynasty !== null) {
+            // 按朝代過濾找不到時，退而不限朝代重試（沿用既有行為）。
+            $candidates = DB::table('NIAN_HAO')
+                ->where('c_nianhao_chn', $name)
+                ->get(['c_nianhao_id', 'c_firstyear', 'c_lastyear']);
+        }
+
+        if ($candidates->count() === 1) {
+            return $candidates->first()->c_nianhao_id;
+        }
+
+        if ($candidates->count() > 1 && $yearHint !== null) {
+            $inRange = $candidates->filter(function ($row) use ($yearHint) {
+                return $row->c_firstyear !== null && $row->c_lastyear !== null
+                    && $yearHint >= $row->c_firstyear && $yearHint <= $row->c_lastyear;
+            });
+            if ($inRange->count() === 1) {
+                return $inRange->first()->c_nianhao_id;
+            }
+        }
+
+        return null;
     }
 
     /**

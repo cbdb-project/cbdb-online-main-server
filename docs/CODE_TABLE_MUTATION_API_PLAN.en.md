@@ -14,7 +14,15 @@
   - (b) **zero controller change**: the external script sends `person_id: 0` for code tables (reusing `NianHaoMutationHandler`'s existing approach).
 - **D-4 `ADDRESSES` derived table:** after correcting `ADDR_CODES`, **rebuild** via `cbdb:regenerate-addresses-table` (production, MySQL-only).
 - **D-5 Phase B "what to change" is governed by the scan rule, no human Sheet needed:** code tables are essentially pure pinyin (verified: of 498 `ETHNICITY.c_name` rows, 11 with v are all genuine pinyin, 0 Western; of 173 `CHORONYM` rows, 1 `Vietnam` has no `lv/nv` syllable and is excluded by the rule). So **apply the deterministic `lv/lve/nv/nve` syllable rule directly to both dedicated pinyin columns and romanized-name columns**; the scan command additionally emits a small `[OTHER-v]` list for a human eyeball (safety net). `ADDR_CODES` is confirmed by the read-only scan at Phase B start before any write.
-- **Scope adjustments**: per D-1, remove `SOCIAL_INSTITUTION_ALTNAME_DATA` from this API's target tables; per D-2, add the `CodesController` audit-fix item.
+- **D-6 Save-time v→ü normalization (stop-the-bleed 2.0, mirroring Phase A §D-12): included in this plan.** Phase A already added save-path stop-the-bleed for person names (`PinyinUmlaut::normalizeFields()`, see [PINYIN_SAVE_NORMALIZE_DESIGN.md](./PINYIN_SAVE_NORMALIZE_DESIGN.md)); after the code tables are batch-cleaned, their **manual-input surface** and **external API** would likewise re-accumulate `v`, so this is added too — otherwise the batch fix gets re-polluted by later data entry.
+  - **Hook points (three)**:
+    1. the new **`AbstractCodeTableMutationHandler`** (covers all code-table API writes in one place — cheapest);
+    2. **`CodesController`** write paths (`store`/`update` and the proposal methods; `destroy` deletes a row, so no normalization needed) — `store`/`update` **overlap with §D-2's `audit_log` hook points** (add alongside), while the proposal methods are §D-6-specific (not covered by §D-2, but they persist column values so they need normalization);
+    3. **`AdminBatchLoadBookTitlesController::updatePinyin()`** (book-title inline edit, currently whitespace/case only; its batch `buildPinyin()` already uses `PinyinUmlaut` — this fixes the inline-vs-batch inconsistency).
+  - **Per-table pinyin-column registry = the SAME list as §D-5**: v→ü may only touch columns that are **definitely Hanyu pinyin**, so a "table → pinyin columns" list is required to exclude English translations (e.g. `OFFICE_CODES.c_office_trans`), Chinese columns (`c_*_chn`), and semantically-uncertain alternate-romanization columns. This list **is exactly the "dedicated pinyin / romanized-name columns" list used by §D-5's batch migration** — batch fix and save-time stop-the-bleed **share one registry** to avoid drift. Generic writes (`CodesController` writing arbitrary columns of arbitrary tables) **must** consult the registry first and normalize only matched columns; never blanket-apply (else Wade-Giles / translation columns get corrupted).
+  - **Usually no Tier 2 dialog (difference from Phase A)**: Phase A's `c_alt_name` needed a frontend dialog (Tier 2) because it may contain Western aliases; but §D-5 verified code-table pinyin columns are "essentially pure pinyin, no Western", so code tables use **Tier 1 backend silent conversion** and generally need no dialog. If §D-5's `[OTHER-v]` scan finds real Western text in some column, assess case-by-case; **default is Tier 1**.
+  - **Tests**: per hook point (typing `lv` reads back as `lü`; English-translation / Chinese columns unaffected; columns not in the registry unchanged; book-title inline consistent with batch).
+- **Scope adjustments**: per D-1, remove `SOCIAL_INSTITUTION_ALTNAME_DATA` from this API's target tables; per D-2, add the `CodesController` audit-fix item; per D-6, add save-time v→ü normalization (hooked at `AbstractCodeTableMutationHandler` + `CodesController` + book-title inline, per the shared registry).
 
 ## 0. Background and Motivation
 
@@ -87,6 +95,7 @@
 - This plan is a **prerequisite for Phase B (the other, non-person-name pinyin fields)** of the [pinyin migration plan](./PINYIN_V_TO_UMLAUT_MIGRATION.en.md).
 - Once this API is built, the Phase B code-table pinyin corrections can be done just like Phase A person names: via an **external script + the audited mutation API**.
 - Phase A (person names) does **not** depend on this plan — person names go through the existing `basicinformation` / `altnames` mutation handlers.
+- **Both halves of stop-the-bleed align here**: Phase A's "save-time stop-the-bleed" is covered by [PINYIN_SAVE_NORMALIZE_DESIGN.md](./PINYIN_SAVE_NORMALIZE_DESIGN.md) for person-name save paths; the code-table half (§D-6) is built into this plan (new handler + `CodesController` + book-title inline), sharing §D-5's per-table pinyin-column registry with the batch fix. Together, code tables also stop producing new `v` after Phase B.
 
 ## 8. To-do Ledger
 
@@ -99,4 +108,7 @@
 - [ ] No-PK table `SOCIAL_INSTITUTION_ALTNAME_DATA`: **SKIP — not handled** (§D-1)
 - [ ] Tests (update / audit / composite PK / authorization / modes / compatibility)
 - [ ] **(Required, §D-2)** add `AuditLogService::write()` to the `CodesController` direct-write paths, making UI and API auditing consistent
+- [ ] **(Required, §D-6)** build the "table → Hanyu-pinyin columns" registry (shared with §D-5's batch migration)
+- [ ] **(Required, §D-6)** hook save-time v→ü normalization at three places: `AbstractCodeTableMutationHandler`, `CodesController` (`store`/`update` + proposal methods; `store`/`update` overlap §D-2's hook points), `AdminBatchLoadBookTitlesController::updatePinyin()`; each normalizes only registry-matched columns
+- [ ] **(§D-6)** Tests: per hook point, typing `lv`→`lü` regression, English-translation/Chinese columns unaffected, non-registry columns unchanged, book-title inline consistent with batch
 - [ ] Doc sync: `AGENTS.md` module entry, and `CHANGELOG.md` as needed

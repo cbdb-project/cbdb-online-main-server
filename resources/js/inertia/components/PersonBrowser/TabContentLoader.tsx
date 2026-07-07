@@ -44,6 +44,8 @@ interface Props {
     postCE?: boolean;
     onSelectPerson?: (personId: number) => void;
     onBasicInfoSaved?: () => void;
+    /** 12 個子資源分頁新增/刪除成功後呼叫：除刷新該分頁列表外，一併通知上層刷新分頁徽章數字（tab_counts）。 */
+    onSubresourceChanged?: () => void;
     onBasicInfoEditorStateChange?: (state: { editing: boolean; dirty: boolean }) => void;
     onRegisterBasicInfoSaveHandler?: (handler: (() => Promise<boolean>) | null) => void;
 }
@@ -93,6 +95,7 @@ export default function TabContentLoader({
     postCE = false,
     onSelectPerson,
     onBasicInfoSaved,
+    onSubresourceChanged,
     onBasicInfoEditorStateChange,
     onRegisterBasicInfoSaveHandler,
 }: Props) {
@@ -174,6 +177,13 @@ export default function TabContentLoader({
             return next;
         });
         setFetchSeq((s) => s + 1);
+    };
+
+    // 12 個子資源分頁新增/刪除成功後的統一 onRefresh：除重新載入該分頁列表外，
+    // 一併通知上層刷新分頁徽章數字（summary.tab_counts），修正「新增/刪除後分頁數字未即時更新」問題。
+    const refreshTabAndSummary = () => {
+        retryActiveTab();
+        onSubresourceChanged?.();
     };
 
     // 靜默刷新指定分頁的快取資料：於背景重新抓取並就地更新 cache[tabKey].data，
@@ -302,7 +312,7 @@ export default function TabContentLoader({
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}
                 deleteEndpoint={deleteEndpoint}
-                onRefresh={retryActiveTab}
+                onRefresh={refreshTabAndSummary}
             />
         );
     }
@@ -320,7 +330,7 @@ export default function TabContentLoader({
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}
                 deleteEndpoint={deleteEndpoint}
-                onRefresh={retryActiveTab}
+                onRefresh={refreshTabAndSummary}
             />
         );
     }
@@ -337,7 +347,7 @@ export default function TabContentLoader({
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}
                 deleteEndpoint={deleteEndpoint}
-                onRefresh={retryActiveTab}
+                onRefresh={refreshTabAndSummary}
             />
         );
     }
@@ -354,7 +364,7 @@ export default function TabContentLoader({
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}
                 deleteEndpoint={deleteEndpoint}
-                onRefresh={retryActiveTab}
+                onRefresh={refreshTabAndSummary}
             />
         );
     }
@@ -372,7 +382,7 @@ export default function TabContentLoader({
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}
                 deleteEndpoint={deleteEndpoint}
-                onRefresh={retryActiveTab}
+                onRefresh={refreshTabAndSummary}
             />
         );
     }
@@ -390,7 +400,7 @@ export default function TabContentLoader({
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}
                 deleteEndpoint={deleteEndpoint}
-                onRefresh={retryActiveTab}
+                onRefresh={refreshTabAndSummary}
                 onSelectPerson={onSelectPerson}
             />
         );
@@ -408,7 +418,7 @@ export default function TabContentLoader({
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}
                 deleteEndpoint={deleteEndpoint}
-                onRefresh={retryActiveTab}
+                onRefresh={refreshTabAndSummary}
                 onSelectPerson={onSelectPerson}
             />
         );
@@ -426,7 +436,7 @@ export default function TabContentLoader({
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}
                 deleteEndpoint={deleteEndpoint}
-                onRefresh={retryActiveTab}
+                onRefresh={refreshTabAndSummary}
             />
         );
     }
@@ -443,7 +453,7 @@ export default function TabContentLoader({
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}
                 deleteEndpoint={deleteEndpoint}
-                onRefresh={retryActiveTab}
+                onRefresh={refreshTabAndSummary}
                 onSelectPerson={onSelectPerson}
             />
         );
@@ -462,7 +472,7 @@ export default function TabContentLoader({
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}
                 deleteEndpoint={deleteEndpoint}
-                onRefresh={retryActiveTab}
+                onRefresh={refreshTabAndSummary}
             />
         );
     }
@@ -479,7 +489,7 @@ export default function TabContentLoader({
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}
                 deleteEndpoint={deleteEndpoint}
-                onRefresh={retryActiveTab}
+                onRefresh={refreshTabAndSummary}
             />
         );
     }
@@ -497,7 +507,7 @@ export default function TabContentLoader({
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}
                 deleteEndpoint={deleteEndpoint}
-                onRefresh={retryActiveTab}
+                onRefresh={refreshTabAndSummary}
             />
         );
     }

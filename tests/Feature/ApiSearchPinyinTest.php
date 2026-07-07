@@ -36,6 +36,7 @@ class ApiSearchPinyinTest extends TestCase {
         Schema::create('BIOG_MAIN', function (Blueprint $table) {
             $table->integer('c_personid')->primary();
             $table->string('c_name_chn')->nullable();
+            $table->string('c_name')->nullable();
         });
     }
 
@@ -251,6 +252,60 @@ class ApiSearchPinyinTest extends TestCase {
 
         $response->assertOk();
         $this->assertSame('(Wife of Li Bai)', trim($response->getContent()));
+        $response->assertHeaderMissing('X-Pinyin-Kinship-Unmatched');
+    }
+
+    #[Test]
+    public function search_pinyin_uses_matched_kin_stored_english_name_instead_of_blind_pinyin(): void {
+        // 「劉」易被姓氏偵測誤判，若對「劉汝彬」盲轉拼音會產生「Liurubin」（未拆分姓名）。
+        // 親屬守衛已確認括號內之人是本人親屬，且該親屬存檔中已有正確英文姓名「Liu Rubin」，
+        // 應直接沿用，而非重新盲轉拼音。
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 200, 'c_name_chn' => '劉汝彬', 'c_name' => 'Liu Rubin']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 100, 'c_kin_id' => 200, 'c_kin_code' => 1]);
+
+        $response = $this->get('/api/select/search/pinyin?q='.urlencode('氏（劉汝彬妻）').'&person_id=100');
+
+        $response->assertOk();
+        $content = trim($response->getContent());
+
+        $this->assertStringContainsString('Wife of Liu Rubin', $content);
+        $this->assertStringNotContainsString('Liurubin', $content);
+        $response->assertHeaderMissing('X-Pinyin-Kinship-Unmatched');
+    }
+
+    #[Test]
+    public function search_pinyin_falls_back_to_pinyin_when_multiple_kin_share_name_with_different_c_name(): void {
+        // 同一人親屬名單中有兩筆中文姓名皆為「劉汝彬」但存檔英文姓名不同 → 無法確定該用哪一筆，
+        // 應退回一般拼音轉換（deterministic），而非任意挑選其中一筆（依資料庫回傳順序不穩定）。
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 200, 'c_name_chn' => '劉汝彬', 'c_name' => 'Liu Rubin']);
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 201, 'c_name_chn' => '劉汝彬', 'c_name' => 'Liu Rubin (II)']);
+        DB::table('KIN_DATA')->insert(['c_personid' => 100, 'c_kin_id' => 200, 'c_kin_code' => 1]);
+        DB::table('KIN_DATA')->insert(['c_personid' => 100, 'c_kin_id' => 201, 'c_kin_code' => 1]);
+
+        $response = $this->get('/api/select/search/pinyin?q='.urlencode('氏（劉汝彬妻）').'&person_id=100');
+
+        $response->assertOk();
+        $content = trim($response->getContent());
+
+        $this->assertStringNotContainsString('Liu Rubin', $content);
+        $response->assertHeaderMissing('X-Pinyin-Kinship-Unmatched');
+    }
+
+    #[Test]
+    public function search_pinyin_falls_back_to_pinyin_when_one_of_multiple_same_name_kin_has_no_c_name(): void {
+        // 同一人親屬名單中有兩筆中文姓名皆為「劉汝彬」，其中一筆有存檔英文姓名、另一筆為空 →
+        // 仍屬「不確定該用哪一筆」的歧義情境，不可誤用那筆非空值，應退回一般拼音轉換。
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 200, 'c_name_chn' => '劉汝彬', 'c_name' => 'Liu Rubin']);
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 201, 'c_name_chn' => '劉汝彬', 'c_name' => null]);
+        DB::table('KIN_DATA')->insert(['c_personid' => 100, 'c_kin_id' => 200, 'c_kin_code' => 1]);
+        DB::table('KIN_DATA')->insert(['c_personid' => 100, 'c_kin_id' => 201, 'c_kin_code' => 1]);
+
+        $response = $this->get('/api/select/search/pinyin?q='.urlencode('氏（劉汝彬妻）').'&person_id=100');
+
+        $response->assertOk();
+        $content = trim($response->getContent());
+
+        $this->assertStringNotContainsString('Liu Rubin', $content);
         $response->assertHeaderMissing('X-Pinyin-Kinship-Unmatched');
     }
 

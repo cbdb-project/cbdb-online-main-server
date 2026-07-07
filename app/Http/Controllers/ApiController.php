@@ -644,12 +644,13 @@ class ApiController extends Controller {
         if (preg_match('/^\s*[（(]\s*(.+?)\s*('.$titlesPattern.')\s*[）)]\s*$/u', $word, $matches) === 1) {
             $targetChn = $matches[1] ?? '';
             // 親屬守衛：括號內之人不在此人親屬名單中 → 判為別名，退回一般轉換並標記提示。
-            if (!$this->personHasKinNamed($personId, $targetChn)) {
+            $kinMatch = $this->resolveKinMatch($personId, $targetChn);
+            if (!$kinMatch['matched']) {
                 $kinshipUnmatched = true;
 
                 return null;
             }
-            $target = $this->buildPinyinWord($targetChn, $split);
+            $target = $kinMatch['c_name'] ?? $this->buildPinyinWord($targetChn, $split);
             $phrase = $this->relationshipPhrases()[$matches[2]] ?? null;
 
             return $phrase ? '('.$phrase.' '.trim($target).')' : null;
@@ -658,13 +659,14 @@ class ApiController extends Controller {
         // 特例 2：例如「宗氏（李白妻）」→「Zong Shi (Wife of Li Bai)」
         if (preg_match('/^(.*?)[（(]\s*(.+?)\s*('.$titlesPattern.')\s*[）)]\s*$/u', $word, $matches) === 1) {
             $targetChn = $matches[2] ?? '';
-            if (!$this->personHasKinNamed($personId, $targetChn)) {
+            $kinMatch = $this->resolveKinMatch($personId, $targetChn);
+            if (!$kinMatch['matched']) {
                 $kinshipUnmatched = true;
 
                 return null;
             }
             $prefix = $this->buildPinyinWord($matches[1] ?? '', $split);
-            $target = $this->buildPinyinWord($targetChn, $split);
+            $target = $kinMatch['c_name'] ?? $this->buildPinyinWord($targetChn, $split);
             $phrase = $this->relationshipPhrases()[$matches[3]] ?? null;
 
             return $phrase ? trim($prefix).' ('.$phrase.' '.trim($target).')' : null;
@@ -674,29 +676,49 @@ class ApiController extends Controller {
     }
 
     /**
-     * 快速判斷此人（$personId）的親屬名單中，是否有「中文姓名等於 $targetNameChn」的親屬。
+     * 判斷此人（$personId）的親屬名單中，是否有「中文姓名等於 $targetNameChn」的親屬，
+     * 若有，一併取回該親屬存檔的英文姓名（BIOG_MAIN.c_name）。
      * 供關係拼音守衛使用：偵測到關係稱謂（如「（靖江女）」）時，若括號內之人不在此人親屬中，
      * 多半是別名而非真實親屬關係，應改走一般拼音轉換。
      *
-     * 無 person 上下文（$personId 為 null）或空目標時回傳 true（不做守衛，維持既有行為、向後相容）。
+     * 無 person 上下文（$personId 為 null）或空目標時視為「已匹配但無姓名」（不做守衛，維持既有行為、向後相容）。
      *
      * 限制（刻意的「快速匹配」）：僅比對親屬中文姓名是否相等，不驗證關係方向／稱謂互逆
      * （如「（靖江女）」代表本人為靖江之女，靖江在本人親屬中應記為「父」）。因此：
      *   - 偽陰性（真親屬但存檔姓名寫法不同）→ 退回一般轉換並提示，屬保守可接受；
      *   - 偽陽性（同名親屬但實際關係不符，或同名多人）→ 仍會套用關係轉換。
      * 這符合使用者「親屬名單中查無此人才不套用」的訴求；若日後需更精準，可加入互逆稱謂比對。
+     *
+     * @return array{matched: bool, c_name: ?string} matched 為 false 時 c_name 恆為 null；
+     *                                                matched 為 true 時，若同名親屬存檔的非空 c_name
+     *                                                恰好只有一種取值，直接沿用（避免對「劉汝彬」這類
+     *                                                姓氏偵測易誤判的姓名重新盲轉拼音、產生「Liurubin」
+     *                                                等未拆分姓名）；若同名親屬有多筆且 c_name 取值不一致
+     *                                                （無法確定該用哪一筆），或皆為空，則回傳 null 交由
+     *                                                呼叫端退回一般拼音轉換，避免任意挑選造成不穩定輸出。
      */
-    private function personHasKinNamed(?int $personId, string $targetNameChn): bool {
+    private function resolveKinMatch(?int $personId, string $targetNameChn): array {
         $target = trim($targetNameChn);
         if ($personId === null || $target === '') {
-            return true;
+            return ['matched' => true, 'c_name' => null];
         }
 
-        return DB::table('KIN_DATA')
+        $rows = DB::table('KIN_DATA')
             ->join('BIOG_MAIN', 'BIOG_MAIN.c_personid', '=', 'KIN_DATA.c_kin_id')
             ->where('KIN_DATA.c_personid', $personId)
             ->where('BIOG_MAIN.c_name_chn', $target)
-            ->exists();
+            ->pluck('BIOG_MAIN.c_name');
+
+        if ($rows->isEmpty()) {
+            return ['matched' => false, 'c_name' => null];
+        }
+
+        // 注意：去重前不可先濾掉空值——若同名親屬中一筆有 c_name、另一筆為空，
+        // 仍代表「不確定該用哪一筆姓名」，須視為歧義並回傳 null（而非誤用那筆非空值）。
+        $distinctNames = $rows->map(static fn ($name) => trim((string) ($name ?? '')))->unique();
+        $resolvedName = $distinctNames->count() === 1 ? $distinctNames->first() : '';
+
+        return ['matched' => true, 'c_name' => $resolvedName !== '' ? $resolvedName : null];
     }
 
     /**

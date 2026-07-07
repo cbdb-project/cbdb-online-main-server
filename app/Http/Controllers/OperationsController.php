@@ -1342,6 +1342,18 @@ class OperationsController extends Controller {
             'BIOG_INST_DATA' => ['c_personid','c_inst_code','c_inst_name_code','c_bi_role_code'],
             'EVENTS_DATA' => ['c_personid','c_sequence','c_event_code'],
             'ASSOC_DATA' => ['c_personid','c_assoc_code','c_assoc_id','c_kin_code','c_kin_id','c_assoc_kin_code','c_assoc_kin_id','c_text_title','c_assoc_first_year'],
+            // Phase B code 表（與 CompositePrimaryKey::SCHEMAS、config/code_table_mutations.php 一致）
+            'NIAN_HAO' => ['c_nianhao_id'],
+            'DYNASTIES' => ['c_dy'],
+            'CHORONYM_CODES' => ['c_choronym_code'],
+            'ETHNICITY_TRIBE_CODES' => ['c_ethnicity_code'],
+            'TEXT_INSTANCE_DATA' => ['c_textid','c_text_edition_id','c_text_instance_id'],
+            'TEXT_BIBLCAT_CODES' => ['c_text_cat_code'],
+            'GANZHI_CODES' => ['c_ganzhi_code'],
+            'SOCIAL_INSTITUTION_NAME_CODES' => ['c_inst_name_code'],
+            'SOCIAL_INSTITUTION_TYPES' => ['c_inst_type_code'],
+            'ADMIN_CAT_CODES' => ['c_admin_cat_code'],
+            'ADDR_CODES' => ['c_addr_id'],
         ];
 
         return $map[$resource] ?? [];

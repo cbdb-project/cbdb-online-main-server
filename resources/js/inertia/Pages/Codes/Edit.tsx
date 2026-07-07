@@ -5,6 +5,8 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { FormField } from '../../components/ui/FormField';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { PinyinUmlautConfirmDialog } from '../../components/PinyinUmlautConfirmDialog';
+import { collectUmlautConversions, type Tier2UmlautHit } from '../../utils/pinyinUmlaut';
 import { useTranslation } from '../../hooks/useTranslation';
 import type { SharedProps } from '../../types/page';
 
@@ -15,14 +17,16 @@ interface CodesEditPageProps extends SharedProps {
     values: Record<string, string | number | null>;
     key_columns: string[];
     can_propose: boolean;
+    tier2_fields?: string[];
     urls: { update: string; propose: string; destroy: string; show: string };
 }
 
 export default function CodesEdit() {
     const props = usePage<CodesEditPageProps>().props;
-    const { table, columns, values, key_columns, can_propose, urls } = props;
+    const { table, columns, values, key_columns, can_propose, tier2_fields, urls } = props;
     const t = useTranslation('codes');
     const tc = useTranslation('common');
+    const tb = useTranslation('biogmains'); // 復用 AltnameEditor 的彈窗字串
 
     const initial: Record<string, string> = { __proposal_comment: '' };
     columns.forEach((c) => {
@@ -31,13 +35,32 @@ export default function CodesEdit() {
 
     const form = useForm<Record<string, string>>(initial);
     const [confirmDelete, setConfirmDelete] = useState(false);
+    const [umlautPrompt, setUmlautPrompt] = useState<{ hits: Tier2UmlautHit[]; run: (overrides?: Record<string, string>) => void } | null>(null);
+
+    // 送出（Tier 2 確認後）：overrides 以 transform 保證此次提交使用者選擇的值，避免 setData 非同步問題。
+    const submitVia = (method: 'patch' | 'post', url: string, overrides?: Record<string, string>) => {
+        if (overrides) {
+            form.transform((d) => ({ ...d, ...overrides }));
+        }
+        form[method](url, { preserveScroll: true, onFinish: () => form.transform((d) => d) });
+    };
+    // §D-6 Tier 2 閘：提交前掃描 Tier 2 欄，有命中先彈窗由使用者決定。
+    const gate = (run: (overrides?: Record<string, string>) => void) => {
+        const hits = collectUmlautConversions(tier2_fields ?? [], form.data);
+        if (hits.length > 0) {
+            setUmlautPrompt({ hits, run });
+
+            return;
+        }
+        run();
+    };
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
         // app.codes.update 接受 PUT/PATCH；useForm.patch 直接送出。
-        form.patch(urls.update, { preserveScroll: true });
+        gate((ov) => submitVia('patch', urls.update, ov));
     };
-    const propose = () => form.post(urls.propose, { preserveScroll: true });
+    const propose = () => gate((ov) => submitVia('post', urls.propose, ov));
 
     return (
         <DashboardLayout
@@ -102,6 +125,21 @@ export default function CodesEdit() {
                 onConfirm={() => {
                     setConfirmDelete(false);
                     router.delete(urls.destroy, { preserveScroll: true });
+                }}
+            />
+
+            <PinyinUmlautConfirmDialog
+                hits={umlautPrompt?.hits ?? null}
+                t={tb}
+                onCancel={() => setUmlautPrompt(null)}
+                onKeep={() => { const p = umlautPrompt; setUmlautPrompt(null); p?.run(); }}
+                onConvert={() => {
+                    const p = umlautPrompt;
+                    setUmlautPrompt(null);
+                    if (!p) return;
+                    const overrides: Record<string, string> = {};
+                    p.hits.forEach((h) => { overrides[h.field] = h.converted; form.setData(h.field, h.converted); });
+                    p.run(overrides);
                 }}
             />
         </DashboardLayout>

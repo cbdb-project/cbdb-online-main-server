@@ -29,7 +29,7 @@ class CodesEditInertiaTest extends TestCase {
             'database' => ':memory:',
             'prefix' => '',
         ]);
-        config(['codes.tables' => ['TEST_EDIT_CODES' => '測試代碼']]);
+        config(['codes.tables' => ['TEST_EDIT_CODES' => '測試代碼', 'ADDR_CODES' => '地址代碼']]);
 
         Schema::create('users', function ($table) {
             $table->increments('id');
@@ -47,6 +47,13 @@ class CodesEditInertiaTest extends TestCase {
             $table->string('description')->nullable();
         });
         DB::table('TEST_EDIT_CODES')->insert(['code_id' => 5, 'description' => 'old']);
+
+        Schema::create('ADDR_CODES', function ($table) {
+            $table->integer('c_addr_id')->primary();
+            $table->string('c_name')->nullable();
+            $table->string('c_name_chn')->nullable();
+        });
+        DB::table('ADDR_CODES')->insert(['c_addr_id' => 900, 'c_name' => 'Test', 'c_name_chn' => '測試']);
 
         Schema::create('operations', function ($table) {
             $table->increments('id');
@@ -80,7 +87,20 @@ class CodesEditInertiaTest extends TestCase {
                 ->where('values.code_id', 5)
                 ->where('values.description', 'old')
                 ->has('urls.update')
-                ->has('urls.destroy'));
+                ->has('urls.destroy')
+                ->where('tier2_fields', [])); // 非 Phase B 表：無 Tier 2 欄
+    }
+
+    #[Test]
+    public function edit_passes_tier2_fields_for_config_table(): void {
+        // §D-6：編輯 ADDR_CODES 時，Tier 2 欄 c_name 傳給前端供保存時偵測 v→ü 彈窗
+        $this->actingAs($this->activeUser())
+            ->get(route('app.codes.edit', ['table_name' => 'ADDR_CODES', 'id' => 900]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Codes/Edit')
+                ->where('table', 'ADDR_CODES')
+                ->where('tier2_fields', ['c_name']));
     }
 
     #[Test]

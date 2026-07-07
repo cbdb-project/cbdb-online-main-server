@@ -29,7 +29,7 @@ class CodesCreateInertiaTest extends TestCase {
             'database' => ':memory:',
             'prefix' => '',
         ]);
-        config(['codes.tables' => ['TEST_CREATE_CODES' => '測試代碼']]);
+        config(['codes.tables' => ['TEST_CREATE_CODES' => '測試代碼', 'ADDR_CODES' => '地址代碼']]);
 
         Schema::create('users', function ($table) {
             $table->increments('id');
@@ -45,6 +45,12 @@ class CodesCreateInertiaTest extends TestCase {
         Schema::create('TEST_CREATE_CODES', function ($table) {
             $table->integer('code_id')->primary();
             $table->string('description')->nullable();
+        });
+
+        Schema::create('ADDR_CODES', function ($table) {
+            $table->integer('c_addr_id')->primary();
+            $table->string('c_name')->nullable();
+            $table->string('c_name_chn')->nullable();
         });
 
         Schema::create('operations', function ($table) {
@@ -79,7 +85,19 @@ class CodesCreateInertiaTest extends TestCase {
                 ->has('columns')
                 ->where('can_propose', true)
                 ->has('urls.store')
-                ->has('urls.propose'));
+                ->has('urls.propose')
+                ->where('tier2_fields', [])); // 非 Phase B 表：無 Tier 2 欄
+    }
+
+    #[Test]
+    public function create_passes_tier2_fields_for_config_table(): void {
+        // §D-6：ADDR_CODES.c_name 為 Tier 2 → 前端據此於保存時偵測 v→ü 並彈窗
+        $this->actingAs($this->activeUser())
+            ->get('/app/codes/ADDR_CODES/create')
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Codes/Create')
+                ->where('table', 'ADDR_CODES')
+                ->where('tier2_fields', ['c_name']));
     }
 
     #[Test]

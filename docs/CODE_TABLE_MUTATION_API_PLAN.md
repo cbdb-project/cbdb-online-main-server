@@ -125,6 +125,7 @@
 - [x] 測試（`ApiV2MutateCodeTablesTest`：單鍵/多欄/三欄/複合三鍵 update・audit・person_id=0・白名單拒絕・proposal・404・403；`ApiV2MutateNianHaoTest` 22 項不變）
 - [ ] **（必做，§D-2）** `CodesController` 直寫路徑補 `AuditLogService::write()`，使 UI 與 API 審計一致
 - [x] **（§D-6）** 「表→拼音欄 Tier」registry——落於 `config/code_table_mutations.php` 每表的 `tier1_fields`／`tier2_fields`（與 allowed_fields 一致；與 §D-5 名單同源）
-- [x] **（§D-6）** 保存時 v→ü 歸一化**後端三掛點全數完成**：(1) `AbstractCodeTableMutationHandler`／`ConfigCodeTableMutationHandler`（v2 API）；(2) `CodesController`（`store`/`update`／proposal store/update，依 config tier1_fields 只轉 Tier 1、Tier 2 不動、非 Phase B 表不動）；(3) `AdminBatchLoadBookTitlesController::updatePinyin()`（書名 c_title Tier 1）。**前端 Tier 2 彈窗待後續里程碑**
-- [x] **（§D-6）** 後端測試：`ApiV2MutateCodeTablesTest`（handler Tier 1/2／冪等）、`CodesControllerTest`（store/update Tier 1 轉、Tier 2 不轉、非 config 表不動）、`AdminBatchLoadBookTitlesTest`（updatePinyin v→ü）。**前端 Tier 2 彈窗測試待後續**
+- [x] **（§D-6）** 保存時 v→ü 歸一化**後端三掛點全數完成**：(1) `AbstractCodeTableMutationHandler`／`ConfigCodeTableMutationHandler`（v2 API）；(2) `CodesController`（`store`/`update`／proposal store/update/updateExisting，依 config tier1_fields 只轉 Tier 1、Tier 2 不動、非 Phase B 表不動）；(3) `AdminBatchLoadBookTitlesController::updatePinyin()`（書名 c_title Tier 1）。
+- [x] **（§D-6）** **前端 Tier 2 彈窗完成**：通用 `/codes` 編輯器（`Codes/Create`、`Codes/Edit`）於保存前對本表 `tier2_fields`（controller 傳入之 prop）以規則偵測 v→ü，命中才彈窗（`PinyinUmlautConfirmDialog`，復用 `pinyinUmlaut.ts`）由使用者「轉換／保留」；`form.transform` 保證提交送出選定值。
+- [x] **（§D-6）** 測試：後端 `ApiV2MutateCodeTablesTest`／`CodesControllerTest`／`AdminBatchLoadBookTitlesTest`；前端 `pinyinUmlaut.test.ts`（`collectUmlautConversions` 多欄偵測）＋ `CodesCreateInertiaTest`（`tier2_fields` prop：config 表為 `['c_name']`、非 config 表為 `[]`）。
 - [ ] 文件同步：`AGENTS.md` 模組入口、必要時 `CHANGELOG.md`

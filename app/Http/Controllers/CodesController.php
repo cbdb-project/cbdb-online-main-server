@@ -811,6 +811,7 @@ class CodesController extends Controller {
             'values' => $rowArray,
             'key_columns' => array_values($keyColumns),
             'can_propose' => Auth::check() && Auth::user()->isActive(),
+            'tier2_fields' => $this->codeTableTier2Fields($table),
             'urls' => [
                 'update' => route('app.codes.update', ['table_name' => $table, 'id' => $compositeId], false),
                 'propose' => route('app.codes.propose.update', ['table_name' => $table, 'id' => $compositeId], false),
@@ -959,6 +960,7 @@ class CodesController extends Controller {
             'columns' => array_values($columns),
             'defaults' => (object) $defaults,
             'can_propose' => Auth::check() && Auth::user()->isActive(),
+            'tier2_fields' => $this->codeTableTier2Fields($table),
             'urls' => [
                 'store' => route('app.codes.store', ['table_name' => $table], false),
                 'propose' => route('app.codes.propose.store', ['table_name' => $table], false),
@@ -1588,6 +1590,23 @@ class CodesController extends Controller {
         }
 
         return $data;
+    }
+
+    /**
+     * 本表的 Tier 2 拼音欄（可能含西文）——傳給前端 /codes 編輯器，供保存時偵測 v→ü 並彈窗由使用者決定。
+     * 未登錄於 config 的表回傳空陣列（不彈窗）。
+     *
+     * @return list<string>
+     */
+    protected function codeTableTier2Fields(string $table): array {
+        $upper = strtoupper($table);
+        foreach ((array) config('code_table_mutations.tables', []) as $def) {
+            if (($def['table'] ?? null) === $upper) {
+                return array_values($def['tier2_fields'] ?? []);
+            }
+        }
+
+        return [];
     }
 
     protected function enforceAuditFieldsForCreate(string $table, array $data): array {

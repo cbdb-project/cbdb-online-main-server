@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useForm, usePage } from '@inertiajs/react';
 import DashboardLayout from '../../Layouts/DashboardLayout';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { FormField } from '../../components/ui/FormField';
+import { PinyinUmlautConfirmDialog } from '../../components/PinyinUmlautConfirmDialog';
+import { collectUmlautConversions, type Tier2UmlautHit } from '../../utils/pinyinUmlaut';
 import { useTranslation } from '../../hooks/useTranslation';
 import type { SharedProps } from '../../types/page';
 
@@ -12,6 +14,7 @@ interface CodesCreatePageProps extends SharedProps {
     columns: string[];
     defaults: Record<string, string | number>;
     can_propose: boolean;
+    tier2_fields?: string[];
     urls: { store: string; propose: string; show: string };
 }
 
@@ -28,9 +31,10 @@ const COLUMN_HINTS: Record<string, Record<string, { text: string; link?: { href:
 
 export default function CodesCreate() {
     const props = usePage<CodesCreatePageProps>().props;
-    const { table, columns, defaults, can_propose, urls } = props;
+    const { table, columns, defaults, can_propose, tier2_fields, urls } = props;
     const t = useTranslation('codes');
     const tc = useTranslation('common');
+    const tb = useTranslation('biogmains'); // 復用 AltnameEditor 的彈窗字串
 
     const initial: Record<string, string> = {};
     columns.forEach((c) => {
@@ -39,8 +43,25 @@ export default function CodesCreate() {
     initial.__proposal_comment = '';
 
     const form = useForm<Record<string, string>>(initial);
+    const [umlautPrompt, setUmlautPrompt] = useState<{ hits: Tier2UmlautHit[]; run: (overrides?: Record<string, string>) => void } | null>(null);
 
-    const post = (url: string) => form.post(url, { preserveScroll: true });
+    // 送出（Tier 2 確認後）：overrides 以 transform 保證此次提交送出使用者選擇的值，避免 setData 非同步問題。
+    const submitPost = (url: string, overrides?: Record<string, string>) => {
+        if (overrides) {
+            form.transform((d) => ({ ...d, ...overrides }));
+        }
+        form.post(url, { preserveScroll: true, onFinish: () => form.transform((d) => d) });
+    };
+    // §D-6 Tier 2 閘：提交前掃描 Tier 2 欄，有命中先彈窗由使用者決定。
+    const gate = (run: (overrides?: Record<string, string>) => void) => {
+        const hits = collectUmlautConversions(tier2_fields ?? [], form.data);
+        if (hits.length > 0) {
+            setUmlautPrompt({ hits, run });
+
+            return;
+        }
+        run();
+    };
     const tableHints = COLUMN_HINTS[table] ?? {};
 
     return (
@@ -51,7 +72,7 @@ export default function CodesCreate() {
             <form
                 onSubmit={(e) => {
                     e.preventDefault();
-                    post(urls.store);
+                    gate((ov) => submitPost(urls.store, ov));
                 }}
                 className="max-w-3xl space-y-3 rounded-lg border border-border bg-card p-4"
             >
@@ -97,13 +118,28 @@ export default function CodesCreate() {
 
                         <div className="flex gap-2">
                             <Button type="submit" disabled={form.processing}>{t('save_direct')}</Button>
-                            <Button type="button" variant="secondary" disabled={form.processing} onClick={() => post(urls.propose)}>
+                            <Button type="button" variant="secondary" disabled={form.processing} onClick={() => gate((ov) => submitPost(urls.propose, ov))}>
                                 {t('submit_proposal')}
                             </Button>
                         </div>
                     </>
                 )}
             </form>
+
+            <PinyinUmlautConfirmDialog
+                hits={umlautPrompt?.hits ?? null}
+                t={tb}
+                onCancel={() => setUmlautPrompt(null)}
+                onKeep={() => { const p = umlautPrompt; setUmlautPrompt(null); p?.run(); }}
+                onConvert={() => {
+                    const p = umlautPrompt;
+                    setUmlautPrompt(null);
+                    if (!p) return;
+                    const overrides: Record<string, string> = {};
+                    p.hits.forEach((h) => { overrides[h.field] = h.converted; form.setData(h.field, h.converted); });
+                    p.run(overrides);
+                }}
+            />
         </DashboardLayout>
     );
 }

@@ -219,6 +219,117 @@ class BiogMainProposalTest extends TestCase {
     }
 
     #[Test]
+    public function testApproveRejectsProposalThatWouldClearExistingMingzi() {
+        // 核准端「不可清空」守衛：payload 把名（中）寫成空、而該列當下有值 → 拒絕核准、資料不變、提案維持 pending。
+        // 模擬「提交端驗證修復前的存量 pending 提案」與 legacy 路徑提交的提案。
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $personId = 4;
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => $personId,
+            'c_name_chn' => '王五',
+            'c_surname_chn' => '王',
+            'c_mingzi_chn' => '五',
+            'c_mingzi' => 'Wu',
+            'c_notes' => 'Old notes',
+        ]);
+
+        $operation = Operation::create([
+            'user_id' => 100,
+            'c_personid' => $personId,
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+            'resource' => 'BIOG_MAIN',
+            'resource_id' => (string) $personId,
+            'resource_data' => json_encode([
+                'c_personid' => $personId,
+                'c_surname_chn' => '王',
+                'c_mingzi_chn' => '',
+                'c_name_chn' => '王',
+                'c_notes' => 'New notes',
+                '__key_columns' => ['c_personid'],
+                '__review_status' => 'pending',
+            ]),
+            'resource_original' => json_encode([
+                'c_personid' => $personId,
+                'c_surname_chn' => '王',
+                'c_mingzi_chn' => '五',
+                'c_notes' => 'Old notes',
+            ]),
+        ]);
+
+        $response = $this->post(route('operations.proposals.approve', $operation), [
+            'review_comment' => 'try approve',
+        ]);
+
+        $response->assertRedirect();
+        $flash = session('flash_notification', collect())->toArray();
+        $this->assertStringContainsString('清空既有的「名（中）」', $flash[0]['message'] ?? '');
+
+        // 資料未變、提案未被標記 approved（交易整筆回滾）。
+        $this->assertDatabaseHas('BIOG_MAIN', [
+            'c_personid' => $personId,
+            'c_mingzi_chn' => '五',
+            'c_notes' => 'Old notes',
+        ]);
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('pending', $payload['__review_status']);
+        $this->assertDatabaseCount('audit_log', 0);
+    }
+
+    #[Test]
+    public function testApproveAllowsProposalKeepingMingziEmptyWhenRowEmpty() {
+        // 守衛的另一半：該列名（中）當下即為空，提案維持空、只改其他欄位 → 照常核准。
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $personId = 5;
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => $personId,
+            'c_name_chn' => '趙',
+            'c_surname_chn' => '趙',
+            'c_mingzi_chn' => '',
+            'c_notes' => 'Old notes',
+        ]);
+
+        $operation = Operation::create([
+            'user_id' => 100,
+            'c_personid' => $personId,
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+            'resource' => 'BIOG_MAIN',
+            'resource_id' => (string) $personId,
+            'resource_data' => json_encode([
+                'c_personid' => $personId,
+                'c_surname_chn' => '趙',
+                'c_mingzi_chn' => '',
+                'c_notes' => 'New notes',
+                '__key_columns' => ['c_personid'],
+                '__review_status' => 'pending',
+            ]),
+            'resource_original' => json_encode([
+                'c_personid' => $personId,
+                'c_surname_chn' => '趙',
+                'c_mingzi_chn' => '',
+                'c_notes' => 'Old notes',
+            ]),
+        ]);
+
+        $this->post(route('operations.proposals.approve', $operation), [
+            'review_comment' => 'ok',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('BIOG_MAIN', [
+            'c_personid' => $personId,
+            'c_mingzi_chn' => '',
+            'c_notes' => 'New notes',
+        ]);
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status']);
+    }
+
+    #[Test]
     public function testBiogMainProposalDoesNotRewriteMingziFieldsWhenNotChanged() {
         $user = $this->makeActiveUser();
         $this->actingAs($user);

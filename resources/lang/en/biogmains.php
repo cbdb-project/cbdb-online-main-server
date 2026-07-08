@@ -70,8 +70,8 @@ return [
     // basic_info dynasty required.
     'required_field' => 'Required',
     'dynasty_required' => 'Dynasty is required — please select a dynasty first.',
-    'mingzi_chn_required' => 'Given name (Chinese) is required',
-    'mingzi_required' => 'Pinyin given name is required',
+    'mingzi_chn_no_clear' => 'Given name (Chinese) cannot be cleared',
+    'mingzi_no_clear' => 'Pinyin given name cannot be cleared',
     'please_select_office' => 'Please select an office',
     'please_select_text' => 'Please select a text',
     // Primary-code required (phase 1): each editor's primary anchor code / target person is required; create rejects empty/Unknown(0).

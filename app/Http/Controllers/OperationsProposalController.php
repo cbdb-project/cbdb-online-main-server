@@ -35,6 +35,18 @@ class OperationsProposalController extends Controller {
         // 注意：ALTNAME_DATA 使用復合主鍵，不使用 Eloquent，改為手動調用索引服務
     ];
 
+    /**
+     * 核准套用時的「不可清空」欄位守衛（per-table）：payload 將該欄寫成空、而資料列當下有值時，
+     * 擋下核准。兜住「提交端驗證修復前的存量 pending 提案」與 legacy 提交路徑（所有提案核准必經此處）。
+     * 以「當下 DB 現值」而非提案存檔時的 original 比對：提案送出後若他人已補值，清空它的舊提案照樣被擋。
+     */
+    protected const NO_CLEAR_COLUMNS_ON_APPLY = [
+        'BIOG_MAIN' => [
+            'c_mingzi_chn' => '名（中）',
+            'c_mingzi' => '拼音名',
+        ],
+    ];
+
     public function __construct(
         OperationRepository $operationRepository,
         NameSearchIndexService $nameSearchIndexService,
@@ -638,6 +650,23 @@ class OperationsProposalController extends Controller {
         return $this->convertRowToArray($row);
     }
 
+    /**
+     * 「不可清空」守衛：提案 payload 把 NO_CLEAR_COLUMNS_ON_APPLY 所列欄位寫成空白、
+     * 而該列當下（$currentRow）有值時，拒絕核准。原本即為空的欄位不受影響（可維持空）。
+     */
+    protected function assertNoClearColumns(string $table, array $data, array $currentRow): void {
+        foreach (self::NO_CLEAR_COLUMNS_ON_APPLY[$table] ?? [] as $column => $label) {
+            if (!array_key_exists($column, $data)) {
+                continue;
+            }
+            $proposed = trim((string) ($data[$column] ?? ''));
+            $current = trim((string) ($currentRow[$column] ?? ''));
+            if ($proposed === '' && $current !== '') {
+                throw new \RuntimeException("此提案會清空既有的「{$label}」，無法核准。");
+            }
+        }
+    }
+
     protected function applyUpdateProposal(string $table, array $data, array $keyColumns, array $original): array {
         if (empty($original)) {
             throw new \RuntimeException('缺少原始資料，無法更新。');
@@ -653,6 +682,8 @@ class OperationsProposalController extends Controller {
             if (!$model) {
                 throw new \RuntimeException('資料不存在或已被刪除，無法更新。');
             }
+
+            $this->assertNoClearColumns($table, $data, $model->toArray());
 
             foreach ($keyColumns as $column) {
                 if (!array_key_exists($column, $original)) {
@@ -679,6 +710,8 @@ class OperationsProposalController extends Controller {
         if (!$current) {
             throw new \RuntimeException('資料不存在或已被刪除，無法更新。');
         }
+
+        $this->assertNoClearColumns($table, $data, (array) $current);
 
         $updatePayload = $this->buildUpdatePayload($data, $keyColumns, $original);
 

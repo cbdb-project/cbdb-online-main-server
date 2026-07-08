@@ -77,6 +77,10 @@ export default function OfficeEditor({
         c_office_id: '', c_source: '0',
         c_inst_code: '0', c_inst_name_code: '0',
         c_fy_intercalary: '0', c_ly_intercalary: '0',
+        // 朝代預設為人物朝代（對齊 legacy：舊 offices/_form 於頁面載入時即從 person dynasty_code
+        // 預填 c_dy，AI 僅在依任官時間判定不同朝代時覆寫）。list 模式 CodeAutocomplete 會依此值
+        // 自載朝代名稱標籤，故不需另傳 label。編輯模式由 initialFields 的 c_dy 覆寫。
+        ...(isCreate && dynastyCode != null ? { c_dy: String(dynastyCode) } : {}),
         ...initialFields,
     };
     const [fields, setFields] = useState<Fields>(base);
@@ -149,7 +153,11 @@ export default function OfficeEditor({
 
     // AI 自動填套用前的快照（供「清除 AI 填入」還原）。
     const preAi = useRef<{ f: Fields; l: Fields; a: AddrItem[] } | null>(null);
-    const applyAiData = (data: AiAutofillData) => {
+    // AI extract 回傳的 ai_fill_logs log id：儲存（create）時經 meta 回傳後端，回寫 user_submitted +
+    // submitted_at，使 /admin/ai-fill-logs 正確顯示「已提交」。清除 AI 填入時一併還原。
+    const aiFillLogId = useRef<number | null>(null);
+    const applyAiData = (data: AiAutofillData, logId?: number | null) => {
+        aiFillLogId.current = logId ?? null;
         if (!preAi.current) preAi.current = { f: { ...fields }, l: { ...labels }, a: [...addr] };
         const entries: Record<string, AiFieldEntry> = { ...(data.matched_fields ?? {}), ...(data.suggested_fields ?? {}) };
         setFields((prev) => {
@@ -193,6 +201,7 @@ export default function OfficeEditor({
         setLabels(preAi.current.l);
         setAddr(preAi.current.a);
         preAi.current = null;
+        aiFillLogId.current = null;
     };
 
     const onPickTextperson = (p: { source: string; pages: string; sourceLabel: string }) => {
@@ -243,12 +252,18 @@ export default function OfficeEditor({
             if (Object.keys(changes).length === 0) { setSaving(false); setError(tr('no_change', '沒有變更')); return; }
         }
 
+        // meta：proposal 附帶審核備註；create 且曾用 AI 自動填時附帶 ai_fill_log_id，供後端回寫
+        // ai_fill_logs 的 user_submitted + submitted_at（不論是否人工修改過 AI 建議皆以 log id 連結）。
+        const meta: Record<string, unknown> = {};
+        if (sm === 'proposal' && comment) meta.comment = comment;
+        if (creating && aiFillLogId.current) meta.ai_fill_log_id = aiFillLogId.current;
+
         try {
             const res = await fetch(endpoint, {
                 method: 'POST',
                 headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
-                body: JSON.stringify({ resource: 'postings', person_id: personId, mode: sm, operation, target: { pk: target }, changes, ...(sm === 'proposal' && comment ? { meta: { comment } } : {}) }),
+                body: JSON.stringify({ resource: 'postings', person_id: personId, mode: sm, operation, target: { pk: target }, changes, ...(Object.keys(meta).length ? { meta } : {}) }),
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);

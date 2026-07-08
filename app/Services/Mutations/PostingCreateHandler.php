@@ -12,6 +12,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * POSTED_TO_OFFICE_DATA（任官）create handler（API v2）
@@ -137,6 +139,9 @@ class PostingCreateHandler extends AbstractMutationHandler {
             ->where('c_posting_id', $pk['c_posting_id'])
             ->first();
 
+        // AI 自動填：使用者實際提交後回寫 ai_fill_logs（見 recordAiFillSubmission）。
+        $this->recordAiFillSubmission($meta, $personId, $writable, $addr);
+
         return response()->json([
             'ok' => true,
             'resource' => 'postings',
@@ -208,5 +213,53 @@ class PostingCreateHandler extends AbstractMutationHandler {
                 'operation_id' => $operation?->id,
             ],
         ]);
+    }
+
+    /**
+     * AI 自動填任官：使用者實際提交（direct create）後，把提交的表單資料回寫 ai_fill_logs
+     * （user_submitted + submitted_at），使 /admin/ai-fill-logs 正確顯示「已提交」。
+     *
+     * 背景：舊 Blade offices/store 以 ai_fill_log_id 回寫；React 遷移（2026-06-26 上線）改走
+     * v2 mutation 後遺漏此步，導致上線後所有經 AI 自動填的任官日誌一律誤顯示「Not Submitted」，
+     * 與使用者是否人工修改過 AI 建議無關（以 log id 連結、不比對欄位值）。
+     *
+     * 守衛：
+     * - log id 由前端經 meta.ai_fill_log_id 傳入；非正整數則略過。
+     * - WHERE 以 id + user_id(Auth) + category='posting' + c_personid 四重限定：user_id 防止覆寫
+     *   他人日誌，category 防止誤寫非任官日誌，c_personid 確保只回寫「同一人物」的日誌（此處
+     *   $personId 為 handler 已知的權威值，非舊路徑那種脆弱的 request 推導，故可安全保留此守衛，
+     *   避免把 A 人物的 AI 日誌誤標為在 B 人物存檔時已提交）。
+     * - Schema::hasTable 守衛，使無 ai_fill_logs 的既有測試不受影響。
+     * - 任何例外只記 warning、不影響主流程（任官已成功寫入）。
+     *
+     * 註：proposal 模式於核准時才落庫，不在此回寫（另計）。
+     */
+    protected function recordAiFillSubmission(array $meta, int $personId, array $writable, array $addr): void {
+        $logId = $meta['ai_fill_log_id'] ?? null;
+        if (!is_numeric($logId) || (int) $logId <= 0) {
+            return;
+        }
+
+        if (!Schema::hasTable('ai_fill_logs')) {
+            return;
+        }
+
+        try {
+            $submitted = $writable;
+            $submitted['c_addr'] = array_values($addr);
+
+            DB::table('ai_fill_logs')
+                ->where('id', (int) $logId)
+                ->where('user_id', Auth::id())
+                ->where('category', 'posting')
+                ->where('c_personid', $personId)
+                ->update([
+                    'user_submitted' => json_encode($submitted, JSON_UNESCAPED_UNICODE),
+                    'submitted_at' => Carbon::now(),
+                    'updated_at' => Carbon::now(),
+                ]);
+        } catch (\Throwable $e) {
+            Log::warning('[AI Fill Log] v2 任官提交回寫失敗: '.$e->getMessage());
+        }
     }
 }

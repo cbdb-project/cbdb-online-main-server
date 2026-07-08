@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use PDO;
 
 class ExportMysqlToSqlite extends Command {
@@ -65,6 +66,32 @@ class ExportMysqlToSqlite extends Command {
      * @var array
      */
     protected $tableMetadata = [];
+
+    /**
+     * 軟刪除標記（見 App\Services\Mutations\BiogMainDeleteHandler::DELETE_MARKER）。
+     * 匯出時：
+     *   1. BIOG_MAIN 本身排除 c_name_chn 為此標記的列；
+     *   2. 其餘表中，所有指向 BIOG_MAIN.c_personid 的欄位（包含 c_personid 本身，
+     *      以及 ASSOC_DATA.c_kin_id、KIN_DATA.c_kin_id 等透過 FK 宣告的關係欄位）
+     *      排除該欄位屬於上述已刪除人物的列，
+     * 避免已刪除人物的資料或其與他人的關係外流到公開釋出檔。
+     *
+     * @var string
+     */
+    protected const DELETED_NAME_MARKER = '<待删除>';
+
+    /**
+     * 額外的人物 ID 欄位對照表：用於資料庫中「語意上」指向 BIOG_MAIN.c_personid，
+     * 但因故未宣告正式 FK、無法透過 information_schema 自動偵測的欄位。
+     * 例如 MERGED_PERSON_DATA.c_merged_from_personid（重複人物合併來源，見遷移
+     * database/migrations/2025_11_12_140940_rename_merged_to_personid_column_in_merged_person_data_table.php）。
+     * 新增此類欄位前應優先確認資料庫端是否能補上正式 FK，讓自動偵測涵蓋。
+     *
+     * @var array<string, array<int, string>>
+     */
+    protected const EXTRA_PERSON_ID_COLUMNS = [
+        'MERGED_PERSON_DATA' => ['c_merged_from_personid'],
+    ];
 
     /**
      * Execute the console command.
@@ -140,7 +167,7 @@ class ExportMysqlToSqlite extends Command {
      */
     protected function validateSourceConnection() {
         try {
-            $driver = DB::connection($this->sourceConnection)->getDriverName();
+            $driver = $this->getSourceDriver();
 
             if ($driver !== 'mysql') {
                 $this->error(sprintf('源数据库必须是 MySQL，当前是: %s', $driver));
@@ -923,6 +950,7 @@ class ExportMysqlToSqlite extends Command {
         try {
             $query = DB::connection($this->sourceConnection)
                 ->table($tableName);
+            $this->excludeSoftDeletedPersons($tableName, $query);
 
             $chunkCallback = function ($rows) use (
                 $tableName,
@@ -1182,18 +1210,137 @@ class ExportMysqlToSqlite extends Command {
     }
 
     /**
-     * 计算数据表的总行数
+     * 计算数据表的总行数。
+     *
+     * 建立過濾條件（excludeSoftDeletedPersons，含 MySQL information_schema 查詢）刻意放在
+     * try/catch 之外：該查詢若失敗必須直接中斷匯出，不可被下方「統計失敗就降級為 0」的
+     * 容錯邏輯吞掉，否則已刪除人物的關係欄位可能在未被察覺的情況下外流。
+     * try/catch 僅保護 COUNT(*) 本身的執行（逾時、鎖等統計性失敗），這類失敗只影響
+     * 進度條與 --limit-records 估算，不影響實際匯出資料是否已正確過濾。
      */
     protected function getTableRowCount($tableName) {
+        $query = DB::connection($this->sourceConnection)->table($tableName);
+        $this->excludeSoftDeletedPersons($tableName, $query);
+
         try {
-            return (int) DB::connection($this->sourceConnection)
-                ->table($tableName)
-                ->count();
+            return (int) $query->count();
         } catch (\Exception $e) {
             $this->warn(sprintf('⚠ 无法统计表 %s 行数: %s', $tableName, $e->getMessage()));
 
             return 0;
         }
+    }
+
+    /**
+     * 排除已被軟刪除人物的資料列，避免其外流到公開釋出檔：
+     *   - BIOG_MAIN 本身：排除 c_name_chn = DELETED_NAME_MARKER 的列。
+     *   - 其餘表：排除所有指向 BIOG_MAIN.c_personid 的欄位（見 getPersonIdColumnsForTable()）
+     *     屬於上述已刪除人物的列，涵蓋該人物自己的資料列，以及他人紀錄中提及該人物的
+     *     關係欄位（如 KIN_DATA.c_kin_id、ASSOC_DATA.c_assoc_id 等）。
+     *   - 沒有任何人物 ID 欄位的表（代碼表等）不受影響。
+     * 相關欄位為 NULL 時不視為已刪除，予以保留；一列只要有任一欄位命中已刪除人物即排除。
+     *
+     * @param string $tableName
+     * @param \Illuminate\Database\Query\Builder $query
+     * @return \Illuminate\Database\Query\Builder
+     */
+    protected function excludeSoftDeletedPersons($tableName, $query) {
+        if ($tableName === 'BIOG_MAIN') {
+            return $query->where(function ($q) {
+                $q->where('c_name_chn', '!=', self::DELETED_NAME_MARKER)
+                    ->orWhereNull('c_name_chn');
+            });
+        }
+
+        $personIdColumns = $this->getPersonIdColumnsForTable($tableName);
+
+        if (empty($personIdColumns)) {
+            return $query;
+        }
+
+        return $query->where(function ($q) use ($personIdColumns) {
+            foreach ($personIdColumns as $column) {
+                $q->where(function ($columnQuery) use ($column) {
+                    $columnQuery->whereNull($column)
+                        ->orWhereNotIn($column, function ($sub) {
+                            $sub->select('c_personid')
+                                ->from('BIOG_MAIN')
+                                ->where('c_name_chn', self::DELETED_NAME_MARKER);
+                        });
+                });
+            }
+        });
+    }
+
+    /**
+     * 取得指定表中所有指向 BIOG_MAIN.c_personid 的欄位名稱：
+     *   1. 欄位名稱本身即為 c_personid（最常見的「擁有者」欄位）。
+     *   2. 透過 information_schema 偵測到的、正式宣告 FK 指向 BIOG_MAIN.c_personid 的欄位
+     *      （如 ASSOC_DATA.c_kin_id、ENTRY_DATA.c_assoc_id 等關係欄位）。
+     *   3. EXTRA_PERSON_ID_COLUMNS 中列出的例外欄位（未宣告 FK 但語意上仍指向人物）。
+     * 正式匯出時若 MySQL information_schema 查詢失敗，必須直接拋錯中止；僅當來源本來就不是
+     * MySQL（例如測試用 SQLite 連線）時，才略過第 2 點並回退為第 1、3 點。
+     *
+     * @param string $tableName
+     * @return array<int, string>
+     */
+    protected function getPersonIdColumnsForTable($tableName) {
+        $columns = [];
+
+        if (Schema::connection($this->sourceConnection)->hasColumn($tableName, 'c_personid')) {
+            $columns[] = 'c_personid';
+        }
+
+        // information_schema 僅 MySQL 來源可查詢；正式匯出的 sourceConnection 一律是 MySQL
+        // （見 validateSourceConnection()），此處若查詢失敗必須真的中斷匯出，不可悄悄降級，
+        // 否則可能讓已刪除人物的關係欄位在未被察覺的情況下外流。僅當來源本來就不是 MySQL
+        // （例如測試使用 SQLite 連線）才略過此步驟。
+        if ($this->sourceUsesInformationSchemaPersonReferences()) {
+            $columns = array_merge($columns, $this->getMysqlPersonIdColumnsFromInformationSchema($tableName));
+        }
+
+        foreach (self::EXTRA_PERSON_ID_COLUMNS[$tableName] ?? [] as $extraColumn) {
+            $columns[] = $extraColumn;
+        }
+
+        return array_values(array_unique($columns));
+    }
+
+    /**
+     * 取得來源資料庫 driver 名稱。
+     */
+    protected function getSourceDriver(): string {
+        return DB::connection($this->sourceConnection)->getDriverName();
+    }
+
+    /**
+     * 正式匯出時是否應依賴 MySQL information_schema 偵測人物 FK 欄位。
+     */
+    protected function sourceUsesInformationSchemaPersonReferences(): bool {
+        return $this->getSourceDriver() === 'mysql';
+    }
+
+    /**
+     * 透過 MySQL information_schema 取得所有 FK 指向 BIOG_MAIN.c_personid 的欄位。
+     *
+     * @param string $tableName
+     * @return array<int, string>
+     */
+    protected function getMysqlPersonIdColumnsFromInformationSchema($tableName): array {
+        $databaseName = DB::connection($this->sourceConnection)->getDatabaseName();
+        $rows = DB::connection($this->sourceConnection)->select(
+            'SELECT DISTINCT COLUMN_NAME FROM information_schema.KEY_COLUMN_USAGE '
+            . 'WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? '
+            . 'AND REFERENCED_TABLE_NAME = ? AND REFERENCED_COLUMN_NAME = ?',
+            [$databaseName, $tableName, 'BIOG_MAIN', 'c_personid']
+        );
+
+        $columns = [];
+        foreach ($rows as $row) {
+            $columns[] = $row->COLUMN_NAME;
+        }
+
+        return $columns;
     }
 
     /**

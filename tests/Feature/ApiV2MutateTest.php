@@ -568,6 +568,56 @@ class ApiV2MutateTest extends TestCase {
     }
 
     #[Test]
+    public function testBiogMainUpdateRejectsClearingMingziWhenOriginalNonEmpty() {
+        // 「不可清空」語義：名（中）／拼音名原值非空時，direct 與 proposal 清空一律 422（四路徑對齊）。
+        $this->actingAs($this->makeUser(email: 'biog-no-clear@example.com'));
+        $this->seedBiogMain();
+
+        foreach (['direct', 'proposal'] as $mode) {
+            foreach ([['c_mingzi_chn' => ''], ['c_mingzi_chn' => null], ['c_mingzi' => '']] as $changes) {
+                $this->postJson('/api/v2/mutate', [
+                    'resource' => 'basicinformation', 'person_id' => 138841, 'mode' => $mode, 'operation' => 'update',
+                    'target' => ['pk' => ['c_personid' => 138841]],
+                    'changes' => $changes,
+                ])->assertStatus(422);
+            }
+        }
+
+        // 資料未被清空，且未產生任何 pending 提案。
+        $this->assertDatabaseHas('BIOG_MAIN', ['c_personid' => 138841, 'c_mingzi_chn' => '忠', 'c_mingzi' => 'Zhong']);
+        $this->assertDatabaseCount('operations', 0);
+    }
+
+    #[Test]
+    public function testBiogMainUpdateAllowsKeepingMingziEmptyWhenOriginalEmpty() {
+        // 「不可清空」語義的另一半：原本即為空的人物，維持空並編輯其他欄位可照常保存（direct 與 proposal）。
+        $this->actingAs($this->makeUser(email: 'biog-keep-empty@example.com'));
+
+        foreach (['direct', 'proposal'] as $mode) {
+            DB::table('BIOG_MAIN')->where('c_personid', 138841)->delete();
+            $this->seedBiogMain(['c_mingzi_chn' => '', 'c_mingzi' => null, 'c_name_chn' => '張', 'c_name' => 'Zhang']);
+
+            $this->postJson('/api/v2/mutate', [
+                'resource' => 'basicinformation', 'person_id' => 138841, 'mode' => $mode, 'operation' => 'update',
+                'target' => ['pk' => ['c_personid' => 138841]],
+                'changes' => ['c_index_year' => $mode === 'direct' ? 1101 : 1102],
+                ...($mode === 'proposal' ? ['meta' => ['comment' => '僅改指數年']] : []),
+            ])->assertOk();
+
+            $row = DB::table('BIOG_MAIN')->where('c_personid', 138841)->first();
+            $this->assertSame('', trim((string) $row->c_mingzi_chn), $mode.'：名（中）應維持空');
+            if ($mode === 'direct') {
+                $this->assertSame(1101, (int) $row->c_index_year, 'direct：其他欄位應照常寫入');
+            } else {
+                $this->assertDatabaseHas('operations', [
+                    'resource' => 'BIOG_MAIN', 'c_personid' => 138841,
+                    'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+                ]);
+            }
+        }
+    }
+
+    #[Test]
     public function testSessionAuthenticatedUserCanMutateAltnameSequenceViaApiV2Mutate() {
         $user = $this->makeUser();
         $this->actingAs($user);

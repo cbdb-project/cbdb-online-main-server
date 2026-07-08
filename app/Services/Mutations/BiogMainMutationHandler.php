@@ -90,7 +90,7 @@ class BiogMainMutationHandler extends AbstractMutationHandler {
             return $this->handleProposalUpdate($personId, $updatedFields, $merged, $original, $meta);
         }
 
-        $validator = Validator::make($merged, $this->validationRules(false), $this->validationMessages());
+        $validator = Validator::make($merged, $this->validationRules($original), $this->validationMessages());
         if ($validator->fails()) {
             return $this->errorResponse('參數校驗失敗', 422, $validator->errors()->toArray());
         }
@@ -133,7 +133,7 @@ class BiogMainMutationHandler extends AbstractMutationHandler {
 
     protected function handleProposalUpdate(int $personId, array $updatedFields, array $merged, BiogMain $original, array $meta): JsonResponse {
         $proposalData = $this->prepareProposalPayload($merged);
-        $validator = Validator::make($proposalData, $this->validationRules(true), $this->validationMessages());
+        $validator = Validator::make($proposalData, $this->validationRules($original), $this->validationMessages());
         if ($validator->fails()) {
             return $this->errorResponse('參數校驗失敗', 422, $validator->errors()->toArray());
         }
@@ -215,12 +215,16 @@ class BiogMainMutationHandler extends AbstractMutationHandler {
         return (new ToolsRepository())->timestamp($payload);
     }
 
-    protected function validationRules(bool $isProposal): array {
+    protected function validationRules(BiogMain $original): array {
         $requestTemplate = new BasicInformationRequest();
         $rules = $requestTemplate->rules();
 
-        if ($isProposal) {
-            unset($rules['c_mingzi_chn'], $rules['c_mingzi']);
+        // 「不可清空」語義（direct 與 proposal 一致）：名（中）／拼音名原值非空才掛 required，
+        // 擋下顯式清空；原本即為空的人物可維持空、照常編輯其他欄位。兩欄獨立判斷。
+        foreach (['c_mingzi_chn', 'c_mingzi'] as $field) {
+            if (trim((string) ($original->{$field} ?? '')) === '') {
+                unset($rules[$field]);
+            }
         }
 
         return $rules;

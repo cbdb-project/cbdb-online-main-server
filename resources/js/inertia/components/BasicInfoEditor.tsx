@@ -223,17 +223,20 @@ export default function BasicInfoEditor({
     // 回傳 boolean：成功 true、驗證失敗／無變更／出錯 false。供切分頁「儲存並繼續」判斷是否可放行導航。
     const save = async (mode: 'direct' | 'proposal'): Promise<boolean> => {
         setSaving(true); setError(null); setMessage(null);
-        // 名（中）／拼音名必填（僅 direct：proposal 時後端會清掉這兩欄，故不擋提案）。空白即阻擋並提示。
-        if (mode === 'direct') {
-            if (!(fields.c_mingzi_chn ?? '').trim()) { setSaving(false); setError(tr('mingzi_chn_required', '「名（中）」為必填')); return false; }
-            if (!(fields.c_mingzi ?? '').trim()) { setSaving(false); setError(tr('mingzi_required', '「拼音名」為必填')); return false; }
+        const initial: Fields = JSON.parse(savedSnapshot);
+        // 名（中）／拼音名「不可清空」（direct 與 proposal 一致，後端同規則）：
+        // 原值非空、現值清空即阻擋；原本即為空的人物可維持空、照常編輯其他欄位。
+        if ((initial.c_mingzi_chn ?? '').trim() && !(fields.c_mingzi_chn ?? '').trim()) {
+            setSaving(false); setError(tr('mingzi_chn_no_clear', '「名（中）」不可清空')); return false;
+        }
+        if ((initial.c_mingzi ?? '').trim() && !(fields.c_mingzi ?? '').trim()) {
+            setSaving(false); setError(tr('mingzi_no_clear', '「拼音名」不可清空')); return false;
         }
         // 朝代 c_dy 必填（僅此基本資料編輯頁；其他編輯器的朝代維持非必填）。空（''/'0'）即阻擋並提示。
         if (!fields.c_dy || fields.c_dy === '0') {
             setSaving(false); setError(tr('dynasty_required', '朝代為必填欄位，請先選擇朝代')); return false;
         }
         // 只送與初始不同、且非唯讀派生的欄位。
-        const initial: Fields = JSON.parse(savedSnapshot);
         const changes: Record<string, string | null> = {};
         for (const [k, v] of Object.entries(fields)) {
             if (READONLY_DERIVED.includes(k)) continue;

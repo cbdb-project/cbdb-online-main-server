@@ -70,8 +70,8 @@ return [
     // basic_info 朝代必填。
     'required_field' => '必填',
     'dynasty_required' => '朝代為必填欄位，請先選擇朝代',
-    'mingzi_chn_required' => '「名（中）」為必填',
-    'mingzi_required' => '「拼音名」為必填',
+    'mingzi_chn_no_clear' => '「名（中）」不可清空',
+    'mingzi_no_clear' => '「拼音名」不可清空',
     'please_select_office' => '請選擇官名',
     'please_select_text' => '請選擇著述',
     // 主碼必填（階段1）：各編輯器主錨碼／對象人物必填，新增時拒絕空值/未詳(0)。

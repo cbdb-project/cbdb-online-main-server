@@ -21,7 +21,8 @@ interface Props {
     aiModel?: string;
     disabled?: boolean;
     t?: (k: string) => string;
-    onApply: (data: AiAutofillData) => void;
+    // 第二參數為 ai_fill_logs 的 log id（extract 回應於頂層回傳），供儲存時回寫「已提交」。
+    onApply: (data: AiAutofillData, aiFillLogId?: number | null) => void;
     onClear: () => void;
 }
 
@@ -49,7 +50,8 @@ export default function PostingAiAutofill({ personId, extractEndpoint, aiModel, 
                 throw new Error(json?.error?.message || json?.error || `HTTP ${res.status}`);
             }
             const data: AiAutofillData = json.data ?? {};
-            onApply(data);
+            const logId = typeof json.ai_fill_log_id === 'number' ? json.ai_fill_log_id : null;
+            onApply(data, logId);
             setStats(data.statistics ?? null);
             setApplied(true);
             setStatus({ kind: 'ok', msg: tr('ai_fill_done_status', 'AI 填充完成，請核對') });

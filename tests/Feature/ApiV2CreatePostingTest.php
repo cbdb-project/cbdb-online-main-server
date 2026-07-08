@@ -29,9 +29,11 @@ class ApiV2CreatePostingTest extends TestCase {
         $this->createOperationsTable();
         $this->createAuditLogTable();
         $this->createPostingTables();
+        $this->createAiFillLogsTable();
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('ai_fill_logs');
         Schema::dropIfExists('POSTED_TO_ADDR_DATA');
         Schema::dropIfExists('POSTED_TO_OFFICE_DATA');
         Schema::dropIfExists('POSTING_DATA');
@@ -155,6 +157,40 @@ class ApiV2CreatePostingTest extends TestCase {
             $table->string('c_created_by', 255)->nullable();
             $table->string('c_created_date', 255)->nullable();
         });
+    }
+
+    protected function createAiFillLogsTable(): void {
+        Schema::create('ai_fill_logs', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->unsignedBigInteger('user_id');
+            $table->integer('c_personid');
+            $table->string('category', 20)->default('posting');
+            $table->string('route_name', 255)->nullable();
+            $table->string('route_url', 500)->nullable();
+            $table->text('source_text')->nullable();
+            $table->longText('ai_raw')->nullable();
+            $table->longText('ai_matched')->nullable();
+            $table->longText('user_submitted')->nullable();
+            $table->boolean('success')->default(false);
+            $table->timestamp('submitted_at')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    /** 建立一筆待提交的 AI 填充日誌，回傳 log id。 */
+    protected function insertAiFillLog(int $userId, int $personId = 1000, string $category = 'posting'): int {
+        return DB::table('ai_fill_logs')->insertGetId([
+            'user_id' => $userId,
+            'c_personid' => $personId,
+            'category' => $category,
+            'route_name' => 'app.basicinformation.office.edit',
+            'route_url' => '/app/basicinformation/'.$personId.'/office',
+            'source_text' => '至和年間知某縣',
+            'ai_matched' => json_encode(['matched_fields' => []]),
+            'success' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     protected function makeUser(int $status = User::STATUS_ACTIVE, int $role = User::ROLE_REGULAR, string $email = 'create-post-tester@example.com'): User {
@@ -325,6 +361,93 @@ class ApiV2CreatePostingTest extends TestCase {
         $audit = DB::table('audit_log')->where('table_name', 'POSTED_TO_OFFICE_DATA')->first();
         $this->assertNotNull($audit);
         $this->assertSame('INSERT', $audit->operation);
+    }
+
+    #[Test]
+    public function testDirectPostingCreateWithAiFillLogIdMarksLogSubmitted(): void {
+        // 回歸：React 遷移後，v2 direct create 未回寫 ai_fill_logs → /admin/ai-fill-logs 全部誤顯示
+        // 「Not Submitted」。修法：meta.ai_fill_log_id 傳入時回寫 user_submitted + submitted_at。
+        $user = $this->makeUser(email: 'create-post-ailog@example.com');
+        $this->actingAs($user);
+
+        $logId = $this->insertAiFillLog($user->id);
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'meta' => ['ai_fill_log_id' => $logId],
+        ]))->assertOk();
+
+        $log = DB::table('ai_fill_logs')->where('id', $logId)->first();
+        $this->assertNotNull($log->user_submitted, 'user_submitted 應回寫（已提交）');
+        $this->assertNotNull($log->submitted_at, 'submitted_at 應回寫');
+
+        $submitted = json_decode($log->user_submitted, true);
+        // 使用者實際提交的欄位值（不論是否人工修改過 AI 建議，皆以 log id 連結、原樣記錄）。
+        $this->assertSame(87473, (int) $submitted['c_office_id']);
+        $this->assertSame([130], $submitted['c_addr']);
+    }
+
+    #[Test]
+    public function testDirectPostingCreateWithoutAiFillLogIdLeavesLogUntouched(): void {
+        // 未使用 AI 自動填（無 meta.ai_fill_log_id）時，不得誤動任何既有日誌。
+        $user = $this->makeUser(email: 'create-post-noailog@example.com');
+        $this->actingAs($user);
+
+        $logId = $this->insertAiFillLog($user->id);
+
+        $this->postJson('/api/v2/create', $this->createPayload())->assertOk();
+
+        $log = DB::table('ai_fill_logs')->where('id', $logId)->first();
+        $this->assertNull($log->user_submitted, '無 log id 不應回寫');
+        $this->assertNull($log->submitted_at);
+    }
+
+    #[Test]
+    public function testAiFillLogNotOverwrittenForOtherUsersLog(): void {
+        // 安全：只能回寫自己的日誌。傳入他人的 log id 不得覆寫（WHERE user_id 守衛）。
+        $owner = $this->makeUser(email: 'create-post-ailog-owner@example.com');
+        $actor = $this->makeUser(email: 'create-post-ailog-actor@example.com');
+        $logId = $this->insertAiFillLog($owner->id);
+
+        $this->actingAs($actor);
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'meta' => ['ai_fill_log_id' => $logId],
+        ]))->assertOk();
+
+        $log = DB::table('ai_fill_logs')->where('id', $logId)->first();
+        $this->assertNull($log->user_submitted, '他人日誌不得被覆寫');
+    }
+
+    #[Test]
+    public function testAiFillLogNotOverwrittenForDifferentPerson(): void {
+        // 連結完整性：只回寫「同一人物」的日誌。log 屬於人物 999，卻在人物 1000 存檔時帶入其 log id，
+        // c_personid 守衛應擋下（$personId 為 handler 權威值，非脆弱推導）。
+        $user = $this->makeUser(email: 'create-post-ailog-person@example.com');
+        $this->actingAs($user);
+        $logId = $this->insertAiFillLog($user->id, 999);
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'person_id' => 1000,
+            'meta' => ['ai_fill_log_id' => $logId],
+        ]))->assertOk();
+
+        $log = DB::table('ai_fill_logs')->where('id', $logId)->first();
+        $this->assertNull($log->user_submitted, '不同人物的日誌不得被回寫');
+    }
+
+    #[Test]
+    public function testProposalPostingCreateDoesNotRecordAiFillSubmission(): void {
+        // 提案模式於核准時才落庫，提交當下不回寫 user_submitted（另計）。
+        $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'create-post-ailog-proposal@example.com');
+        $this->actingAs($user);
+        $logId = $this->insertAiFillLog($user->id);
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'mode' => 'proposal',
+            'meta' => ['ai_fill_log_id' => $logId],
+        ]))->assertOk();
+
+        $log = DB::table('ai_fill_logs')->where('id', $logId)->first();
+        $this->assertNull($log->user_submitted, 'proposal 提交當下不回寫');
     }
 
     #[Test]

@@ -138,6 +138,7 @@ return [
 
     'apply_filters' => 'Apply Filters',
     'clear_filters' => 'Clear Filters',
+    'sort_filter_requires_login' => 'Sorting and filtering require signing in with an activated account.',
     'download_full_table' => 'Download full table (.txt)',
     'search_tables' => 'Search tables…',
 

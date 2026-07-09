@@ -136,6 +136,7 @@ return [
 
     'apply_filters' => '套用篩選',
     'clear_filters' => '清除篩選',
+    'sort_filter_requires_login' => '排序與篩選功能需先登入已啟用的帳號。',
     'download_full_table' => '下載完整表（.txt）',
     'search_tables' => '搜尋表格…',
 

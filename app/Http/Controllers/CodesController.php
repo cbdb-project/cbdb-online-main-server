@@ -374,6 +374,12 @@ class CodesController extends Controller {
      */
     public function appShow(Request $request, $table_name) {
         $table = $this->guardTable($table_name);
+
+        $guardRedirect = $this->guardSortFilterRequiresAuth($request);
+        if ($guardRedirect !== null) {
+            return $guardRedirect;
+        }
+
         $search = trim((string) $request->query('search', ''));
 
         try {
@@ -479,6 +485,50 @@ class CodesController extends Controller {
 
         // 其餘（edit/destroy，P2-4）就緒前一律回退舊 Blade 路徑。
         return '/codes/' . $table . '/' . $action;
+    }
+
+    /**
+     * app/codes/{table_name}（React/Inertia 版）專用：若請求帶 sort_by 或非空 filters[...]，
+     * 且使用者未登入，導向登入頁（記錄 intended URL，登入後彈回原網址）。
+     *
+     * 判定為簡化版，不重現 buildShowPayload() 內 sanitizeSortParameters()/sanitizeColumnFilters()
+     * 的欄位白名單檢查（那時候還沒查出 $thead），寧可誤擋不存在的欄位名，不可漏放真正的排序/篩選。
+     * 只接在 appShow()，Blade 版 show() 不呼叫此方法。見 docs/CODES_SORT_FILTER_AUTH_GATE.md §4.1、4.2。
+     */
+    protected function guardSortFilterRequiresAuth(Request $request): ?RedirectResponse {
+        $hasSortBy = trim((string) $request->query('sort_by', '')) !== '';
+
+        $hasFilter = false;
+        $filters = $request->query('filters', []);
+        if (is_array($filters)) {
+            foreach ($filters as $value) {
+                if (is_scalar($value) && trim((string) $value) !== '') {
+                    $hasFilter = true;
+
+                    break;
+                }
+            }
+        }
+
+        if (!$hasSortBy && !$hasFilter) {
+            return null;
+        }
+
+        if (!Auth::check()) {
+            return redirect()->guest(route('login'));
+        }
+
+        // 「已登入」不等於「owner 手動激活」，兩者在本 controller 一貫分開判定
+        // （見 ensureEditableAccess()）。login 路由掛 guest middleware，若對已登入但未
+        // 激活的使用者導向 route('login')，會被 guest middleware 彈到別處、訊息消失，
+        // 因此走 flash + redirect back，跟既有的未激活擋寫入邏輯一致。
+        if (!Auth::user()->isActive()) {
+            flash('該用戶沒有權限使用排序／篩選功能，請聯絡管理員 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        return null;
     }
 
     /**

@@ -242,20 +242,22 @@ class AiFillLogController extends Controller {
             $aiDisplay = $this->formatValue($aiText);
             $userDisplay = $this->formatValue($userValue);
 
+            // 判斷是否匹配（用原始值比較；normalizeForCompare 會把表單預設 0 視為空）
+            $aiCompare = $this->normalizeForCompare($aiValue);
+            $userCompare = $this->normalizeForCompare($userValue);
+            $matches = ($aiCompare === $userCompare);
+
+            // 若 AI 沒有給值、且用戶值正規化後為空（含表單預設 0／''／null），跳過此欄位。
+            // 這會濾掉像「始年閏月 0」「終年閏月 0」「是否赴任 0」這類純預設值列，
+            // 避免它們污染比較表。（AI 有給顯示值時仍保留，以便呈現 AI 建議 vs 用戶預設的差異。）
+            if ($aiDisplay === '' && $userCompare === '') {
+                continue;
+            }
+
             // 若用戶提交的是代碼，附上中文名稱
             if (isset($codeLabels[$field]) && $userDisplay !== '') {
                 $userDisplay = $userDisplay.' ('.$codeLabels[$field].')';
             }
-
-            // 若兩者都為空，跳過此欄位
-            if ($aiDisplay === '' && $userDisplay === '') {
-                continue;
-            }
-
-            // 判斷是否匹配（用原始值比較）
-            $aiCompare = $this->normalizeForCompare($aiValue);
-            $userCompare = $this->normalizeForCompare($userValue);
-            $matches = ($aiCompare === $userCompare);
 
             $rows[] = [
                 'field' => $label,

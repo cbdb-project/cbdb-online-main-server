@@ -71,6 +71,10 @@ export default function CodesShow() {
     const [filters, setFilters] = useState<Record<string, string>>(props.filters ?? {});
     const [deleteId, setDeleteId] = useState<string | null>(null);
 
+    // 排序／篩選需已登入且已啟用的帳號（見 docs/CODES_SORT_FILTER_AUTH_GATE.md）；
+    // 純 UX 提示，非防線——後端 guardSortFilterRequiresAuth() 才是唯一有效防線。
+    const canSortOrFilter = Boolean(props.auth?.user?.roles?.is_active);
+
     const path = typeof window !== 'undefined' ? window.location.pathname : urls.index;
 
     const reload = (params: Params) =>
@@ -101,7 +105,10 @@ export default function CodesShow() {
         if (boolean_enabled) params.filter_bool = 1;
         reload(params);
     };
-    const applyFilters = () => visit({ page: 1 });
+    const applyFilters = () => {
+        if (!canSortOrFilter) return;
+        visit({ page: 1 });
+    };
     const clearFilters = () => {
         setFilters({});
         const params: Params = {};
@@ -111,6 +118,7 @@ export default function CodesShow() {
     };
 
     const toggleSort = (col: string) => {
+        if (!canSortOrFilter) return;
         let nextBy = col;
         let nextDir: 'asc' | 'desc' | '' = 'asc';
         if (sort_by === col) {
@@ -204,10 +212,21 @@ export default function CodesShow() {
                     )}
                 </form>
                 {!use_cursor && (
-                    <Button type="button" size="sm" onClick={applyFilters}>{t('apply_filters')}</Button>
+                    <Button
+                        type="button"
+                        size="sm"
+                        onClick={applyFilters}
+                        disabled={!canSortOrFilter}
+                        title={canSortOrFilter ? undefined : t('sort_filter_requires_login')}
+                    >
+                        {t('apply_filters')}
+                    </Button>
                 )}
                 {(Object.keys(props.filters).length > 0 || sort_by) && (
                     <Button type="button" size="sm" variant="secondary" onClick={clearFilters}>{t('clear_filters')}</Button>
+                )}
+                {!canSortOrFilter && (
+                    <span className="text-xs text-muted-foreground">{t('sort_filter_requires_login')}</span>
                 )}
                 {can_edit && (
                     <a href={urls.create} className="inline-flex items-center rounded-md border border-input px-3 py-1.5 text-sm hover:bg-muted">
@@ -272,7 +291,12 @@ export default function CodesShow() {
                         <tr>
                             {thead.map((col) => (
                                 <th key={col} className="whitespace-nowrap px-3 py-2 text-left font-medium">
-                                    <button type="button" className="hover:underline" onClick={() => toggleSort(col)}>
+                                    <button
+                                        type="button"
+                                        className={cn('hover:underline', !canSortOrFilter && 'cursor-not-allowed opacity-60 hover:no-underline')}
+                                        onClick={() => toggleSort(col)}
+                                        title={canSortOrFilter ? undefined : t('sort_filter_requires_login')}
+                                    >
                                         {joined_columns.includes(col) ? `(${col})` : col} <span aria-hidden>{sortIcon(col)}</span>
                                     </button>
                                     {key_columns.includes(col) && (

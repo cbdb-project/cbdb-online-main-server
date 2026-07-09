@@ -103,6 +103,7 @@ php artisan cbdb:fetch-chgis-map        # 下載 CHGIS 底圖（缺檔才下載�
 - `POSTED_TO_ADDR_DATA` 的 `resource_id` 會沿用 `POSTED_TO_OFFICE_DATA` 格式，地址明細存於 `resource_data['rows']`。
 - 與時間欄位有關的修改，請注意 `DB_TIMEZONE` 必須與 `APP_TIMEZONE` 對齊；資料庫時區使用數字偏移，例如 `+08:00`。
 - 若測試需自行建表，請補齊必要主鍵、nullable、timestamps；很多回歸都來自測試表結構過度簡化。
+- `app/codes/{table_name}`（`CodesController@appShow`）帶 `sort_by`／`filters[...]` 時需登入且 `Auth::user()->isActive()`（見 `guardSortFilterRequiresAuth()`）；**Blade 版 `codes/{table_name}`（`show()`）未同步處理**，若把 `codes` migration flag 切回 `old` 會重新暴露無門檻的深分頁排序查詢，需重新評估。詳見 [docs/CODES_SORT_FILTER_AUTH_GATE.md](./docs/CODES_SORT_FILTER_AUTH_GATE.md)。
 
 ## 文檔維護原則
 - `AGENTS.md` 只保留目前有效的規則與入口，不記錄已淘汰的歷史流程。

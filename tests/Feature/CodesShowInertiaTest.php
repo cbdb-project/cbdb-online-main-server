@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -66,8 +68,19 @@ class CodesShowInertiaTest extends TestCase {
 
     #[Test]
     public function it_applies_column_filter(): void {
+        // §CODES_SORT_FILTER_AUTH_GATE：帶 filters 需已激活登入使用者，見該計畫文件 M2。
+        $this->actingAs($this->activeUser());
+
         $this->get(route('app.codes.show', ['table_name' => 'TEST_CODES', 'filters' => ['description' => 'beta']]))
             ->assertInertia(fn (Assert $page) => $page->has('rows', 1));
+    }
+
+    private function activeUser(string $name = 'active', int $id = 21): User {
+        $user = new User(['name' => $name, 'email' => $name.'@example.com', 'confirmation_token' => Str::random(32)]);
+        $user->id = $id;
+        $user->is_active = 1;
+
+        return $user;
     }
 
     #[Test]

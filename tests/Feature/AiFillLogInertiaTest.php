@@ -124,6 +124,57 @@ class AiFillLogInertiaTest extends TestCase {
     }
 
     #[Test]
+    public function it_omits_default_zero_only_fields_from_comparison(): void {
+        $admin = $this->makeSuperAdmin();
+
+        // AI 只匹配到 c_firstyear；用戶提交除了 c_firstyear 外還帶著表單預設 0
+        // 的欄位（始年閏月／終年閏月／是否赴任）。這些純預設值列不應出現在比較表。
+        $this->seedLog($admin->id, [
+            'ai_matched' => json_encode([
+                'statistics' => ['matched_count' => 1],
+                'matched_fields' => ['c_firstyear' => ['value' => '1050', 'text' => '1050']],
+            ]),
+            'user_submitted' => json_encode([
+                'c_firstyear' => '1050',
+                'c_fy_intercalary' => 0,
+                'c_ly_intercalary' => 0,
+                'c_assume_office_code' => 0,
+            ]),
+        ]);
+
+        $this->actingAs($admin)->get(route('app.admin.ai-fill-logs'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('logs.data.0.comparison_rows', 1)
+                ->where('logs.data.0.comparison_rows.0.field_key', 'c_firstyear'));
+    }
+
+    #[Test]
+    public function it_keeps_field_when_ai_suggests_but_user_left_default_zero(): void {
+        $admin = $this->makeSuperAdmin();
+
+        // AI 對 c_fy_month 有建議值，但用戶留下預設 0：此列仍應保留以呈現差異。
+        $this->seedLog($admin->id, [
+            'ai_matched' => json_encode([
+                'statistics' => ['matched_count' => 1, 'suggested_count' => 1],
+                'matched_fields' => ['c_firstyear' => ['value' => '1050', 'text' => '1050']],
+                'suggested_fields' => ['c_fy_month' => ['value' => '5', 'text' => '5']],
+            ]),
+            'user_submitted' => json_encode([
+                'c_firstyear' => '1050',
+                'c_fy_month' => 0,
+            ]),
+        ]);
+
+        $this->actingAs($admin)->get(route('app.admin.ai-fill-logs'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('logs.data.0.comparison_rows', 2)
+                ->where('logs.data.0.comparison_rows.1.field_key', 'c_fy_month')
+                ->where('logs.data.0.comparison_rows.1.ai_value', '5')
+                // 用戶留預設 0 vs AI 建議 5：正規化後視為不相符，仍應呈現差異。
+                ->where('logs.data.0.comparison_rows.1.matches', false));
+    }
+
+    #[Test]
     public function non_super_admin_gets_403(): void {
         $expert = User::create([
             'name' => 'Exp', 'email' => 'e@example.com', 'password' => bcrypt('x'),

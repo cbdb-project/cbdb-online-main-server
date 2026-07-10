@@ -355,6 +355,52 @@ class BiogMainNameSearchTest extends TestCase {
     }
 
     #[Test]
+    public function test_pinyin_search_not_hijacked_by_stray_latin_fts_row(): void {
+        // 迴歸（正式環境 /app/basicinformation 實際走的 namesByQuery 路徑）：CBDB__NAME_FTS 只索引
+        // 中文，但索引中偶有夾帶拉丁子字串的外文名（如 "Lves…"）。拼音 "lv" 曾以 LIKE 'lv%' 誤命中
+        // 該雜訊列、短路 FTS 分支（whereIn 只含那 1 筆），跳過能命中姓呂(Lü)的拼音 LIKE 回退，
+        // 造成「搜 lv／lü 只有一筆、查不到大量姓呂的人，但搜 zhang 卻正常」。
+        // 修法：拉丁查詢不走中文 FTS，一律改走多欄位 LIKE 回退。
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 5010,
+            'c_name_chn' => '呂大防',
+            'c_name' => 'Lü Dafang',
+            'c_surname' => 'Lü',      // 遷移後以正字 ü 儲存的羅馬字姓
+            'c_mingzi' => 'Dafang',
+            'c_index_year' => 1027,
+            'c_dy' => 15,
+            'c_index_addr_id' => 100,
+        ]);
+        // 夾帶拉丁子字串的外文名（模擬 c_name_chn 內含 "Lves"）＋對應的雜訊 FTS 列。
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 5011,
+            'c_name_chn' => 'Lves',
+            'c_name' => 'Lves',
+            'c_surname' => 'Lves',
+            // 刻意用與呂大防(5010, c_dy=15)不同的朝代，讓朝代分面斷言具鑑別力：
+            // 修正前 facet 只會有雜訊列 5011 的朝代 16、缺 15；修正後才會出現 15。
+            'c_dy' => 16,
+        ]);
+        $now = now();
+        DB::table('CBDB__NAME_FTS')->insert([
+            ['c_personid' => 5011, 'name_type_code' => null, 'name_type_desc' => 'main_name', 'name_type_desc_chn' => '本名', 'search_term' => 'lves', 'full_name' => 'Lves', 'source' => 'biog_main', 'source_key' => 'biog_main:5011', 'is_simplified' => 0, 'created_at' => $now, 'updated_at' => $now],
+        ]);
+
+        $idsFor = fn (string $q): array => collect(
+            BiogMainRepository::namesByQuery(new Request(['q' => $q]), 20)->items()
+        )->pluck('c_personid')->map(fn ($id) => (int) $id)->all();
+
+        $this->assertContains(5010, $idsFor('lv'), '拼音 "lv" 應命中以 ü 儲存的呂大防(5010)，不應被雜訊 FTS 列 "lves" 短路排除');
+        $this->assertContains(5010, $idsFor('lü'), '拼音 "lü" 亦應命中呂大防(5010)');
+
+        // 側欄朝代分面須與人物列表同口徑（同樣繞過雜訊 FTS），否則列表有呂大防、側欄卻漏計。
+        // 修正前 facet 走 FTS→只含雜訊列 5011 的朝代 16、缺 15，故此斷言在修正前會失敗。
+        $facetDynasties = BiogMainRepository::dynastyFacetsByQuery('lv')
+            ->pluck('c_dy')->map(fn ($d) => (int) $d)->all();
+        $this->assertContains(15, $facetDynasties, '拼音 "lv" 的朝代分面應含呂大防(5010)所屬朝代 15，與列表一致');
+    }
+
+    #[Test]
     public function test_pinyin_normalizer_helper(): void {
         // ü／Ü 折成 v／V；中文／無 ü 字串為 no-op；null 安全。
         $this->assertSame('Lv Zhen', \App\Support\PinyinSearchNormalizer::umlautToV('Lü Zhen'));

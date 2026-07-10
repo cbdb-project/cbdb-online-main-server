@@ -31,6 +31,18 @@ class PinyinSearchNormalizer {
     }
 
     /**
+     * 查詢是否應走「中文姓名」倒排索引（CBDB__NAME_FTS）。
+     *
+     * FTS 只索引中文字後綴。拼音／拉丁字母查詢不應查它：索引中偶有夾帶拉丁子字串的外文名
+     * （例如某人 c_name_chn 含 "Lves…"），拼音輸入（如 "lv"）會以 LIKE 'lv%' 誤命中這類雜訊、
+     * 拿到極少數 id 後短路，跳過能命中全部呂（Lü）姓的拼音 LIKE 回退，導致「搜 lv／lü 查不到
+     * 大量姓呂的人，但搜 zhang 卻正常」。故僅含 Han 字（中文）的查詢才走 FTS，其餘走 LIKE 回退。
+     */
+    public static function isChineseQuery(?string $term): bool {
+        return preg_match('/\p{Han}/u', (string) $term) === 1;
+    }
+
+    /**
      * 查詢展開：回傳應以 OR 同時比對的拼音形式（去重、保序）。
      *
      * 三個來源形式：

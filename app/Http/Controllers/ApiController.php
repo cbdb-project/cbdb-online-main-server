@@ -458,13 +458,18 @@ class ApiController extends Controller {
             $data = BiogMain::where('c_personid', '=', $request->q)->paginate($num);
         } else {
             // 優化2：使用 CBDB__NAME_FTS 倒排索引表進行高效前綴匹配
-            $personIds = DB::table('CBDB__NAME_FTS')
-                ->where('search_term', 'LIKE', $request->q . '%')
-                ->orderByRaw('LENGTH(search_term) ASC')  // 優先精確匹配
-                ->limit(500)  // 限制最多 500 個候選人
-                ->pluck('c_personid')
-                ->unique()
-                ->toArray();
+            // 僅中文查詢走 FTS；拼音／拉丁查詢直接落到下方 LIKE 回退（見 isChineseQuery 說明：
+            // 否則 "lv" 會誤命中索引中夾帶的拉丁子字串而短路，查不到姓呂的人）。
+            $personIds = [];
+            if (\App\Support\PinyinSearchNormalizer::isChineseQuery($request->q)) {
+                $personIds = DB::table('CBDB__NAME_FTS')
+                    ->where('search_term', 'LIKE', $request->q . '%')
+                    ->orderByRaw('LENGTH(search_term) ASC')  // 優先精確匹配
+                    ->limit(500)  // 限制最多 500 個候選人
+                    ->pluck('c_personid')
+                    ->unique()
+                    ->toArray();
+            }
 
             if (!empty($personIds)) {
                 // 使用 FIELD() 排序保持匹配質量順序

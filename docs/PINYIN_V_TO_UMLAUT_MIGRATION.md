@@ -59,7 +59,7 @@
 - **D-9c `ADDRESSES` 派生表：** 改完 `ADDR_CODES` 後以 `cbdb:regenerate-addresses-table`（生產、MySQL-only）**重建**。
 
 ### D-10 最後一步（Phase A 收尾，資料清乾淨後執行）
-- 自 `config/codes.php` 的 `ui_hidden` **移除 `'pinyin'`**（重新顯示姓氏拼音表）為**既定計畫的一環**，**非另需人工決定**。
+- 自 `config/codes.php` 的 `ui_hidden` **移除 `'pinyin'`**（重新顯示姓氏／單字拼音對照表，見 [PINYIN_TABLE_CONSOLIDATION_PLAN.md](./PINYIN_TABLE_CONSOLIDATION_PLAN.md)）為**既定計畫的一環**，**非另需人工決定**。
 - **移除 M2 掃描指令 `cbdb:scan-pinyin-v`**（採 Frank #1087@L83：盤點屬一次性工作、不需常設指令）：刪除 `app/Console/Commands/ScanPinyinV.php`、`tests/Feature/ScanPinyinVTest.php`、`app/Console/Kernel.php` 的註冊列，作為整個 Phase A 的**最後一個小環節**。（`app/Support/PinyinUmlaut.php` 為止血與查詢展開共用，**保留**。）
 
 ### D-11 執行實測結果與最終機制定案（全量生產 dry-run + execute 後回填）
@@ -130,7 +130,7 @@ CBDB 拼音規範長期以 `v` 代替 `ü`（如 `呂 = Lv`、`閭丘 = Lvqiu`�
 
 > 此節是「搜尋兼容為何可延後」的依據。
 
-- **collation 事實**：生產環境 MariaDB 的 `utf8mb4_general_ci` 與 `utf8mb4_unicode_ci` **皆為 accent-insensitive，會把 `ü` 摺疊成 `u`**。受影響欄位 `c_surname`、`c_mingzi`、`pinyin.lastname_pinyin`、`c_alt_name` 為 general_ci，`c_name` 為 unicode_ci，兩者都折疊。
+- **collation 事實**：生產環境 MariaDB 的 `utf8mb4_general_ci` 與 `utf8mb4_unicode_ci` **皆為 accent-insensitive，會把 `ü` 摺疊成 `u`**。受影響欄位 `c_surname`、`c_mingzi`、`pinyin.c_pinyin`、`c_alt_name` 為 general_ci，`c_name` 為 unicode_ci，兩者都折疊。
 - **結論**：使用者**打 `u` 已能命中 `ü` 資料**，無需額外程式（Frank 線上實例：搜尋 `yelu` 命中 `Yelü`，符合預期）。因此把資料改成 `ü` **不會**讓既有以 `u` 搜尋的使用者失效。
 - **唯一兼容缺口：習慣打 `v` 的使用者**（如 `Lv`、`Yelv`）——`v` 不會被 collation 折疊成 `ü`。**建議採「查詢展開（query expansion）」：當使用者輸入含 `v` 的音節形式（`lv`/`lve`/`nv`/`nve`）時，系統同時以 `v` 形式與對應 `ü` 形式查詢（OR），而非把查詢中的 `v` 取代為 `ü`。**
   - 理由：在使用者查詢中**無法可靠區分** `lv` 是 `lü` 的代打、還是西文名（如 `Calvin`）的一部分；直接取代會選定單一解讀、可能讓含 `v` 的西文名查詢落空。同時查兩者最穩健——既命中已正規化的 `ü` 資料，也命中過渡期殘留的 `v` 形式與西文名。
@@ -234,5 +234,5 @@ CBDB 拼音規範長期以 `v` 代替 `ü`（如 `呂 = Lv`、`閭丘 = Lvqiu`�
 - [~] 階段 B：批次遷移工具已建（`cbdb:migrate-code-pinyin-v`：掃描 Tier 1/2 拼音欄、確定性規則、預設 dry-run、`--execute` 走審計 API）。**本機 CBDB 副本 dry-run 實測：預定變更約 1460 筆**（Tier 1 為主：`TEXT_CODES.c_title` 824、`OFFICE_CODES` 522、`TEXT_INSTANCE_DATA` 77、`SOCIAL_INSTITUTION_NAME_CODES` 8…；Tier 2：`ADDR_CODES.c_name` 16、`ETHNICITY.c_romanized` 2），`[OTHER-v]` 安全網 393 筆。**生產 `--execute` 為人工把關步驟**（Tier 1 可自動、Tier 2 需先複核 `[OTHER-v]`／命中）；`ADDRESSES` 於 `ADDR_CODES` 改後重建；`SOCIAL_INSTITUTION_ALTNAME_DATA` **SKIP**（§D-9a）
 - [ ] 回歸測試（生成 / 正規化 / 人名修正 / audit / 西文名排除；注意 SQLite collation 差異）
 - [ ] 文件同步：`CHANGELOG.md`、必要時 `DATABASE.md` / `README.md`
-- [ ] **最後環節（§D-10）**：自 `config/codes.php` 的 `ui_hidden` 移除 `'pinyin'`，於 codes 介面重新顯示姓氏拼音對照表
+- [ ] **最後環節（§D-10）**：自 `config/codes.php` 的 `ui_hidden` 移除 `'pinyin'`，於 codes 介面重新顯示姓氏／單字拼音對照表
 - [ ] **Phase A 最末步（§D-10）**：移除 M2 掃描指令 `cbdb:scan-pinyin-v`（`ScanPinyinV.php` + 測試 + Kernel 註冊；保留 `PinyinUmlaut.php`）

@@ -8,9 +8,12 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Concerns\SeedsPinyinDictionary;
 use Tests\TestCase;
 
 class ApiV2CreateBiogMainTest extends TestCase {
+    use SeedsPinyinDictionary;
+
     protected function setUp(): void {
         parent::setUp();
 
@@ -135,15 +138,21 @@ class ApiV2CreateBiogMainTest extends TestCase {
     protected function createPinyinTable(): void {
         Schema::create('pinyin', function (Blueprint $table) {
             $table->increments('id');
-            $table->string('lastname_chn')->nullable();
-            $table->string('lastname_pinyin')->nullable();
+            $table->string('c_chn');
+            $table->string('c_pinyin')->nullable();
+            $table->tinyInteger('c_lastname')->default(0);
+            $table->unique(['c_chn', 'c_lastname']);
         });
 
         // 提供常見姓氏拼音，讓 auto_pinyin 能拆出姓名
         DB::table('pinyin')->insert([
-            ['lastname_chn' => '張', 'lastname_pinyin' => 'zhang'],
-            ['lastname_chn' => '李', 'lastname_pinyin' => 'li'],
+            ['c_chn' => '張', 'c_pinyin' => 'zhang', 'c_lastname' => 1],
+            ['c_chn' => '李', 'c_pinyin' => 'li', 'c_lastname' => 1],
         ]);
+
+        // 名字部分（mingzi）走一般轉換路徑，需要真實字典資料才能跟現行
+        // Pinyin::$dic 行為一致（見 docs/PINYIN_TABLE_CONSOLIDATION_PLAN.md 步驟4）。
+        $this->seedPinyinDictionary();
     }
 
     // ── Helpers ──────────────────────────────────────────────

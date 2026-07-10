@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Repositories\BiogMainRepository;
+use App\Services\PinyinDictionary;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -33,23 +34,30 @@ class AutoPinyinTest extends TestCase {
         // 建立最小化的 pinyin 表供姓氏查詢
         Schema::dropIfExists('pinyin');
         Schema::create('pinyin', function (Blueprint $table) {
-            $table->string('lastname_chn');
-            $table->string('lastname_pinyin');
+            $table->string('c_chn');
+            $table->string('c_pinyin');
+            $table->tinyInteger('c_lastname')->default(0);
+            $table->unique(['c_chn', 'c_lastname']);
         });
 
-        // 插入測試姓氏
+        // 插入測試姓氏（c_lastname=1）。名字部分的一般轉換若查無 c_lastname=0
+        // 資料，會退回同一字的 c_lastname=1 讀音（見 PinyinDictionary 的優先序設計），
+        // 這也是 testRepeatedCharacterNameKeepsGivenNameAfterSurnameSplit 能通過的原因。
         DB::table('pinyin')->insert([
-            ['lastname_chn' => '王', 'lastname_pinyin' => 'Wang'],
-            ['lastname_chn' => '歐陽', 'lastname_pinyin' => 'Ouyang'],
-            ['lastname_chn' => '林', 'lastname_pinyin' => 'Lin'],
-            ['lastname_chn' => '於', 'lastname_pinyin' => 'Yu'],
+            ['c_chn' => '王', 'c_pinyin' => 'Wang', 'c_lastname' => 1],
+            ['c_chn' => '歐陽', 'c_pinyin' => 'Ouyang', 'c_lastname' => 1],
+            ['c_chn' => '林', 'c_pinyin' => 'Lin', 'c_lastname' => 1],
+            ['c_chn' => '於', 'c_pinyin' => 'Yu', 'c_lastname' => 1],
         ]);
+
+        PinyinDictionary::reset();
 
         $this->repository = new BiogMainRepository();
     }
 
     protected function tearDown(): void {
         Schema::dropIfExists('pinyin');
+        PinyinDictionary::reset();
         parent::tearDown();
     }
 

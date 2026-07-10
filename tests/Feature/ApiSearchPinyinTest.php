@@ -6,9 +6,12 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Concerns\SeedsPinyinDictionary;
 use Tests\TestCase;
 
 class ApiSearchPinyinTest extends TestCase {
+    use SeedsPinyinDictionary;
+
     protected function setUp(): void {
         parent::setUp();
 
@@ -21,9 +24,16 @@ class ApiSearchPinyinTest extends TestCase {
 
         Schema::dropIfExists('pinyin');
         Schema::create('pinyin', function (Blueprint $table) {
-            $table->string('lastname_chn')->primary();
-            $table->string('lastname_pinyin')->nullable();
+            $table->increments('id');
+            $table->string('c_chn');
+            $table->string('c_pinyin')->nullable();
+            $table->tinyInteger('c_lastname')->default(0);
+            $table->unique(['c_chn', 'c_lastname']);
         });
+
+        // 一般轉換路徑（split=0、姓氏拆分後的名字部分）需要真實字典資料，
+        // 才能跟現行 Pinyin::$dic 的行為一致（見 docs/PINYIN_TABLE_CONSOLIDATION_PLAN.md 步驟4）。
+        $this->seedPinyinDictionary();
 
         // 親屬關係守衛（person_id）測試用最小表：KIN_DATA + BIOG_MAIN（僅需 c_name_chn 供姓名比對）。
         Schema::dropIfExists('KIN_DATA');
@@ -63,8 +73,8 @@ class ApiSearchPinyinTest extends TestCase {
     #[Test]
     public function search_pinyin_converts_wife_pattern_to_wife_of_english_phrase(): void {
         DB::table('pinyin')->insert([
-            'lastname_chn' => '李',
-            'lastname_pinyin' => 'Li',
+            'c_chn' => '李',
+            'c_pinyin' => 'Li', 'c_lastname' => 1,
         ]);
 
         $response = $this->get('/api/select/search/pinyin?q=（李白妻）');
@@ -79,8 +89,8 @@ class ApiSearchPinyinTest extends TestCase {
     #[Test]
     public function search_pinyin_matches_known_surname_using_same_logic_as_auto_pinyin(): void {
         DB::table('pinyin')->insert([
-            'lastname_chn' => '王',
-            'lastname_pinyin' => 'Wang',
+            'c_chn' => '王',
+            'c_pinyin' => 'Wang', 'c_lastname' => 1,
         ]);
 
         $response = $this->get('/api/select/search/pinyin?q=王安石傳');
@@ -93,8 +103,8 @@ class ApiSearchPinyinTest extends TestCase {
     #[Test]
     public function search_pinyin_converts_supported_relationship_patterns_to_english_phrases(): void {
         DB::table('pinyin')->insert([
-            ['lastname_chn' => '李', 'lastname_pinyin' => 'Li'],
-            ['lastname_chn' => '王', 'lastname_pinyin' => 'Wang'],
+            ['c_chn' => '李', 'c_pinyin' => 'Li', 'c_lastname' => 1],
+            ['c_chn' => '王', 'c_pinyin' => 'Wang', 'c_lastname' => 1],
         ]);
 
         $cases = [
@@ -120,8 +130,8 @@ class ApiSearchPinyinTest extends TestCase {
     #[Test]
     public function search_pinyin_converts_expanded_relationship_patterns_to_english_phrases(): void {
         DB::table('pinyin')->insert([
-            ['lastname_chn' => '李', 'lastname_pinyin' => 'Li'],
-            ['lastname_chn' => '王', 'lastname_pinyin' => 'Wang'],
+            ['c_chn' => '李', 'c_pinyin' => 'Li', 'c_lastname' => 1],
+            ['c_chn' => '王', 'c_pinyin' => 'Wang', 'c_lastname' => 1],
         ]);
 
         $cases = [
@@ -143,9 +153,9 @@ class ApiSearchPinyinTest extends TestCase {
     #[Test]
     public function search_pinyin_prefers_multi_char_titles_over_single_char_suffix(): void {
         DB::table('pinyin')->insert([
-            ['lastname_chn' => '李', 'lastname_pinyin' => 'Li'],
-            ['lastname_chn' => '王', 'lastname_pinyin' => 'Wang'],
-            ['lastname_chn' => '宗', 'lastname_pinyin' => 'Zong'],
+            ['c_chn' => '李', 'c_pinyin' => 'Li', 'c_lastname' => 1],
+            ['c_chn' => '王', 'c_pinyin' => 'Wang', 'c_lastname' => 1],
+            ['c_chn' => '宗', 'c_pinyin' => 'Zong', 'c_lastname' => 1],
         ]);
 
         // 多字稱謂不可被其單字後綴（母/父/女）誤切：祖母≠母、祖父≠父、孫女≠女。
@@ -167,8 +177,8 @@ class ApiSearchPinyinTest extends TestCase {
     #[Test]
     public function search_pinyin_does_not_treat_non_relationship_parenthetical_as_relationship(): void {
         DB::table('pinyin')->insert([
-            ['lastname_chn' => '李', 'lastname_pinyin' => 'Li'],
-            ['lastname_chn' => '公', 'lastname_pinyin' => 'Gong'],
+            ['c_chn' => '李', 'c_pinyin' => 'Li', 'c_lastname' => 1],
+            ['c_chn' => '公', 'c_pinyin' => 'Gong', 'c_lastname' => 1],
         ]);
 
         // 「子」「孫」非稱謂（刻意未收）：「（李子）」「（公孫）」這類括號別名/詞不應被誤判為關係稱謂。
@@ -183,8 +193,8 @@ class ApiSearchPinyinTest extends TestCase {
     #[Test]
     public function search_pinyin_with_split_zero_does_not_split_by_surname(): void {
         DB::table('pinyin')->insert([
-            'lastname_chn' => '安',
-            'lastname_pinyin' => 'An',
+            'c_chn' => '安',
+            'c_pinyin' => 'An', 'c_lastname' => 1,
         ]);
 
         // 預設 split=1 會在已知姓氏後插入空格
@@ -215,8 +225,8 @@ class ApiSearchPinyinTest extends TestCase {
     #[Test]
     public function search_pinyin_keeps_relationship_phrase_capitalization_unchanged(): void {
         DB::table('pinyin')->insert([
-            'lastname_chn' => '李',
-            'lastname_pinyin' => 'Li',
+            'c_chn' => '李',
+            'c_pinyin' => 'Li', 'c_lastname' => 1,
         ]);
 
         // 關係片語括號內已為大寫英文（(Wife of ...)），大寫化不得誤傷或重覆處理。
@@ -229,8 +239,8 @@ class ApiSearchPinyinTest extends TestCase {
     #[Test]
     public function search_pinyin_converts_prefixed_relationship_patterns_to_english_phrases(): void {
         DB::table('pinyin')->insert([
-            ['lastname_chn' => '宗', 'lastname_pinyin' => 'Zong'],
-            ['lastname_chn' => '李', 'lastname_pinyin' => 'Li'],
+            ['c_chn' => '宗', 'c_pinyin' => 'Zong', 'c_lastname' => 1],
+            ['c_chn' => '李', 'c_pinyin' => 'Li', 'c_lastname' => 1],
         ]);
 
         $response = $this->get('/api/select/search/pinyin?q='.urlencode('宗氏（李白母）'));
@@ -243,7 +253,7 @@ class ApiSearchPinyinTest extends TestCase {
 
     #[Test]
     public function search_pinyin_applies_relationship_when_target_is_a_kin(): void {
-        DB::table('pinyin')->insert(['lastname_chn' => '李', 'lastname_pinyin' => 'Li']);
+        DB::table('pinyin')->insert(['c_chn' => '李', 'c_pinyin' => 'Li', 'c_lastname' => 1]);
         // 100 的親屬名單中確有「李白」（id 200）→ 關係守衛通過，維持關係轉換。
         DB::table('BIOG_MAIN')->insert(['c_personid' => 200, 'c_name_chn' => '李白']);
         DB::table('KIN_DATA')->insert(['c_personid' => 100, 'c_kin_id' => 200, 'c_kin_code' => 1]);
@@ -328,7 +338,7 @@ class ApiSearchPinyinTest extends TestCase {
     #[Test]
     public function search_pinyin_without_person_id_keeps_relationship_conversion(): void {
         // 向後相容：未帶 person_id 時不做親屬守衛，維持既有關係轉換、且不帶提示標頭。
-        DB::table('pinyin')->insert(['lastname_chn' => '李', 'lastname_pinyin' => 'Li']);
+        DB::table('pinyin')->insert(['c_chn' => '李', 'c_pinyin' => 'Li', 'c_lastname' => 1]);
 
         $response = $this->get('/api/select/search/pinyin?q='.urlencode('（李白妻）'));
 

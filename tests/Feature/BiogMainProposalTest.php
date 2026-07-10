@@ -87,8 +87,10 @@ class BiogMainProposalTest extends TestCase {
 
         Schema::create('pinyin', function (Blueprint $table) {
             $table->increments('id');
-            $table->string('lastname_chn')->nullable();
-            $table->string('lastname_pinyin')->nullable();
+            $table->string('c_chn');
+            $table->string('c_pinyin')->nullable();
+            $table->tinyInteger('c_lastname')->default(0);
+            $table->unique(['c_chn', 'c_lastname']);
         });
     }
 
@@ -347,8 +349,9 @@ class BiogMainProposalTest extends TestCase {
         ]);
 
         DB::table('pinyin')->insert([
-            'lastname_chn' => '李',
-            'lastname_pinyin' => 'Li',
+            'c_chn' => '李',
+            'c_pinyin' => 'Li',
+            'c_lastname' => 1,
         ]);
 
         $response = $this->patch(route('basicinformation.update', $personId), [

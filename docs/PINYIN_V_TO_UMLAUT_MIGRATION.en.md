@@ -130,7 +130,7 @@ Therefore **only these four substrings need conversion** (handle each case separ
 
 > This section is the basis for "why search compatibility can be deferred".
 
-- **Collation fact**: on production MariaDB, both `utf8mb4_general_ci` and `utf8mb4_unicode_ci` are **accent-insensitive and fold `ü` to `u`**. The affected columns `c_surname`, `c_mingzi`, `pinyin.lastname_pinyin`, and `c_alt_name` are general_ci; `c_name` is unicode_ci — both fold.
+- **Collation fact**: on production MariaDB, both `utf8mb4_general_ci` and `utf8mb4_unicode_ci` are **accent-insensitive and fold `ü` to `u`**. The affected columns `c_surname`, `c_mingzi`, `pinyin.c_pinyin`, and `c_alt_name` are general_ci; `c_name` is unicode_ci — both fold.
 - **Conclusion**: users **searching with plain `u` already match `ü` data** with no code change (Frank's live example: searching `yelu` matches `Yelü`, as expected). So changing the data to `ü` does **not** break existing users who search with `u`.
 - **The only compatibility gap: users accustomed to typing `v`** (e.g. `Lv`, `Yelv`) — `v` is not folded to `ü` by collation. **The recommended approach is query expansion: when a user types a `v`-containing syllable form (`lv`/`lve`/`nv`/`nve`), the system searches for both the `v` form and the corresponding `ü` form (OR), rather than replacing `v` with `ü` in the query.**
   - Rationale: in a user query it is **not possible to reliably distinguish** whether `lv` is a stand-in for `lü` or part of a Western name (e.g. `Calvin`); replacing it would commit to one interpretation and could make a `v`-containing Western-name query miss. Searching both is the most robust — it matches normalized `ü` data, residual `v` forms, and Western names alike.

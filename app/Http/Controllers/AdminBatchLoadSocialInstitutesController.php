@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Pinyin;
 use App\Repositories\OperationRepository;
+use App\Services\PinyinDictionary;
 use App\Support\PinyinUmlaut;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -461,7 +461,7 @@ class AdminBatchLoadSocialInstitutesController extends Controller {
 
         foreach ($chars as $char) {
             if (preg_match('/\p{Han}/u', $char)) {
-                $syllables[] = strtolower(Pinyin::getPinyin($char));
+                $syllables[] = strtolower(PinyinDictionary::getPinyin($char));
             } elseif (preg_match('/[A-Za-z0-9]/u', $char)) {
                 $syllables[] = strtolower($char);
             }

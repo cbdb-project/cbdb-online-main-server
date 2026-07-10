@@ -8,9 +8,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Concerns\SeedsPinyinDictionary;
 use Tests\TestCase;
 
 class AdminBatchLoadBookTitlesTest extends TestCase {
+    use SeedsPinyinDictionary;
+
     protected function setUp(): void {
         parent::setUp();
 
@@ -74,9 +77,22 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             $table->smallInteger('crowdsourcing_status')->default(0);
             $table->smallInteger('rate')->default(0);
         });
+
+        Schema::create('pinyin', function (Blueprint $table) {
+            $table->increments('id');
+            $table->string('c_chn');
+            $table->string('c_pinyin')->nullable();
+            $table->tinyInteger('c_lastname')->default(0);
+            $table->unique(['c_chn', 'c_lastname']);
+        });
+
+        // 書名逐字轉拼音走一般轉換路徑，需要真實字典資料才能跟現行
+        // Pinyin::$dic 行為一致（見 docs/PINYIN_TABLE_CONSOLIDATION_PLAN.md 步驟4）。
+        $this->seedPinyinDictionary();
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('pinyin');
         Schema::dropIfExists('operations');
         Schema::dropIfExists('BIOG_MAIN');
         Schema::dropIfExists('TEXT_CODES');

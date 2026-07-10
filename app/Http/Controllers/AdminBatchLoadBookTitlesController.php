@@ -3,10 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Operation;
-use App\Models\Pinyin;
 use App\Models\TextCode;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
+use App\Services\PinyinDictionary;
 use App\Services\VariantCharNormalizer;
 use App\Support\PinyinUmlaut;
 use Illuminate\Http\JsonResponse;
@@ -477,7 +477,7 @@ class AdminBatchLoadBookTitlesController extends Controller {
      * Return Han characters in the title that the Pinyin dictionary cannot translate.
      * Mirrors the steps buildPinyin() takes (drop volume info, normalize variants),
      * so the result reflects exactly which characters would survive untranslated in
-     * c_title. Pinyin::getPinyin() returns the original character on lookup miss.
+     * c_title. PinyinDictionary::getPinyin() returns the original character on lookup miss.
      *
      * @return array<int,string>
      */
@@ -491,7 +491,7 @@ class AdminBatchLoadBookTitlesController extends Controller {
             if (!preg_match('/^\p{Han}$/u', $ch)) {
                 continue;
             }
-            $pinyin = trim((string) Pinyin::getPinyin($ch));
+            $pinyin = trim((string) PinyinDictionary::getPinyin($ch));
             if ($pinyin === '' || $pinyin === $ch) {
                 $unmapped[$ch] = true;
             }
@@ -543,7 +543,7 @@ class AdminBatchLoadBookTitlesController extends Controller {
 
         foreach ($chars as $char) {
             if (preg_match('/\p{Han}/u', $char)) {
-                $syllables[] = strtolower(Pinyin::getPinyin($char));
+                $syllables[] = strtolower(PinyinDictionary::getPinyin($char));
             } elseif (preg_match('/[A-Za-z0-9]/u', $char)) {
                 $syllables[] = strtolower($char);
             }

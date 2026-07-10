@@ -1629,12 +1629,15 @@
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
 | `id` | int(11) | NO | (NULL) |  [AUTO_INCREMENT] |
-| `lastname_chn` | varchar(10) | YES | NULL |  |
-| `lastname_pinyin` | varchar(30) | YES | NULL |  |
+| `c_chn` | varchar(10) | NO | (NULL) |  |
+| `c_pinyin` | varchar(30) | YES | NULL |  |
+| `c_lastname` | tinyint(4) | NO | 0 |  |
 
 **索引**:
 
 - `PRIMARY` (UNIQUE): (id)
+- `pinyin_c_chn_c_lastname_unique` (UNIQUE): (c_chn, c_lastname)
+- `pinyin_c_chn_index`: (c_chn)
 
 ---
 
@@ -4417,8 +4420,14 @@
 | 列名 | 類型 | 可空 | 默認值 | 備註 |
 |------|------|------|--------|------|
 | `id` | INTEGER | YES | (NULL) |  |
-| `lastname_chn` | varchar(10) | YES | NULL |  |
-| `lastname_pinyin` | varchar(30) | YES | NULL |  |
+| `c_chn` | varchar | NO | (NULL) |  |
+| `c_pinyin` | varchar(30) | YES | NULL |  |
+| `c_lastname` | INTEGER | NO | '0' |  |
+
+**索引**:
+
+- `pinyin_c_chn_index`: (c_chn)
+- `pinyin_c_chn_c_lastname_unique` (UNIQUE): (c_chn, c_lastname)
 
 ---
 

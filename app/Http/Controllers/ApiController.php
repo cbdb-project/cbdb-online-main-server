@@ -10,7 +10,6 @@ use App\Models\EntryCode;
 use App\Models\EventCode;
 use App\Models\KinshipCode;
 use App\Models\OfficeCode;
-use App\Models\Pinyin;
 use App\Models\SocialInst;
 use App\Models\SocialInstAddr;
 use App\Models\SocialInstCode;
@@ -25,6 +24,7 @@ use App\Repositories\DynastyRepository;
 use App\Repositories\EthnicityRepository;
 use App\Repositories\NianHaoRepository;
 use App\Repositories\YearRangeRepository;
+use App\Services\PinyinDictionary;
 use App\Services\VariantCharNormalizer;
 use App\Support\PinyinUmlaut;
 use App\v1;
@@ -639,7 +639,7 @@ class ApiController extends Controller {
         $normalized = VariantCharNormalizer::normalize($word);
 
         // 止血：生成後把殘留的 v 代寫正規化為 ü。
-        return PinyinUmlaut::normalize(ucfirst(Pinyin::getPinyin($normalized)));
+        return PinyinUmlaut::normalize(ucfirst(PinyinDictionary::getPinyin($normalized)));
     }
 
     private function buildRelationshipPinyin(string $word, int $split = 1, ?int $personId = null, bool &$kinshipUnmatched = false): ?string {

@@ -19,7 +19,6 @@ use App\Models\Dynasty;
 use App\Models\EntryCode;
 use App\Models\KinshipCode;
 use App\Models\OfficeCode;
-use App\Models\Pinyin;
 use App\Models\SocialInst;
 use App\Models\SocialInstAddr;
 use App\Models\SocialInstCode;
@@ -31,6 +30,7 @@ use App\Services\AuditLogService;
 
 //20210625建安修改
 use App\Services\BracketNormalizer;
+use App\Services\PinyinDictionary;
 use App\Services\VariantCharNormalizer;
 use App\Support\CompositePrimaryKey;
 use App\Support\PinyinUmlaut;
@@ -4016,18 +4016,19 @@ class BiogMainRepository {
         }
 
         $surnameRows = DB::table('pinyin')
-            ->select('lastname_chn', 'lastname_pinyin')
-            ->whereIn('lastname_chn', $prefixes)
+            ->select('c_chn', 'c_pinyin')
+            ->where('c_lastname', 1)
+            ->whereIn('c_chn', $prefixes)
             ->get()
-            ->keyBy('lastname_chn');
+            ->keyBy('c_chn');
 
         // 以最長前綴優先，盡量命中已知姓氏（包含複姓）
         foreach ($prefixes as $prefix) {
             $row = $surnameRows->get($prefix);
-            if (!empty($row?->lastname_pinyin)) {
+            if (!empty($row?->c_pinyin)) {
                 $c_surname_chn = $prefix;
                 // 止血：姓氏拼音取自 pinyin 表；若表中仍殘留 v 代寫，正規化為 ü。
-                $c_surname = PinyinUmlaut::normalize((string) $row->lastname_pinyin);
+                $c_surname = PinyinUmlaut::normalize((string) $row->c_pinyin);
 
                 break;
             }
@@ -4039,7 +4040,7 @@ class BiogMainRepository {
             $c_mingzi_chn = mb_substr($name, $surnameLength, null, 'utf-8');
             // 標準化異體字（僅用於拼音轉換，不修改原始名字）
             $normalizedMingzi = VariantCharNormalizer::normalize($c_mingzi_chn);
-            $c_mingzi = PinyinUmlaut::normalize(ucfirst(Pinyin::getPinyin($normalizedMingzi)) ?? '');
+            $c_mingzi = PinyinUmlaut::normalize(ucfirst(PinyinDictionary::getPinyin($normalizedMingzi)) ?? '');
             $c_name = trim($c_surname.' '.$c_mingzi);
             $data['c_surname_chn'] = $c_surname_chn;
             $data['c_surname'] = $c_surname;
@@ -4050,7 +4051,7 @@ class BiogMainRepository {
             $c_mingzi_chn = $name;
             // 標準化異體字（僅用於拼音轉換，不修改原始名字）
             $normalizedMingzi = VariantCharNormalizer::normalize($c_mingzi_chn);
-            $c_mingzi = PinyinUmlaut::normalize(ucfirst(Pinyin::getPinyin($normalizedMingzi)) ?? '');
+            $c_mingzi = PinyinUmlaut::normalize(ucfirst(PinyinDictionary::getPinyin($normalizedMingzi)) ?? '');
             $c_name = $c_mingzi;
             $data['c_surname_chn'] = '';
             $data['c_surname'] = '';

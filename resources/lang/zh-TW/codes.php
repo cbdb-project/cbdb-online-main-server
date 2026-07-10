@@ -72,7 +72,7 @@ return [
         'OFFICE_CODE_TYPE_REL' => '官職代碼與類型關聯表',
         'OFFICE_TYPE_TREE' => '官職類型層級樹',
         'PARENTAL_STATUS_CODES' => '父母狀況代碼表',
-        'pinyin' => '姓氏拼音對照表',
+        'pinyin' => '姓氏／單字拼音對照表',
         'POSSESSION_ACT_CODES' => '財產行為代碼表',
         'POSSESSION_ADDR' => '財產地址資料表',
         'POSSESSION_DATA' => '財產資料表',

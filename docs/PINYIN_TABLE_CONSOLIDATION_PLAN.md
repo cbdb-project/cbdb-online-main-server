@@ -1,5 +1,7 @@
 # 拼音資料整併 Work Plan：`pinyin` 表吸收 `Pinyin.php`
 
+> **✅ 已完成**：步驟 1-5 均已實作並通過測試與 review（`app/Models/Pinyin.php` 已刪除，`pinyin` 表已改用 `c_chn`/`c_pinyin`/`c_lastname` 欄位）。以下背景與步驟說明保留作為設計歷史記錄，內文的「目前／現況」等現在式描述為**變更前**的架構，非目前狀態。
+
 ## 背景與目標
 
 目前拼音轉換由兩個資料來源組合而成：

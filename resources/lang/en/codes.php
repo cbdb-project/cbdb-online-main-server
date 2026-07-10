@@ -74,7 +74,7 @@ return [
         'OFFICE_CODE_TYPE_REL' => 'Office Code-Type Relations',
         'OFFICE_TYPE_TREE' => 'Office Type Hierarchy Tree',
         'PARENTAL_STATUS_CODES' => 'Parental Status Codes',
-        'pinyin' => 'Surname Pinyin Map',
+        'pinyin' => 'Surname / Character Pinyin Map',
         'POSSESSION_ACT_CODES' => 'Possession Act Codes',
         'POSSESSION_ADDR' => 'Possession Address Data',
         'POSSESSION_DATA' => 'Possession Data',

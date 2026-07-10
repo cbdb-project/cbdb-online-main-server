@@ -951,6 +951,40 @@ class PersonBrowserTest extends TestCase {
     }
 
     #[Test]
+    public function test_pinyin_search_not_hijacked_by_stray_latin_fts_row(): void {
+        // 迴歸：CBDB__NAME_FTS 只索引中文，但索引中偶有夾帶拉丁子字串的外文名（如 "Lves…"）。
+        // 拼音查詢 "lv" 曾以 LIKE 'lv%' 誤命中該筆雜訊、短路 FTS 分支（whereIn 只含那 1 筆），
+        // 跳過能命中全部呂(Lü)姓的拼音 LIKE 回退，造成「搜 lv／lü 查不到大量姓呂的人，
+        // 但搜 zhang 卻正常」。修法：拉丁查詢不走中文 FTS，一律改走多欄位 LIKE 回退。
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 800,
+            'c_name_chn' => '呂大防',
+            'c_name' => 'Lü Dafang',
+            'c_surname' => 'Lü',
+            'c_mingzi' => 'Dafang',
+            'c_dy' => 2,
+        ]);
+        // 夾帶拉丁子字串的外文名（模擬 c_name_chn 內含 "Lves"）＋對應的雜訊 FTS 列。
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 801,
+            'c_name_chn' => 'Lves',
+            'c_name' => 'Lves',
+            'c_surname' => 'Lves',
+            'c_dy' => 2,
+        ]);
+        DB::table('CBDB__NAME_FTS')->insert([
+            ['search_term' => 'lves', 'c_personid' => 801],
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->getJson(route('app.person-browser.search') . '?' . http_build_query(['q' => 'lv']));
+
+        $response->assertOk();
+        $ids = collect($response->json('data'))->pluck('c_personid')->map(fn ($id) => (int) $id)->all();
+        $this->assertContains(800, $ids, '拼音 "lv" 應命中以 ü 儲存的呂大防(800)，不應被雜訊 FTS 列 "lves" 短路排除');
+    }
+
+    #[Test]
     public function test_search_by_alt_name_via_fts(): void {
         $response = $this->actingAs($this->user)
             ->getJson(route('app.person-browser.search') . '?q=太白');

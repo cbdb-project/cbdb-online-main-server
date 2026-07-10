@@ -6,6 +6,19 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class PersonBrowserService {
+    /**
+     * 該查詢是否應走 CBDB__NAME_FTS 倒排索引。
+     *
+     * FTS 只索引「中文姓名」（c_name_chn／c_alt_name_chn 的中文字後綴）。拼音／拉丁字母
+     * 查詢不應查 FTS：索引中偶有夾帶拉丁子字串的外文名（例如某人 c_name_chn 含 "Lves…"），
+     * 拼音輸入（如 "lv"）會誤命中這類雜訊記錄、拿到極少數 id 後短路，跳過底下能命中全部
+     * 呂（Lü）姓的拼音 LIKE 回退，造成「搜 lv／lü 查不到大量姓呂的人，但搜 zhang 卻正常」。
+     * 拉丁查詢一律改走多欄位 LIKE 回退（含 c_name_chn，故外文名仍可被回退命中）。
+     */
+    private function queryUsesFtsIndex(string $q): bool {
+        return preg_match('/\p{Han}/u', $q) === 1;
+    }
+
     private function formatAdminCatLabel(?string $hz, ?string $trans): ?string {
         $parts = array_values(array_filter([
             $hz ? trim($hz) : null,
@@ -50,25 +63,28 @@ class PersonBrowserService {
                 $idQuery->where('BIOG_MAIN.c_personid', '=', (int) $q)
                     ->orderBy('BIOG_MAIN.c_personid', $sortDirection);
             } else {
-                // 先嘗試倒排索引
-                $ftsIds = DB::table('CBDB__NAME_FTS')
-                    ->where('search_term', 'LIKE', $q . '%')
-                    ->orderByRaw('LENGTH(search_term) ASC')
-                    ->limit(500)
-                    ->pluck('c_personid')
-                    ->unique()
-                    ->values()
-                    ->toArray();
-
-                if ($dynasty !== '' && !empty($ftsIds)) {
-                    // 倒排索引結果需要過濾朝代
-                    $ftsIds = DB::table('BIOG_MAIN')
-                        ->whereIn('c_personid', $ftsIds)
-                        ->where('c_dy', '=', (int) $dynasty)
+                // 先嘗試倒排索引（僅中文查詢；拼音／拉丁查詢直接走下方 LIKE 回退）
+                $ftsIds = [];
+                if ($this->queryUsesFtsIndex($q)) {
+                    $ftsIds = DB::table('CBDB__NAME_FTS')
+                        ->where('search_term', 'LIKE', $q . '%')
+                        ->orderByRaw('LENGTH(search_term) ASC')
+                        ->limit(500)
                         ->pluck('c_personid')
-                        ->map(fn ($id) => (int) $id)
+                        ->unique()
                         ->values()
                         ->toArray();
+
+                    if ($dynasty !== '' && !empty($ftsIds)) {
+                        // 倒排索引結果需要過濾朝代
+                        $ftsIds = DB::table('BIOG_MAIN')
+                            ->whereIn('c_personid', $ftsIds)
+                            ->where('c_dy', '=', (int) $dynasty)
+                            ->pluck('c_personid')
+                            ->map(fn ($id) => (int) $id)
+                            ->values()
+                            ->toArray();
+                    }
                 }
 
                 if (!empty($ftsIds)) {
@@ -182,14 +198,19 @@ class PersonBrowserService {
             if (ctype_digit($q)) {
                 $query->where('BIOG_MAIN.c_personid', '=', (int) $q);
             } else {
-                $ftsIds = DB::table('CBDB__NAME_FTS')
-                    ->where('search_term', 'LIKE', $q . '%')
-                    ->orderByRaw('LENGTH(search_term) ASC')
-                    ->limit(500)
-                    ->pluck('c_personid')
-                    ->unique()
-                    ->values()
-                    ->toArray();
+                // 與 search() 同口徑：拼音／拉丁查詢不走中文 FTS，直接以 LIKE 展開集分面，
+                // 否則朝代側欄會沿用 FTS 雜訊命中而與人物列表（已回退）不一致。
+                $ftsIds = [];
+                if ($this->queryUsesFtsIndex($q)) {
+                    $ftsIds = DB::table('CBDB__NAME_FTS')
+                        ->where('search_term', 'LIKE', $q . '%')
+                        ->orderByRaw('LENGTH(search_term) ASC')
+                        ->limit(500)
+                        ->pluck('c_personid')
+                        ->unique()
+                        ->values()
+                        ->toArray();
+                }
 
                 if (!empty($ftsIds)) {
                     $query->whereIn('BIOG_MAIN.c_personid', $ftsIds);

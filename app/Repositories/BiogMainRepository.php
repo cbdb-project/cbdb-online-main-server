@@ -477,13 +477,18 @@ class BiogMainRepository {
 
         // 20251115新增：使用倒排索引表進行高效姓名搜尋
         // 透過 CBDB__NAME_FTS 表實現前綴匹配，查詢效能從 1500ms 降至 3ms（500倍提升）
-        $personIds = DB::table('CBDB__NAME_FTS')
-            ->where('search_term', 'LIKE', $request->q . '%')
-            ->orderByRaw('LENGTH(search_term) ASC')  // 優先精確匹配
-            ->limit(500)  // 限制最多 500 個候選人
-            ->pluck('c_personid')
-            ->unique()
-            ->toArray();
+        // 僅中文查詢走 FTS；拼音／拉丁查詢直接落到下方 LIKE 回退（見 isChineseQuery 說明：
+        // 否則 "lv" 會誤命中索引中夾帶的拉丁子字串而短路，查不到大量姓呂的人）。
+        $personIds = [];
+        if (\App\Support\PinyinSearchNormalizer::isChineseQuery($request->q)) {
+            $personIds = DB::table('CBDB__NAME_FTS')
+                ->where('search_term', 'LIKE', $request->q . '%')
+                ->orderByRaw('LENGTH(search_term) ASC')  // 優先精確匹配
+                ->limit(500)  // 限制最多 500 個候選人
+                ->pluck('c_personid')
+                ->unique()
+                ->toArray();
+        }
 
         // 如果倒排索引查到結果，按找到的 personIds 查詢完整資訊
         if (!empty($personIds)) {
@@ -606,14 +611,18 @@ class BiogMainRepository {
             return collect();
         }
 
-        // 倒排索引路徑
-        $personIds = DB::table('CBDB__NAME_FTS')
-            ->where('search_term', 'LIKE', $q . '%')
-            ->orderByRaw('LENGTH(search_term) ASC')
-            ->limit(500)
-            ->pluck('c_personid')
-            ->unique()
-            ->toArray();
+        // 倒排索引路徑（僅中文查詢；與 namesByQuery 同口徑，拼音／拉丁查詢直接走下方 LIKE 回退，
+        // 否則側欄朝代分面會沿用 FTS 雜訊命中而與人物列表不一致）。
+        $personIds = [];
+        if (\App\Support\PinyinSearchNormalizer::isChineseQuery($q)) {
+            $personIds = DB::table('CBDB__NAME_FTS')
+                ->where('search_term', 'LIKE', $q . '%')
+                ->orderByRaw('LENGTH(search_term) ASC')
+                ->limit(500)
+                ->pluck('c_personid')
+                ->unique()
+                ->toArray();
+        }
 
         if (!empty($personIds)) {
             $validDynasties = DB::table('BIOG_MAIN')

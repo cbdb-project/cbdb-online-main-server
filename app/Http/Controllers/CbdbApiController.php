@@ -303,7 +303,9 @@ class CbdbApiController extends Controller {
 
         // 20251115新增：使用倒排索引表 CBDB__NAME_FTS 進行高效姓名搜尋
         // 透過前綴匹配，查詢效能從 1500ms 降至 3ms（500倍提升）
-        if (Schema::hasTable('CBDB__NAME_FTS')) {
+        // 僅中文查詢走 FTS；拼音／拉丁查詢直接落到下方 LIKE 回退（見 isChineseQuery 說明：
+        // 否則 "lv" 會誤命中索引中夾帶的拉丁子字串而短路，查不到姓呂的人）。
+        if (Schema::hasTable('CBDB__NAME_FTS') && \App\Support\PinyinSearchNormalizer::isChineseQuery($term)) {
             $personIds = DB::table('CBDB__NAME_FTS')
                 ->where('search_term', 'LIKE', $term . '%')
                 ->orderByRaw('LENGTH(search_term) ASC')  // 優先精確匹配

@@ -14,9 +14,10 @@ class PersonBrowserService {
      * 拼音輸入（如 "lv"）會誤命中這類雜訊記錄、拿到極少數 id 後短路，跳過底下能命中全部
      * 呂（Lü）姓的拼音 LIKE 回退，造成「搜 lv／lü 查不到大量姓呂的人，但搜 zhang 卻正常」。
      * 拉丁查詢一律改走多欄位 LIKE 回退（含 c_name_chn，故外文名仍可被回退命中）。
+     * 判定邏輯集中於 PinyinSearchNormalizer::isChineseQuery（BiogMainRepository 亦共用）。
      */
     private function queryUsesFtsIndex(string $q): bool {
-        return preg_match('/\p{Han}/u', $q) === 1;
+        return \App\Support\PinyinSearchNormalizer::isChineseQuery($q);
     }
 
     private function formatAdminCatLabel(?string $hz, ?string $trans): ?string {

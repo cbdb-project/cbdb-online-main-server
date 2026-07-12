@@ -1,5 +1,7 @@
 # Wiki 导入任务管理
 
+> ⚠️ **仅限首次全量导入。** 本文描述的 `WikiMaintenanceController` / `wiki:task` 工具会**删除某 `c_textid` 的全部记录再重灌**，**不得用于增量新增／修正**。日常增量维护中文维基条目（BIOG_SOURCE_DATA）请走 mutation API，见 [ZHWIKI_SOURCE_SYNC.md](./ZHWIKI_SOURCE_SYNC.md) 与技能 [.claude/skills/mutation-api-record-editing.md](../.claude/skills/mutation-api-record-editing.md)。
+
 Wiki 维护工具现在支持任务取消功能，包括前端界面取消和命令行管理。
 
 ## 前端取消功能

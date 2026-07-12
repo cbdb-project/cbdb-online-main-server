@@ -16,6 +16,7 @@ class VerifyCsrfToken extends BaseVerifier {
         'api/v2/delete',
         'api/v2/get',
         'api/v2/mutate',
+        'api/v2/batch_mutate',
     ];
 
     /**

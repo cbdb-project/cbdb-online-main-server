@@ -36,6 +36,7 @@ Route::get('openapi.yaml', function () {
     ]);
 })->name('openapi.yaml');
 Route::middleware(['auth.optional'])->post('api/v2/mutate', 'Api\\MutationController@store')->name('api.v2.mutate.web');
+Route::middleware(['auth.optional'])->post('api/v2/batch_mutate', 'Api\\MutationController@batchStore')->name('api.v2.batch-mutate.web');
 Route::middleware(['auth.optional'])->post('api/v2/create', 'Api\\MutationController@create')->name('api.v2.create.web');
 Route::middleware(['auth.optional'])->post('api/v2/delete', 'Api\\MutationController@delete')->name('api.v2.delete.web');
 Route::middleware(['auth.optional'])->match(['get', 'post'], 'api/v2/get', 'Api\\MutationController@get')->name('api.v2.get.web');

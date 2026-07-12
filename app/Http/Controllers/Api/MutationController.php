@@ -12,6 +12,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class MutationController extends Controller {
+    /** batch_mutate 單次請求最多筆數（避免超大請求撐爆記憶體/逾時）。 */
+    public const BATCH_MAX_ITEMS = 500;
+
     protected MutationHandlerRegistry $handlerRegistry;
     protected MutationReadService $readService;
     protected RelationshipMirrorService $mirrorService;
@@ -265,6 +268,167 @@ class MutationController extends Controller {
         }
 
         return $handler->handle($resource, $mode, 'delete', (int) $personId, $targetPk, [], is_array($meta) ? $meta : []);
+    }
+
+    /**
+     * 批次變更：一個請求帶多筆 item，逐筆分發到既有 handler（沿用同一套校驗／改鍵碰撞／授權／
+     * operations／AuditLog，避免另起平行寫入邏輯造成語義漂移）。用於降低逐筆 HTTP 往返成本。
+     *
+     * 請求：{ items: [ {resource, mode, operation, person_id, target:{pk}, changes, meta}, ... ],
+     *        atomic?: bool, resource?/mode?/operation?/meta?: 頂層預設（逐項可覆寫） }
+     *
+     * atomic=false（預設）：逐筆獨立結算，單筆失敗不影響其餘；回 200，body.results 為逐筆結果、
+     *   body.summary 為彙總；body.ok = 是否全數成功。
+     * atomic=true：整批單一交易，任一筆失敗整批回滾，回 409 並帶 failed_index。
+     */
+    public function batchStore(Request $request): JsonResponse {
+        $payload = $request->json()->all();
+        if (!is_array($payload) || empty($payload)) {
+            $payload = $request->all();
+        }
+
+        $items = $payload['items'] ?? null;
+        if (!is_array($items) || $items === []) {
+            return $this->errorResponse('缺少 items', 422, ['items' => ['required']]);
+        }
+
+        if (count($items) > self::BATCH_MAX_ITEMS) {
+            return $this->errorResponse('單次批次筆數超過上限', 422, [
+                'items' => ['too_many', 'max:'.self::BATCH_MAX_ITEMS, 'count:'.count($items)],
+            ]);
+        }
+
+        $atomic = filter_var($payload['atomic'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $defaults = [
+            'resource' => $payload['resource'] ?? null,
+            'mode' => $payload['mode'] ?? null,
+            'operation' => $payload['operation'] ?? null,
+            'meta' => $payload['meta'] ?? null,
+        ];
+
+        if (!$atomic) {
+            $results = [];
+            foreach ($items as $index => $item) {
+                $results[] = $this->runBatchItem($item, $defaults, (int) $index);
+            }
+
+            return $this->batchSummaryResponse($results, false);
+        }
+
+        // atomic：手動交易，任一筆非成功即整批回滾（handler 內層交易為 savepoint，外層 rollBack 一併撤銷）。
+        DB::beginTransaction();
+
+        try {
+            $results = [];
+            foreach ($items as $index => $item) {
+                $res = $this->runBatchItem($item, $defaults, (int) $index);
+                $results[] = $res;
+                if (!$res['ok']) {
+                    DB::rollBack();
+
+                    return response()->json([
+                        'ok' => false,
+                        'atomic' => true,
+                        'message' => '批次原子模式：某筆失敗，整批已回滾',
+                        'failed_index' => $res['index'],
+                        'failed' => $res,
+                        'results' => $results,
+                    ], 409);
+                }
+            }
+            DB::commit();
+        } catch (\Throwable $e) {
+            if (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
+
+            throw $e;
+        }
+
+        return $this->batchSummaryResponse($results, true);
+    }
+
+    /**
+     * 執行單筆批次 item：解析頂層預設、做與單筆端點一致的必要欄位檢查、解析 handler、呼叫 handle()，
+     * 並把回傳的 JsonResponse 正規化為含 index/http_status/ok 的陣列。
+     */
+    protected function runBatchItem($item, array $defaults, int $index): array {
+        if (!is_array($item)) {
+            return ['index' => $index, 'http_status' => 422, 'ok' => false,
+                'message' => 'item 必須為物件', 'errors' => ['item' => ['invalid']]];
+        }
+
+        $resource = strtolower((string) ($item['resource'] ?? $defaults['resource'] ?? ''));
+        $mode = strtolower((string) ($item['mode'] ?? $defaults['mode'] ?? 'direct'));
+        $operation = strtolower((string) ($item['operation'] ?? $defaults['operation'] ?? 'update'));
+        $personId = $item['person_id'] ?? null;
+        $targetPk = $item['target']['pk'] ?? null;
+        $changes = $item['changes'] ?? null;
+        $meta = $item['meta'] ?? $defaults['meta'] ?? [];
+
+        $fail = fn (string $msg, array $errors): array => [
+            'index' => $index, 'http_status' => 422, 'ok' => false, 'message' => $msg, 'errors' => $errors,
+        ];
+
+        if (!is_array($targetPk)) {
+            return $fail('缺少 target.pk', ['target.pk' => ['required']]);
+        }
+        if ($operation !== 'delete' && !is_array($changes)) {
+            return $fail('缺少 changes', ['changes' => ['required']]);
+        }
+        if ($personId === null || $personId === '') {
+            return $fail('缺少 person_id', ['person_id' => ['required']]);
+        }
+
+        $handler = $this->handlerRegistry->resolve($resource, $mode, $operation);
+        if (!$handler) {
+            return ['index' => $index, 'http_status' => 501, 'ok' => false,
+                'message' => '目前尚未支援此變更模式',
+                'errors' => ['resource' => $resource, 'mode' => $mode, 'operation' => $operation]];
+        }
+
+        try {
+            $response = $handler->handle(
+                $resource,
+                $mode,
+                $operation,
+                (int) $personId,
+                $targetPk,
+                is_array($changes) ? $changes : [],
+                is_array($meta) ? $meta : []
+            );
+        } catch (\Throwable $e) {
+            // 單筆未預期例外不拖垮整個請求：轉為該筆 500 錯誤（atomic 模式下會經 !ok 路徑觸發整批回滾）。
+            return ['index' => $index, 'http_status' => 500, 'ok' => false,
+                'message' => '處理時發生例外', 'errors' => ['exception' => [$e->getMessage()]]];
+        }
+
+        $status = $response->getStatusCode();
+        $body = json_decode($response->getContent(), true);
+        if (!is_array($body)) {
+            $body = [];
+        }
+
+        $out = ['index' => $index, 'http_status' => $status] + $body;
+        $out['ok'] = ($body['ok'] ?? false) === true;
+
+        return $out;
+    }
+
+    protected function batchSummaryResponse(array $results, bool $atomic): JsonResponse {
+        $failed = 0;
+        foreach ($results as $r) {
+            if (!$r['ok']) {
+                $failed++;
+            }
+        }
+
+        return response()->json([
+            'ok' => $failed === 0,
+            'atomic' => $atomic,
+            'summary' => ['total' => count($results), 'ok' => count($results) - $failed, 'failed' => $failed],
+            'results' => $results,
+        ]);
     }
 
     protected function errorResponse(string $message, int $status, array $errors = []): JsonResponse {

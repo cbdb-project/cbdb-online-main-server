@@ -4,6 +4,14 @@
 
 ## 2026-07
 
+### 新增批次變更端點 `POST /api/v2/batch_mutate`
+- 一個請求帶多筆 `items`，逐筆分發到既有 `MutationHandlerRegistry` handler，**完全沿用單筆端點的校驗／改鍵碰撞偵測／授權／`operations`＋AuditLog**，不另起平行寫入邏輯；用於消除逐筆 HTTP 往返與限流（429）成本。
+- `atomic=false`（預設）：逐筆獨立結算，單筆失敗不影響其餘，回 200 + `results[]` + `summary{total,ok,failed}`（`body.ok`＝是否全數成功）。
+- `atomic=true`：整批單一交易，任一筆失敗整批回滾（handler 內層交易降為 savepoint），回 409 + `failed_index`。
+- 支援頂層 `resource/mode/operation/meta` 預設（逐項可覆寫）；單次上限 `BATCH_MAX_ITEMS=500`（超過回 422）；單筆未預期例外隔離為該筆 500，不拖垮整批。
+- 端點列入 CSRF 豁免、`auth.optional`；`direct` 寫入仍需 `canWriteDirectly()`。
+- 測試 `tests/Feature/ApiV2MutateBatchTest.php`：missing-items/over-limit 422、非原子部分成功、原子全成、原子失敗回滾、頂層預設合併、群眾外包 direct 403。
+
 ### `/codes` 排序／篩選功能加登入門檻（僅 React/Inertia 版）
 - 背景：一次生產環境癱瘓事後分析發現，`/codes/{TABLE}?sort_by=...` 這類深分頁＋任意欄位排序／前導通配符 filter 查詢先於請求量異常變慢，推擠掉 php-fpm worker 拖垮全站。
 - `app/codes/{table_name}`（`CodesController@appShow`）新增 `guardSortFilterRequiresAuth()`：請求帶 `sort_by` 或非空 `filters[...]` 時，未登入導向 `login`（記錄 intended URL）；已登入但未激活（`Auth::user()->isActive()` 為 false）改用 flash 訊息 + `redirect()->back()`（避免被 `login` 路由的 `guest` middleware 攔截）；已登入且已激活不受影響。無 sort/filter 的基礎瀏覽維持公開，不需登入。

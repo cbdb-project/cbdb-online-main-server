@@ -4,6 +4,12 @@
 
 ## 2026-07
 
+### 中文維基連結改走 mutation API 增量維護（BIOG_SOURCE_DATA）
+- 確立中文/英文維基與 Wikidata 連結在 CBDB prod 存於 `BIOG_SOURCE_DATA`（`c_textid` 60795/68943/68942，`c_pages` 存條目標題），維護一律走 `/api/v2/{mutate,create,delete}` 的 `sources` 資源（`direct`、Bearer PAT、CSRF 豁免，寫入靠 `canWriteDirectly()`），每筆有 `operation_id` 可回滾。
+- **`WikiMaintenanceController`（全量刪除重灌）標記為僅限首次導入**，不得用於增量新增／修正；[docs/WIKI_TASK_MANAGEMENT.md](docs/WIKI_TASK_MANAGEMENT.md) 加說明橫幅。
+- 批次追溯：direct 模式 `meta.comment` 不落庫，故批號寫入 `c_notes`（`日期 | 操作者 | batch_id`，batch_id = 來源報表內容 hash）。
+- 新增技能 [.claude/skills/mutation-api-record-editing.md](.claude/skills/mutation-api-record-editing.md) 與流程文檔 [docs/ZHWIKI_SOURCE_SYNC.md](docs/ZHWIKI_SOURCE_SYNC.md)；執行腳本 `cbdb-dbs/d1_build_*/round3/sync_zhwiki_sources.py`（dry-run 預設、分批、429 退避）。
+
 ### `/codes` 排序／篩選功能加登入門檻（僅 React/Inertia 版）
 - 背景：一次生產環境癱瘓事後分析發現，`/codes/{TABLE}?sort_by=...` 這類深分頁＋任意欄位排序／前導通配符 filter 查詢先於請求量異常變慢，推擠掉 php-fpm worker 拖垮全站。
 - `app/codes/{table_name}`（`CodesController@appShow`）新增 `guardSortFilterRequiresAuth()`：請求帶 `sort_by` 或非空 `filters[...]` 時，未登入導向 `login`（記錄 intended URL）；已登入但未激活（`Auth::user()->isActive()` 為 false）改用 flash 訊息 + `redirect()->back()`（避免被 `login` 路由的 `guest` middleware 攔截）；已登入且已激活不受影響。無 sort/filter 的基礎瀏覽維持公開，不需登入。

@@ -115,12 +115,14 @@ php artisan cbdb:fetch-chgis-map        # 下載 CHGIS 底圖（缺檔才下載�
 - [CHANGELOG.md](./CHANGELOG.md)
 - [DATABASE.md](./DATABASE.md)
 - [docs/APPROVAL_FLOWS.md](./docs/APPROVAL_FLOWS.md)
+- [docs/ZHWIKI_SOURCE_SYNC.md](./docs/ZHWIKI_SOURCE_SYNC.md)（中文維基連結增量維護：走 mutation API，勿用 WikiMaintenanceController 全量重灌）
 - [docs/VIEWS.md](./docs/VIEWS.md)
 - [docs/POSTING_OFFICE.md](./docs/POSTING_OFFICE.md)
 - [docs/COMPOSITE_PRIMARY_KEY_URL_DESIGN.md](./docs/COMPOSITE_PRIMARY_KEY_URL_DESIGN.md)
 
 ## AI / Claude skills
 - `.claude/skills/database-schema.md`
+- `.claude/skills/mutation-api-record-editing.md`
 - `.claude/skills/migration-guide.md`
 - `.claude/skills/pre-commit-checks.md`
 - `.claude/skills/testing-guide.md`

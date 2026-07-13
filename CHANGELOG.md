@@ -4,6 +4,14 @@
 
 ## 2026-07
 
+### 新增批次變更端點 `POST /api/v2/batch_mutate`
+- 一個請求帶多筆 `items`，逐筆分發到既有 `MutationHandlerRegistry` handler，**完全沿用單筆端點的校驗／改鍵碰撞偵測／授權／`operations`＋AuditLog**，不另起平行寫入邏輯；用於消除逐筆 HTTP 往返與限流（429）成本。
+- `atomic=false`（預設）：逐筆獨立結算，單筆失敗不影響其餘，回 200 + `results[]` + `summary{total,ok,failed}`（`body.ok`＝是否全數成功）。
+- `atomic=true`：整批單一交易，任一筆失敗整批回滾（handler 內層交易降為 savepoint），回 409 + `failed_index`。
+- 支援頂層 `resource/mode/operation/meta` 預設（逐項可覆寫）；單次上限 `BATCH_MAX_ITEMS=500`（超過回 422）；單筆未預期例外隔離為該筆 500，不拖垮整批。
+- 端點列入 CSRF 豁免、`auth.optional`；`direct` 寫入仍需 `canWriteDirectly()`。
+- 測試 `tests/Feature/ApiV2MutateBatchTest.php`：missing-items/over-limit 422、非原子部分成功、原子全成、原子失敗回滾、頂層預設合併、群眾外包 direct 403。
+
 ### 修復 operations 表缺索引導致每筆 create 全表掃描（生產穩定性）
 - **問題**：所有子資源 create 都會對 operations 做「pending 提案」預檢（`WHERE resource=? AND resource_id IN(?) AND op_type=?`，見 `AbstractPersonSubresourceCreateHandler` / `SourceMutationHandler` / `PostingCreateHandler`），但 operations 僅有 `PRIMARY(id)` 與 `KEY(c_personid)`，`resource`/`resource_id` 無索引 → 每寫一筆就**全表掃描一次** operations（該表隨每次 mutation 持續增長）。批次/並發寫入時大量並發全表掃描飽和 DB、堆積慢查詢、推爆 php-fpm（與 /codes 深分頁那次生產癱瘓同一模式）。
 - **修復**：新增 migration 為 operations 補 `(resource, resource_id, op_type)` 複合索引（`2026_07_12_000000_add_resource_index_to_operations_table`），把預檢由全表掃描收斂為索引 seek。

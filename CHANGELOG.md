@@ -4,6 +4,14 @@
 
 ## 2026-07
 
+### mutation API 支援 code 表寫入（先接 TEXT_CODES，resource=text-codes）
+- 讓單主鍵 code 表可經 `/api/v2/{create,delete}` 與 `batch_mutate` 機器化寫入（token、`operations` + AuditLog、可回滾），補上目前 codes 網頁表單/書目導入工具缺的統一審計。
+- config 驅動（`config/code_table_writes.php`）：每張表定 `resource/aliases/table/key_column/auto_assign_id/allowed_fields`。新增 `CodeTableCreateHandler` / `CodeTableDeleteHandler`（獨立於 person-subresource 基底，因 code 表無 c_personid）。
+- **create 支援「顯式主鍵」與「服務端自動分配 id」（`max(key)+1`）兩種**：前者供補指定 textid（如 merge-recovery 的證據源）、後者供書目等批量新增；並發撞號由唯一鍵兜底 409。
+- `CompositePrimaryKey::SCHEMAS` 補 `TEXT_CODES => (c_textid)`（供 Operations/Restore 解析 resource_id）。
+- 註：既有 `AdminBatchLoadBookTitlesController`（書目導入）暫維持現狀（有 operations、無 audit_log），後續可改走此通道統一。
+- 測試 `tests/Feature/ApiV2MutateCodeTableTextCodesTest.php`（顯式/自動分配/409/422/delete/batch）。
+
 ### mutation API 支援 MERGED_PERSON_DATA（合併人物記錄，resource=merged-person）
 - 讓「補錄已刪人物併入哪個 survivor」的合併映射可經 `/api/v2/{create,delete}` 與 `batch_mutate` 機器化寫入（原本僅 `codes` CRUD 網頁表單直接 insert、無 operation_id）。
 - 新增 `MergedPersonCreateHandler` / `MergedPersonDeleteHandler`（沿用 `AbstractPersonSubresourceCreate/DeleteHandler`），走既有授權（`canWriteDirectly`）+ `operations` + AuditLog → 可回滾；`CompositePrimaryKey::SCHEMAS` 補 `MERGED_PERSON_DATA => (c_personid, c_merged_from_personid)`。

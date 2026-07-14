@@ -4,6 +4,13 @@
 
 ## 2026-07
 
+### mutation API 支援 MERGED_PERSON_DATA（合併人物記錄，resource=merged-person）
+- 讓「補錄已刪人物併入哪個 survivor」的合併映射可經 `/api/v2/{create,delete}` 與 `batch_mutate` 機器化寫入（原本僅 `codes` CRUD 網頁表單直接 insert、無 operation_id）。
+- 新增 `MergedPersonCreateHandler` / `MergedPersonDeleteHandler`（沿用 `AbstractPersonSubresourceCreate/DeleteHandler`），走既有授權（`canWriteDirectly`）+ `operations` + AuditLog → 可回滾；`CompositePrimaryKey::SCHEMAS` 補 `MERGED_PERSON_DATA => (c_personid, c_merged_from_personid)`。
+- 語意注意：`c_merged_from_personid` 是**刻意的已刪 id**，僅做「person_id 與 PK 內 c_personid 一致性」校驗、**不對 BIOG_MAIN 做存在性檢查**；可寫欄 `c_notes`（合併原因，會由 `CbdbApiController::buildMergeHint` 展示）、`c_source`、`c_pages`。
+- 因 batch_mutate 逐筆復用 handler dispatch，單筆與批次端點同時生效，無需分別改。
+- 測試 `tests/Feature/ApiV2MutateMergedPersonTest.php`（create/409/person 不一致/batch/delete/已刪 from-id 不被校驗）。
+
 ### 新增批次變更端點 `POST /api/v2/batch_mutate`
 - 一個請求帶多筆 `items`，逐筆分發到既有 `MutationHandlerRegistry` handler，**完全沿用單筆端點的校驗／改鍵碰撞偵測／授權／`operations`＋AuditLog**，不另起平行寫入邏輯；用於消除逐筆 HTTP 往返與限流（429）成本。
 - `atomic=false`（預設）：逐筆獨立結算，單筆失敗不影響其餘，回 200 + `results[]` + `summary{total,ok,failed}`（`body.ok`＝是否全數成功）。

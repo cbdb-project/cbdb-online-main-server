@@ -13,6 +13,12 @@ import { cn } from '../../lib/utils';
 type Row = Record<string, unknown>;
 type Params = Record<string, FormDataConvertible>;
 
+// 安全開關：停用碼表刪除的前端入口。多數碼表（DYNASTIES/GANZHI_CODES/TEXT_CODES/
+// OFFICE_CODES/SOCIAL_INSTITUTION_* 等）被人物資料以 ON DELETE CASCADE 外鍵引用，刪一列
+// 可能連帶刪除數萬筆人物列且無法乾淨復原。刪除功能尚無引用護欄前一律隱藏入口。
+// 注意：此為純前端隱藏，後端刪除路由仍存在，之後須另補後端護欄。
+const RISKY_DELETE_DISABLED = true;
+
 interface CursorData {
     rows: Row[];
     first_id: number | string | null;
@@ -347,9 +353,11 @@ export default function CodesShow() {
                                                     <a href={urls.edit_template.replace('__ID__', encodeURIComponent(id))} className="rounded bg-sky-100 px-2 py-0.5 text-xs text-sky-800 hover:bg-sky-200">
                                                         {tc('edit')}
                                                     </a>
-                                                    <button type="button" onClick={() => setDeleteId(id)} className="rounded bg-red-100 px-2 py-0.5 text-xs text-red-800 hover:bg-red-200">
-                                                        {tc('delete')}
-                                                    </button>
+                                                    {!RISKY_DELETE_DISABLED && (
+                                                        <button type="button" onClick={() => setDeleteId(id)} className="rounded bg-red-100 px-2 py-0.5 text-xs text-red-800 hover:bg-red-200">
+                                                            {tc('delete')}
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         )}

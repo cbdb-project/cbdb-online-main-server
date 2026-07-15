@@ -49,7 +49,14 @@ class OfficeImportService {
         return array_values(array_diff($unique, $found));
     }
 
-    /** 官職被人物任官（POSTED_TO_OFFICE_DATA）引用的筆數；>0 表示不可安全刪除。 */
+    /**
+     * 官職被人物任官（POSTED_TO_OFFICE_DATA）引用的筆數；>0 表示不可刪除。
+     *
+     * ⚠ 安全關鍵：POSTED_TO_OFFICE_DATA.c_office_id → OFFICE_CODES 的外鍵為 ON DELETE CASCADE，
+     * 若在有引用時刪除官職，資料庫會連帶刪掉這些人物的任官紀錄（人物資料靜默損毀）。
+     * 呼叫端（handler）務必先以本方法擋下有引用者，勿移除此護欄。
+     * （POSTED_TO_ADDR_DATA 依附於 POSTED_TO_OFFICE_DATA，擋下後者即涵蓋。）
+     */
     public function referenceCount(int $officeId): int {
         return (int) DB::table('POSTED_TO_OFFICE_DATA')->where('c_office_id', $officeId)->count();
     }

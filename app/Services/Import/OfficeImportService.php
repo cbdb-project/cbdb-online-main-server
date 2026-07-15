@@ -16,14 +16,18 @@ use Illuminate\Support\Facades\DB;
  *
  * 一次「加官職」= 原子寫入兩表：
  *  - OFFICE_CODES：c_office_id(max+1)、c_office_pinyin(派生)、c_dy、c_office_chn/trans、c_source
- *  - OFFICE_CODE_TYPE_REL：(c_office_id, c_office_tree_id=type_id)
+ *  - OFFICE_CODE_TYPE_REL：(c_office_id, c_office_tree_id=type_id)；官職可屬多個類型節點，故此為集合。
  *
  * OFFICE_CODES 無 c_created_by/date 審計欄（見生產 DB schema），故直接 plain insert、
  * 不走 ToolsRepository::timestamp（否則會 INSERT 不存在的欄位而 500）；審計改由
  * operations + audit_log 承載。與 SocialInstituteImportService 一致。
  *
- * create() 不自開交易，於呼叫端交易內執行（批量：controller 一個交易包全部；單筆 API：handler 包一筆），
- * 以保留「全有或全無」語意。呼叫端須先以 validate*() 過濾非法輸入。
+ * 除 create() 外亦提供 load()／update()／delete()，作為「官職實體」聚合 CRUD 的單一真源，
+ * 供 mutation API（OfficeImportHandler / OfficeUpdateHandler / OfficeDeleteHandler）與前端
+ * 聚合編輯頁共用。update() 對 OFFICE_CODE_TYPE_REL 做集合對賬（僅增刪差異、不整批重寫），
+ * 避免多類型官職被靜默刪去其他類型。delete() 前須先 referenceCount() 檢查是否仍被人物任官引用。
+ *
+ * 寫入方法皆不自開交易，於呼叫端交易內執行以保留「全有或全無」語意；呼叫端須先過濾非法輸入。
  */
 class OfficeImportService {
     use SharesImportHelpers;
@@ -45,11 +49,41 @@ class OfficeImportService {
         return array_values(array_diff($unique, $found));
     }
 
+    /** 官職被人物任官（POSTED_TO_OFFICE_DATA）引用的筆數；>0 表示不可安全刪除。 */
+    public function referenceCount(int $officeId): int {
+        return (int) DB::table('POSTED_TO_OFFICE_DATA')->where('c_office_id', $officeId)->count();
+    }
+
+    /** 載入單一官職聚合（供編輯頁與 API 讀取）；不存在回 null。 */
+    public function load(int $officeId): ?array {
+        $row = DB::table('OFFICE_CODES')->where('c_office_id', $officeId)->first();
+        if (!$row) {
+            return null;
+        }
+        $typeIds = DB::table('OFFICE_CODE_TYPE_REL')
+            ->where('c_office_id', $officeId)
+            ->orderBy('c_office_tree_id')
+            ->pluck('c_office_tree_id')
+            ->map(fn ($v) => (string) $v)
+            ->all();
+
+        return [
+            'office_id' => (int) $row->c_office_id,
+            'name' => (string) ($row->c_office_chn ?? ''),
+            'translation' => $row->c_office_trans !== null ? (string) $row->c_office_trans : null,
+            'pinyin' => (string) ($row->c_office_pinyin ?? ''),
+            'dynasty_code' => $row->c_dy !== null ? (int) $row->c_dy : null,
+            'source_id' => $row->c_source !== null ? (int) $row->c_source : null,
+            'type_ids' => $typeIds,
+        ];
+    }
+
     /**
      * 執行「新增一個官職」過程（於呼叫端交易內）。輸入須已驗證。
+     * 類型可給單值（type_id，向後相容批量匯入）或多值（type_ids[]）。
      *
-     * @param array{name:string,translation:?string,dynasty_code:int,type_id:string|int,source_id:int} $input
-     * @return array{office_id:int,pinyin:string,operation_id_office:?int,operation_id_rel:?int}
+     * @param array{name:string,translation:?string,dynasty_code:int,type_id?:string|int,type_ids?:array,source_id:int} $input
+     * @return array{office_id:int,pinyin:string,type_ids:array,operation_id_office:?int,operation_id_rel:?int}
      */
     public function create(array $input, int $actorPersonId = 0): array {
         // lockForUpdate 序列化並發的 max()+1 配號：兩個同時到達的請求若讀到同一 max，
@@ -69,19 +103,124 @@ class OfficeImportService {
         DB::table('OFFICE_CODES')->insert($officePayload);
         $officeOp = $this->recordOp('OFFICE_CODES', ['c_office_id' => $officeId], $officePayload, $actorPersonId);
 
-        $relPayload = [
-            'c_office_id' => $officeId,
-            'c_office_tree_id' => $input['type_id'],
-        ];
-        DB::table('OFFICE_CODE_TYPE_REL')->insert($relPayload);
-        $relPk = ['c_office_id' => $officeId, 'c_office_tree_id' => $input['type_id']];
-        $relOp = $this->recordOp('OFFICE_CODE_TYPE_REL', $relPk, $relPayload, $actorPersonId);
+        $typeIds = $this->typeIdList($input);
+        $relOps = [];
+        foreach ($typeIds as $tid) {
+            $relPayload = ['c_office_id' => $officeId, 'c_office_tree_id' => $tid];
+            DB::table('OFFICE_CODE_TYPE_REL')->insert($relPayload);
+            $relOps[] = $this->recordOp('OFFICE_CODE_TYPE_REL', $relPayload, $relPayload, $actorPersonId);
+        }
 
         return [
             'office_id' => $officeId,
             'pinyin' => $pinyin,
+            'type_ids' => $typeIds,
             'operation_id_office' => $officeOp?->id,
-            'operation_id_rel' => $relOp?->id,
+            'operation_id_rel' => $relOps[0]?->id ?? null,
         ];
+    }
+
+    /**
+     * 更新官職聚合（於呼叫端交易內）。輸入須已驗證，且官職須存在。
+     * OFFICE_CODES 欄位整體覆寫；OFFICE_CODE_TYPE_REL 做集合對賬（僅增刪差異）。
+     *
+     * @param array{name:string,translation:?string,dynasty_code:int,type_ids:array,source_id:int} $input
+     * @return array{office_id:int,pinyin:string,type_ids:array,types_added:array,types_removed:array,operation_id_office:?int}
+     */
+    public function update(int $officeId, array $input, int $actorPersonId = 0): array {
+        $before = (array) DB::table('OFFICE_CODES')->where('c_office_id', $officeId)->lockForUpdate()->first();
+        $pinyin = $this->buildPinyin($input['name']);
+        $after = [
+            'c_dy' => (int) $input['dynasty_code'],
+            'c_office_pinyin' => $pinyin,
+            'c_office_trans' => $input['translation'] ?? null,
+            'c_office_chn' => $input['name'],
+            'c_source' => (int) $input['source_id'],
+        ];
+        DB::table('OFFICE_CODES')->where('c_office_id', $officeId)->update($after);
+        $officeOp = $this->recordUpdate(
+            'OFFICE_CODES',
+            ['c_office_id' => $officeId],
+            $before,
+            array_merge(['c_office_id' => $officeId], $after),
+            $actorPersonId
+        );
+
+        // REL 集合對賬：只刪不再需要的、只加尚未存在的，逐筆記 op（可個別復原）。
+        $desired = $this->typeIdList($input);
+        $current = DB::table('OFFICE_CODE_TYPE_REL')
+            ->where('c_office_id', $officeId)
+            ->pluck('c_office_tree_id')
+            ->map(fn ($v) => (string) $v)
+            ->all();
+        $toAdd = array_values(array_diff($desired, $current));
+        $toRemove = array_values(array_diff($current, $desired));
+
+        foreach ($toRemove as $tid) {
+            $pk = ['c_office_id' => $officeId, 'c_office_tree_id' => $tid];
+            DB::table('OFFICE_CODE_TYPE_REL')->where('c_office_id', $officeId)->where('c_office_tree_id', $tid)->delete();
+            $this->recordDelete('OFFICE_CODE_TYPE_REL', $pk, $pk, $actorPersonId);
+        }
+        foreach ($toAdd as $tid) {
+            $payload = ['c_office_id' => $officeId, 'c_office_tree_id' => $tid];
+            DB::table('OFFICE_CODE_TYPE_REL')->insert($payload);
+            $this->recordOp('OFFICE_CODE_TYPE_REL', $payload, $payload, $actorPersonId);
+        }
+
+        return [
+            'office_id' => $officeId,
+            'pinyin' => $pinyin,
+            'type_ids' => $desired,
+            'types_added' => $toAdd,
+            'types_removed' => $toRemove,
+            'operation_id_office' => $officeOp?->id,
+        ];
+    }
+
+    /**
+     * 刪除官職聚合（於呼叫端交易內）：先刪 OFFICE_CODE_TYPE_REL 各行、再刪 OFFICE_CODES，逐筆記 op。
+     * 呼叫端須先以 referenceCount() 確認未被人物任官引用。
+     *
+     * @return array{office_id:int,rel_deleted:int,operation_id_office:?int}
+     */
+    public function delete(int $officeId, int $actorPersonId = 0): array {
+        $officeBefore = (array) DB::table('OFFICE_CODES')->where('c_office_id', $officeId)->first();
+        $rels = DB::table('OFFICE_CODE_TYPE_REL')->where('c_office_id', $officeId)->get();
+        foreach ($rels as $rel) {
+            $pk = ['c_office_id' => $officeId, 'c_office_tree_id' => (string) $rel->c_office_tree_id];
+            DB::table('OFFICE_CODE_TYPE_REL')
+                ->where('c_office_id', $officeId)
+                ->where('c_office_tree_id', $rel->c_office_tree_id)
+                ->delete();
+            $this->recordDelete('OFFICE_CODE_TYPE_REL', $pk, (array) $rel, $actorPersonId);
+        }
+        DB::table('OFFICE_CODES')->where('c_office_id', $officeId)->delete();
+        $officeOp = $this->recordDelete('OFFICE_CODES', ['c_office_id' => $officeId], $officeBefore, $actorPersonId);
+
+        return [
+            'office_id' => $officeId,
+            'rel_deleted' => count($rels),
+            'operation_id_office' => $officeOp?->id,
+        ];
+    }
+
+    /** 從輸入取類型 id 集合：優先 type_ids[]，否則單值 type_id；正規化為去重、非空字串。 */
+    protected function typeIdList(array $input): array {
+        if (isset($input['type_ids']) && is_array($input['type_ids'])) {
+            $ids = $input['type_ids'];
+        } elseif (isset($input['type_id']) && $input['type_id'] !== null && $input['type_id'] !== '') {
+            $ids = [$input['type_id']];
+        } else {
+            $ids = [];
+        }
+        $out = [];
+        foreach ($ids as $v) {
+            $v = (string) $v;
+            if ($v !== '' && !in_array($v, $out, true)) {
+                $out[] = $v;
+            }
+        }
+
+        return $out;
     }
 }

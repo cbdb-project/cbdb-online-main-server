@@ -81,4 +81,56 @@ trait SharesImportHelpers {
 
         return $operation;
     }
+
+    /** 寫一筆 operations + audit_log（UPDATE）。resource_data=更新後、resource_original=更新前。 */
+    protected function recordUpdate(string $table, array $pk, array $before, array $after, int $actorPersonId): ?Operation {
+        $operation = $this->operationRepository->store(
+            Auth::id(),
+            $actorPersonId,
+            Operation::TYPE_UPDATE,
+            $table,
+            CompositePrimaryKey::buildStoredResourceId($pk),
+            $after,
+            $before
+        );
+
+        $this->auditLogService->write(
+            $table,
+            'UPDATE',
+            $pk,
+            $this->auditLogService->normalizeRow($before),
+            $this->auditLogService->normalizeRow($after),
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
+
+        return $operation;
+    }
+
+    /** 寫一筆 operations + audit_log（DELETE）。resource_data=刪除前快照（供復原重建）。 */
+    protected function recordDelete(string $table, array $pk, array $before, int $actorPersonId): ?Operation {
+        $operation = $this->operationRepository->store(
+            Auth::id(),
+            $actorPersonId,
+            Operation::TYPE_DELETE,
+            $table,
+            CompositePrimaryKey::buildStoredResourceId($pk),
+            $before,
+            $before
+        );
+
+        $this->auditLogService->write(
+            $table,
+            'DELETE',
+            $pk,
+            $this->auditLogService->normalizeRow($before),
+            null,
+            'user',
+            (string) Auth::id(),
+            $operation ? (string) $operation->id : null
+        );
+
+        return $operation;
+    }
 }

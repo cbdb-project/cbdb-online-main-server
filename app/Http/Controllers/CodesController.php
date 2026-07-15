@@ -245,6 +245,13 @@ class CodesController extends Controller {
      */
     protected $tableColumnsCache = [];
 
+    /**
+     * Per-request column NOT NULL / default metadata cache (keyed by table name).
+     *
+     * @var array<string, array<string, array{not_null: bool, has_default: bool}>>
+     */
+    protected $columnConstraintsCache = [];
+
     protected ColumnFilterExpression $columnFilterExpression;
 
     protected AuditLogService $auditLogService;
@@ -923,6 +930,9 @@ class CodesController extends Controller {
         $data = Arr::except($request->all(), ['_method', '_token', '__proposal_comment']);
         $data = $this->enforceAuditFieldsForUpdate($data, $originalRow ?: []);
         $data = $this->normalizeCodeTablePinyin($table, $data);
+        // 與 performStore 一致：留白的 NOT NULL（有預設值）欄不寫入 null（更新時等於保留原值），
+        // 避免觸發完整性違規；留白但無預設值的 NOT NULL 欄仍交由資料庫拋出誠實錯誤。
+        $data = $this->applyColumnDefaultsForBlanks($table, $data);
 
         try {
             $query->update($data);
@@ -933,6 +943,16 @@ class CodesController extends Controller {
                 return redirect()->back()
                     ->withInput()
                     ->withErrors(['duplicate' => '更新失敗：主鍵或唯一值已存在。']);
+            }
+
+            // 其餘完整性違規（NOT NULL、外鍵…）給誠實訊息，不再誤標為重複，也不要直接 500。
+            if ($this->isIntegrityConstraintException($e)) {
+                \Illuminate\Support\Facades\Log::warning('Codes 更新完整性違規', ['table' => $table, 'error' => $e->getMessage()]);
+                flash('更新失敗：必填欄位未填寫或關聯值不存在。', 'error');
+
+                return redirect()->back()
+                    ->withInput()
+                    ->withErrors(['integrity' => '更新失敗：必填欄位未填寫或關聯值不存在。']);
             }
 
             throw $e;
@@ -1302,17 +1322,10 @@ class CodesController extends Controller {
         }
         $data = $this->enforceAuditFieldsForCreate($table, $data);
         $data = $this->normalizeCodeTablePinyin($table, $data);
+        // 留白的 NOT NULL 欄（空字串經 ConvertEmptyStringsToNull 已成 null）改套用資料庫預設值，
+        // 避免把 null 寫入 NOT NULL 欄觸發完整性違規（例如 pinyin.c_lastname 留白應視為預設 0）。
+        $data = $this->applyColumnDefaultsForBlanks($table, $data);
 
-        //20210323遮除「第一欄預設隱藏」
-        //$id_ = $this->getIdName($table_name);
-        //if($table_name != 'SOCIAL_INSTITUTION_CODES') {
-        //$id = DB::table($table_name)->max($id_) + 1;
-        //$data[$id_] = $id;
-        //}
-        //else {
-        //當資料表等於SOCIAL_INSTITUTION_CODES，$id從表單取值。
-        //$id = $data[$id_];
-        //}
         try {
             DB::table($table)->insert($data);
         } catch (\Illuminate\Database\QueryException $e) {
@@ -1322,6 +1335,17 @@ class CodesController extends Controller {
                 return redirect()->back()
                     ->withInput()
                     ->withErrors(['duplicate' => '新增失敗：主鍵或唯一值已存在。']);
+            }
+
+            // 其餘完整性違規（NOT NULL、外鍵…）給出誠實訊息，不可再誤標為「主鍵或唯一值已存在」。
+            if ($this->isIntegrityConstraintException($e)) {
+                // 友善訊息會吞掉例外，仍記一筆 warning 以保留可觀測性（非預期 FK/NOT NULL bug 才好追）。
+                \Illuminate\Support\Facades\Log::warning('Codes 新增完整性違規', ['table' => $table, 'error' => $e->getMessage()]);
+                flash('新增失敗：必填欄位未填寫或關聯值不存在。', 'error');
+
+                return redirect()->back()
+                    ->withInput()
+                    ->withErrors(['integrity' => '新增失敗：必填欄位未填寫或關聯值不存在。']);
             }
 
             throw $e;
@@ -1527,6 +1551,89 @@ class CodesController extends Controller {
         }
 
         return $cache[$table] = array_values(array_unique(array_filter($keys)));
+    }
+
+    /**
+     * 取得各欄位的 NOT NULL / 是否有預設值資訊（相容 MySQL 與 SQLite），供
+     * applyColumnDefaultsForBlanks 判斷「留白 NOT NULL 欄」是否可退回資料庫預設值。
+     *
+     * @return array<string, array{not_null: bool, has_default: bool}>
+     */
+    protected function getColumnConstraints(string $table): array {
+        if (array_key_exists($table, $this->columnConstraintsCache)) {
+            return $this->columnConstraintsCache[$table];
+        }
+
+        $meta = [];
+
+        try {
+            $connection = DB::connection();
+
+            if ($connection->getDriverName() === 'sqlite') {
+                foreach ($connection->select('PRAGMA table_info("' . $table . '")') as $row) {
+                    $col = (array) $row;
+                    if (empty($col['name'])) {
+                        continue;
+                    }
+                    $meta[$col['name']] = [
+                        'not_null' => (int) ($col['notnull'] ?? 0) === 1,
+                        'has_default' => ($col['dflt_value'] ?? null) !== null,
+                    ];
+                }
+            } else {
+                $databaseName = $connection->getDatabaseName();
+                if ($databaseName !== null && $databaseName !== '') {
+                    $rows = $connection->select(
+                        'SELECT COLUMN_NAME, IS_NULLABLE, COLUMN_DEFAULT, EXTRA FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?',
+                        [$databaseName, $table]
+                    );
+                    foreach ($rows as $row) {
+                        $col = (array) $row;
+                        $name = $col['COLUMN_NAME'] ?? null;
+                        if ($name === null || $name === '') {
+                            continue;
+                        }
+                        $hasDefault = ($col['COLUMN_DEFAULT'] ?? null) !== null
+                            || stripos((string) ($col['EXTRA'] ?? ''), 'auto_increment') !== false;
+                        $meta[$name] = [
+                            'not_null' => strtoupper((string) ($col['IS_NULLABLE'] ?? 'YES')) === 'NO',
+                            'has_default' => $hasDefault,
+                        ];
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            $meta = [];
+        }
+
+        return $this->columnConstraintsCache[$table] = $meta;
+    }
+
+    /**
+     * 對「NOT NULL 且有預設值」的欄位，若送來的值為 null（空字串經
+     * ConvertEmptyStringsToNull 中介層會轉成 null），改為移除該欄，讓資料庫套用預設值。
+     *
+     * 若不處理，直接把 null 寫入 NOT NULL 欄會拋 SQLSTATE 23000（NOT NULL 違規），
+     * 造成使用者留白某欄（如 pinyin.c_lastname，預設 0）時新增失敗。留白但「無預設值」
+     * 的 NOT NULL 欄不動，交由資料庫拋出誠實的完整性錯誤。
+     *
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    protected function applyColumnDefaultsForBlanks(string $table, array $data): array {
+        $meta = $this->getColumnConstraints($table);
+
+        foreach ($data as $column => $value) {
+            if ($value !== null) {
+                continue;
+            }
+            $info = $meta[$column] ?? null;
+            if ($info !== null && $info['not_null'] && $info['has_default']) {
+                unset($data[$column]);
+            }
+        }
+
+        return $data;
     }
 
     /**
@@ -2159,13 +2266,38 @@ class CodesController extends Controller {
     }
 
     protected function isDuplicateKeyException(\Illuminate\Database\QueryException $exception): bool {
-        if ($exception->getCode() === '23000') {
+        // 只認「唯一鍵／主鍵重複」。SQLSTATE 23000 是「完整性違規」大類，同時涵蓋
+        // NOT NULL（MySQL 1048）、外鍵（1452）等，不能整個類別都當成重複，否則使用者
+        // 留白某 NOT NULL 欄時會看到假的「主鍵或唯一值已存在」（實際上並無重複資料）。
+        if ($exception instanceof \Illuminate\Database\UniqueConstraintViolationException) {
             return true;
         }
 
         $message = $exception->getMessage();
 
-        return strpos($message, 'Duplicate entry') !== false;
+        // MySQL/MariaDB：1062 Duplicate entry；SQLite：UNIQUE constraint failed。
+        return strpos($message, 'Duplicate entry') !== false
+            || stripos($message, 'UNIQUE constraint failed') !== false;
+    }
+
+    /**
+     * 是否為「非重複」的完整性約束違規（NOT NULL、外鍵…），即 SQLSTATE 23000
+     * 但不屬於唯一鍵重複者。用於給出誠實錯誤訊息，而非誤標為重複或直接 500。
+     */
+    protected function isIntegrityConstraintException(\Illuminate\Database\QueryException $exception): bool {
+        if ($this->isDuplicateKeyException($exception)) {
+            return false;
+        }
+
+        if ((string) $exception->getCode() === '23000') {
+            return true;
+        }
+
+        $message = $exception->getMessage();
+
+        return strpos($message, 'SQLSTATE[23000]') !== false
+            || stripos($message, 'NOT NULL constraint failed') !== false
+            || stripos($message, 'FOREIGN KEY constraint failed') !== false;
     }
 
     /**

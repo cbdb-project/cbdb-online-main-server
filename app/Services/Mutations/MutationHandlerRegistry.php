@@ -49,7 +49,11 @@ class MutationHandlerRegistry {
         PossessionDeleteHandler $possessionDeleteHandler,
         PostingDeleteHandler $postingDeleteHandler,
         OfficeImportHandler $officeImportHandler,
-        SocialInstituteImportHandler $socialInstituteImportHandler
+        SocialInstituteImportHandler $socialInstituteImportHandler,
+        MergedPersonCreateHandler $mergedPersonCreateHandler,
+        MergedPersonDeleteHandler $mergedPersonDeleteHandler,
+        CodeTableCreateHandler $codeTableCreateHandler,
+        CodeTableDeleteHandler $codeTableDeleteHandler
     ) {
         $this->handlers = [
             $biogMainHandler,
@@ -93,6 +97,10 @@ class MutationHandlerRegistry {
             $postingDeleteHandler,
             $officeImportHandler,
             $socialInstituteImportHandler,
+            $mergedPersonCreateHandler,
+            $mergedPersonDeleteHandler,
+            $codeTableCreateHandler,
+            $codeTableDeleteHandler,
         ];
     }
 

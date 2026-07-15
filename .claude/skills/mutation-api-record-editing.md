@@ -23,8 +23,17 @@ description: 使用 /api/v2 mutation 端點對 CBDB 人物子資源與 code 表�
 | 新增 | `POST /api/v2/create` | `operation` 固定 `create` |
 | 修改 | `POST /api/v2/mutate` | `operation` 預設 `update`（也可傳 `create`） |
 | 刪除 | `POST /api/v2/delete` | `operation` 固定 `delete` |
+| **批次** | **`POST /api/v2/batch_mutate`** | **一個請求多筆——大批量首選**（見下節） |
 
-> 目前每個端點**一次一筆**；大批量（如上千筆）建議分批 + 退避（見下文安全流程）。**批次接口 `POST /api/v2/batch_mutate`（一次多筆）規劃中、另行 PR**，落地後大批量改走它。
+> **大批量（幾十筆以上）一律優先用 `/api/v2/batch_mutate`**：一次請求多筆，大幅減少 HTTP 往返與限流（429）壓力，且每筆仍走同一套 handler／校驗／`operations`＋AuditLog。單筆端點僅用於零星改動或需逐筆即時回應的場景。
+
+### 批次端點 `/api/v2/batch_mutate`（大批量首選，已上線 #1156）
+
+- Payload：`{ items: [ {resource, mode, operation, person_id, target:{pk}, changes, meta}, … ], atomic?, 頂層 resource/mode/operation/meta 預設（逐項可覆寫） }`；上限 `BATCH_MAX_ITEMS=500`（超過回 422，缺 items 回 422）。
+- **逐筆分發到既有 `*MutationHandler`**：校驗／改鍵碰撞偵測／授權／`operations`＋AuditLog 與單筆端點**完全一致**，無平行寫入路徑。
+- `atomic=false`（**預設**）：逐筆獨立結算，回 200 + `results[]`（各含 `index/http_status/ok/result.operation_id`）+ `summary{total,ok,failed}`；`body.ok`＝是否全數成功。單筆失敗不影響其餘（例：create 撞 409 只該筆 failed）。
+- `atomic=true`：整批單一交易，任一筆失敗整批回滾，回 409 + `failed_index`（handler 內層交易降為 savepoint）。
+- 授權同單筆（Bearer PAT；direct 需 `canWriteDirectly()`）；已列入 CSRF 豁免。單筆未預期例外隔離為該筆 500，不拖垮整批。
 
 ## 授權與模式（mode）
 
@@ -105,8 +114,9 @@ CBDB prod 的維基／維基數據關聯存在 **`BIOG_SOURCE_DATA`**（不是 `
 3. **小批寫入**：先寫 5~10 筆（`direct`），到 prod 覆核（用 `/api/v2/get` 或 MCP 讀回），確認連結正確、`c_notes` batch id 有寫、`operation_id` 有記錄。
 4. **逐步擴大**：確認無誤後逐步加大批次，直到清單全數處理。
 5. **限流與網路**：`/api/v2/*` 會回 `429`（限流）；批次腳本要對 429／暫時性錯誤做**指數退避重試**，並在每筆間 `sleep`（0.2s 起）。
-6. **可回滾／可追溯**：每筆都有 `operation_id` + `c_notes` batch id；出錯用 Operations／Restore（`OperationRepository`）回退。
-7. 授權用 **Bearer PAT**（可直接用 MCP token；寫入靠 `canWriteDirectly()` 而非 token ability），**不寫成跑在 prod 的 artisan**（操作員未必有後台），全程**不改 Cloudflare（D1）**。
+6. **生產負載**：每筆 `create` 會對 `operations` 表做 pending 提案預檢。此查詢**曾因缺索引拖垮過 prod**（大批寫入全表掃描 → 飽和 DB／php-fpm）；已補 `(resource, resource_id, op_type)` 索引修復（migration `2026_07_12_000000_add_resource_index_to_operations_table`，已入 develop）。**歷史教訓**：任何走 mutation 的大批寫入，先確認該類慢查詢已有索引，否則放慢節奏。優先用 **batch 端點**（一次請求、不製造並發掃描風暴）進一步降載。註：`409 already` 於 create 在 `findByPk` 命中即短路、不觸發該掃描，故廉價。
+7. **可回滾／可追溯**：每筆都有 `operation_id` + `c_notes` batch id；出錯用 Operations／Restore（`OperationRepository`）回退。
+8. 授權用 **Bearer PAT**（可直接用 MCP token；寫入靠 `canWriteDirectly()` 而非 token ability），**不寫成跑在 prod 的 artisan**（操作員未必有後台），全程**不改 Cloudflare（D1）**。
 
 參考實作：`cbdb-dbs/d1_build_*/round3/sync_zhwiki_sources.py`（dry-run 預設、`--only`/`--limit`/`--offset` 分批、`--operator`、`--renote`、429 退避、結果 CSV 存 operation_id）。流程總覽見 `docs/ZHWIKI_SOURCE_SYNC.md`。
 

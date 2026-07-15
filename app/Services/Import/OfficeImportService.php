@@ -70,11 +70,50 @@ class OfficeImportService {
         return [
             'office_id' => (int) $row->c_office_id,
             'name' => (string) ($row->c_office_chn ?? ''),
+            'name_alt' => $row->c_office_chn_alt !== null ? (string) $row->c_office_chn_alt : null,
             'translation' => $row->c_office_trans !== null ? (string) $row->c_office_trans : null,
+            'translation_alt' => $row->c_office_trans_alt !== null ? (string) $row->c_office_trans_alt : null,
             'pinyin' => (string) ($row->c_office_pinyin ?? ''),
+            'pinyin_alt' => $row->c_office_pinyin_alt !== null ? (string) $row->c_office_pinyin_alt : null,
             'dynasty_code' => $row->c_dy !== null ? (int) $row->c_dy : null,
             'source_id' => $row->c_source !== null ? (int) $row->c_source : null,
+            'pages' => $row->c_pages !== null ? (string) $row->c_pages : null,
+            'notes' => $row->c_notes !== null ? (string) $row->c_notes : null,
             'type_ids' => $typeIds,
+        ];
+    }
+
+    /**
+     * 由業務輸入組出 OFFICE_CODES 各欄位（create／update 共用，確保欄位語意一致）。
+     * 拼音留空則自動依對應中文派生（name→c_office_pinyin、name_alt→c_office_pinyin_alt）；
+     * 給值則逐字採用。其餘選填欄空字串折成 null。
+     *
+     * @param array{name:string,name_alt?:?string,translation?:?string,translation_alt?:?string,pinyin?:?string,pinyin_alt?:?string,dynasty_code:int,source_id:int,pages?:?string,notes?:?string} $input
+     */
+    protected function officeColumns(array $input): array {
+        $name = (string) $input['name'];
+        $nameAlt = (isset($input['name_alt']) && trim((string) $input['name_alt']) !== '') ? (string) $input['name_alt'] : null;
+
+        $pinyin = (isset($input['pinyin']) && trim((string) $input['pinyin']) !== '')
+            ? (string) $input['pinyin']
+            : $this->buildPinyin($name);
+        $pinyinAlt = (isset($input['pinyin_alt']) && trim((string) $input['pinyin_alt']) !== '')
+            ? (string) $input['pinyin_alt']
+            : ($nameAlt !== null ? $this->buildPinyin($nameAlt) : null);
+
+        $opt = fn ($v) => (isset($v) && $v !== '') ? (string) $v : null;
+
+        return [
+            'c_dy' => (int) $input['dynasty_code'],
+            'c_office_pinyin' => $pinyin,
+            'c_office_chn' => $name,
+            'c_office_pinyin_alt' => $pinyinAlt,
+            'c_office_chn_alt' => $nameAlt,
+            'c_office_trans' => $opt($input['translation'] ?? null),
+            'c_office_trans_alt' => $opt($input['translation_alt'] ?? null),
+            'c_source' => (int) $input['source_id'],
+            'c_pages' => $opt($input['pages'] ?? null),
+            'c_notes' => $opt($input['notes'] ?? null),
         ];
     }
 
@@ -89,16 +128,10 @@ class OfficeImportService {
         // lockForUpdate 序列化並發的 max()+1 配號：兩個同時到達的請求若讀到同一 max，
         // 後者 insert 會撞主鍵而 500。MariaDB 生效；SQLite（測試）grammar 編譯為 no-op。
         $officeId = max(0, (int) DB::table('OFFICE_CODES')->lockForUpdate()->max('c_office_id')) + 1;
-        $pinyin = $this->buildPinyin($input['name']);
+        $columns = $this->officeColumns($input);
+        $pinyin = $columns['c_office_pinyin'];
 
-        $officePayload = [
-            'c_office_id' => $officeId,
-            'c_dy' => (int) $input['dynasty_code'],
-            'c_office_pinyin' => $pinyin,
-            'c_office_trans' => $input['translation'] ?? null,
-            'c_office_chn' => $input['name'],
-            'c_source' => (int) $input['source_id'],
-        ];
+        $officePayload = array_merge(['c_office_id' => $officeId], $columns);
 
         DB::table('OFFICE_CODES')->insert($officePayload);
         $officeOp = $this->recordOp('OFFICE_CODES', ['c_office_id' => $officeId], $officePayload, $actorPersonId);
@@ -129,14 +162,8 @@ class OfficeImportService {
      */
     public function update(int $officeId, array $input, int $actorPersonId = 0): array {
         $before = (array) DB::table('OFFICE_CODES')->where('c_office_id', $officeId)->lockForUpdate()->first();
-        $pinyin = $this->buildPinyin($input['name']);
-        $after = [
-            'c_dy' => (int) $input['dynasty_code'],
-            'c_office_pinyin' => $pinyin,
-            'c_office_trans' => $input['translation'] ?? null,
-            'c_office_chn' => $input['name'],
-            'c_source' => (int) $input['source_id'],
-        ];
+        $after = $this->officeColumns($input);
+        $pinyin = $after['c_office_pinyin'];
         DB::table('OFFICE_CODES')->where('c_office_id', $officeId)->update($after);
         $officeOp = $this->recordUpdate(
             'OFFICE_CODES',

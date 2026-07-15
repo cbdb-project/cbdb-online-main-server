@@ -45,6 +45,14 @@ trait ResolvesOfficeAggregateInput {
         $translation = $this->scalarOrNull($changes['translation'] ?? $changes['c_office_trans'] ?? null);
         $sourceId = $this->scalarOrNull($changes['source_id'] ?? $changes['c_source'] ?? null);
 
+        // 選填欄位（無 required 校驗；空字串由 service 折成 null）。
+        $nameAlt = $this->scalarOrNull($changes['name_alt'] ?? $changes['c_office_chn_alt'] ?? null);
+        $translationAlt = $this->scalarOrNull($changes['translation_alt'] ?? $changes['c_office_trans_alt'] ?? null);
+        $pinyin = $this->scalarOrNull($changes['pinyin'] ?? $changes['c_office_pinyin'] ?? null);
+        $pinyinAlt = $this->scalarOrNull($changes['pinyin_alt'] ?? $changes['c_office_pinyin_alt'] ?? null);
+        $pages = $this->scalarOrNull($changes['pages'] ?? $changes['c_pages'] ?? null);
+        $notes = $this->scalarOrNull($changes['notes'] ?? $changes['c_notes'] ?? null);
+
         // 朝代：給碼（dynasty_code/c_dy）優先；否則以朝代名（dynasty_label）解析。
         $dynastyMap = $service->dynastyMap();
         $dynastyCode = $this->scalarOrNull($changes['dynasty_code'] ?? $changes['c_dy'] ?? null);
@@ -82,10 +90,16 @@ trait ResolvesOfficeAggregateInput {
 
         return [$errors, [
             'name' => $name,
+            'name_alt' => $nameAlt,
             'translation' => $translation,
+            'translation_alt' => $translationAlt,
+            'pinyin' => $pinyin,
+            'pinyin_alt' => $pinyinAlt,
             'dynasty_code' => ($dynastyCode !== null && $dynastyCode !== '') ? (int) $dynastyCode : null,
             'type_ids' => $typeIds,
             'source_id' => ($sourceId !== null && $sourceId !== '') ? (int) $sourceId : null,
+            'pages' => $pages,
+            'notes' => $notes,
         ]];
     }
 }

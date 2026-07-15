@@ -45,13 +45,7 @@ class OfficeImportHandler extends AbstractMutationHandler {
             return $this->errorResponse('參數校驗失敗', 422, $errors);
         }
 
-        $result = DB::transaction(fn () => $this->service->create([
-            'name' => $input['name'],
-            'translation' => $input['translation'],
-            'dynasty_code' => $input['dynasty_code'],
-            'type_ids' => $input['type_ids'],
-            'source_id' => $input['source_id'],
-        ], $personId));
+        $result = DB::transaction(fn () => $this->service->create($input, $personId));
 
         return response()->json([
             'ok' => true,

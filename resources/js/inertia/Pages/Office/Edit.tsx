@@ -9,10 +9,15 @@ import OfficeForm, { OfficeUrls, OfficeInitialLabels } from './OfficeForm';
 interface OfficeAggregate {
     office_id: number;
     name: string;
+    name_alt: string | null;
     translation: string | null;
+    translation_alt: string | null;
     pinyin: string;
+    pinyin_alt: string | null;
     dynasty_code: number | null;
     source_id: number | null;
+    pages: string | null;
+    notes: string | null;
     type_ids: string[];
 }
 
@@ -70,9 +75,15 @@ export default function OfficeEdit() {
                     officeId={office.office_id}
                     initial={{
                         name: office.name,
+                        name_alt: office.name_alt,
                         translation: office.translation,
+                        translation_alt: office.translation_alt,
+                        pinyin: office.pinyin,
+                        pinyin_alt: office.pinyin_alt,
                         dynasty_code: office.dynasty_code,
                         source_id: office.source_id,
+                        pages: office.pages,
+                        notes: office.notes,
                         type_ids: office.type_ids,
                     }}
                     initialLabels={initial_labels}

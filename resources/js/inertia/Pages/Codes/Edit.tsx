@@ -10,6 +10,11 @@ import { collectUmlautConversions, type Tier2UmlautHit } from '../../utils/pinyi
 import { useTranslation } from '../../hooks/useTranslation';
 import type { SharedProps } from '../../types/page';
 
+// 安全開關：停用碼表刪除的前端入口。碼表多被人物資料以 ON DELETE CASCADE 外鍵引用，
+// 刪一列可能連帶刪除數萬筆人物列且無法乾淨復原；刪除無引用護欄前一律隱藏入口。
+// 純前端隱藏，後端刪除路由仍存在，之後須另補後端護欄。
+const RISKY_DELETE_DISABLED = true;
+
 interface CodesEditPageProps extends SharedProps {
     table: string;
     id: string;
@@ -109,9 +114,11 @@ export default function CodesEdit() {
                             {t('submit_proposal')}
                         </Button>
                     )}
-                    <Button type="button" variant="destructive" disabled={form.processing} onClick={() => setConfirmDelete(true)}>
-                        {tc('delete')}
-                    </Button>
+                    {!RISKY_DELETE_DISABLED && (
+                        <Button type="button" variant="destructive" disabled={form.processing} onClick={() => setConfirmDelete(true)}>
+                            {tc('delete')}
+                        </Button>
+                    )}
                     <a href={urls.show} className="inline-flex items-center rounded-md border border-input px-4 py-2 text-sm hover:bg-muted">
                         {tc('cancel')}
                     </a>

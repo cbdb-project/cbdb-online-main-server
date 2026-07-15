@@ -133,6 +133,19 @@ class CodesCreateInertiaTest extends TestCase {
     }
 
     #[Test]
+    public function create_form_marks_required_columns_and_prefills_db_defaults(): void {
+        // c_chn（NOT NULL 無預設）標必填；auto id 與 c_lastname（NOT NULL 有預設）不算必填；
+        // c_lastname 以資料庫預設值 0 預填（避免留白→null 的假性重複）。
+        $this->actingAs($this->activeUser())
+            ->get(route('app.codes.create', ['table_name' => 'TEST_AUTOINC_CODES']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Codes/Create')
+                ->where('required_columns', ['c_chn'])
+                ->where('defaults.c_lastname', '0'));
+    }
+
+    #[Test]
     public function store_blank_not_null_with_default_uses_db_default_not_false_duplicate(): void {
         // 復現回報情境：使用者留白 c_lastname（NOT NULL，預設 0）。空字串經
         // ConvertEmptyStringsToNull 會變 null，若直接寫入會觸發 NOT NULL 違規（SQLSTATE 23000），

@@ -248,7 +248,7 @@ class CodesController extends Controller {
     /**
      * Per-request column NOT NULL / default metadata cache (keyed by table name).
      *
-     * @var array<string, array<string, array{not_null: bool, has_default: bool}>>
+     * @var array<string, array<string, array{not_null: bool, has_default: bool, default: string|null}>>
      */
     protected $columnConstraintsCache = [];
 
@@ -872,6 +872,7 @@ class CodesController extends Controller {
             'columns' => array_keys($rowArray),
             'values' => $rowArray,
             'key_columns' => array_values($keyColumns),
+            'required_columns' => $this->codeColumnFormMeta($table)['required'],
             'can_propose' => Auth::check() && Auth::user()->isActive(),
             'tier2_fields' => $this->codeTableTier2Fields($table),
             'urls' => [
@@ -1030,10 +1031,20 @@ class CodesController extends Controller {
             }
         }
 
+        // 以資料庫的字面量預設值預填（如 c_lastname → 0），讓「留白 → null」的問題在來源就避免；
+        // 主鍵預填（guessNextKeyValue）優先，不被覆蓋。
+        $formMeta = $this->codeColumnFormMeta($table);
+        foreach ($formMeta['defaults'] as $column => $value) {
+            if (!array_key_exists($column, $defaults)) {
+                $defaults[$column] = $value;
+            }
+        }
+
         return Inertia::render('Codes/Create', [
             'table' => $table,
             'columns' => array_values($columns),
             'defaults' => (object) $defaults,
+            'required_columns' => $formMeta['required'],
             'can_propose' => Auth::check() && Auth::user()->isActive(),
             'tier2_fields' => $this->codeTableTier2Fields($table),
             'urls' => [
@@ -1554,10 +1565,11 @@ class CodesController extends Controller {
     }
 
     /**
-     * 取得各欄位的 NOT NULL / 是否有預設值資訊（相容 MySQL 與 SQLite），供
-     * applyColumnDefaultsForBlanks 判斷「留白 NOT NULL 欄」是否可退回資料庫預設值。
+     * 取得各欄位的 NOT NULL / 是否有預設值 / 原始預設值（相容 MySQL 與 SQLite）。
+     * 供 applyColumnDefaultsForBlanks 判斷留白欄可否退回預設，以及 codeColumnFormMeta
+     * 計算前端必填標記與預填值。
      *
-     * @return array<string, array{not_null: bool, has_default: bool}>
+     * @return array<string, array{not_null: bool, has_default: bool, default: string|null}>
      */
     protected function getColumnConstraints(string $table): array {
         if (array_key_exists($table, $this->columnConstraintsCache)) {
@@ -1570,15 +1582,35 @@ class CodesController extends Controller {
             $connection = DB::connection();
 
             if ($connection->getDriverName() === 'sqlite') {
+                $pkColumns = [];
                 foreach ($connection->select('PRAGMA table_info("' . $table . '")') as $row) {
                     $col = (array) $row;
                     if (empty($col['name'])) {
                         continue;
                     }
+                    $default = $col['dflt_value'] ?? null;
                     $meta[$col['name']] = [
                         'not_null' => (int) ($col['notnull'] ?? 0) === 1,
-                        'has_default' => ($col['dflt_value'] ?? null) !== null,
+                        'has_default' => $default !== null,
+                        'default' => $default !== null ? (string) $default : null,
                     ];
+                    if (!empty($col['pk']) && stripos((string) ($col['type'] ?? ''), 'INT') !== false) {
+                        $pkColumns[] = $col['name'];
+                    }
+                }
+                // AUTOINCREMENT 的單一 INTEGER 主鍵由資料庫自動指派，等同「有預設值」
+                // （MySQL 端由 EXTRA=auto_increment 判定，此處補齊 SQLite）。以 AUTOINCREMENT
+                // 關鍵字判定，才能與 `integer()->primary()` 這類手填整數主鍵區分。
+                if (count($pkColumns) === 1) {
+                    $createRow = $connection->selectOne(
+                        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
+                        [$table]
+                    );
+                    // 比對 'primary key autoincrement'（SQLite/Laravel 產生 rowid 別名的固定寫法），
+                    // 較單純比對 'autoincrement' 字串更不易誤命中欄名/預設值等其他位置。
+                    if (stripos($createRow->sql ?? '', 'primary key autoincrement') !== false) {
+                        $meta[$pkColumns[0]]['has_default'] = true;
+                    }
                 }
             } else {
                 $databaseName = $connection->getDatabaseName();
@@ -1593,11 +1625,13 @@ class CodesController extends Controller {
                         if ($name === null || $name === '') {
                             continue;
                         }
-                        $hasDefault = ($col['COLUMN_DEFAULT'] ?? null) !== null
+                        $rawDefault = $col['COLUMN_DEFAULT'] ?? null;
+                        $hasDefault = $rawDefault !== null
                             || stripos((string) ($col['EXTRA'] ?? ''), 'auto_increment') !== false;
                         $meta[$name] = [
                             'not_null' => strtoupper((string) ($col['IS_NULLABLE'] ?? 'YES')) === 'NO',
                             'has_default' => $hasDefault,
+                            'default' => $rawDefault !== null ? (string) $rawDefault : null,
                         ];
                     }
                 }
@@ -1607,6 +1641,59 @@ class CodesController extends Controller {
         }
 
         return $this->columnConstraintsCache[$table] = $meta;
+    }
+
+    /**
+     * 供新增/編輯表單使用的欄位中繼資料：
+     * - required：使用者必填欄（NOT NULL 且無預設值；auto_increment 因帶預設而排除）。
+     * - defaults：NOT NULL 且有「字面量」預設值的欄與其值（如 c_lastname → 0），
+     *   供新增表單預填，讓留白造成 null 的問題在來源就避免。
+     *
+     * @return array{required: array<int, string>, defaults: array<string, string>}
+     */
+    protected function codeColumnFormMeta(string $table): array {
+        $meta = $this->getColumnConstraints($table);
+        $required = [];
+        $defaults = [];
+
+        foreach ($meta as $column => $info) {
+            if ($info['not_null'] && !$info['has_default']) {
+                $required[] = $column;
+
+                continue;
+            }
+            if ($info['not_null'] && $info['has_default']) {
+                $value = $this->normalizeColumnDefault($info['default'] ?? null);
+                if ($value !== null) {
+                    $defaults[$column] = $value;
+                }
+            }
+        }
+
+        return ['required' => $required, 'defaults' => $defaults];
+    }
+
+    /**
+     * 把資料庫回報的原始預設值正規化為可預填的字面量；非字面量（SQL 函式、
+     * MariaDB 對「無預設」欄回報的字串 'NULL'、auto_increment 的 null）回傳 null。
+     */
+    protected function normalizeColumnDefault(?string $raw): ?string {
+        if ($raw === null) {
+            return null;
+        }
+
+        $value = $raw;
+        // SQLite 對字串/數值預設會帶外層單引號（如 '0'），去除以取得純值。
+        if (strlen($value) >= 2 && $value[0] === "'" && substr($value, -1) === "'") {
+            $value = substr($value, 1, -1);
+        }
+
+        $upper = strtoupper(trim($value));
+        if ($upper === 'NULL' || str_contains($upper, 'CURRENT_TIMESTAMP') || str_ends_with($upper, '()')) {
+            return null;
+        }
+
+        return $value;
     }
 
     /**

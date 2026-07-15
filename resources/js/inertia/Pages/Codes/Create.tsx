@@ -13,6 +13,7 @@ interface CodesCreatePageProps extends SharedProps {
     table: string;
     columns: string[];
     defaults: Record<string, string | number>;
+    required_columns?: string[];
     can_propose: boolean;
     tier2_fields?: string[];
     urls: { store: string; propose: string; show: string };
@@ -31,7 +32,8 @@ const COLUMN_HINTS: Record<string, Record<string, { text: string; link?: { href:
 
 export default function CodesCreate() {
     const props = usePage<CodesCreatePageProps>().props;
-    const { table, columns, defaults, can_propose, tier2_fields, urls } = props;
+    const { table, columns, defaults, required_columns, can_propose, tier2_fields, urls } = props;
+    const requiredSet = new Set(required_columns ?? []);
     const t = useTranslation('codes');
     const tc = useTranslation('common');
     const tb = useTranslation('biogmains'); // 復用 AltnameEditor 的彈窗字串
@@ -79,7 +81,7 @@ export default function CodesCreate() {
                 {columns.map((col) => {
                     const hint = tableHints[col];
                     return (
-                        <FormField key={col} label={col} htmlFor={col} error={form.errors[col]}>
+                        <FormField key={col} label={col} htmlFor={col} required={requiredSet.has(col)} error={form.errors[col]}>
                             <Input
                                 id={col}
                                 value={form.data[col] ?? ''}

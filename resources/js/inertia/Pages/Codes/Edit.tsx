@@ -16,6 +16,7 @@ interface CodesEditPageProps extends SharedProps {
     columns: string[];
     values: Record<string, string | number | null>;
     key_columns: string[];
+    required_columns?: string[];
     can_propose: boolean;
     tier2_fields?: string[];
     urls: { update: string; propose: string; destroy: string; show: string };
@@ -23,7 +24,8 @@ interface CodesEditPageProps extends SharedProps {
 
 export default function CodesEdit() {
     const props = usePage<CodesEditPageProps>().props;
-    const { table, columns, values, key_columns, can_propose, tier2_fields, urls } = props;
+    const { table, columns, values, key_columns, required_columns, can_propose, tier2_fields, urls } = props;
+    const requiredSet = new Set(required_columns ?? []);
     const t = useTranslation('codes');
     const tc = useTranslation('common');
     const tb = useTranslation('biogmains'); // 復用 AltnameEditor 的彈窗字串
@@ -73,6 +75,7 @@ export default function CodesEdit() {
                         key={col}
                         label={col}
                         htmlFor={col}
+                        required={requiredSet.has(col)}
                         error={form.errors[col]}
                     >
                         <Input

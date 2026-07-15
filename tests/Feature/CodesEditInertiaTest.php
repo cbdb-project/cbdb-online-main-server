@@ -104,6 +104,17 @@ class CodesEditInertiaTest extends TestCase {
     }
 
     #[Test]
+    public function edit_form_marks_required_columns(): void {
+        // code_id（NOT NULL 手填主鍵、無預設）標必填；description 可空不標。
+        $this->actingAs($this->activeUser())
+            ->get(route('app.codes.edit', ['table_name' => 'TEST_EDIT_CODES', 'id' => 5]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Codes/Edit')
+                ->where('required_columns', ['code_id']));
+    }
+
+    #[Test]
     public function update_modifies_row_and_redirects(): void {
         $this->actingAs($this->activeUser())
             ->patch(route('app.codes.update', ['table_name' => 'TEST_EDIT_CODES', 'id' => 5]), [

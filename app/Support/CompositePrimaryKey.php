@@ -162,6 +162,20 @@ class CompositePrimaryKey {
         'SOCIAL_INSTITUTION_TYPES' => [
             'c_inst_type_code',
         ],
+        // 社會機構匯入（SocialInstituteImportService）寫入的兩張表——主鍵取自生產 DB 實際 PRIMARY KEY，
+        // 欄位順序須與 recordOp() 傳入的 pk 一致，並與 OperationsController::resourceKeyColumns() 同步。
+        'SOCIAL_INSTITUTION_CODES' => [
+            'c_inst_code',
+            'c_inst_name_code',
+        ],
+        'SOCIAL_INSTITUTION_ADDR' => [
+            'c_inst_addr_id',
+            'c_inst_addr_type_code',
+            'c_inst_code',
+            'c_inst_name_code',
+            'inst_xcoord',
+            'inst_ycoord',
+        ],
         'ADMIN_CAT_CODES' => [
             'c_admin_cat_code',
         ],

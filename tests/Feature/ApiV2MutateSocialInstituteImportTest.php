@@ -176,6 +176,19 @@ class ApiV2MutateSocialInstituteImportTest extends TestCase {
         $this->assertSame(1, DB::table('operations')->where('resource', 'SOCIAL_INSTITUTION_CODES')->count());
         $this->assertSame(1, DB::table('operations')->where('resource', 'SOCIAL_INSTITUTION_ADDR')->count());
         $this->assertSame(3, DB::table('audit_log')->count());
+
+        // resource_id 必須能被 CompositePrimaryKey 解析（表已登記 SCHEMAS），
+        // 否則 /operations 實時比對與 restore 定位會靜默失效。
+        $codeResourceId = (string) DB::table('operations')->where('resource', 'SOCIAL_INSTITUTION_CODES')->value('resource_id');
+        $this->assertSame(
+            ['c_inst_code' => '201', 'c_inst_name_code' => '101'],
+            \App\Support\CompositePrimaryKey::parseStoredResourceId($codeResourceId, 'SOCIAL_INSTITUTION_CODES')
+        );
+        $addrResourceId = (string) DB::table('operations')->where('resource', 'SOCIAL_INSTITUTION_ADDR')->value('resource_id');
+        $parsedAddr = \App\Support\CompositePrimaryKey::parseStoredResourceId($addrResourceId, 'SOCIAL_INSTITUTION_ADDR');
+        $this->assertNotNull($parsedAddr);
+        $this->assertSame('12345', $parsedAddr['c_inst_addr_id']);
+        $this->assertSame('201', $parsedAddr['c_inst_code']);
     }
 
     #[Test]

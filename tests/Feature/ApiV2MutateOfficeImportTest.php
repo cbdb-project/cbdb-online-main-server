@@ -179,6 +179,16 @@ class ApiV2MutateOfficeImportTest extends TestCase {
     }
 
     #[Test]
+    public function testNonScalarTypeIdReturns422(): void {
+        $this->actingAs($this->makeUser(email: 'of-arr@example.com'));
+
+        $p = $this->payload();
+        $p['changes']['type_id'] = ['x01']; // 非純量（JSON 陣列）須回 422，不可流入 whereIn/insert 造成 500
+        $this->postJson('/api/v2/create', $p)->assertStatus(422);
+        $this->assertSame(0, DB::table('OFFICE_CODES')->count());
+    }
+
+    #[Test]
     public function testDynastyLabelResolvesToCode(): void {
         $this->actingAs($this->makeUser(email: 'of-dyn@example.com'));
 

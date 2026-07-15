@@ -36,16 +36,17 @@ class OfficeImportHandler extends AbstractMutationHandler {
             return $authError;
         }
 
-        $name = trim((string) ($changes['name'] ?? $changes['c_office_chn'] ?? ''));
-        $translation = $changes['translation'] ?? $changes['c_office_trans'] ?? null;
-        $typeId = $changes['type_id'] ?? $changes['c_office_tree_id'] ?? null;
-        $sourceId = $changes['source_id'] ?? $changes['c_source'] ?? null;
+        // 所有輸入先經 scalarOrNull 收斂：非純量折成 null，由後續校驗回 422。
+        $name = trim((string) ($this->scalarOrNull($changes['name'] ?? $changes['c_office_chn'] ?? null) ?? ''));
+        $translation = $this->scalarOrNull($changes['translation'] ?? $changes['c_office_trans'] ?? null);
+        $typeId = $this->scalarOrNull($changes['type_id'] ?? $changes['c_office_tree_id'] ?? null);
+        $sourceId = $this->scalarOrNull($changes['source_id'] ?? $changes['c_source'] ?? null);
 
         // 朝代：給碼（c_dy/dynasty_code）優先；否則以朝代名（dynasty_label）解析。
         $dynastyMap = $this->service->dynastyMap();
-        $dynastyCode = $changes['dynasty_code'] ?? $changes['c_dy'] ?? null;
+        $dynastyCode = $this->scalarOrNull($changes['dynasty_code'] ?? $changes['c_dy'] ?? null);
         if (($dynastyCode === null || $dynastyCode === '') && isset($changes['dynasty_label'])) {
-            $label = trim((string) $changes['dynasty_label']);
+            $label = trim((string) ($this->scalarOrNull($changes['dynasty_label']) ?? ''));
             $dynastyCode = $dynastyMap[$label] ?? null;
             if ($dynastyCode === null) {
                 return $this->errorResponse('找不到朝代名對應的代碼', 422, ['dynasty_label' => ['not_found']]);

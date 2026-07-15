@@ -2,13 +2,9 @@
 
 namespace App\Services\Import;
 
-use App\Models\Operation;
 use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
-use App\Services\PinyinDictionary;
-use App\Support\CompositePrimaryKey;
-use App\Support\PinyinUmlaut;
-use Illuminate\Support\Facades\Auth;
+use App\Services\Import\Concerns\SharesImportHelpers;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -17,6 +13,7 @@ use Illuminate\Support\Facades\DB;
  * 由 admin 批量表單（AdminBatchLoadSocialInstitutesController）與 mutation API
  * （SocialInstituteImportHandler）共用，確保名稱去重、派生（拼音）、自動 id、
  * 配套地址行與審計（operations + AuditLog）只有一份實作、不漂移。
+ * 共用的派生／校驗／審計基元見 SharesImportHelpers（與 OfficeImportService 共用）。
  *
  * 一次「加機構」= 原子寫入至多三表：
  *  - SOCIAL_INSTITUTION_NAME_CODES：名稱去重——同名（c_inst_name_hz）已存在則複用其
@@ -32,19 +29,12 @@ use Illuminate\Support\Facades\DB;
  * 後一筆皆能看見前一筆剛插入的 NAME_CODES，故無需跨筆記憶體狀態。
  */
 class SocialInstituteImportService {
+    use SharesImportHelpers;
+
     public function __construct(
         protected OperationRepository $operationRepository,
         protected AuditLogService $auditLogService
     ) {
-    }
-
-    /** 朝代名→代碼對照。 */
-    public function dynastyMap(): array {
-        return DB::table('DYNASTIES')
-            ->orderBy('c_dy')
-            ->pluck('c_dy', 'c_dynasty_chn')
-            ->mapWithKeys(fn ($code, $label) => [trim((string) $label) => (int) $code])
-            ->toArray();
     }
 
     /** 機構類型（中文名或拼音）→代碼對照。 */
@@ -81,36 +71,6 @@ class SocialInstituteImportService {
         return array_values(array_diff($unique, $found));
     }
 
-    /** 校驗來源 TEXT_ID 存在於 TEXT_CODES；回傳缺失的 id。 */
-    public function missingSourceIds(array $sourceIds): array {
-        $unique = array_values(array_unique(array_map('intval', array_filter($sourceIds, fn ($v) => $v !== '' && $v !== null))));
-        if (empty($unique)) {
-            return [];
-        }
-        $found = DB::table('TEXT_CODES')->whereIn('c_textid', $unique)->pluck('c_textid')->map(fn ($v) => (int) $v)->all();
-
-        return array_values(array_diff($unique, $found));
-    }
-
-    /** 中文字串轉空格分隔拼音（v→ü 正規化）。 */
-    public function buildPinyin(string $value): string {
-        $chars = preg_split('//u', $value, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-        $syllables = [];
-        foreach ($chars as $char) {
-            if (preg_match('/\p{Han}/u', $char)) {
-                $syllables[] = strtolower(PinyinDictionary::getPinyin($char));
-            } elseif (preg_match('/[A-Za-z0-9]/u', $char)) {
-                $syllables[] = strtolower($char);
-            }
-        }
-        $syllables = array_filter($syllables, fn ($s) => $s !== '');
-        if (empty($syllables)) {
-            return strtolower(trim(preg_replace('/\s+/u', ' ', $value)));
-        }
-
-        return PinyinUmlaut::normalize(implode(' ', $syllables));
-    }
-
     /**
      * 執行「新增一個社會機構」過程（於呼叫端交易內）。輸入須已驗證。
      *
@@ -124,9 +84,12 @@ class SocialInstituteImportService {
         $name = $input['name'];
 
         // 名稱去重：同名已存在則複用碼、不新增 NAME_CODES。
+        // lockForUpdate 防兩個同新名的並發請求同時判定「不存在」而各建一列同碼 NAME_CODES；
+        // MariaDB 生效，SQLite（測試）grammar 編譯為 no-op。
         $existing = DB::table('SOCIAL_INSTITUTION_NAME_CODES')
             ->where('c_inst_name_hz', $name)
             ->orderBy('c_inst_name_code')
+            ->lockForUpdate()
             ->first();
 
         $nameCreated = false;
@@ -137,7 +100,8 @@ class SocialInstituteImportService {
             $nameCode = (int) $existing->c_inst_name_code;
             $namePinyin = (string) ($existing->c_inst_name_py ?? '');
         } else {
-            $nameCode = max(0, (int) DB::table('SOCIAL_INSTITUTION_NAME_CODES')->max('c_inst_name_code')) + 1;
+            // lockForUpdate 序列化並發的 max()+1 配號，避免撞主鍵（同上，SQLite no-op）。
+            $nameCode = max(0, (int) DB::table('SOCIAL_INSTITUTION_NAME_CODES')->lockForUpdate()->max('c_inst_name_code')) + 1;
             $namePinyin = $this->buildPinyin($name);
             $namePayload = [
                 'c_inst_name_code' => $nameCode,
@@ -149,7 +113,7 @@ class SocialInstituteImportService {
             $nameCreated = true;
         }
 
-        $instCode = max(0, (int) DB::table('SOCIAL_INSTITUTION_CODES')->max('c_inst_code')) + 1;
+        $instCode = max(0, (int) DB::table('SOCIAL_INSTITUTION_CODES')->lockForUpdate()->max('c_inst_code')) + 1;
 
         $codePayload = [
             'c_inst_name_code' => $nameCode,
@@ -196,31 +160,5 @@ class SocialInstituteImportService {
             'operation_id_code' => $codeOp?->id,
             'operation_id_addr' => $addrOp?->id,
         ];
-    }
-
-    /** 寫一筆 operations + audit_log（INSERT）。 */
-    protected function recordOp(string $table, array $pk, array $rowData, int $actorPersonId): ?Operation {
-        $operation = $this->operationRepository->store(
-            Auth::id(),
-            $actorPersonId,
-            Operation::TYPE_CREATE,
-            $table,
-            CompositePrimaryKey::buildStoredResourceId($pk),
-            $rowData,
-            []
-        );
-
-        $this->auditLogService->write(
-            $table,
-            'INSERT',
-            $pk,
-            null,
-            $this->auditLogService->normalizeRow($rowData),
-            'user',
-            (string) Auth::id(),
-            $operation ? (string) $operation->id : null
-        );
-
-        return $operation;
     }
 }

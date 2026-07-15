@@ -41,15 +41,16 @@ class SocialInstituteImportHandler extends AbstractMutationHandler {
             return $authError;
         }
 
-        $name = trim((string) ($changes['name'] ?? $changes['c_inst_name_hz'] ?? ''));
-        $addrId = $changes['addr_id'] ?? $changes['c_inst_addr_id'] ?? null;
-        $sourceId = $changes['source_id'] ?? $changes['c_source'] ?? null;
+        // 所有輸入先經 scalarOrNull 收斂：非純量折成 null，由後續校驗回 422。
+        $name = trim((string) ($this->scalarOrNull($changes['name'] ?? $changes['c_inst_name_hz'] ?? null) ?? ''));
+        $addrId = $this->scalarOrNull($changes['addr_id'] ?? $changes['c_inst_addr_id'] ?? null);
+        $sourceId = $this->scalarOrNull($changes['source_id'] ?? $changes['c_source'] ?? null);
 
         // 類型：給碼（type_code/c_inst_type_code）優先；否則以類型名（type_label）解析。
         $typeMap = $this->service->typeMap();
-        $typeCode = $changes['type_code'] ?? $changes['c_inst_type_code'] ?? null;
+        $typeCode = $this->scalarOrNull($changes['type_code'] ?? $changes['c_inst_type_code'] ?? null);
         if (($typeCode === null || $typeCode === '') && isset($changes['type_label'])) {
-            $label = trim((string) $changes['type_label']);
+            $label = trim((string) ($this->scalarOrNull($changes['type_label']) ?? ''));
             $typeCode = $typeMap[$label] ?? null;
             if ($typeCode === null) {
                 return $this->errorResponse('找不到類型名對應的代碼', 422, ['type_label' => ['not_found']]);
@@ -58,9 +59,9 @@ class SocialInstituteImportHandler extends AbstractMutationHandler {
 
         // 朝代：給碼（dynasty_code/c_inst_begin_dy）優先；否則以朝代名（dynasty_label）解析。
         $dynastyMap = $this->service->dynastyMap();
-        $dynastyCode = $changes['dynasty_code'] ?? $changes['c_inst_begin_dy'] ?? null;
+        $dynastyCode = $this->scalarOrNull($changes['dynasty_code'] ?? $changes['c_inst_begin_dy'] ?? null);
         if (($dynastyCode === null || $dynastyCode === '') && isset($changes['dynasty_label'])) {
-            $label = trim((string) $changes['dynasty_label']);
+            $label = trim((string) ($this->scalarOrNull($changes['dynasty_label']) ?? ''));
             $dynastyCode = $dynastyMap[$label] ?? null;
             if ($dynastyCode === null) {
                 return $this->errorResponse('找不到朝代名對應的代碼', 422, ['dynasty_label' => ['not_found']]);

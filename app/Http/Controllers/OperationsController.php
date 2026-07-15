@@ -1352,6 +1352,8 @@ class OperationsController extends Controller {
             'GANZHI_CODES' => ['c_ganzhi_code'],
             'SOCIAL_INSTITUTION_NAME_CODES' => ['c_inst_name_code'],
             'SOCIAL_INSTITUTION_TYPES' => ['c_inst_type_code'],
+            'SOCIAL_INSTITUTION_CODES' => ['c_inst_code','c_inst_name_code'],
+            'SOCIAL_INSTITUTION_ADDR' => ['c_inst_addr_id','c_inst_addr_type_code','c_inst_code','c_inst_name_code','inst_xcoord','inst_ycoord'],
             'ADMIN_CAT_CODES' => ['c_admin_cat_code'],
             'ADDR_CODES' => ['c_addr_id'],
         ];

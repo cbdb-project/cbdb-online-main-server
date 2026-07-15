@@ -1287,7 +1287,8 @@ class CodesControllerTest extends TestCase {
     }
 
     #[Test]
-    public function testActiveUserDestroyLogsOperation() {
+    public function testDestroyIsDisabledAndRecordsNothing() {
+        // 安全：碼表刪除已停用（防級聯刪除人物資料）。仍導回 show，但不刪列、不記 operation。
         DB::table('TEST_CODES')->insert([
             ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'To delete'],
         ]);
@@ -1307,12 +1308,8 @@ class CodesControllerTest extends TestCase {
 
         $response->assertRedirect(route('codes.show', ['table_name' => 'TEST_CODES']));
 
-        $this->assertCount(1, $this->operationSpy->calls);
-        $call = $this->operationSpy->calls[0];
-        $this->assertSame(4, $call['op_type']);
-        $this->assertSame('TEST_CODES', $call['resource']);
-        $this->assertSame('A1_._X1', $call['resource_id']);
-        $this->assertSame('To delete', $call['resource_data']['description']);
+        // 封堵在刪除前直接 return，故不會記錄任何刪除 operation。
+        $this->assertCount(0, $this->operationSpy->calls);
     }
 
     #[Test]

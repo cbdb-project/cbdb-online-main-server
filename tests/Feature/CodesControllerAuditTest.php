@@ -111,16 +111,14 @@ class CodesControllerAuditTest extends TestCase {
     }
 
     #[Test]
-    public function destroy_writes_audit_log_delete(): void {
+    public function destroy_is_disabled_no_delete_no_audit(): void {
+        // 安全：碼表刪除已停用（防級聯刪除人物資料）。不刪列、不寫 DELETE 審計。
         $this->actingAs($this->activeUser());
         DB::table('TEST_AUDIT_CODES')->insert(['code_id' => 9, 'description' => 'doomed']);
 
         $this->delete('/codes/TEST_AUDIT_CODES/9');
 
-        $audit = DB::table('audit_log')->where('operation', 'DELETE')->first();
-        $this->assertNotNull($audit);
-        $this->assertSame('TEST_AUDIT_CODES', $audit->table_name);
-        $this->assertSame('doomed', json_decode($audit->old_data, true)['description']);
-        $this->assertNull($audit->new_data);
+        $this->assertDatabaseHas('TEST_AUDIT_CODES', ['code_id' => 9]);
+        $this->assertNull(DB::table('audit_log')->where('operation', 'DELETE')->first());
     }
 }

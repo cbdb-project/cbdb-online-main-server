@@ -3,7 +3,6 @@
 namespace App\Services\Import;
 
 use App\Repositories\OperationRepository;
-use App\Repositories\ToolsRepository;
 use App\Services\AuditLogService;
 use App\Services\Import\Concerns\SharesImportHelpers;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +18,10 @@ use Illuminate\Support\Facades\DB;
  *  - OFFICE_CODES：c_office_id(max+1)、c_office_pinyin(派生)、c_dy、c_office_chn/trans、c_source
  *  - OFFICE_CODE_TYPE_REL：(c_office_id, c_office_tree_id=type_id)
  *
+ * OFFICE_CODES 無 c_created_by/date 審計欄（見生產 DB schema），故直接 plain insert、
+ * 不走 ToolsRepository::timestamp（否則會 INSERT 不存在的欄位而 500）；審計改由
+ * operations + audit_log 承載。與 SocialInstituteImportService 一致。
+ *
  * create() 不自開交易，於呼叫端交易內執行（批量：controller 一個交易包全部；單筆 API：handler 包一筆），
  * 以保留「全有或全無」語意。呼叫端須先以 validate*() 過濾非法輸入。
  */
@@ -27,8 +30,7 @@ class OfficeImportService {
 
     public function __construct(
         protected OperationRepository $operationRepository,
-        protected AuditLogService $auditLogService,
-        protected ToolsRepository $toolsRepository
+        protected AuditLogService $auditLogService
     ) {
     }
 
@@ -55,14 +57,14 @@ class OfficeImportService {
         $officeId = max(0, (int) DB::table('OFFICE_CODES')->lockForUpdate()->max('c_office_id')) + 1;
         $pinyin = $this->buildPinyin($input['name']);
 
-        $officePayload = $this->toolsRepository->timestamp([
+        $officePayload = [
             'c_office_id' => $officeId,
             'c_dy' => (int) $input['dynasty_code'],
             'c_office_pinyin' => $pinyin,
             'c_office_trans' => $input['translation'] ?? null,
             'c_office_chn' => $input['name'],
             'c_source' => (int) $input['source_id'],
-        ], true);
+        ];
 
         DB::table('OFFICE_CODES')->insert($officePayload);
         $officeOp = $this->recordOp('OFFICE_CODES', ['c_office_id' => $officeId], $officePayload, $actorPersonId);

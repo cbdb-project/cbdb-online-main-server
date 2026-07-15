@@ -65,6 +65,7 @@ class ApiV2MutateOfficeImportTest extends TestCase {
             $table->longText('old_data')->nullable();
             $table->longText('new_data')->nullable();
         });
+        // 生產 OFFICE_CODES 無 c_created_by/date 審計欄，schema 須如實反映（服務直接 plain insert）。
         Schema::create('OFFICE_CODES', function (Blueprint $table) {
             $table->integer('c_office_id')->primary();
             $table->integer('c_dy')->nullable();
@@ -72,10 +73,6 @@ class ApiV2MutateOfficeImportTest extends TestCase {
             $table->string('c_office_trans')->nullable();
             $table->string('c_office_chn')->nullable();
             $table->integer('c_source')->nullable();
-            $table->string('c_created_by')->nullable();
-            $table->dateTime('c_created_date')->nullable();
-            $table->string('c_modified_by')->nullable();
-            $table->dateTime('c_modified_date')->nullable();
         });
         Schema::create('OFFICE_CODE_TYPE_REL', function (Blueprint $table) {
             $table->integer('c_office_id');
@@ -151,7 +148,6 @@ class ApiV2MutateOfficeImportTest extends TestCase {
         ]);
         $this->assertDatabaseHas('OFFICE_CODES', ['c_office_id' => 101, 'c_office_chn' => '知府', 'c_dy' => 15, 'c_source' => 7596]);
         $this->assertDatabaseHas('OFFICE_CODE_TYPE_REL', ['c_office_id' => 101, 'c_office_tree_id' => 'x01']);
-        $this->assertSame('Office Tester', DB::table('OFFICE_CODES')->where('c_office_id', 101)->value('c_created_by'));
         // operations + audit：OFFICE_CODES 與 OFFICE_CODE_TYPE_REL 各一
         $this->assertSame(1, DB::table('operations')->where('resource', 'OFFICE_CODES')->count());
         $this->assertSame(1, DB::table('operations')->where('resource', 'OFFICE_CODE_TYPE_REL')->count());

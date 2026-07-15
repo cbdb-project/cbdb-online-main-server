@@ -85,12 +85,29 @@ class AdminBatchLoadOfficesTest extends TestCase {
             $table->unique(['c_chn', 'c_lastname']);
         });
 
+        // OfficeImportService 經共用 recordOp 寫 operations + audit_log。
+        Schema::create('audit_log', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->dateTime('occurred_at');
+            $table->dateTime('created_at');
+            $table->string('table_name', 64);
+            $table->string('operation', 16);
+            $table->string('actor_type', 32);
+            $table->string('actor_id', 128);
+            $table->string('operation_id', 64);
+            $table->text('row_pk');
+            $table->string('row_pk_text', 512)->nullable();
+            $table->longText('old_data')->nullable();
+            $table->longText('new_data')->nullable();
+        });
+
         // 職官名逐字轉拼音走一般轉換路徑，需要真實字典資料才能跟現行
         // Pinyin::$dic 行為一致（見 docs/PINYIN_TABLE_CONSOLIDATION_PLAN.md 步驟4）。
         $this->seedPinyinDictionary();
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('audit_log');
         Schema::dropIfExists('pinyin');
         Schema::dropIfExists('operations');
         Schema::dropIfExists('TEXT_CODES');

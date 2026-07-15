@@ -2,9 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Repositories\OperationRepository;
-use App\Services\PinyinDictionary;
-use App\Support\PinyinUmlaut;
+use App\Services\Import\SocialInstituteImportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -12,12 +10,12 @@ use Inertia\Inertia;
 
 class AdminBatchLoadSocialInstitutesController extends Controller {
     /**
-     * @var OperationRepository
+     * @var SocialInstituteImportService
      */
-    protected $operationRepository;
+    protected $socialInstituteImportService;
 
-    public function __construct(OperationRepository $operationRepository) {
-        $this->operationRepository = $operationRepository;
+    public function __construct(SocialInstituteImportService $socialInstituteImportService) {
+        $this->socialInstituteImportService = $socialInstituteImportService;
     }
 
     public function showForm() {
@@ -74,7 +72,6 @@ class AdminBatchLoadSocialInstitutesController extends Controller {
 
         $typeMap = $this->getTypeMap();
         $dynastyMap = $this->getDynastyMap();
-        $existingNames = $this->getExistingNames(array_column($rows, 'name'));
 
         $additionalErrors = $this->validateLookups($rows, $typeMap, $dynastyMap);
         if (!empty($additionalErrors)) {
@@ -91,79 +88,29 @@ class AdminBatchLoadSocialInstitutesController extends Controller {
 
         $results = [];
 
-        DB::transaction(function () use ($rows, $typeMap, $dynastyMap, $existingNames, &$results) {
-            $nextNameCode = (int) DB::table('SOCIAL_INSTITUTION_NAME_CODES')->max('c_inst_name_code');
-            $nextInstCode = (int) DB::table('SOCIAL_INSTITUTION_CODES')->max('c_inst_code');
-
-            $newNameCodes = [];
-            $createdNameCodes = [];
-
+        // 寫入委派給 SocialInstituteImportService（與 mutation API 共用同一存儲過程），
+        // controller 只保留解析／校驗／組裝畫面結果。名稱去重由 service 於同一交易內以
+        // DB 查詢為準：後一列能看見前一列剛插入的 NAME_CODES，故不需在此手動維護跨列狀態。
+        DB::transaction(function () use ($rows, $typeMap, $dynastyMap, &$results) {
             foreach ($rows as $row) {
                 $typeCode = $typeMap[$row['type_label']];
                 $dynastyCode = $dynastyMap[$row['dynasty_label']];
 
-                $nameCode = $this->resolveNameCode($row['name'], $existingNames, $newNameCodes, $nextNameCode);
-                $instCode = ++$nextInstCode;
-
-                $createdName = false;
-                if (!isset($existingNames[$row['name']]) && !isset($createdNameCodes[$nameCode])) {
-                    $namePayload = [
-                        'c_inst_name_code' => $nameCode,
-                        'c_inst_name_hz' => $row['name'],
-                        'c_inst_name_py' => $this->buildPinyin($row['name']),
-                    ];
-
-                    DB::table('SOCIAL_INSTITUTION_NAME_CODES')->insert($namePayload);
-                    $this->operationRepository->store(Auth::id(), '', 1, 'SOCIAL_INSTITUTION_NAME_CODES', $nameCode, $namePayload);
-                    $existingNames[$row['name']] = $namePayload;
-                    $createdNameCodes[$nameCode] = true;
-                    $createdName = true;
-                }
-
-                $codePayload = [
-                    'c_inst_name_code' => $nameCode,
-                    'c_inst_code' => $instCode,
-                    'c_inst_type_code' => $typeCode,
-                    'c_inst_begin_dy' => $dynastyCode,
-                    'c_inst_floruit_dy' => $dynastyCode,
-                    'c_source' => $row['source_id'],
-                ];
-                DB::table('SOCIAL_INSTITUTION_CODES')->insert($codePayload);
-                $this->operationRepository->store(Auth::id(), '', 1, 'SOCIAL_INSTITUTION_CODES', $instCode, $codePayload);
-
-                $addrPayload = [
-                    'c_inst_name_code' => $nameCode,
-                    'c_inst_code' => $instCode,
-                    'c_inst_addr_type_code' => 1,
-                    'c_inst_addr_id' => $row['addr_id'],
-                    'inst_xcoord' => 0,
-                    'inst_ycoord' => 0,
-                    'c_source' => $row['source_id'],
-                ];
-
-                DB::table('SOCIAL_INSTITUTION_ADDR')->insert($addrPayload);
-                $this->operationRepository->store(
-                    Auth::id(),
-                    '',
-                    1,
-                    'SOCIAL_INSTITUTION_ADDR',
-                    $instCode . '_._' . $row['addr_id'],
-                    $addrPayload
-                );
-
-                $nameRecord = $existingNames[$row['name']] ?? [
-                    'c_inst_name_code' => $nameCode,
-                    'c_inst_name_hz' => $row['name'],
-                    'c_inst_name_py' => $this->buildPinyin($row['name']),
-                ];
+                $created = $this->socialInstituteImportService->create([
+                    'name' => $row['name'],
+                    'type_code' => $typeCode,
+                    'dynasty_code' => $dynastyCode,
+                    'addr_id' => $row['addr_id'],
+                    'source_id' => $row['source_id'],
+                ]);
 
                 $results[] = [
                     'line' => $row['line'],
                     'name' => $row['name'],
-                    'name_code' => $nameCode,
-                    'name_pinyin' => $nameRecord['c_inst_name_py'],
-                    'name_created' => $createdName,
-                    'inst_code' => $instCode,
+                    'name_code' => $created['name_code'],
+                    'name_pinyin' => $created['name_pinyin'],
+                    'name_created' => $created['name_created'],
+                    'inst_code' => $created['inst_code'],
                     'type_label' => $row['type_label'],
                     'type_code' => $typeCode,
                     'dynasty_label' => $row['dynasty_label'],
@@ -311,40 +258,6 @@ class AdminBatchLoadSocialInstitutesController extends Controller {
     }
 
     /**
-     * Fetch existing names keyed by label.
-     *
-     * @param array<int,string> $names
-     * @return array<string,array<string,mixed>>
-     */
-    protected function getExistingNames(array $names): array {
-        if (empty($names)) {
-            return [];
-        }
-
-        $records = DB::table('SOCIAL_INSTITUTION_NAME_CODES')
-            ->whereIn('c_inst_name_hz', $names)
-            ->orderBy('c_inst_name_code')
-            ->get();
-
-        $map = [];
-        foreach ($records as $record) {
-            $hz = trim((string) $record->c_inst_name_hz);
-            if ($hz === '') {
-                continue;
-            }
-            if (!isset($map[$hz])) {
-                $map[$hz] = [
-                    'c_inst_name_code' => (int) $record->c_inst_name_code,
-                    'c_inst_name_hz' => $hz,
-                    'c_inst_name_py' => (string) ($record->c_inst_name_py ?? ''),
-                ];
-            }
-        }
-
-        return $map;
-    }
-
-    /**
      * Validate type and dynasty labels exist.
      *
      * @param array<int,array<string,mixed>> $rows
@@ -426,57 +339,6 @@ class AdminBatchLoadSocialInstitutesController extends Controller {
         return array_map(function ($id) {
             return "找不到來源 TEXT_ID {$id}，請確認資料是否已存在於 TEXT_CODES";
         }, $missing);
-    }
-
-    /**
-     * Resolve or assign a name code.
-     *
-     * @param string $name
-     * @param array<string,array<string,mixed>> $existingNames
-     * @param array<string,array<int,int>> $newNameCodes
-     * @param int $nextNameCode
-     * @return int
-     */
-    protected function resolveNameCode(string $name, array $existingNames, array &$newNameCodes, int &$nextNameCode): int {
-        if (isset($existingNames[$name])) {
-            return (int) $existingNames[$name]['c_inst_name_code'];
-        }
-
-        if (isset($newNameCodes[$name])) {
-            return $newNameCodes[$name];
-        }
-
-        $newCode = ++$nextNameCode;
-        $newNameCodes[$name] = $newCode;
-
-        return $newCode;
-    }
-
-    /**
-     * Build a space separated lower-case pinyin string.
-     */
-    protected function buildPinyin(string $value): string {
-        $chars = preg_split('//u', $value, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-        $syllables = [];
-
-        foreach ($chars as $char) {
-            if (preg_match('/\p{Han}/u', $char)) {
-                $syllables[] = strtolower(PinyinDictionary::getPinyin($char));
-            } elseif (preg_match('/[A-Za-z0-9]/u', $char)) {
-                $syllables[] = strtolower($char);
-            }
-        }
-
-        $syllables = array_filter($syllables, static function ($syllable) {
-            return $syllable !== '';
-        });
-
-        if (empty($syllables)) {
-            return strtolower(trim(preg_replace('/\s+/u', ' ', $value)));
-        }
-
-        // 止血：把生成拼音中殘留的 v 代寫正規化為 ü。
-        return PinyinUmlaut::normalize(implode(' ', $syllables));
     }
 
     /**

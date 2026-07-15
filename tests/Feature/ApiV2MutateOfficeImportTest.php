@@ -95,14 +95,20 @@ class ApiV2MutateOfficeImportTest extends TestCase {
             $table->string('c_pinyin')->nullable();
             $table->integer('c_lastname')->default(0);
         });
+        // 刪除護欄：referenceCount() 查此表是否仍有人物任官引用該官職。
+        Schema::create('POSTED_TO_OFFICE_DATA', function (Blueprint $table) {
+            $table->integer('c_personid');
+            $table->integer('c_office_id');
+            $table->integer('c_posting_id');
+        });
 
         DB::table('DYNASTIES')->insert(['c_dy' => 15, 'c_dynasty_chn' => '宋']);
-        DB::table('OFFICE_TYPE_TREE')->insert(['c_office_type_node_id' => 'x01']);
-        DB::table('TEXT_CODES')->insert(['c_textid' => 7596]);
+        DB::table('OFFICE_TYPE_TREE')->insert([['c_office_type_node_id' => 'x01'], ['c_office_type_node_id' => 'x02']]);
+        DB::table('TEXT_CODES')->insert([['c_textid' => 7596], ['c_textid' => 8000]]);
     }
 
     protected function tearDown(): void {
-        foreach (['pinyin', 'TEXT_CODES', 'DYNASTIES', 'OFFICE_TYPE_TREE', 'OFFICE_CODE_TYPE_REL', 'OFFICE_CODES', 'audit_log', 'operations', 'users'] as $t) {
+        foreach (['POSTED_TO_OFFICE_DATA', 'pinyin', 'TEXT_CODES', 'DYNASTIES', 'OFFICE_TYPE_TREE', 'OFFICE_CODE_TYPE_REL', 'OFFICE_CODES', 'audit_log', 'operations', 'users'] as $t) {
             Schema::dropIfExists($t);
         }
         parent::tearDown();
@@ -193,5 +199,92 @@ class ApiV2MutateOfficeImportTest extends TestCase {
         $p['changes']['dynasty_label'] = '宋';
         $this->postJson('/api/v2/create', $p)->assertOk();
         $this->assertDatabaseHas('OFFICE_CODES', ['c_office_chn' => '知府', 'c_dy' => 15]);
+    }
+
+    #[Test]
+    public function testUpdateOverwritesFieldsAndReconcilesTypes(): void {
+        $this->actingAs($this->makeUser(email: 'of-upd@example.com'));
+        // 先建一個 type=x01 的官職。
+        $this->postJson('/api/v2/create', $this->payload())->assertOk();
+        $officeId = (int) DB::table('OFFICE_CODES')->where('c_office_chn', '知府')->value('c_office_id');
+
+        // 更新：改名/來源，類型集合改為 [x01, x02]（x01 保留、x02 新增）。
+        $res = $this->postJson('/api/v2/mutate', [
+            'resource' => 'office',
+            'operation' => 'update',
+            'person_id' => 0,
+            'target' => ['pk' => ['c_office_id' => $officeId]],
+            'changes' => [
+                'name' => '知州',
+                'translation' => 'Prefect II',
+                'dynasty_code' => 15,
+                'type_ids' => ['x01', 'x02'],
+                'source_id' => 8000,
+            ],
+        ]);
+        $res->assertOk()->assertJson(['operation' => 'update', 'result' => ['status' => 'updated']]);
+        $this->assertDatabaseHas('OFFICE_CODES', ['c_office_id' => $officeId, 'c_office_chn' => '知州', 'c_source' => 8000]);
+        $this->assertSame(2, DB::table('OFFICE_CODE_TYPE_REL')->where('c_office_id', $officeId)->count());
+
+        // 再更新：類型集合縮為 [x02]（x01 應被對賬刪除，非整批重寫多刪）。
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'office',
+            'operation' => 'update',
+            'person_id' => 0,
+            'target' => ['pk' => ['c_office_id' => $officeId]],
+            'changes' => [
+                'name' => '知州',
+                'dynasty_code' => 15,
+                'type_ids' => ['x02'],
+                'source_id' => 8000,
+            ],
+        ])->assertOk();
+        $this->assertDatabaseMissing('OFFICE_CODE_TYPE_REL', ['c_office_id' => $officeId, 'c_office_tree_id' => 'x01']);
+        $this->assertDatabaseHas('OFFICE_CODE_TYPE_REL', ['c_office_id' => $officeId, 'c_office_tree_id' => 'x02']);
+    }
+
+    #[Test]
+    public function testUpdateMissingOfficeReturns404(): void {
+        $this->actingAs($this->makeUser(email: 'of-u404@example.com'));
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'office',
+            'operation' => 'update',
+            'person_id' => 0,
+            'target' => ['pk' => ['c_office_id' => 999999]],
+            'changes' => ['name' => '知府', 'dynasty_code' => 15, 'type_ids' => ['x01'], 'source_id' => 7596],
+        ])->assertStatus(404);
+    }
+
+    #[Test]
+    public function testDeleteRemovesAggregateWhenUnreferenced(): void {
+        $this->actingAs($this->makeUser(email: 'of-del@example.com'));
+        $this->postJson('/api/v2/create', $this->payload())->assertOk();
+        $officeId = (int) DB::table('OFFICE_CODES')->where('c_office_chn', '知府')->value('c_office_id');
+
+        $this->postJson('/api/v2/delete', [
+            'resource' => 'office',
+            'person_id' => 0,
+            'target' => ['pk' => ['c_office_id' => $officeId]],
+        ])->assertOk()->assertJson(['operation' => 'delete', 'result' => ['status' => 'deleted']]);
+
+        $this->assertDatabaseMissing('OFFICE_CODES', ['c_office_id' => $officeId]);
+        $this->assertSame(0, DB::table('OFFICE_CODE_TYPE_REL')->where('c_office_id', $officeId)->count());
+    }
+
+    #[Test]
+    public function testDeleteBlockedWhenReferencedByPostings(): void {
+        $this->actingAs($this->makeUser(email: 'of-delref@example.com'));
+        $this->postJson('/api/v2/create', $this->payload())->assertOk();
+        $officeId = (int) DB::table('OFFICE_CODES')->where('c_office_chn', '知府')->value('c_office_id');
+        DB::table('POSTED_TO_OFFICE_DATA')->insert(['c_personid' => 7, 'c_office_id' => $officeId, 'c_posting_id' => 1]);
+
+        $this->postJson('/api/v2/delete', [
+            'resource' => 'office',
+            'person_id' => 0,
+            'target' => ['pk' => ['c_office_id' => $officeId]],
+        ])->assertStatus(409);
+
+        // 未刪：仍在。
+        $this->assertDatabaseHas('OFFICE_CODES', ['c_office_id' => $officeId]);
     }
 }

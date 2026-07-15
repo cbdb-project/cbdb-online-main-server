@@ -8,30 +8,22 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
 /**
- * mutation API 的「新增官職」handler（resource=office）。薄封裝：把請求 payload 映射為業務輸入，
- * 校驗後委派 OfficeImportService::create()（與 admin 批量表單共用同一存儲過程）。
+ * mutation API 的「更新官職實體」handler（resource=office、operation=update）。
+ * 委派 OfficeImportService::update()：OFFICE_CODES 欄位整體覆寫、OFFICE_CODE_TYPE_REL 做集合對賬。
  *
- * 語意：一次 create = 原子寫入 OFFICE_CODES + OFFICE_CODE_TYPE_REL（類型可多值），含拼音/朝代碼派生、
- * 自動 office_id。為領域級複合寫入，故不走裸 code 表通道。person_id 對本資源無意義（僅記入 operations）。
- * 校驗與 OfficeUpdateHandler 共用 ResolvesOfficeAggregateInput，確保 create／update 語意一致。
- *
- * changes 欄位（接受業務名或欄名）：
- *  - name / c_office_chn（必填）
- *  - translation / c_office_trans（選填）
- *  - dynasty_code / c_dy（朝代碼）或 dynasty_label（朝代名，二擇一）
- *  - type_ids[]（多值）或 type_id / c_office_tree_id（單值，向後相容）——OFFICE_TYPE_TREE 節點，至少一個、須存在
- *  - source_id / c_source（TEXT_CODES textid，必填、須存在）
+ * 校驗與 OfficeImportHandler 共用 ResolvesOfficeAggregateInput（create／update 一致，含類型至少一個）。
+ * target.pk 須帶 c_office_id；不存在回 404。person_id 對本資源無意義（僅記入 operations）。
  */
-class OfficeImportHandler extends AbstractMutationHandler {
+class OfficeUpdateHandler extends AbstractMutationHandler {
     use ResolvesOfficeAggregateInput;
 
     public function __construct(protected OfficeImportService $service) {
     }
 
     public function supports(string $resource, string $mode, string $operation): bool {
-        return $operation === 'create'
+        return $operation === 'update'
             && $mode === 'direct'
-            && in_array($resource, ['office', 'offices', 'office-load'], true);
+            && in_array($resource, ['office', 'offices'], true);
     }
 
     public function handle(string $resource, string $mode, string $operation, int $personId, array $targetPk, array $changes, array $meta = []): JsonResponse {
@@ -40,12 +32,22 @@ class OfficeImportHandler extends AbstractMutationHandler {
             return $authError;
         }
 
+        $officeId = $this->scalarOrNull($targetPk['c_office_id'] ?? $targetPk['office_id'] ?? null);
+        if ($officeId === null || $officeId === '' || !ctype_digit((string) $officeId)) {
+            return $this->errorResponse('target.pk 缺少有效的 c_office_id', 422, ['c_office_id' => ['required_integer']]);
+        }
+        $officeId = (int) $officeId;
+
+        if ($this->service->load($officeId) === null) {
+            return $this->errorResponse('找不到官職', 404, ['c_office_id' => ['not_found']]);
+        }
+
         [$errors, $input] = $this->validateOfficeAggregate($changes, $this->service);
         if ($errors !== []) {
             return $this->errorResponse('參數校驗失敗', 422, $errors);
         }
 
-        $result = DB::transaction(fn () => $this->service->create([
+        $result = DB::transaction(fn () => $this->service->update($officeId, [
             'name' => $input['name'],
             'translation' => $input['translation'],
             'dynasty_code' => $input['dynasty_code'],
@@ -57,13 +59,15 @@ class OfficeImportHandler extends AbstractMutationHandler {
             'ok' => true,
             'resource' => 'office',
             'mode' => 'direct',
-            'operation' => 'create',
+            'operation' => 'update',
             'result' => [
-                'pk' => ['c_office_id' => $result['office_id']],
-                'status' => 'created',
+                'pk' => ['c_office_id' => $officeId],
+                'status' => 'updated',
                 'operation_id' => $result['operation_id_office'],
+                'types_added' => $result['types_added'],
+                'types_removed' => $result['types_removed'],
                 'row' => [
-                    'c_office_id' => $result['office_id'],
+                    'c_office_id' => $officeId,
                     'c_office_chn' => $input['name'],
                     'c_office_pinyin' => $result['pinyin'],
                     'type_ids' => $result['type_ids'],

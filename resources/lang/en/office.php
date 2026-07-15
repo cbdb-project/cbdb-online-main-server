@@ -1,0 +1,49 @@
+<?php
+
+return [
+    'page_title_index' => 'Office entities',
+    'page_title_create' => 'New office',
+    'page_title_edit' => 'Edit office',
+    'intro' => 'Manage OFFICE_CODES and its type links as a single office entity; writes go through the shared mutation API.',
+
+    'search_placeholder' => 'Search name / pinyin / ID',
+    'search' => 'Search',
+    'col_id' => 'ID',
+    'col_name' => 'Name',
+    'col_pinyin' => 'Pinyin',
+    'col_dynasty' => 'Dynasty',
+    'col_types' => 'Types',
+    'col_actions' => 'Actions',
+    'empty_list' => 'No matching offices',
+    'total_count' => ':n total',
+
+    'btn_create' => 'New office',
+    'btn_edit' => 'Edit',
+    'btn_delete' => 'Delete',
+    'btn_save' => 'Save',
+    'btn_cancel' => 'Cancel',
+    'btn_back' => 'Back to list',
+
+    'field_name' => 'Office name (Chinese)',
+    'field_translation' => 'English / translation',
+    'field_dynasty' => 'Dynasty',
+    'field_types' => 'Office types (multi-select)',
+    'field_source' => 'Source (TEXT)',
+    'type_add_placeholder' => 'Search and add a type node',
+    'source_placeholder' => 'Search source text',
+    'dynasty_placeholder' => 'Select dynasty',
+    'no_types' => 'No types selected yet',
+
+    'save_failed' => 'Save failed',
+    'created' => 'Created',
+    'updated' => 'Updated',
+    'deleted' => 'Deleted',
+    'delete_confirm' => 'Delete this office? This can be restored from /operations.',
+    'delete_blocked' => 'This office is still referenced by appointments and cannot be deleted',
+
+    'err_name_required' => 'Office name is required',
+    'err_dynasty_invalid' => 'Please select a valid dynasty',
+    'err_types_required' => 'Select at least one type',
+    'err_source_required' => 'Please select a valid source',
+    'err_type_not_found' => 'Type node not found',
+];

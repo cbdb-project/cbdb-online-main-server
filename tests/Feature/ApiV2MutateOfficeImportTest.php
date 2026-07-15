@@ -70,9 +70,14 @@ class ApiV2MutateOfficeImportTest extends TestCase {
             $table->integer('c_office_id')->primary();
             $table->integer('c_dy')->nullable();
             $table->string('c_office_pinyin')->nullable();
-            $table->string('c_office_trans')->nullable();
             $table->string('c_office_chn')->nullable();
+            $table->string('c_office_pinyin_alt')->nullable();
+            $table->string('c_office_chn_alt')->nullable();
+            $table->string('c_office_trans')->nullable();
+            $table->string('c_office_trans_alt')->nullable();
             $table->integer('c_source')->nullable();
+            $table->string('c_pages')->nullable();
+            $table->text('c_notes')->nullable();
         });
         Schema::create('OFFICE_CODE_TYPE_REL', function (Blueprint $table) {
             $table->integer('c_office_id');
@@ -241,6 +246,55 @@ class ApiV2MutateOfficeImportTest extends TestCase {
         ])->assertOk();
         $this->assertDatabaseMissing('OFFICE_CODE_TYPE_REL', ['c_office_id' => $officeId, 'c_office_tree_id' => 'x01']);
         $this->assertDatabaseHas('OFFICE_CODE_TYPE_REL', ['c_office_id' => $officeId, 'c_office_tree_id' => 'x02']);
+    }
+
+    #[Test]
+    public function testFullFieldsRoundTripAndPinyinAutoWhenBlank(): void {
+        $this->actingAs($this->makeUser(email: 'of-full@example.com'));
+
+        // create：帶齊選填欄 + 手動拼音（手動值須逐字採用、不派生）。
+        $p = $this->payload();
+        $p['changes'] = array_merge($p['changes'], [
+            'name_alt' => '知府別名',
+            'translation_alt' => 'Prefect alt',
+            'pinyin' => 'zhi fu manual',
+            'pinyin_alt' => 'zhi fu bie ming',
+            'pages' => 'p.12',
+            'notes' => '測試備註',
+        ]);
+        $this->postJson('/api/v2/create', $p)->assertOk();
+        $this->assertDatabaseHas('OFFICE_CODES', [
+            'c_office_chn' => '知府',
+            'c_office_chn_alt' => '知府別名',
+            'c_office_pinyin' => 'zhi fu manual',
+            'c_office_pinyin_alt' => 'zhi fu bie ming',
+            'c_office_trans_alt' => 'Prefect alt',
+            'c_pages' => 'p.12',
+            'c_notes' => '測試備註',
+        ]);
+        $officeId = (int) DB::table('OFFICE_CODES')->where('c_office_chn', '知府')->value('c_office_id');
+
+        // update：留空 pinyin → 依名稱自動派生；不帶 name_alt → 折成 null；改 notes。
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'office',
+            'operation' => 'update',
+            'person_id' => 0,
+            'target' => ['pk' => ['c_office_id' => $officeId]],
+            'changes' => [
+                'name' => '知州',
+                'dynasty_code' => 15,
+                'type_ids' => ['x01'],
+                'source_id' => 7596,
+                'pinyin' => '',
+                'notes' => '改後備註',
+            ],
+        ])->assertOk();
+
+        $row = DB::table('OFFICE_CODES')->where('c_office_id', $officeId)->first();
+        $this->assertSame('改後備註', $row->c_notes);
+        $this->assertNotSame('', (string) $row->c_office_pinyin); // 留空後派生出非空拼音
+        $this->assertNull($row->c_office_chn_alt); // update 未帶 name_alt → null
+        $this->assertNull($row->c_pages); // update 未帶 pages → null
     }
 
     #[Test]

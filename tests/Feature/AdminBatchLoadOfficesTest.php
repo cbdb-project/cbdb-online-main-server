@@ -41,7 +41,12 @@ class AdminBatchLoadOfficesTest extends TestCase {
             $table->string('c_office_pinyin')->nullable();
             $table->string('c_office_trans')->nullable();
             $table->string('c_office_chn')->nullable();
+            $table->string('c_office_pinyin_alt')->nullable();
+            $table->string('c_office_chn_alt')->nullable();
+            $table->string('c_office_trans_alt')->nullable();
             $table->integer('c_source')->nullable();
+            $table->string('c_pages')->nullable();
+            $table->text('c_notes')->nullable();
         });
 
         Schema::create('OFFICE_CODE_TYPE_REL', function (Blueprint $table) {

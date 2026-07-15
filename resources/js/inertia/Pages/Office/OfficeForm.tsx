@@ -18,9 +18,15 @@ export interface OfficeUrls {
 
 export interface OfficeInitial {
     name: string;
+    name_alt: string | null;
     translation: string | null;
+    translation_alt: string | null;
+    pinyin: string | null;
+    pinyin_alt: string | null;
     dynasty_code: number | null;
     source_id: number | null;
+    pages: string | null;
+    notes: string | null;
     type_ids: string[];
 }
 
@@ -48,7 +54,13 @@ export default function OfficeForm({ mode, officeId, initial, initialLabels, url
     const t = useTranslation('office');
 
     const [name, setName] = useState(initial.name);
+    const [nameAlt, setNameAlt] = useState(initial.name_alt ?? '');
     const [translation, setTranslation] = useState(initial.translation ?? '');
+    const [translationAlt, setTranslationAlt] = useState(initial.translation_alt ?? '');
+    const [pinyin, setPinyin] = useState(initial.pinyin ?? '');
+    const [pinyinAlt, setPinyinAlt] = useState(initial.pinyin_alt ?? '');
+    const [pages, setPages] = useState(initial.pages ?? '');
+    const [notes, setNotes] = useState(initial.notes ?? '');
     const [dynasty, setDynasty] = useState(initial.dynasty_code != null ? String(initial.dynasty_code) : '');
     const [source, setSource] = useState(initial.source_id != null ? String(initial.source_id) : '');
     const [sourceLabel, setSourceLabel] = useState<string | null>(initialLabels.source);
@@ -82,12 +94,19 @@ export default function OfficeForm({ mode, officeId, initial, initialLabels, url
         setErrors({});
         setServerError(null);
 
+        const nn = (s: string) => (s.trim() === '' ? null : s);
         const changes = {
             name,
-            translation: translation.trim() === '' ? null : translation,
+            name_alt: nn(nameAlt),
+            translation: nn(translation),
+            translation_alt: nn(translationAlt),
+            pinyin, // 留空由後端依名稱自動派生
+            pinyin_alt: pinyinAlt,
             dynasty_code: dynasty ? Number(dynasty) : null,
             type_ids: types.map((x) => x.id),
             source_id: source ? Number(source) : null,
+            pages: nn(pages),
+            notes: nn(notes),
         };
         const body =
             mode === 'create'
@@ -144,12 +163,51 @@ export default function OfficeForm({ mode, officeId, initial, initialLabels, url
                 />
             </FormField>
 
+            <FormField label={t('field_name_alt')} htmlFor="office-name-alt">
+                <input
+                    id="office-name-alt"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    value={nameAlt}
+                    onChange={(e) => setNameAlt(e.target.value)}
+                />
+            </FormField>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <FormField label={t('field_pinyin')} htmlFor="office-pinyin">
+                    <input
+                        id="office-pinyin"
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        placeholder={t('pinyin_auto_hint')}
+                        value={pinyin}
+                        onChange={(e) => setPinyin(e.target.value)}
+                    />
+                </FormField>
+                <FormField label={t('field_pinyin_alt')} htmlFor="office-pinyin-alt">
+                    <input
+                        id="office-pinyin-alt"
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        placeholder={t('pinyin_auto_hint')}
+                        value={pinyinAlt}
+                        onChange={(e) => setPinyinAlt(e.target.value)}
+                    />
+                </FormField>
+            </div>
+
             <FormField label={t('field_translation')} htmlFor="office-trans" error={errors.translation}>
                 <input
                     id="office-trans"
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     value={translation}
                     onChange={(e) => setTranslation(e.target.value)}
+                />
+            </FormField>
+
+            <FormField label={t('field_translation_alt')} htmlFor="office-trans-alt">
+                <input
+                    id="office-trans-alt"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    value={translationAlt}
+                    onChange={(e) => setTranslationAlt(e.target.value)}
                 />
             </FormField>
 
@@ -179,6 +237,25 @@ export default function OfficeForm({ mode, officeId, initial, initialLabels, url
                         setSource(v);
                         setSourceLabel(label);
                     }}
+                />
+            </FormField>
+
+            <FormField label={t('field_pages')} htmlFor="office-pages">
+                <input
+                    id="office-pages"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    value={pages}
+                    onChange={(e) => setPages(e.target.value)}
+                />
+            </FormField>
+
+            <FormField label={t('field_notes')} htmlFor="office-notes">
+                <textarea
+                    id="office-notes"
+                    rows={3}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
                 />
             </FormField>
 

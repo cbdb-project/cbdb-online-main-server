@@ -21,7 +21,19 @@ export default function OfficeCreate() {
                 </a>
                 <OfficeForm
                     mode="create"
-                    initial={{ name: '', translation: null, dynasty_code: null, source_id: null, type_ids: [] }}
+                    initial={{
+                        name: '',
+                        name_alt: null,
+                        translation: null,
+                        translation_alt: null,
+                        pinyin: null,
+                        pinyin_alt: null,
+                        dynasty_code: null,
+                        source_id: null,
+                        pages: null,
+                        notes: null,
+                        type_ids: [],
+                    }}
                     initialLabels={{ dynasty: null, source: null, types: {} }}
                     urls={urls}
                 />

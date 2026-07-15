@@ -166,7 +166,8 @@ class ApiV2MutateCodeTableTextCodesTest extends TestCase {
     }
 
     #[Test]
-    public function testDeleteRemovesRow(): void {
+    public function testDeleteIsDisabled(): void {
+        // 安全：碼表刪除已停用（防級聯刪除人物資料）——回 403、不刪列、不寫 DELETE 審計。
         $this->actingAs($this->makeUser(email: 'tc-del@example.com'));
         DB::table('TEXT_CODES')->insert(['c_textid' => 71853, 'c_title_chn' => '待刪']);
 
@@ -174,10 +175,10 @@ class ApiV2MutateCodeTableTextCodesTest extends TestCase {
             'resource' => 'text-codes',
             'person_id' => 0,
             'target' => ['pk' => ['c_textid' => 71853]],
-        ])->assertOk()->assertJson(['ok' => true, 'operation' => 'delete']);
+        ])->assertStatus(403);
 
-        $this->assertSame(0, DB::table('TEXT_CODES')->count());
-        $this->assertSame(1, DB::table('audit_log')->where('operation', 'DELETE')->count());
+        $this->assertSame(1, DB::table('TEXT_CODES')->count());
+        $this->assertSame(0, DB::table('audit_log')->where('operation', 'DELETE')->count());
     }
 
     #[Test]

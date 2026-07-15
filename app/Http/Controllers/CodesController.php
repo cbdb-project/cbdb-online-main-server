@@ -1454,6 +1454,14 @@ class CodesController extends Controller {
      * 刪除代碼表列的共用實作；$showRoute 控制唯讀/成功重導目標。
      */
     protected function performDestroy(string $table, $id, string $showRoute) {
+        // 安全：停用碼表刪除。碼表多被人物資料以 ON DELETE CASCADE 外鍵引用，刪一列碼可能
+        // 連帶刪除數萬筆人物列（朝代、干支等高扇出碼尤甚）且無法在 /operations 乾淨復原；
+        // 現行刪除又無引用護欄。在補上後端引用護欄前，前後端一律封堵此路徑
+        // （與前端 RISKY_DELETE_DISABLED 同步）。移除本護欄前務必先加「有引用則拒刪」。
+        flash('代碼表刪除已停用（防止級聯刪除人物資料）。', 'warning');
+
+        return redirect()->route($showRoute, ['table_name' => $table]);
+
         if (!Auth::check()) {
             flash('請登入後編輯 @ '.Carbon::now(), 'error');
 

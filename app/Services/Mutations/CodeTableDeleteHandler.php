@@ -42,6 +42,12 @@ class CodeTableDeleteHandler extends AbstractMutationHandler {
     }
 
     public function handle(string $resource, string $mode, string $operation, int $personId, array $targetPk, array $changes, array $meta = []): JsonResponse {
+        // 安全：停用碼表刪除。碼表多被人物資料以 ON DELETE CASCADE 外鍵引用，刪一列可能
+        // 連帶刪除數萬筆人物列（朝代、干支等高扇出碼尤甚）且無法乾淨復原；現行刪除無引用
+        // 護欄。在補上「有引用則拒刪」前，前後端一律封堵（與前端 RISKY_DELETE_DISABLED、
+        // CodesController::performDestroy 同步）。移除本護欄前務必先加引用護欄。
+        return $this->errorResponse('代碼表刪除已停用（防止級聯刪除人物資料）', 403, ['resource' => [$resource]]);
+
         $authError = $this->authorizeDirect();
         if ($authError) {
             return $authError;

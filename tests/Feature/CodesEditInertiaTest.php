@@ -127,12 +127,13 @@ class CodesEditInertiaTest extends TestCase {
     }
 
     #[Test]
-    public function destroy_deletes_row_and_redirects_to_show(): void {
+    public function destroy_is_disabled_and_keeps_row(): void {
+        // 安全：碼表刪除已停用（防級聯刪除人物資料）。仍導回 show，但不得刪列。
         $this->actingAs($this->activeUser())
             ->delete(route('app.codes.destroy', ['table_name' => 'TEST_EDIT_CODES', 'id' => 5]))
             ->assertRedirect(route('app.codes.show', ['table_name' => 'TEST_EDIT_CODES']));
 
-        $this->assertDatabaseMissing('TEST_EDIT_CODES', ['code_id' => 5]);
+        $this->assertDatabaseHas('TEST_EDIT_CODES', ['code_id' => 5]);
     }
 
     #[Test]

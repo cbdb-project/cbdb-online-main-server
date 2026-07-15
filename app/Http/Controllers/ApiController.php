@@ -285,6 +285,38 @@ class ApiController extends Controller {
         return $data;
     }
 
+    /**
+     * 官職類型節點搜尋（OFFICE_TYPE_TREE），供官職實體聚合編輯頁的多選類型 picker 使用。
+     * 回傳 CodeAutocomplete search 模式所需的 { data: [{ id, text }] } 結構。
+     */
+    public function searchOfficeType(Request $request) {
+        $q = (string) $request->q;
+        $paginator = \Illuminate\Support\Facades\DB::table('OFFICE_TYPE_TREE')
+            ->where(function ($w) use ($q) {
+                $w->where('c_office_type_node_id', 'like', '%'.$q.'%')
+                    ->orWhere('c_office_type_desc_chn', 'like', '%'.$q.'%')
+                    ->orWhere('c_office_type_desc', 'like', '%'.$q.'%');
+            })
+            ->orderBy('c_office_type_node_id')
+            ->paginate(20);
+
+        $data = collect($paginator->items())->map(function ($row) {
+            $id = (string) $row->c_office_type_node_id;
+            $chn = trim((string) ($row->c_office_type_desc_chn ?? ''));
+            $en = trim((string) ($row->c_office_type_desc ?? ''));
+            $label = trim($id.' '.$chn.($en !== '' && $en !== '[not yet translated]' ? ' '.$en : ''));
+
+            return ['id' => $id, 'text' => $label !== '' ? $label : $id];
+        })->values();
+
+        return response()->json([
+            'data' => $data,
+            'total' => $paginator->total(),
+            'current_page' => $paginator->currentPage(),
+            'last_page' => $paginator->lastPage(),
+        ]);
+    }
+
     public function socialinstaddr(Request $request) {
         $data = SocialInstAddr::where('c_inst_code', 'like', '%'.$request->q.'%')->paginate(20);
         $data->appends(['q' => $request->q])->links();

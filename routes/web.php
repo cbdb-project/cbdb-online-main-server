@@ -316,6 +316,15 @@ Route::delete('app/codes/{table_name}/{id}', 'CodesController@appDestroy')
 Route::get('app/codes/{table_name}', 'CodesController@appShow')
     ->middleware('inertia')
     ->name('app.codes.show');
+
+// 官職實體聚合 CRUD（/app/office/*）——上層聚合入口，寫入走 mutation API（resource=office）。
+// create 須排在 {id}/edit 之前；{id} 限數字避免吞掉 create。
+Route::get('app/office', 'OfficeEntityController@appIndex')
+    ->middleware('inertia')->name('app.office.index');
+Route::get('app/office/create', 'OfficeEntityController@appCreate')
+    ->middleware('inertia')->name('app.office.create');
+Route::get('app/office/{id}/edit', 'OfficeEntityController@appEdit')
+    ->middleware('inertia')->name('app.office.edit')->whereNumber('id');
 Route::get('codes/{table_name}/create', 'CodesController@create')->name('codes.create');
 Route::post('codes/{table_name}/proposal', 'CodesController@proposalStore')->name('codes.propose.store');
 Route::get('codes/{table_name}/proposals/{operation}/edit', 'CodesController@proposalEdit')->name('codes.proposals.edit');

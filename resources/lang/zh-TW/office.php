@@ -45,7 +45,7 @@ return [
     'created' => '已新增',
     'updated' => '已更新',
     'deleted' => '已刪除',
-    'delete_confirm' => '確定刪除此官職？此動作可於 /operations 復原。',
+    'delete_confirm' => '確定刪除此官職？此為永久刪除、無法復原；且僅在未被任何人物任官引用時才能刪除。',
     'delete_blocked' => '此官職仍被人物任官引用，無法刪除',
 
     'err_name_required' => '官職名為必填',

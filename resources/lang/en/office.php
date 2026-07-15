@@ -45,7 +45,7 @@ return [
     'created' => 'Created',
     'updated' => 'Updated',
     'deleted' => 'Deleted',
-    'delete_confirm' => 'Delete this office? This can be restored from /operations.',
+    'delete_confirm' => 'Delete this office? This is permanent and cannot be undone; only offices not referenced by any appointment can be deleted.',
     'delete_blocked' => 'This office is still referenced by appointments and cannot be deleted',
 
     'err_name_required' => 'Office name is required',

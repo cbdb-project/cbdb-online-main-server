@@ -2,10 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Repositories\OperationRepository;
-use App\Services\PinyinDictionary;
-use App\Support\CompositePrimaryKey;
-use App\Support\PinyinUmlaut;
+use App\Services\Import\OfficeImportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -13,12 +10,12 @@ use Inertia\Inertia;
 
 class AdminBatchLoadOfficesController extends Controller {
     /**
-     * @var OperationRepository
+     * @var OfficeImportService
      */
-    protected $operationRepository;
+    protected $officeImportService;
 
-    public function __construct(OperationRepository $operationRepository) {
-        $this->operationRepository = $operationRepository;
+    public function __construct(OfficeImportService $officeImportService) {
+        $this->officeImportService = $officeImportService;
     }
 
     public function showForm() {
@@ -86,49 +83,26 @@ class AdminBatchLoadOfficesController extends Controller {
 
         $results = [];
 
+        // 寫入委派給 OfficeImportService（與 mutation API 共用同一存儲過程），
+        // controller 只保留解析／校驗／組裝畫面結果。逐列於同一交易內呼叫 create()，
+        // 派生（拼音）、自動 c_office_id、配套 REL 行、operations + audit_log 皆由 service 負責。
         DB::transaction(function () use (&$results, $rows, $dynastyMap) {
-            $nextOfficeId = (int) DB::table('OFFICE_CODES')->max('c_office_id');
-
             foreach ($rows as $row) {
-                $nextOfficeId++;
-                $pinyin = $this->buildPinyin($row['name']);
                 $dynastyCode = $dynastyMap[$row['dynasty_label']];
 
-                $officePayload = [
-                    'c_office_id' => $nextOfficeId,
-                    'c_dy' => $dynastyCode,
-                    'c_office_pinyin' => $pinyin,
-                    'c_office_trans' => $row['translation'],
-                    'c_office_chn' => $row['name'],
-                    'c_source' => $row['source_id'],
-                ];
-
-                DB::table('OFFICE_CODES')->insert($officePayload);
-                $this->operationRepository->store(Auth::id(), '', 1, 'OFFICE_CODES', $nextOfficeId, $officePayload);
-
-                $relationPayload = [
-                    'c_office_id' => $nextOfficeId,
-                    'c_office_tree_id' => $row['type_id'],
-                ];
-
-                DB::table('OFFICE_CODE_TYPE_REL')->insert($relationPayload);
-                $this->operationRepository->store(
-                    Auth::id(),
-                    '',
-                    1,
-                    'OFFICE_CODE_TYPE_REL',
-                    CompositePrimaryKey::buildStoredResourceId([
-                        'c_office_id' => $nextOfficeId,
-                        'c_office_tree_id' => $row['type_id'],
-                    ]),
-                    $relationPayload
-                );
+                $created = $this->officeImportService->create([
+                    'name' => $row['name'],
+                    'translation' => $row['translation'],
+                    'dynasty_code' => $dynastyCode,
+                    'type_id' => $row['type_id'],
+                    'source_id' => $row['source_id'],
+                ]);
 
                 $results[] = [
                     'line' => $row['line'],
-                    'office_id' => $nextOfficeId,
+                    'office_id' => $created['office_id'],
                     'name' => $row['name'],
-                    'pinyin' => $pinyin,
+                    'pinyin' => $created['pinyin'],
                     'translation' => $row['translation'],
                     'dynasty_label' => $row['dynasty_label'],
                     'dynasty_code' => $dynastyCode,
@@ -315,33 +289,6 @@ class AdminBatchLoadOfficesController extends Controller {
         return array_map(function ($id) {
             return "找不到來源 TEXT_ID {$id}，請確認 TEXT_CODES 是否已有資料";
         }, $missing);
-    }
-
-    /**
-     * Convert Chinese string to space-separated pinyin.
-     */
-    protected function buildPinyin(string $value): string {
-        $chars = preg_split('//u', $value, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-        $syllables = [];
-
-        foreach ($chars as $char) {
-            if (preg_match('/\p{Han}/u', $char)) {
-                $syllables[] = strtolower(PinyinDictionary::getPinyin($char));
-            } elseif (preg_match('/[A-Za-z0-9]/u', $char)) {
-                $syllables[] = strtolower($char);
-            }
-        }
-
-        $syllables = array_filter($syllables, static function ($syllable) {
-            return $syllable !== '';
-        });
-
-        if (empty($syllables)) {
-            return strtolower(trim(preg_replace('/\s+/u', ' ', $value)));
-        }
-
-        // 止血：把生成拼音中殘留的 v 代寫正規化為 ü。
-        return PinyinUmlaut::normalize(implode(' ', $syllables));
     }
 
     /**

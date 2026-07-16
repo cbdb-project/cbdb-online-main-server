@@ -163,6 +163,7 @@ return [
     'filter_err_unknown' => '語法錯誤',
     // AST→人話片語（由 ColumnFilterExpression::describe() 組裝）
     'filter_desc_contains' => '含「:term」',
+    'filter_desc_exact' => '等於「:term」',
     'filter_desc_not' => '非',
     'filter_desc_and' => ' 且 ',
     'filter_desc_or' => ' 或 ',

@@ -157,8 +157,8 @@ class CodesShowInertiaTest extends TestCase {
         $this->seedKinshipCodesForSortFilter();
         $this->actingAs($this->activeUser());
 
-        // 與其他數值欄位一致：篩選用 LIKE '%2%' 字面比對，diff=-2 的列也會命中（因為 "-2"
-        // 內含子字串 "2"），非本功能特有行為。
+        // 此計算欄位是數值型，match_mode 設為 exact（完全比對）而非 LIKE 子字串，所以篩
+        // "2" 只命中 diff=2 的列（kincode 1），diff=-2 的列（kincode 2）不會被誤配對。
         $this->get(route('app.codes.show', [
             'table_name' => 'KINSHIP_CODES',
             'filters' => ['c_up_down_diff_step' => '2'],
@@ -167,9 +167,65 @@ class CodesShowInertiaTest extends TestCase {
             ->assertInertia(fn (Assert $page) => $page
                 ->where('rows', function ($rows) {
                     $ids = collect($rows->all())->pluck('c_kincode')->all();
+
+                    return $ids === [1];
+                }));
+    }
+
+    #[Test]
+    public function kinship_codes_computed_column_exact_filter_can_match_negative_values(): void {
+        $this->seedKinshipCodesForSortFilter();
+        $this->actingAs($this->activeUser());
+
+        $this->get(route('app.codes.show', [
+            'table_name' => 'KINSHIP_CODES',
+            'filters' => ['c_up_down_diff_step' => '-2'],
+        ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('rows', function ($rows) {
+                    $ids = collect($rows->all())->pluck('c_kincode')->all();
+
+                    return $ids === [2];
+                }));
+    }
+
+    #[Test]
+    public function kinship_codes_computed_column_exact_filter_ignores_non_numeric_input(): void {
+        $this->seedKinshipCodesForSortFilter();
+        $this->actingAs($this->activeUser());
+
+        // 非數字輸入不套用篩選（避免 MySQL 隱式轉型為 0 誤配對 diff=0 的列），回傳全部列。
+        $this->get(route('app.codes.show', [
+            'table_name' => 'KINSHIP_CODES',
+            'filters' => ['c_up_down_diff_step' => 'abc'],
+        ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('rows', function ($rows) {
+                    return count($rows->all()) === 3;
+                }));
+    }
+
+    #[Test]
+    public function kinship_codes_computed_column_exact_filter_works_in_boolean_mode(): void {
+        $this->seedKinshipCodesForSortFilter();
+        $this->actingAs($this->activeUser());
+
+        // 進階布林篩選模式（filter_bool=1）下，exact match_mode 仍應走 `=` 完全比對，
+        // NOT 詞項對數字仍走 NULL-safe 排除；非數字詞項恆不相等（見 ColumnFilterExpression）。
+        $this->get(route('app.codes.show', [
+            'table_name' => 'KINSHIP_CODES',
+            'filter_bool' => 1,
+            'filters' => ['c_up_down_diff_step' => '!2'],
+        ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('rows', function ($rows) {
+                    $ids = collect($rows->all())->pluck('c_kincode')->all();
                     sort($ids);
 
-                    return $ids === [1, 2];
+                    return $ids === [2, 3];
                 }));
     }
 

@@ -84,7 +84,7 @@ class CodesShowInertiaTest extends TestCase {
     }
 
     #[Test]
-    public function it_injects_kinship_codes_up_down_diff_step_computed_column(): void {
+    public function it_injects_kinship_codes_down_up_diff_step_computed_column(): void {
         config(['codes.tables' => ['TEST_CODES' => '測試代碼', 'KINSHIP_CODES' => '親屬關係代碼表']]);
 
         Schema::create('KINSHIP_CODES', function ($table) {
@@ -104,16 +104,17 @@ class CodesShowInertiaTest extends TestCase {
                 ->component('Codes/Show')
                 ->where('thead', function ($thead) {
                     $thead = $thead->all();
-                    $diffIndex = array_search('c_up_down_diff_step', $thead, true);
+                    $diffIndex = array_search('c_down_up_diff_step', $thead, true);
                     $upstepIndex = array_search('c_upstep', $thead, true);
 
                     return $diffIndex !== false && $upstepIndex !== false && $diffIndex === $upstepIndex - 1;
                 })
-                ->where('computed_columns', ['c_up_down_diff_step'])
+                ->where('computed_columns', ['c_down_up_diff_step'])
                 ->where('rows', function ($rows) {
                     $rows = $rows->all();
 
-                    return $rows[0]['c_up_down_diff_step'] === 2 && $rows[1]['c_up_down_diff_step'] === null;
+                    // diff = c_dwnstep - c_upstep = 1 - 3 = -2；第二列 c_upstep 為 null → diff 為 null。
+                    return $rows[0]['c_down_up_diff_step'] === -2 && $rows[1]['c_down_up_diff_step'] === null;
                 }));
     }
 
@@ -126,8 +127,8 @@ class CodesShowInertiaTest extends TestCase {
             $table->smallInteger('c_dwnstep')->nullable();
         });
         DB::table('KINSHIP_CODES')->insert([
-            ['c_kincode' => 1, 'c_upstep' => 3, 'c_dwnstep' => 1],  // diff = 2
-            ['c_kincode' => 2, 'c_upstep' => 1, 'c_dwnstep' => 3],  // diff = -2
+            ['c_kincode' => 1, 'c_upstep' => 3, 'c_dwnstep' => 1],  // diff = c_dwnstep - c_upstep = -2
+            ['c_kincode' => 2, 'c_upstep' => 1, 'c_dwnstep' => 3],  // diff = 2
             ['c_kincode' => 3, 'c_upstep' => 5, 'c_dwnstep' => 5],  // diff = 0
         ]);
     }
@@ -139,16 +140,17 @@ class CodesShowInertiaTest extends TestCase {
 
         $this->get(route('app.codes.show', [
             'table_name' => 'KINSHIP_CODES',
-            'sort_by' => 'c_up_down_diff_step',
+            'sort_by' => 'c_down_up_diff_step',
             'sort_dir' => 'asc',
         ]))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('sort_by', 'c_up_down_diff_step')
+                ->where('sort_by', 'c_down_up_diff_step')
                 ->where('rows', function ($rows) {
                     $rows = $rows->all();
 
-                    return $rows[0]['c_kincode'] === 2 && $rows[1]['c_kincode'] === 3 && $rows[2]['c_kincode'] === 1;
+                    // 升冪：kincode1(-2) < kincode3(0) < kincode2(2)。
+                    return $rows[0]['c_kincode'] === 1 && $rows[1]['c_kincode'] === 3 && $rows[2]['c_kincode'] === 2;
                 }));
     }
 
@@ -158,28 +160,10 @@ class CodesShowInertiaTest extends TestCase {
         $this->actingAs($this->activeUser());
 
         // 此計算欄位是數值型，match_mode 設為 exact（完全比對）而非 LIKE 子字串，所以篩
-        // "2" 只命中 diff=2 的列（kincode 1），diff=-2 的列（kincode 2）不會被誤配對。
+        // "2" 只命中 diff=2 的列（kincode 2），diff=-2 的列（kincode 1）不會被誤配對。
         $this->get(route('app.codes.show', [
             'table_name' => 'KINSHIP_CODES',
-            'filters' => ['c_up_down_diff_step' => '2'],
-        ]))
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->where('rows', function ($rows) {
-                    $ids = collect($rows->all())->pluck('c_kincode')->all();
-
-                    return $ids === [1];
-                }));
-    }
-
-    #[Test]
-    public function kinship_codes_computed_column_exact_filter_can_match_negative_values(): void {
-        $this->seedKinshipCodesForSortFilter();
-        $this->actingAs($this->activeUser());
-
-        $this->get(route('app.codes.show', [
-            'table_name' => 'KINSHIP_CODES',
-            'filters' => ['c_up_down_diff_step' => '-2'],
+            'filters' => ['c_down_up_diff_step' => '2'],
         ]))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
@@ -191,6 +175,24 @@ class CodesShowInertiaTest extends TestCase {
     }
 
     #[Test]
+    public function kinship_codes_computed_column_exact_filter_can_match_negative_values(): void {
+        $this->seedKinshipCodesForSortFilter();
+        $this->actingAs($this->activeUser());
+
+        $this->get(route('app.codes.show', [
+            'table_name' => 'KINSHIP_CODES',
+            'filters' => ['c_down_up_diff_step' => '-2'],
+        ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('rows', function ($rows) {
+                    $ids = collect($rows->all())->pluck('c_kincode')->all();
+
+                    return $ids === [1];
+                }));
+    }
+
+    #[Test]
     public function kinship_codes_computed_column_exact_filter_ignores_non_numeric_input(): void {
         $this->seedKinshipCodesForSortFilter();
         $this->actingAs($this->activeUser());
@@ -198,7 +200,7 @@ class CodesShowInertiaTest extends TestCase {
         // 非數字輸入不套用篩選（避免 MySQL 隱式轉型為 0 誤配對 diff=0 的列），回傳全部列。
         $this->get(route('app.codes.show', [
             'table_name' => 'KINSHIP_CODES',
-            'filters' => ['c_up_down_diff_step' => 'abc'],
+            'filters' => ['c_down_up_diff_step' => 'abc'],
         ]))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
@@ -217,7 +219,7 @@ class CodesShowInertiaTest extends TestCase {
         $this->get(route('app.codes.show', [
             'table_name' => 'KINSHIP_CODES',
             'filter_bool' => 1,
-            'filters' => ['c_up_down_diff_step' => '!2'],
+            'filters' => ['c_down_up_diff_step' => '!2'],
         ]))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
@@ -225,7 +227,7 @@ class CodesShowInertiaTest extends TestCase {
                     $ids = collect($rows->all())->pluck('c_kincode')->all();
                     sort($ids);
 
-                    return $ids === [2, 3];
+                    return $ids === [1, 3];
                 }));
     }
 
@@ -237,12 +239,12 @@ class CodesShowInertiaTest extends TestCase {
 
         $this->get(route('app.codes.show', [
             'table_name' => 'KINSHIP_CODES',
-            'sort_by' => 'c_up_down_diff_step',
+            'sort_by' => 'c_down_up_diff_step',
         ]))->assertRedirect(route('login'));
 
         $this->get(route('app.codes.show', [
             'table_name' => 'KINSHIP_CODES',
-            'filters' => ['c_up_down_diff_step' => '2'],
+            'filters' => ['c_down_up_diff_step' => '2'],
         ]))->assertRedirect(route('login'));
     }
 

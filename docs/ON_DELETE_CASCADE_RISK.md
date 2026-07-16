@@ -1,5 +1,7 @@
 # 「物理刪除 × ON DELETE CASCADE」是唯一不可接受的組合
 
+> English version: [ON_DELETE_CASCADE_RISK.en.md](./ON_DELETE_CASCADE_RISK.en.md)
+>
 > 撰寫日期：2026-07-07 ｜ 依據：`database/migrations/2025_01_01_000000_import_cbdb_schema.php`（生產 MariaDB schema 的入庫來源）
 >
 > **本文目的**：說明本專案 schema 目前處於「物理刪除 × 級聯刪除」這個對資料資產最危險的組合中，
@@ -50,6 +52,14 @@
 特別注意：**`BIOG_MAIN` 自身有 13 個指向詞表的 CASCADE 外鍵**（`BIOG_MAIN_ibfk_1`–`13`，指向 `NIAN_HAO`×4、`YEAR_RANGE_CODES`×3、`GANZHI_CODES`×2、`DYNASTIES`、`CHORONYM_CODES`、`ETHNICITY_TRIBE_CODES`、`HOUSEHOLD_STATUS_CODES`）。
 
 同時，應用層對詞表的「刪除」目前是**物理 DELETE**：`/codes` 編輯器與 `AdminBatchLoadBookTitlesController::deleteBatch` 硬刪 `TEXT_CODES`，刪除前不做引用檢查——矩陣左上角的兩個條件同時成立。
+
+### 1.1 歷史背景：這是刻意的設計取捨，而非疏忽
+
+「物理刪除 × CASCADE」在原本的設計中是有意識的省時設置：CBDB 的代碼表並非逐條經過字典式考證，而是在**批量建設、允許一定錯誤率**的前提下累積起來的，「物理刪除 × CASCADE」因此成為清理 codes 連同其引用資料的低成本手段。本文不否定這個取捨在當時的合理性，而是指出取捨賴以成立的成本結構已經改變：
+
+- 在 agent 協助下，把外鍵機制承擔的清理邏輯搬進應用層代碼（引用檢查、合併＋重定向、顯式級聯）的開發時間成本已經可控；
+- 專案的可追溯目標正從**離散可追溯**（發佈離散的版本，版本之間的差異不可考）走向**線性可追溯**（operations / audit_log 記全每個版本差異之間的 logs；Phase B 已為 `/codes` 直寫路徑補上 audit_log）。DB 級聯是這條線上的結構性盲區（§3.3），不移除它，線性可追溯在機制上就無法成立；
+- 線上系統與離線發佈版（Michael 的 Access）在結構上分離，由匯出功能保證發佈版與 Access 架構一致（§5.3），因此線上 schema 的演進（如加 `c_deprecated` 欄）不受發佈格式束縛。
 
 ## 2. 一個具體的災難場景
 
@@ -206,7 +216,7 @@ RESTRICT 的失敗模式是「煩人但無害」（fail-closed），CASCADE 的�
 
 **Step 2：應用層補課（每項獨立 PR）**
 1. **引用檢查服務**：輸入（詞表, 主鍵值），輸出各引用表的計數與樣例——資料來源就是 Step 0 的外鍵清單，可直接由 `information_schema` 驅動，不必手工維護映射。
-2. **詞表生命週期**：詞表加 `c_deprecated` 狀態欄（僅詞表、非資料表；schema 與離線發佈版的對齊需確認）；選擇器/搜尋端點過濾退役詞條，顯示 JOIN 不過濾；`/codes` 的「刪除」改為「退役」，物理刪除僅在引用數為零時開放；廢除 `deleteBatch` 刪 `operations` 紀錄的行為。
+2. **詞表生命週期**：詞表加 `c_deprecated` 狀態欄（僅詞表、非資料表；**新增欄位須先經 executive committee 討論，離線發佈版的對齊規則與匯出更新見 §5.3，匯出更新與本欄位同一里程碑交付**）；選擇器/搜尋端點過濾退役詞條，顯示 JOIN 不過濾；`/codes` 的「刪除」改為「退役」，物理刪除僅在引用數為零時開放；廢除 `deleteBatch` 刪 `operations` 紀錄的行為。
 3. **合併＋重定向工具**：把 A 詞條的全部引用批次改指到 B 詞條，受審計、可回退，A 退役留重定向——這也是日後「人物合併」的同構地基。
 4. **顯式級聯刪除服務**：覆蓋 Step 1 標記為「組合」的少數關係（參考 `OfficePostingRepository` 現行寫法，補齊快照與同 operation_id 分組）。
 
@@ -248,6 +258,27 @@ ALTER TABLE ALTNAME_DATA
 | 5 長期項 | 各自立項 | — | — |
 
 整條路線沒有一步是「大爆炸」：應用層 PR 各自獨立，約束翻轉分批且逐批可退。完成後系統落在矩陣的 ④（軟刪除 × RESTRICT）：正常路徑上「刪除」不再發生，異常路徑上代價被封頂為一個報錯——「任何操作皆可回退」才第一次在機制上成為可能。在此之前，DB 級聯這個天窗會讓任何審計/撤銷工程的保證落空，這也是為什麼本文的結論是：**打破「物理刪除 × CASCADE」組合應排在所有資料安全工程之前。**
+
+### 5.3 離線發佈（SQLite / Access）與治理對齊
+
+線上系統與離線發佈版在結構上分離，由匯出功能保證發佈版與 Access 架構一致。`c_deprecated` 落地時，離線發佈有兩件事必須同步處理：
+
+**(1) 匯出排除規則——deprecated codes 與人物軟刪除結構不同，不能照搬整批排除。**
+
+已有的先例是 BIOG_MAIN 人物軟刪除的匯出排除（commit 8930d73，見 `docs/SQLITE_DATA_RELEASE.md`）：已刪除人物是**整組排除**——人物列、其所有資料列、他人紀錄中提及它的關係列（經 `information_schema` 動態偵測 FK 欄位）一起消失，匯出檔中不留懸掛引用；`information_schema` 查詢失敗時 fail-closed 中止整個匯出，配專屬回歸測試。這個**模式**（過濾集中在 query 建構處、fail-closed、回歸測試）值得沿用。
+
+但 deprecate 的**語義**與人物軟刪除相反：既有引用保留、只禁止新引用。引用某個 deprecated code 的資料列都是正常人物的正常資料，不能連坐排除；若把 deprecated codes 整批從匯出剔除，這些資料列會帶著懸掛外鍵值（指向 Access/SQLite 中不存在的 code），Access 端 JOIN 直接漏資料。因此匯出規則按引用數分兩檔：
+
+| deprecated code 的引用數 | 匯出行為 | 說明 |
+|---|---|---|
+| **零** | 從匯出排除 | 對 Access 而言等同於「已刪除」，與現行認知一致 |
+| **仍有引用** | 照常匯出為普通 code 列（**不帶 `c_deprecated` 欄**） | 對 Access 完全透明、不產生懸掛引用；治理上由合併＋重定向（Step 2-3）逐步把引用遷走，引用歸零後自然從下一個發佈版消失 |
+
+匯出功能的更新與 `c_deprecated` 欄位**放在同一里程碑交付**，不允許出現「欄位上了、匯出還沒跟上」的窗口。
+
+**(2) 治理前提——新增欄位須經 executive committee 討論。**
+
+線上系統新增欄位一律需經 executive committee 討論。由於 `c_deprecated` 只存在於線上系統、依上表規則**不匯出到 Access**，對 committee 而言這不是共享 schema 的變更，而是**詞表生命週期政策的變更**（「刪除」變為「退役／合併」，以及發佈版本的收錄規則）。提交討論時準備一頁說明：`c_deprecated` 的語義、上述匯出規則、以及發佈的 Access 版本 schema 保持不變。此討論是 Step 2 里程碑 2 的前置條件。
 
 ---
 

@@ -1,4 +1,4 @@
-FROM dunglas/frankenphp:1-php8.4.15 AS build
+FROM dunglas/frankenphp:1-php8.4.23 AS build
 
 WORKDIR /build
 
@@ -24,7 +24,7 @@ RUN cd /tmp \
     && ldconfig \
     && rm -rf /tmp/sqlite-autoconf-${SQLITE_VERSION}*
 
-FROM dunglas/frankenphp:1-php8.4.15
+FROM dunglas/frankenphp:1-php8.4.23
 
 WORKDIR /app
 

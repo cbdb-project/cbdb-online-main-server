@@ -9,6 +9,7 @@ use App\Repositories\ToolsRepository;
 use App\Services\PinyinDictionary;
 use App\Services\VariantCharNormalizer;
 use App\Support\PinyinUmlaut;
+use App\Support\SimplifiedOnlyChars;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -466,6 +467,16 @@ class AdminBatchLoadBookTitlesController extends Controller {
                         return sprintf('「%s」(U+%04X)', $ch, mb_ord($ch, 'UTF-8'));
                     }, $unpinyinable));
                     $errors[] = "第 {$line} 行書名含有無拼音對應的漢字（將造成 c_title 內仍含中文）：{$display}";
+                }
+
+                // 簡體字形嫌疑（僅簡體字集，見 SimplifiedOnlyChars）：多為現代轉錄混入，
+                // 但這些字形在古籍中也可能是俗字／古字，故採警告＋強制放行語義，不硬性拒絕。
+                $simplified = SimplifiedOnlyChars::findIn((string) $row['title']);
+                if (!empty($simplified)) {
+                    $display = implode(' ', array_map(static function ($ch) {
+                        return sprintf('「%s」(U+%04X)', $ch, mb_ord($ch, 'UTF-8'));
+                    }, $simplified));
+                    $errors[] = "第 {$line} 行書名含簡體字形：{$display}；若文獻原貌即為此字形（俗字），請使用強制匯入放行";
                 }
             }
         }

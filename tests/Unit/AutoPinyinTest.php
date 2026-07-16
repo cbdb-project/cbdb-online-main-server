@@ -107,6 +107,17 @@ class AutoPinyinTest extends TestCase {
     }
 
     #[Test]
+    public function testGivenNameGetsApostropheBeforeAOESyllable(): void {
+        // 名字連寫依正詞法插隔音符：長安 → Chang'an（讀音來自 opencc-pinyin 靜態字典）。
+        $result = $this->repository->auto_pinyin(['c_name_chn' => '王長安']);
+
+        $this->assertSame('王', $result['c_surname_chn']);
+        $this->assertSame('長安', $result['c_mingzi_chn']);
+        $this->assertSame("Chang'an", $result['c_mingzi']);
+        $this->assertSame("Wang Chang'an", $result['c_name']);
+    }
+
+    #[Test]
     public function testKnownSurnameStillMatchesWhenGivenNameLongerThanTwoChars(): void {
         $result = $this->repository->auto_pinyin(['c_name_chn' => '王安石傳']);
 

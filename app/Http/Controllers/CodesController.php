@@ -234,13 +234,19 @@ class CodesController extends Controller {
      * 與其他欄位一致，不做特例放寬。目前僅 KINSHIP_CODES 一例：
      * c_up_down_diff_step = c_upstep − c_dwnstep，顯示於 c_upstep 左邊。
      *
-     * @var array<string, array<string, array{expression: string, insert_before: string}>>
+     * `match_mode`（預設 'contains'）：'exact' 表示該欄位篩選走完全比對（=）而非 LIKE
+     * 子字串比對——數值型計算欄位用 LIKE 會有誤導性命中（例如篩 "2" 會連 "-2"、"12" 都
+     * 命中），改用 exact 更符合直覺。僅影響逐欄篩選框；上方全域搜尋框（多欄 OR LIKE）
+     * 不受影響，維持原本子字串搜尋語意。
+     *
+     * @var array<string, array<string, array{expression: string, insert_before: string, match_mode?: string}>>
      */
     protected $tableComputedColumns = [
         'KINSHIP_CODES' => [
             'c_up_down_diff_step' => [
                 'expression' => '(c_upstep - c_dwnstep)',
                 'insert_before' => 'c_upstep',
+                'match_mode' => 'exact',
             ],
         ],
     ];
@@ -662,6 +668,14 @@ class CodesController extends Controller {
                 continue;
             }
 
+            // 計算欄位可個別指定 match_mode（見 $tableComputedColumns 註解）：'exact' 用
+            // `=` 完全比對，避免數值欄位用 LIKE 子字串造成誤判命中（如篩 "2" 連 "-2" 都中）。
+            $matchMode = $computedColumns[$column]['match_mode'] ?? 'contains';
+            if ($matchMode === 'exact' && !$booleanEnabled && !is_numeric($value)) {
+                // 非數字輸入略過套用：避免 MySQL 將非數字字串隱式轉型為 0，誤配對到 diff=0 的列。
+                continue;
+            }
+
             if ($booleanEnabled) {
                 try {
                     $ast = $this->columnFilterExpression->parse($value);
@@ -670,8 +684,16 @@ class CodesController extends Controller {
 
                     continue;
                 }
-                $this->columnFilterExpression->applyToBuilder($query, $filterColumn, $ast);
-                $filterDescriptions[$column] = $this->columnFilterExpression->describe($ast, $descLabels);
+                $this->columnFilterExpression->applyToBuilder($query, $filterColumn, $ast, $matchMode);
+                $termLabels = $descLabels;
+                if ($matchMode === 'exact') {
+                    $termLabels['contains'] = (string) __('codes.filter_desc_exact');
+                }
+                $filterDescriptions[$column] = $this->columnFilterExpression->describe($ast, $termLabels);
+            } elseif ($matchMode === 'exact') {
+                // SQLite 對算術運算式（無欄位型別可依附）比對字串繫結值時不會做數字轉換，
+                // 因此需先轉成數字型別再綁定，MySQL 亦相容。
+                $query->where($filterColumn, '=', $value + 0);
             } else {
                 $query->where($filterColumn, 'like', '%' . $value . '%');
             }

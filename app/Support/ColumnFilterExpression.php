@@ -88,9 +88,11 @@ class ColumnFilterExpression {
      *
      * @param \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder $query
      * @param array<string,mixed> $ast
+     * @param string $matchMode 'contains'（預設，LIKE 子字串）或 'exact'（=，完全比對；
+     *     供數值型計算欄位使用，避免 LIKE 對負數/子字串的誤導性命中）。
      */
-    public function applyToBuilder($query, Expression|string $column, array $ast): void {
-        $this->applyNode($query, $column, $ast, false);
+    public function applyToBuilder($query, Expression|string $column, array $ast, string $matchMode = 'contains'): void {
+        $this->applyNode($query, $column, $ast, false, $matchMode);
     }
 
     /**
@@ -393,9 +395,32 @@ class ColumnFilterExpression {
      * @param \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder $query
      * @param array<string,mixed> $node
      */
-    private function applyNode($query, Expression|string $col, array $node, bool $negate): void {
+    private function applyNode($query, Expression|string $col, array $node, bool $negate, string $matchMode = 'contains'): void {
         switch ($node['type']) {
             case 'term':
+                if ($matchMode === 'exact') {
+                    // 非數字詞項對數值運算式而言恆不相等；直接下「恆假／恆真」條件，避免
+                    // 字串繫結值被資料庫隱式轉型（如轉 0）造成誤配對。數字詞項需顯式轉數字
+                    // 型別再繫結——SQLite 對算術運算式比對字串繫結值不會做數字轉換。
+                    $isNumeric = is_numeric($node['value']);
+                    if (!$negate) {
+                        if ($isNumeric) {
+                            $query->where($col, '=', $node['value'] + 0);
+                        } else {
+                            $query->whereRaw('1 = 0');
+                        }
+                    } elseif ($isNumeric) {
+                        // NULL-safe NOT: a NULL column must NOT be excluded.
+                        $query->where(function ($q) use ($col, $node): void {
+                            $q->whereNull($col)->orWhere($col, '!=', $node['value'] + 0);
+                        });
+                    } else {
+                        $query->whereRaw('1 = 1');
+                    }
+
+                    return;
+                }
+
                 $pattern = '%' . $node['value'] . '%';
                 if (!$negate) {
                     $query->where($col, 'like', $pattern);
@@ -410,7 +435,7 @@ class ColumnFilterExpression {
 
             case 'not':
                 // Push negation down toward the leaves (De Morgan): no bare NOT(...) group.
-                $this->applyNode($query, $col, $node['child'], !$negate);
+                $this->applyNode($query, $col, $node['child'], !$negate, $matchMode);
 
                 return;
 
@@ -421,11 +446,11 @@ class ColumnFilterExpression {
                 $effectiveAnd = $negate ? !$isAnd : $isAnd;
                 $children = $node['children'];
 
-                $query->where(function ($q) use ($col, $children, $negate, $effectiveAnd): void {
+                $query->where(function ($q) use ($col, $children, $negate, $effectiveAnd, $matchMode): void {
                     $first = true;
                     foreach ($children as $child) {
-                        $apply = function ($qq) use ($col, $child, $negate): void {
-                            $this->applyNode($qq, $col, $child, $negate);
+                        $apply = function ($qq) use ($col, $child, $negate, $matchMode): void {
+                            $this->applyNode($qq, $col, $child, $negate, $matchMode);
                         };
                         if ($first) {
                             $q->where($apply);

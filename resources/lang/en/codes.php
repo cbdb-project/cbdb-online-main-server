@@ -165,6 +165,7 @@ return [
     'filter_err_unknown' => 'Syntax error',
     // AST -> human phrases (assembled by ColumnFilterExpression::describe())
     'filter_desc_contains' => 'contains ":term"',
+    'filter_desc_exact' => 'equals ":term"',
     'filter_desc_not' => 'not ',
     'filter_desc_and' => ' and ',
     'filter_desc_or' => ' or ',

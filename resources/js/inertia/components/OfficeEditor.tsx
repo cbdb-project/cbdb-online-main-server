@@ -255,7 +255,7 @@ export default function OfficeEditor({
         // meta：proposal 附帶審核備註；create 且曾用 AI 自動填時附帶 ai_fill_log_id，供後端回寫
         // ai_fill_logs 的 user_submitted + submitted_at（不論是否人工修改過 AI 建議皆以 log id 連結）。
         const meta: Record<string, unknown> = {};
-        if (sm === 'proposal' && comment) meta.comment = comment;
+        if (comment) meta.comment = comment;
         if (creating && aiFillLogId.current) meta.ai_fill_log_id = aiFillLogId.current;
 
         try {

@@ -254,7 +254,7 @@ export default function BasicInfoEditor({
                 body: JSON.stringify({
                     resource: 'basicinformation', person_id: personId, mode, operation: 'update',
                     target: { pk: { c_personid: personId } }, changes,
-                    ...(mode === 'proposal' ? { comment } : {}),
+                    ...(comment ? { meta: { comment } } : {}),
                 }),
             });
             const json = await res.json().catch(() => ({}));

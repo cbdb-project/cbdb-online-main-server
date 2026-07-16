@@ -214,7 +214,7 @@ export default function KinEditor({
         try {
             // #66：meta 可帶 comment（proposal）與 force（衝突警告中選「強制覆寫」時）。
             const meta: Record<string, unknown> = {};
-            if (sm === 'proposal' && comment) meta.comment = comment;
+            if (comment) meta.comment = comment;
             if (force) meta.force = true;
             const res = await fetch(endpoint, {
                 method: 'POST',

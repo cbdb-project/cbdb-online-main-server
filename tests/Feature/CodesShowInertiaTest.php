@@ -117,10 +117,8 @@ class CodesShowInertiaTest extends TestCase {
                 }));
     }
 
-    #[Test]
-    public function kinship_codes_computed_column_is_not_sortable_or_filterable(): void {
+    private function seedKinshipCodesForSortFilter(): void {
         config(['codes.tables' => ['KINSHIP_CODES' => '親屬關係代碼表']]);
-        $this->actingAs($this->activeUser());
 
         Schema::create('KINSHIP_CODES', function ($table) {
             $table->smallInteger('c_kincode')->primary();
@@ -128,23 +126,68 @@ class CodesShowInertiaTest extends TestCase {
             $table->smallInteger('c_dwnstep')->nullable();
         });
         DB::table('KINSHIP_CODES')->insert([
-            ['c_kincode' => 1, 'c_upstep' => 3, 'c_dwnstep' => 1],
-            ['c_kincode' => 2, 'c_upstep' => 1, 'c_dwnstep' => 3],
+            ['c_kincode' => 1, 'c_upstep' => 3, 'c_dwnstep' => 1],  // diff = 2
+            ['c_kincode' => 2, 'c_upstep' => 1, 'c_dwnstep' => 3],  // diff = -2
+            ['c_kincode' => 3, 'c_upstep' => 5, 'c_dwnstep' => 5],  // diff = 0
         ]);
+    }
 
-        // 排序／篩選白名單來自 buildShowPayload() 內原始（未疊加計算欄位）的 $thead，
-        // 帶入計算欄位名應被忽略、不拋 SQL 錯誤，且回傳全部列（篩選未套用）。
+    #[Test]
+    public function active_user_can_sort_by_kinship_codes_computed_column(): void {
+        $this->seedKinshipCodesForSortFilter();
+        $this->actingAs($this->activeUser());
+
         $this->get(route('app.codes.show', [
             'table_name' => 'KINSHIP_CODES',
             'sort_by' => 'c_up_down_diff_step',
+            'sort_dir' => 'asc',
+        ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('sort_by', 'c_up_down_diff_step')
+                ->where('rows', function ($rows) {
+                    $rows = $rows->all();
+
+                    return $rows[0]['c_kincode'] === 2 && $rows[1]['c_kincode'] === 3 && $rows[2]['c_kincode'] === 1;
+                }));
+    }
+
+    #[Test]
+    public function active_user_can_filter_by_kinship_codes_computed_column(): void {
+        $this->seedKinshipCodesForSortFilter();
+        $this->actingAs($this->activeUser());
+
+        // 與其他數值欄位一致：篩選用 LIKE '%2%' 字面比對，diff=-2 的列也會命中（因為 "-2"
+        // 內含子字串 "2"），非本功能特有行為。
+        $this->get(route('app.codes.show', [
+            'table_name' => 'KINSHIP_CODES',
             'filters' => ['c_up_down_diff_step' => '2'],
         ]))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('sort_by', '')
                 ->where('rows', function ($rows) {
-                    return count($rows->all()) === 2;
+                    $ids = collect($rows->all())->pluck('c_kincode')->all();
+                    sort($ids);
+
+                    return $ids === [1, 2];
                 }));
+    }
+
+    #[Test]
+    public function guest_sort_or_filter_on_kinship_codes_computed_column_requires_login(): void {
+        // 與其他欄位一致，未登入使用者帶 sort_by/filters 一律導向登入頁（見
+        // guardSortFilterRequiresAuth()），不因為是計算欄位而放寬，避免拖慢伺服器。
+        $this->seedKinshipCodesForSortFilter();
+
+        $this->get(route('app.codes.show', [
+            'table_name' => 'KINSHIP_CODES',
+            'sort_by' => 'c_up_down_diff_step',
+        ]))->assertRedirect(route('login'));
+
+        $this->get(route('app.codes.show', [
+            'table_name' => 'KINSHIP_CODES',
+            'filters' => ['c_up_down_diff_step' => '2'],
+        ]))->assertRedirect(route('login'));
     }
 
     #[Test]

@@ -232,7 +232,9 @@ class CodesController extends Controller {
      * resolveColumnForQuery() 會把欄位名解回 `expression`（DB::raw）而非誤判為真實
      * 資料表欄位。排序／篩選仍受 guardSortFilterRequiresAuth() 登入且已激活門檻保護，
      * 與其他欄位一致，不做特例放寬。目前僅 KINSHIP_CODES 一例：
-     * c_up_down_diff_step = c_upstep − c_dwnstep，顯示於 c_upstep 左邊。
+     * c_down_up_diff_step = c_dwnstep − c_upstep，顯示於 c_upstep 左邊。用 dwnstep - upstep
+     * （而非 upstep - dwnstep）是因為輩份上，負值代表往上（長輩）較符合直覺——例如
+     * dwnstep=1、upstep=2 時 diff = -1，代表往上一輩。
      *
      * `match_mode`（預設 'contains'）：'exact' 表示該欄位篩選走完全比對（=）而非 LIKE
      * 子字串比對——數值型計算欄位用 LIKE 會有誤導性命中（例如篩 "2" 會連 "-2"、"12" 都
@@ -243,8 +245,8 @@ class CodesController extends Controller {
      */
     protected $tableComputedColumns = [
         'KINSHIP_CODES' => [
-            'c_up_down_diff_step' => [
-                'expression' => '(c_upstep - c_dwnstep)',
+            'c_down_up_diff_step' => [
+                'expression' => '(c_dwnstep - c_upstep)',
                 'insert_before' => 'c_upstep',
                 'match_mode' => 'exact',
             ],

@@ -426,10 +426,14 @@ class CodesController extends Controller {
             ];
         }
 
+        [$thead, $rows, $computedColumns] = $this->injectComputedColumns($table, $payload['thead'], $dataProp['rows']);
+        $dataProp['rows'] = $rows;
+
         return Inertia::render('Codes/Show', [
             'table' => $table,
-            'thead' => $payload['thead'],
+            'thead' => $thead,
             'rows' => $dataProp['rows'],
+            'computed_columns' => $computedColumns,
             'cursor' => $useCursor ? $dataProp : null,
             'meta' => $meta,
             'use_cursor' => $useCursor,
@@ -1491,6 +1495,41 @@ class CodesController extends Controller {
         flash('Delete success @ '.Carbon::now(), 'success');
 
         return redirect()->route($showRoute, ['table_name' => $table]);
+    }
+
+    /**
+     * app/codes/{table_name}（Inertia 版）專用：在 buildShowPayload() 產出的 thead／rows
+     * 之外，疊加純前端展示用的計算欄位（不進資料庫、不可排序／篩選，因為 buildShowPayload()
+     * 內的 sanitizeColumnFilters()/sanitizeSortParameters() 已用原始 $thead 產生白名單，
+     * 這裡才把計算欄位加進去，所以永遠不會被誤判為可查詢欄位）。目前僅 KINSHIP_CODES 的
+     * c_up_down_diff_step（= c_upstep − c_dwnstep）一例；只做在 React 路徑，不動 Blade。
+     *
+     * @param array<int, string> $thead
+     * @param array<int, array<string, mixed>> $rows
+     * @return array{0: array<int, string>, 1: array<int, array<string, mixed>>, 2: array<int, string>}
+     */
+    protected function injectComputedColumns(string $table, array $thead, array $rows): array {
+        if (strtoupper($table) !== 'KINSHIP_CODES') {
+            return [$thead, $rows, []];
+        }
+
+        $virtualColumn = 'c_up_down_diff_step';
+        $anchorIndex = array_search('c_upstep', $thead, true);
+        if ($anchorIndex === false || !in_array('c_dwnstep', $thead, true) || in_array($virtualColumn, $thead, true)) {
+            return [$thead, $rows, []];
+        }
+
+        array_splice($thead, $anchorIndex, 0, [$virtualColumn]);
+
+        $rows = array_map(function (array $row) use ($virtualColumn) {
+            $up = $row['c_upstep'] ?? null;
+            $down = $row['c_dwnstep'] ?? null;
+            $row[$virtualColumn] = (is_numeric($up) && is_numeric($down)) ? ($up - $down) : null;
+
+            return $row;
+        }, $rows);
+
+        return [$thead, $rows, [$virtualColumn]];
     }
 
     protected function buildTableHead(string $table, $sampleRow, ?array $joinConfig = null): array {

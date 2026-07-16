@@ -42,6 +42,7 @@ interface CodesShowPageProps extends SharedProps {
     exportable: boolean;
     key_columns: string[];
     joined_columns: string[];
+    computed_columns: string[];
     copyright_note: string | null;
     filters: Record<string, string>;
     sort_by: string;
@@ -69,7 +70,7 @@ export default function CodesShow() {
 
     const {
         table, thead, rows, cursor, meta, use_cursor, dynasty_map, key_columns, joined_columns,
-        copyright_note, sort_by, sort_dir, boolean_enabled, boolean_filter_available,
+        computed_columns, copyright_note, sort_by, sort_dir, boolean_enabled, boolean_filter_available,
         filter_errors, filter_descriptions, can_edit, urls,
     } = props;
 
@@ -297,14 +298,18 @@ export default function CodesShow() {
                         <tr>
                             {thead.map((col) => (
                                 <th key={col} className="whitespace-nowrap px-3 py-2 text-left font-medium">
-                                    <button
-                                        type="button"
-                                        className={cn('hover:underline', !canSortOrFilter && 'cursor-not-allowed opacity-60 hover:no-underline')}
-                                        onClick={() => toggleSort(col)}
-                                        title={canSortOrFilter ? undefined : t('sort_filter_requires_login')}
-                                    >
-                                        {joined_columns.includes(col) ? `(${col})` : col} <span aria-hidden>{sortIcon(col)}</span>
-                                    </button>
+                                    {computed_columns.includes(col) ? (
+                                        <span>{col}</span>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            className={cn('hover:underline', !canSortOrFilter && 'cursor-not-allowed opacity-60 hover:no-underline')}
+                                            onClick={() => toggleSort(col)}
+                                            title={canSortOrFilter ? undefined : t('sort_filter_requires_login')}
+                                        >
+                                            {joined_columns.includes(col) ? `(${col})` : col} <span aria-hidden>{sortIcon(col)}</span>
+                                        </button>
+                                    )}
                                     {key_columns.includes(col) && (
                                         <span className="ml-1 rounded bg-blue-100 px-1 text-xs text-blue-800">PK</span>
                                     )}
@@ -315,6 +320,9 @@ export default function CodesShow() {
                         {!use_cursor && (
                             <tr>
                                 {thead.map((col) => {
+                                    if (computed_columns.includes(col)) {
+                                        return <th key={col} className="px-2 py-1" />;
+                                    }
                                     const hasErr = boolean_enabled && col in filter_errors;
                                     return (
                                         <th key={col} className="px-2 py-1">

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "69553b83e394834aaf637b4880fa4d95",
+    "content-hash": "71d243e59d9bb7b4d8d80fd6f7a26dab",
     "packages": [
         {
             "name": "brick/math",
@@ -507,6 +507,50 @@
                 }
             ],
             "time": "2025-03-06T22:45:56+00:00"
+        },
+        {
+            "name": "frankslin/opencc-pinyin",
+            "version": "v1.0.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/frankslin/opencc-pinyin.git",
+                "reference": "bca1fbb26379d8f522f0e8e989f680ec5047ca7e"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/frankslin/opencc-pinyin/zipball/bca1fbb26379d8f522f0e8e989f680ec5047ca7e",
+                "reference": "bca1fbb26379d8f522f0e8e989f680ec5047ca7e",
+                "shasum": ""
+            },
+            "require": {
+                "ext-mbstring": "*",
+                "php": ">=8.2"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^10.5"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "OpenccPinyin\\": "php/src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "Packed Hanyu Pinyin lookup data (zdic.net via mozillazg/pinyin-data) with an O(1) codepoint-addressed PHP loader; tone-marked by default, toneless on demand.",
+            "keywords": [
+                "CJK",
+                "Chinese",
+                "OpenCC",
+                "Pinyin"
+            ],
+            "support": {
+                "issues": "https://github.com/frankslin/opencc-pinyin/issues",
+                "source": "https://github.com/frankslin/opencc-pinyin/tree/v1.0.1"
+            },
+            "time": "2026-07-16T05:41:45+00:00"
         },
         {
             "name": "fruitcake/php-cors",
@@ -10293,5 +10337,5 @@
         "ext-curl": "*"
     },
     "platform-dev": {},
-    "plugin-api-version": "2.6.0"
+    "plugin-api-version": "2.9.0"
 }

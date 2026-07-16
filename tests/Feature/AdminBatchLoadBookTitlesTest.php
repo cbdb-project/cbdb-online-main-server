@@ -406,8 +406,9 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         DB::table('BIOG_MAIN')->insert(['c_personid' => 205, 'c_dy' => '8']);
         DB::table('TEXT_CODES')->insert(['c_textid' => 704, 'c_title_chn' => '來源']);
 
-        // 龘 (U+9F98) is unmapped in the Pinyin dict, which fails the pinyin check.
-        $entries = "205\t合法書名\t704\n205\t龘瑣稿\t704";
+        // 𰻞 (U+30EDE) is unmapped in the Pinyin dict — pinyin 表與 opencc-pinyin
+        // 靜態字典（zdic 不含 Ext G 區）皆查無讀音 — which fails the pinyin check.
+        $entries = "205\t合法書名\t704\n205\t𰻞瑣稿\t704";
 
         $response = $this->post(route('admin.batch-load-book-titles.store'), [
             'entries' => $entries,
@@ -429,17 +430,18 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         DB::table('BIOG_MAIN')->insert(['c_personid' => 260, 'c_dy' => '6']);
         DB::table('TEXT_CODES')->insert(['c_textid' => 760, 'c_title_chn' => '來源']);
 
-        // 龘 (U+9F98) is a valid Han character but not in the Pinyin dict, so without
-        // this check it would survive untranslated in c_title (e.g. "龘 suo xian na gao").
+        // 𰻞 (U+30EDE) is a valid Han character but not in the Pinyin dict（pinyin 表與
+        // opencc-pinyin 靜態字典皆無，zdic 不含 Ext G 區）, so without this check it
+        // would survive untranslated in c_title (e.g. "𰻞 suo xian na gao").
         $response = $this->post(route('admin.batch-load-book-titles.store'), [
-            'entries' => "260\t龘瑣獻納稿\t760",
+            'entries' => "260\t𰻞瑣獻納稿\t760",
         ]);
 
         $response->assertRedirect(route('admin.batch-load-book-titles'));
         $errors = $response->getSession()->get('batch_errors', []);
         $this->assertNotEmpty($errors);
         $this->assertStringContainsString('無拼音對應', implode("\n", $errors));
-        $this->assertStringContainsString('龘', implode("\n", $errors));
+        $this->assertStringContainsString('𰻞', implode("\n", $errors));
         $this->assertSame(1, DB::table('TEXT_CODES')->count());
         $this->assertSame(0, DB::table('operations')->count());
     }
@@ -539,7 +541,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         ]);
 
         $response->assertRedirect(route('admin.batch-load-book-titles'));
-        $this->assertEmpty($response->getSession()->get('batch_errors', []));
+        $this->assertSame([], $response->getSession()->get('batch_errors', []));
 
         $record = DB::table('TEXT_CODES')->where('c_textid', '>', 791)->orderByDesc('c_textid')->first();
         $this->assertNotNull($record);
@@ -607,8 +609,9 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         DB::table('BIOG_MAIN')->insert(['c_personid' => 292, 'c_dy' => '6']);
         DB::table('TEXT_CODES')->insert(['c_textid' => 792, 'c_title_chn' => '來源']);
 
-        // 我們刻意只加入繁體淨→jing，未加入簡體净（U+51C0）。簡體字轉不出來，
-        // 正是用來攔截「簡體字混入」的訊號，因此含净的書名應被拒絕、不得匯入。
+        // 簡體混入偵測改由 SimplifiedOnlyChars 顯式承擔（opencc-pinyin 靜態字典
+        // 補全後，净 也能轉出拼音，「無拼音對應」不再兼任簡體防火牆）。
+        // 含净的書名預設仍被攔下，訊息明確指出是簡體字形。
         $response = $this->post(route('admin.batch-load-book-titles.store'), [
             'entries' => "292\t净土錄\t792",
         ]);
@@ -616,11 +619,34 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $response->assertRedirect(route('admin.batch-load-book-titles'));
         $errors = $response->getSession()->get('batch_errors', []);
         $this->assertNotEmpty($errors);
-        $this->assertStringContainsString('無拼音對應', implode("\n", $errors));
+        $this->assertStringContainsString('簡體字形', implode("\n", $errors));
         $this->assertStringContainsString('净', implode("\n", $errors));
         // 只有預先插入的來源列，未新增任何資料。
         $this->assertSame(1, DB::table('TEXT_CODES')->count());
         $this->assertSame(0, DB::table('operations')->count());
+    }
+
+    #[Test]
+    public function test_simplified_char_can_be_force_imported_as_vulgar_variant(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 293, 'c_dy' => '6']);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 793, 'c_title_chn' => '來源']);
+
+        // 簡體字形在古籍中可能是俗字（文獻原貌），故簡體嫌疑是「警告＋強制放行」
+        // 而非硬性拒絕：force=1 應可匯入，且書名保留原字形、拼音照常轉出。
+        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "293\t净土錄\t793",
+            'force' => '1',
+        ]);
+
+        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $this->assertEmpty($response->getSession()->get('batch_errors', []));
+        $record = DB::table('TEXT_CODES')->where('c_textid', '>', 793)->orderByDesc('c_textid')->first();
+        $this->assertNotNull($record);
+        $this->assertSame('净土錄', $record->c_title_chn);
+        $this->assertSame('jing tu lu', $record->c_title);
     }
 
     #[Test]

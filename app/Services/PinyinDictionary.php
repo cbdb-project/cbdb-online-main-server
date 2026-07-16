@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\DB;
+use OpenccPinyin\PinyinData;
 
 /**
  * 拼音字典查詢服務，取代原本的 app/Models/Pinyin.php 靜態陣列，
@@ -12,6 +13,10 @@ use Illuminate\Support\Facades\DB;
  * 姓氏前綴比對使用（該處直接查 DB，不經過本服務）；本服務的 getPinyin() 屬於
  * 「其他所有轉換」，會同時查 c_lastname=1 與 c_lastname=0 兩種資料，
  * 同一字兩邊都有資料時優先採用 c_lastname=0（一般讀音）。
+ *
+ * 資料分層：pinyin 表是人工策展的權威層（姓氏讀音、多音字取捨、歷史人名特殊讀法），
+ * 查無此字時退回 frankslin/opencc-pinyin 套件的 zdic 全量字典（約 4.2 萬字、
+ * 無聲調首讀音）。因此「查無拼音」如今只剩極生僻字與非漢字，不再是常用異體字。
  */
 class PinyinDictionary {
     /**
@@ -26,13 +31,57 @@ class PinyinDictionary {
      * （完全比照 app/Models/Pinyin.php 的 chineseToPinyin() 既有行為）。
      */
     public static function getPinyin(string $string): string {
-        self::ensureLoaded();
-
-        $chars = preg_split('//u', $string, -1, PREG_SPLIT_NO_EMPTY) ?: [];
         $result = '';
 
-        foreach ($chars as $char) {
-            $result .= self::$cache[$char] ?? $char;
+        foreach (self::getSyllables($string) as $syllable) {
+            $result .= $syllable['pinyin'] ?? $syllable['char'];
+        }
+
+        return $result;
+    }
+
+    /**
+     * 逐字音節分解，保留音節邊界供呼叫端自行決定連接規則
+     * （空格分隔、人名連寫加隔音符、首字母大寫等）。
+     *
+     * @return list<array{char:string,pinyin:?string}> 查無讀音（含非漢字）時 pinyin 為 null
+     */
+    public static function getSyllables(string $string): array {
+        self::ensureLoaded();
+
+        $out = [];
+        foreach (preg_split('//u', $string, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $char) {
+            $out[] = [
+                'char' => $char,
+                'pinyin' => self::$cache[$char] ?? PinyinData::lookup($char, false),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * 人名（名字段）連寫：音節直接相連，後一音節以 a/o/e 開頭時依
+     * 漢語拼音正詞法（GB/T 16159）插入隔音符，如 長安 → chang'an、
+     * 西安 → xi'an。查無讀音的字元原樣保留（維持「無拼音」信號），
+     * 且其前後不插隔音符。
+     */
+    public static function getNamePinyin(string $string): string {
+        $result = '';
+        $prevWasSyllable = false;
+
+        foreach (self::getSyllables($string) as $syllable) {
+            if ($syllable['pinyin'] === null) {
+                $result .= $syllable['char'];
+                $prevWasSyllable = false;
+
+                continue;
+            }
+            if ($prevWasSyllable && preg_match('/^[aoeAOE]/u', $syllable['pinyin'])) {
+                $result .= "'";
+            }
+            $result .= $syllable['pinyin'];
+            $prevWasSyllable = true;
         }
 
         return $result;

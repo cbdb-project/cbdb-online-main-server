@@ -4040,7 +4040,8 @@ class BiogMainRepository {
             $c_mingzi_chn = mb_substr($name, $surnameLength, null, 'utf-8');
             // 標準化異體字（僅用於拼音轉換，不修改原始名字）
             $normalizedMingzi = VariantCharNormalizer::normalize($c_mingzi_chn);
-            $c_mingzi = PinyinUmlaut::normalize(ucfirst(PinyinDictionary::getPinyin($normalizedMingzi)) ?? '');
+            // 名字連寫並依正詞法插隔音符（長安 → Chang'an），見 PinyinDictionary::getNamePinyin()
+            $c_mingzi = PinyinUmlaut::normalize(ucfirst(PinyinDictionary::getNamePinyin($normalizedMingzi)) ?? '');
             $c_name = trim($c_surname.' '.$c_mingzi);
             $data['c_surname_chn'] = $c_surname_chn;
             $data['c_surname'] = $c_surname;
@@ -4051,7 +4052,8 @@ class BiogMainRepository {
             $c_mingzi_chn = $name;
             // 標準化異體字（僅用於拼音轉換，不修改原始名字）
             $normalizedMingzi = VariantCharNormalizer::normalize($c_mingzi_chn);
-            $c_mingzi = PinyinUmlaut::normalize(ucfirst(PinyinDictionary::getPinyin($normalizedMingzi)) ?? '');
+            // 名字連寫並依正詞法插隔音符（長安 → Chang'an），見 PinyinDictionary::getNamePinyin()
+            $c_mingzi = PinyinUmlaut::normalize(ucfirst(PinyinDictionary::getNamePinyin($normalizedMingzi)) ?? '');
             $c_name = $c_mingzi;
             $data['c_surname_chn'] = '';
             $data['c_surname'] = '';

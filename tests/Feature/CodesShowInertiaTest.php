@@ -84,6 +84,70 @@ class CodesShowInertiaTest extends TestCase {
     }
 
     #[Test]
+    public function it_injects_kinship_codes_up_down_diff_step_computed_column(): void {
+        config(['codes.tables' => ['TEST_CODES' => '測試代碼', 'KINSHIP_CODES' => '親屬關係代碼表']]);
+
+        Schema::create('KINSHIP_CODES', function ($table) {
+            $table->smallInteger('c_kincode')->primary();
+            $table->smallInteger('c_pick_sorting')->nullable();
+            $table->smallInteger('c_upstep')->nullable();
+            $table->smallInteger('c_dwnstep')->nullable();
+        });
+        DB::table('KINSHIP_CODES')->insert([
+            ['c_kincode' => 1, 'c_pick_sorting' => 1, 'c_upstep' => 3, 'c_dwnstep' => 1],
+            ['c_kincode' => 2, 'c_pick_sorting' => 2, 'c_upstep' => null, 'c_dwnstep' => 2],
+        ]);
+
+        $this->get(route('app.codes.show', ['table_name' => 'KINSHIP_CODES']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Codes/Show')
+                ->where('thead', function ($thead) {
+                    $thead = $thead->all();
+                    $diffIndex = array_search('c_up_down_diff_step', $thead, true);
+                    $upstepIndex = array_search('c_upstep', $thead, true);
+
+                    return $diffIndex !== false && $upstepIndex !== false && $diffIndex === $upstepIndex - 1;
+                })
+                ->where('computed_columns', ['c_up_down_diff_step'])
+                ->where('rows', function ($rows) {
+                    $rows = $rows->all();
+
+                    return $rows[0]['c_up_down_diff_step'] === 2 && $rows[1]['c_up_down_diff_step'] === null;
+                }));
+    }
+
+    #[Test]
+    public function kinship_codes_computed_column_is_not_sortable_or_filterable(): void {
+        config(['codes.tables' => ['KINSHIP_CODES' => '親屬關係代碼表']]);
+        $this->actingAs($this->activeUser());
+
+        Schema::create('KINSHIP_CODES', function ($table) {
+            $table->smallInteger('c_kincode')->primary();
+            $table->smallInteger('c_upstep')->nullable();
+            $table->smallInteger('c_dwnstep')->nullable();
+        });
+        DB::table('KINSHIP_CODES')->insert([
+            ['c_kincode' => 1, 'c_upstep' => 3, 'c_dwnstep' => 1],
+            ['c_kincode' => 2, 'c_upstep' => 1, 'c_dwnstep' => 3],
+        ]);
+
+        // 排序／篩選白名單來自 buildShowPayload() 內原始（未疊加計算欄位）的 $thead，
+        // 帶入計算欄位名應被忽略、不拋 SQL 錯誤，且回傳全部列（篩選未套用）。
+        $this->get(route('app.codes.show', [
+            'table_name' => 'KINSHIP_CODES',
+            'sort_by' => 'c_up_down_diff_step',
+            'filters' => ['c_up_down_diff_step' => '2'],
+        ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('sort_by', '')
+                ->where('rows', function ($rows) {
+                    return count($rows->all()) === 2;
+                }));
+    }
+
+    #[Test]
     public function unknown_table_404(): void {
         $this->get(route('app.codes.show', ['table_name' => 'NOPE_TABLE']))->assertNotFound();
     }

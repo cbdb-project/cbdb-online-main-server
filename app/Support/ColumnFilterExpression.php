@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use Illuminate\Contracts\Database\Query\Expression;
+
 /**
  * Parses a single-column boolean filter expression (AND / OR / NOT, with `&` `|` `!`,
  * parentheses and quoted literals) into an AST, and applies it to a query builder as a
@@ -87,7 +89,7 @@ class ColumnFilterExpression {
      * @param \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder $query
      * @param array<string,mixed> $ast
      */
-    public function applyToBuilder($query, string $column, array $ast): void {
+    public function applyToBuilder($query, Expression|string $column, array $ast): void {
         $this->applyNode($query, $column, $ast, false);
     }
 
@@ -391,7 +393,7 @@ class ColumnFilterExpression {
      * @param \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder $query
      * @param array<string,mixed> $node
      */
-    private function applyNode($query, string $col, array $node, bool $negate): void {
+    private function applyNode($query, Expression|string $col, array $node, bool $negate): void {
         switch ($node['type']) {
             case 'term':
                 $pattern = '%' . $node['value'] . '%';

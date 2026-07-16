@@ -10,6 +10,7 @@ use App\Support\ColumnFilterExpression;
 use App\Support\ColumnFilterParseException;
 use App\Support\PinyinUmlaut;
 use Carbon\Carbon;
+use Illuminate\Contracts\Database\Query\Expression;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -226,6 +227,24 @@ class CodesController extends Controller {
         ],
     ];
     /**
+     * 純算術／表達式型「計算欄位」（同表欄位間運算，無 JOIN）。走真實 SQL（selectRaw），
+     * 因此可正常排序／篩選：thead 白名單在 buildShowPayload() 內產生時就含此欄位，
+     * resolveColumnForQuery() 會把欄位名解回 `expression`（DB::raw）而非誤判為真實
+     * 資料表欄位。排序／篩選仍受 guardSortFilterRequiresAuth() 登入且已激活門檻保護，
+     * 與其他欄位一致，不做特例放寬。目前僅 KINSHIP_CODES 一例：
+     * c_up_down_diff_step = c_upstep − c_dwnstep，顯示於 c_upstep 左邊。
+     *
+     * @var array<string, array<string, array{expression: string, insert_before: string}>>
+     */
+    protected $tableComputedColumns = [
+        'KINSHIP_CODES' => [
+            'c_up_down_diff_step' => [
+                'expression' => '(c_upstep - c_dwnstep)',
+                'insert_before' => 'c_upstep',
+            ],
+        ],
+    ];
+    /**
      * Explicit primary key definitions for code tables.
      *
      * @var array<string, array<int, string>>
@@ -390,7 +409,7 @@ class CodesController extends Controller {
         $search = trim((string) $request->query('search', ''));
 
         try {
-            $payload = $this->buildShowPayload($request, $table, $search);
+            $payload = $this->buildShowPayload($request, $table, $search, includeComputedColumns: true);
         } catch (\PDOException $e) {
             flash('找不到該資料表', 'warning');
 
@@ -426,14 +445,11 @@ class CodesController extends Controller {
             ];
         }
 
-        [$thead, $rows, $computedColumns] = $this->injectComputedColumns($table, $payload['thead'], $dataProp['rows']);
-        $dataProp['rows'] = $rows;
-
         return Inertia::render('Codes/Show', [
             'table' => $table,
-            'thead' => $thead,
+            'thead' => $payload['thead'],
             'rows' => $dataProp['rows'],
-            'computed_columns' => $computedColumns,
+            'computed_columns' => array_values($payload['computedColumns'] ?? []),
             'cursor' => $useCursor ? $dataProp : null,
             'meta' => $meta,
             'use_cursor' => $useCursor,
@@ -545,9 +561,12 @@ class CodesController extends Controller {
     /**
      * 建立 codes show 的 props payload（標準 offset 或游標分頁）。Blade 與 Inertia 共用。
      *
+     * @param bool $includeComputedColumns 是否疊加 $tableComputedColumns 計算欄位。新功能只做
+     *     React 路徑（AGENTS.md）：appShow() 傳 true，舊 Blade show() 傳 false 以維持原樣，
+     *     不讓計算欄位的排序／篩選流入未受 guardSortFilterRequiresAuth() 保護的舊路由。
      * @return array<string, mixed>
      */
-    protected function buildShowPayload(Request $request, string $table, string $search): array {
+    protected function buildShowPayload(Request $request, string $table, string $search, bool $includeComputedColumns = false): array {
         $perPage = config('codes.per_page', 20);
         $upperTable = strtoupper($table);
 
@@ -559,8 +578,21 @@ class CodesController extends Controller {
             $query = DB::table($table);
         }
 
+        // 計算欄位（見 $tableComputedColumns 註解）：目前僅支援無 JOIN 的表，選出 `*` 後
+        // 再疊加 selectRaw 運算式；若該表同時也有 $joinConfig，暫不支援（尚無此組合的表）。
+        $computedColumns = ($includeComputedColumns && $joinConfig === null)
+            ? ($this->tableComputedColumns[$upperTable] ?? [])
+            : [];
+        if (!empty($computedColumns)) {
+            $query->select($table . '.*');
+            foreach ($computedColumns as $columnName => $definition) {
+                $query->selectRaw($definition['expression'] . ' as ' . $columnName);
+            }
+        }
+
         $sampleRow = (clone $query)->first();
         $thead = $this->buildTableHead($table, $sampleRow, $joinConfig);
+        $thead = $this->insertComputedColumnNames($thead, $computedColumns);
         $searchableColumns = $this->determineSearchableColumns($table, $thead);
 
         // ★ 提前取得主鍵（tie-breaker 排序需要用到）
@@ -588,9 +620,9 @@ class CodesController extends Controller {
             && $sortBy === '';
 
         if ($search !== '' && !empty($searchableColumns)) {
-            $query->where(function ($subQuery) use ($searchableColumns, $search, $useCursorPagination, $joinConfig) {
+            $query->where(function ($subQuery) use ($searchableColumns, $search, $useCursorPagination, $joinConfig, $computedColumns) {
                 foreach ($searchableColumns as $column) {
-                    $searchColumn = $this->resolveColumnForQuery($column, $joinConfig);
+                    $searchColumn = $this->resolveColumnForQuery($column, $joinConfig, $computedColumns);
                     if ($searchColumn === null) {
                         continue;
                     }
@@ -625,7 +657,7 @@ class CodesController extends Controller {
             if ($value === '') {
                 continue;
             }
-            $filterColumn = $this->resolveColumnForQuery($column, $joinConfig);
+            $filterColumn = $this->resolveColumnForQuery($column, $joinConfig, $computedColumns);
             if ($filterColumn === null) {
                 continue;
             }
@@ -649,13 +681,13 @@ class CodesController extends Controller {
 
         // 排序 + 主鍵 tie-breaker
         if ($sortBy !== '') {
-            $sortColumn = $this->resolveColumnForQuery($sortBy, $joinConfig);
+            $sortColumn = $this->resolveColumnForQuery($sortBy, $joinConfig, $computedColumns);
             if ($sortColumn !== null) {
                 $query->orderBy($sortColumn, $sortDir);
             }
         }
         foreach ($keyColumns as $pkCol) {
-            $pkSortExpr = $this->resolveColumnForQuery($pkCol, $joinConfig);
+            $pkSortExpr = $this->resolveColumnForQuery($pkCol, $joinConfig, $computedColumns);
             if ($pkSortExpr !== null) {
                 $query->orderBy($pkSortExpr, 'asc');
             }
@@ -693,6 +725,7 @@ class CodesController extends Controller {
             'keyColumns' => $keyColumns,
             'copyrightNote' => $copyrightNote,
             'joinedColumns' => $joinedColumns,
+            'computedColumns' => array_keys($computedColumns),
             'filters' => $filters,
             'sortBy' => $sortBy,
             'sortDir' => $sortDir,
@@ -1498,38 +1531,29 @@ class CodesController extends Controller {
     }
 
     /**
-     * app/codes/{table_name}（Inertia 版）專用：在 buildShowPayload() 產出的 thead／rows
-     * 之外，疊加純前端展示用的計算欄位（不進資料庫、不可排序／篩選，因為 buildShowPayload()
-     * 內的 sanitizeColumnFilters()/sanitizeSortParameters() 已用原始 $thead 產生白名單，
-     * 這裡才把計算欄位加進去，所以永遠不會被誤判為可查詢欄位）。目前僅 KINSHIP_CODES 的
-     * c_up_down_diff_step（= c_upstep − c_dwnstep）一例；只做在 React 路徑，不動 Blade。
+     * 將 $tableComputedColumns 定義的計算欄位名稱排入 $thead 正確位置（`insert_before`
+     * 錨點欄位之前）。sampleRow 的 selectRaw 結果會讓 buildTableHead() 把計算欄位名附加在
+     * 尾端，這裡先移除該尾端項目、再插回錨點前，確保欄位順序穩定且不重複。
      *
      * @param array<int, string> $thead
-     * @param array<int, array<string, mixed>> $rows
-     * @return array{0: array<int, string>, 1: array<int, array<string, mixed>>, 2: array<int, string>}
+     * @param array<string, array{expression: string, insert_before: string}> $computedColumns
+     * @return array<int, string>
      */
-    protected function injectComputedColumns(string $table, array $thead, array $rows): array {
-        if (strtoupper($table) !== 'KINSHIP_CODES') {
-            return [$thead, $rows, []];
+    protected function insertComputedColumnNames(array $thead, array $computedColumns): array {
+        foreach ($computedColumns as $columnName => $definition) {
+            $thead = array_values(array_filter($thead, fn ($col) => $col !== $columnName));
+
+            $anchorIndex = array_search($definition['insert_before'], $thead, true);
+            if ($anchorIndex === false) {
+                $thead[] = $columnName;
+
+                continue;
+            }
+
+            array_splice($thead, $anchorIndex, 0, [$columnName]);
         }
 
-        $virtualColumn = 'c_up_down_diff_step';
-        $anchorIndex = array_search('c_upstep', $thead, true);
-        if ($anchorIndex === false || !in_array('c_dwnstep', $thead, true) || in_array($virtualColumn, $thead, true)) {
-            return [$thead, $rows, []];
-        }
-
-        array_splice($thead, $anchorIndex, 0, [$virtualColumn]);
-
-        $rows = array_map(function (array $row) use ($virtualColumn) {
-            $up = $row['c_upstep'] ?? null;
-            $down = $row['c_dwnstep'] ?? null;
-            $row[$virtualColumn] = (is_numeric($up) && is_numeric($down)) ? ($up - $down) : null;
-
-            return $row;
-        }, $rows);
-
-        return [$thead, $rows, [$virtualColumn]];
+        return $thead;
     }
 
     protected function buildTableHead(string $table, $sampleRow, ?array $joinConfig = null): array {
@@ -2595,6 +2619,7 @@ class CodesController extends Controller {
             'keyColumns' => $keyColumns,
             'copyrightNote' => $copyrightNote,
             'joinedColumns' => $joinedColumns,
+            'computedColumns' => [],  // 游标分页表尚无计算栏位配置
             'useCursorPagination' => true,  // 标记使用游标分页
             'filters' => $filters,
             'sortBy' => $sortBy,
@@ -2609,7 +2634,17 @@ class CodesController extends Controller {
         ];
     }
 
-    protected function resolveColumnForQuery(string $column, ?array $joinConfig): ?string {
+    /**
+     * @param array<string, array{expression: string, insert_before: string}> $computedColumns
+     */
+    protected function resolveColumnForQuery(string $column, ?array $joinConfig, array $computedColumns = []): Expression|string|null {
+        // 計算欄位（見 $tableComputedColumns）：無真實欄位可查，改回傳 DB::raw() 運算式，
+        // 讓 where()/orderBy() 直接下算術 SQL，而非把欄位名當識別字誤包引號。必須排在
+        // $joinConfig === null 快速通道之前，否則會原樣回傳不存在的欄位名。
+        if (isset($computedColumns[$column])) {
+            return DB::raw($computedColumns[$column]['expression']);
+        }
+
         if ($joinConfig === null) {
             return $column;
         }

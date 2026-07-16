@@ -298,18 +298,14 @@ export default function CodesShow() {
                         <tr>
                             {thead.map((col) => (
                                 <th key={col} className="whitespace-nowrap px-3 py-2 text-left font-medium">
-                                    {computed_columns.includes(col) ? (
-                                        <span>{col}</span>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            className={cn('hover:underline', !canSortOrFilter && 'cursor-not-allowed opacity-60 hover:no-underline')}
-                                            onClick={() => toggleSort(col)}
-                                            title={canSortOrFilter ? undefined : t('sort_filter_requires_login')}
-                                        >
-                                            {joined_columns.includes(col) ? `(${col})` : col} <span aria-hidden>{sortIcon(col)}</span>
-                                        </button>
-                                    )}
+                                    <button
+                                        type="button"
+                                        className={cn('hover:underline', !canSortOrFilter && 'cursor-not-allowed opacity-60 hover:no-underline')}
+                                        onClick={() => toggleSort(col)}
+                                        title={canSortOrFilter ? undefined : t('sort_filter_requires_login')}
+                                    >
+                                        {joined_columns.includes(col) || computed_columns.includes(col) ? `(${col})` : col} <span aria-hidden>{sortIcon(col)}</span>
+                                    </button>
                                     {key_columns.includes(col) && (
                                         <span className="ml-1 rounded bg-blue-100 px-1 text-xs text-blue-800">PK</span>
                                     )}
@@ -320,9 +316,6 @@ export default function CodesShow() {
                         {!use_cursor && (
                             <tr>
                                 {thead.map((col) => {
-                                    if (computed_columns.includes(col)) {
-                                        return <th key={col} className="px-2 py-1" />;
-                                    }
                                     const hasErr = boolean_enabled && col in filter_errors;
                                     return (
                                         <th key={col} className="px-2 py-1">

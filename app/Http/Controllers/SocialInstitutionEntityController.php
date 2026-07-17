@@ -3,9 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\Import\SocialInstituteImportService;
-use App\Support\ColumnFilterExpression;
-use App\Support\ColumnFilterParseException;
-use Illuminate\Http\RedirectResponse;
+use App\Support\EntityTableBrowser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -61,7 +59,7 @@ class SocialInstitutionEntityController extends Controller {
 
     public function __construct(
         protected SocialInstituteImportService $service,
-        protected ColumnFilterExpression $columnFilterExpression,
+        protected EntityTableBrowser $browser,
     ) {
     }
 
@@ -111,128 +109,29 @@ class SocialInstitutionEntityController extends Controller {
     /**
      * 機構列表：與 app/codes/SOCIAL_INSTITUTION_CODES 裸表頁 feature parity（全欄位、任意欄
      * 排序＋主鍵 tie-breaker、逐欄篩選含布林模式、關鍵字搜尋、朝代標籤、公開可讀），另加
-     * 聚合特有的機構名與地址數計算欄。此頁是側欄「社會機構編碼表」的新入口。
+     * 聚合特有的機構名（joined）與地址數計算欄。瀏覽機制由 EntityTableBrowser 描述子驅動
+     * （§6.5）。此頁是側欄「社會機構編碼表」的新入口。
      */
     public function appIndex(Request $request) {
-        $guardRedirect = $this->guardSortFilterRequiresAuth($request);
+        $guardRedirect = $this->browser->guard($request, 'app.social-institution.index');
         if ($guardRedirect !== null) {
             return $guardRedirect;
         }
 
-        $thead = array_merge(self::INST_COLUMNS, array_keys(self::COMPUTED_COLUMNS));
+        $payload = $this->browser->payload($request, [
+            'table' => 'SOCIAL_INSTITUTION_CODES',
+            'columns' => self::INST_COLUMNS,
+            'computed' => self::COMPUTED_COLUMNS,
+            'key_column' => 'c_inst_code',
+            // 關鍵字搜尋額外命中機構名（joined 運算式）。
+            'search_expressions' => [self::COMPUTED_COLUMNS['c_inst_name_hz']['expression']],
+        ]);
 
-        $query = DB::table('SOCIAL_INSTITUTION_CODES')->select('SOCIAL_INSTITUTION_CODES.*');
-        foreach (self::COMPUTED_COLUMNS as $name => $definition) {
-            $query->selectRaw($definition['expression'].' as '.$name);
-        }
-
-        // 關鍵字搜尋：所有實體欄位 %term%＋機構名（joined 運算式），與 codes 頁語義一致再加名稱。
-        $q = trim((string) $request->query('q', ''));
-        if ($q !== '') {
-            $query->where(function ($sub) use ($q) {
-                foreach (self::INST_COLUMNS as $column) {
-                    $sub->orWhere($column, 'like', '%'.$q.'%');
-                }
-                $sub->orWhere(DB::raw(self::COMPUTED_COLUMNS['c_inst_name_hz']['expression']), 'like', '%'.$q.'%');
-            });
-        }
-
-        // 逐欄篩選（欄位間 AND；布林模式逐欄解析，失敗記錯誤並略過，不轉字面）。
-        $filters = $this->sanitizeColumnFilters($request->query('filters', []), $thead);
-        $booleanAvailable = (bool) config('codes.boolean_filter_enabled', true);
-        $booleanEnabled = $booleanAvailable && $request->boolean('filter_bool');
-        $appliedFilters = [];
-        $filterErrors = [];
-        $filterDescriptions = [];
-        $descLabels = $booleanEnabled ? [
-            'contains' => (string) __('codes.filter_desc_contains'),
-            'not' => (string) __('codes.filter_desc_not'),
-            'and' => (string) __('codes.filter_desc_and'),
-            'or' => (string) __('codes.filter_desc_or'),
-        ] : [];
-        foreach ($filters as $column => $value) {
-            if ($value === '') {
-                continue;
-            }
-            $filterColumn = $this->resolveColumnForQuery($column);
-            $matchMode = self::COMPUTED_COLUMNS[$column]['match_mode'] ?? 'contains';
-            if ($matchMode === 'exact' && !$booleanEnabled && !is_numeric($value)) {
-                // 非數字輸入略過：避免 MySQL 將字串隱式轉 0，誤命中 count=0 的列。
-                continue;
-            }
-
-            if ($booleanEnabled) {
-                try {
-                    $ast = $this->columnFilterExpression->parse($value);
-                } catch (ColumnFilterParseException $e) {
-                    $filterErrors[$column] = $e->errorCode;
-
-                    continue;
-                }
-                $this->columnFilterExpression->applyToBuilder($query, $filterColumn, $ast, $matchMode);
-                $termLabels = $descLabels;
-                if ($matchMode === 'exact') {
-                    $termLabels['contains'] = (string) __('codes.filter_desc_exact');
-                }
-                $filterDescriptions[$column] = $this->columnFilterExpression->describe($ast, $termLabels);
-            } elseif ($matchMode === 'exact') {
-                // SQLite 對運算式比對字串繫結值不做數字轉換，先轉數字再綁定（MySQL 亦相容）。
-                $query->where($filterColumn, '=', $value + 0);
-            } else {
-                $query->where($filterColumn, 'like', '%'.$value.'%');
-            }
-
-            $appliedFilters[$column] = $value;
-        }
-
-        // 排序 + 主鍵 tie-breaker（未指定排序時維持 inst_code 倒序瀏覽體驗）。
-        [$sortBy, $sortDir] = $this->sanitizeSortParameters(
-            (string) $request->query('sort_by', ''),
-            (string) $request->query('sort_dir', 'asc'),
-            $thead
-        );
-        if ($sortBy !== '') {
-            $query->orderBy($this->resolveColumnForQuery($sortBy), $sortDir);
-            $query->orderBy('c_inst_code', 'asc');
-        } else {
-            $query->orderByDesc('c_inst_code');
-        }
-
-        // 分頁連結只攜帶實際套用的 filters（排除語法錯誤欄位），其餘 query 參數原樣保留。
-        $appendQuery = $request->except(['page', 'filters']);
-        if (!empty($appliedFilters)) {
-            $appendQuery['filters'] = $appliedFilters;
-        }
-        $paginator = $query->paginate((int) config('codes.per_page', 20))->appends($appendQuery);
-
-        $dynastyMap = DB::table('DYNASTIES')->pluck('c_dynasty_chn', 'c_dy')->all();
-
-        return Inertia::render('SocialInstitution/Index', [
-            'thead' => $thead,
-            'rows' => array_map(fn ($r) => (array) $r, $paginator->items()),
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'last_page' => $paginator->lastPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
-                'from' => $paginator->firstItem(),
-                'to' => $paginator->lastItem(),
-            ],
-            'q' => $q,
-            'dynasty_map' => (object) $dynastyMap,
-            'key_columns' => ['c_inst_code'],
-            'computed_columns' => array_keys(self::COMPUTED_COLUMNS),
-            'filters' => (object) $filters,
-            'sort_by' => $sortBy,
-            'sort_dir' => $sortDir,
-            'boolean_enabled' => $booleanEnabled,
-            'boolean_filter_available' => $booleanAvailable,
-            'filter_errors' => (object) $filterErrors,
-            'filter_descriptions' => (object) $filterDescriptions,
+        return Inertia::render('SocialInstitution/Index', array_merge($payload, [
             'can_write' => Auth::check() && Auth::user()->canWriteDirectly(),
             'urls' => $this->urls(),
             'page_translations' => $this->translations(),
-        ]);
+        ]));
     }
 
     /** 新增機構表單頁。 */
@@ -297,89 +196,5 @@ class SocialInstitutionEntityController extends Controller {
             'urls' => $this->urls(),
             'page_translations' => $this->translations(),
         ]);
-    }
-
-    /**
-     * 排序／篩選需登入且已激活（鏡像 CodesController::guardSortFilterRequiresAuth，
-     * 與 OfficeEntityController 相同）。
-     */
-    protected function guardSortFilterRequiresAuth(Request $request): ?RedirectResponse {
-        $hasSortBy = trim((string) $request->query('sort_by', '')) !== '';
-
-        $hasFilter = false;
-        $filters = $request->query('filters', []);
-        if (is_array($filters)) {
-            foreach ($filters as $value) {
-                if (is_scalar($value) && trim((string) $value) !== '') {
-                    $hasFilter = true;
-
-                    break;
-                }
-            }
-        }
-
-        if (!$hasSortBy && !$hasFilter) {
-            return null;
-        }
-
-        if (!Auth::check()) {
-            return redirect()->guest(route('login'));
-        }
-
-        if (!Auth::user()->isActive()) {
-            flash('該用戶沒有權限使用排序／篩選功能，請聯絡管理員', 'error');
-
-            return redirect()->route('app.social-institution.index');
-        }
-
-        return null;
-    }
-
-    /** 欄位名 → 查詢用欄位（計算欄位還原為原始運算式，供 WHERE／ORDER BY 使用）。 */
-    protected function resolveColumnForQuery(string $column): \Illuminate\Contracts\Database\Query\Expression|string {
-        if (isset(self::COMPUTED_COLUMNS[$column])) {
-            return DB::raw(self::COMPUTED_COLUMNS[$column]['expression']);
-        }
-
-        return $column;
-    }
-
-    /**
-     * 只保留 thead 白名單內、scalar、trim 後的 filters（鏡像 CodesController::sanitizeColumnFilters）。
-     *
-     * @param mixed $rawFilters
-     * @return array<string, string>
-     */
-    protected function sanitizeColumnFilters($rawFilters, array $thead): array {
-        if (!is_array($rawFilters)) {
-            return [];
-        }
-
-        $filters = [];
-        foreach ($rawFilters as $column => $value) {
-            if (!in_array($column, $thead, true) || !is_scalar($value)) {
-                continue;
-            }
-            $trimmed = trim((string) $value);
-            if ($trimmed !== '') {
-                $filters[$column] = $trimmed;
-            }
-        }
-
-        return $filters;
-    }
-
-    /**
-     * 排序參數白名單化（鏡像 CodesController::sanitizeSortParameters）。
-     *
-     * @return array{0: string, 1: string}
-     */
-    protected function sanitizeSortParameters(string $sortBy, string $sortDir, array $thead): array {
-        $sortBy = trim($sortBy);
-        if ($sortBy === '' || !in_array($sortBy, $thead, true)) {
-            return ['', 'asc'];
-        }
-
-        return [$sortBy, strtolower($sortDir) === 'desc' ? 'desc' : 'asc'];
     }
 }

@@ -251,11 +251,10 @@ class Navigation {
             self::codeItem('addresses', 'codes.addresses', 'fas fa-map', 'ADDRESSES'),
             self::codeItem('altname-codes', 'codes.altname_codes', 'fas fa-user-tag', 'ALTNAME_CODES'),
             self::codeItem('appointment-codes', 'codes.appointment_codes', 'fas fa-briefcase', 'APPOINTMENT_CODES'),
-            // 官職改指實體聚合頁（/app/office，feature parity 的超集）；裸表 /app/codes/OFFICE_CODES
-            // 已封寫、僅供讀取回退。active.pages 保留 'OFFICE_CODES' 讓直訪裸表頁時仍高亮此節點。
-            self::entityItem('office-codes', 'codes.office_codes', 'fas fa-id-badge', 'app.office.index', 'OFFICE_CODES', 'app.office.*'),
-            // 社會機構改指實體聚合頁（/app/social-institution）；裸表已封寫、僅供讀取回退。
-            self::entityItem('social-institution-codes', 'codes.social_institution_codes', 'fas fa-university', 'app.social-institution.index', 'SOCIAL_INSTITUTION_CODES', 'app.social-institution.*'),
+            // 官職／社會機構已收斂為實體聚合：節點改指實體頁（/app/office、/app/social-institution），
+            // 設定來自 config/entity_aggregates.php（§6.5 單一真源）；裸表已封寫、僅供讀取回退。
+            self::entityNavItem('OFFICE_CODES', 'office-codes', 'codes.office_codes', 'fas fa-id-badge'),
+            self::entityNavItem('SOCIAL_INSTITUTION_CODES', 'social-institution-codes', 'codes.social_institution_codes', 'fas fa-university'),
             self::codeItem('text-codes', 'codes.text_codes', 'fas fa-book', 'TEXT_CODES'),
             self::codeItem('text-instance-data', 'codes.text_instance_data', 'fas fa-book-open', 'TEXT_INSTANCE_DATA'),
         ];
@@ -353,18 +352,30 @@ class Navigation {
     }
 
     /**
-     * 實體聚合頁節點（官職／社會機構）：href 指向上層實體入口（/app/*），而非裸表。
-     * active.pages 保留裸表名（$page_title）讓直訪裸表頁時仍高亮此節點；
-     * 路由不存在時回退裸表頁（防呆，正常部署不會發生）。
+     * 實體聚合頁節點：依 config/entity_aggregates.php 的 nav 設定，把裸表節點改指
+     * 上層實體入口（/app/*，§6.5 單一真源）。active.pages 保留裸表名（$page_title）
+     * 讓直訪裸表頁時仍高亮此節點；實體未在 config 註冊（回退）時退回裸表 codeItem。
      *
      * @return array<string, mixed>
      */
-    protected static function entityItem(string $key, string $label, string $icon, string $route, string $table, string $pattern): array {
-        $href = self::routeUrl($route) ?? '/codes/' . $table;
-        $node = self::item($key, $label, $icon, $href, ['pages' => [$table], 'patterns' => [$pattern]]);
-        $node['suffix'] = '(' . $table . ')';
+    protected static function entityNavItem(string $table, string $fallbackKey, string $fallbackLabel, string $fallbackIcon): array {
+        foreach (config('entity_aggregates.entities', []) as $entity) {
+            $nav = $entity['nav'] ?? null;
+            if (!$nav || strtoupper((string) ($nav['table'] ?? '')) !== strtoupper($table)) {
+                continue;
+            }
+            // 路由不存在時回退裸表頁（防呆，正常部署不會發生）。
+            $href = self::routeUrl($nav['route']) ?? '/codes/' . $table;
+            $node = self::item($nav['key'], $nav['label'], $nav['icon'], $href, [
+                'pages' => [$table],
+                'patterns' => [$nav['pattern']],
+            ]);
+            $node['suffix'] = '(' . $table . ')';
 
-        return $node;
+            return $node;
+        }
+
+        return self::codeItem($fallbackKey, $fallbackLabel, $fallbackIcon, $table);
     }
 
     /**

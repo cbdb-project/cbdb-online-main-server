@@ -185,9 +185,12 @@ class CharVariantMapService {
 ```php
 'char_variant_map' => '異體字落地替換對照表',
 ```
-新增／更新測試（`tests/Feature/CodesControllerAuditTest.php` 或新建對應測試）：
-- 透過 `/app/codes/char_variant_map` UI 新增一筆對照，確認寫入 `audit_log`（比照現行 `CodesController` 對其他表的既有稽核測試模式，不需要新寫稽核邏輯，只需確認註冊後既有機制對這張新表也生效）。
-- 確認 `/app/codes/char_variant_map` 列表頁可正常顯示 7 筆種子資料。
+新增／更新測試（`tests/Feature/CodesCharVariantMapAuditTest.php`，比照 `tests/Feature/CodesControllerAuditTest.php` 既有模式新建）：
+- 透過 `/codes/char_variant_map` UI 新增一筆對照，確認寫入 `audit_log`（比照現行 `CodesController` 對其他表的既有稽核測試模式，不需要新寫稽核邏輯，只需確認註冊後既有機制對這張新表也生效）。
+- 確認 `/codes/char_variant_map` 列表頁可正常顯示 7 筆種子資料。
+
+**副作用（非缺陷，但需明確記錄）**：`config('codes.tables')` 同時也是 Query Playground／Natural Language Query／MCP 唯讀查詢工具的白名單來源（見 `app/Services/QueryPlaygroundService.php`、`NaturalLanguageQueryService.php`、`NlQueryToolsService.php`、`DatabaseSchemaService.php`、`app/Http/Controllers/QueryPlaygroundController.php` 對 `config('codes.tables')` 的讀取）。本步驟把 `char_variant_map` 加進 `codes.tables` 後，這張表會自動一併開放給上述唯讀查詢管道存取——這是預期且可接受的副作用（純參照對照表、無 PII、無風險），沿用現有其他代碼表註冊後的既有行為，不需要額外白名單或授權處理，僅在此明確記錄避免日後誤以為是意外暴露。
+- `resources/lang/zh-TW/codes.php`、`resources/lang/en/codes.php` 的 `table_desc` 陣列須同步加入 `char_variant_map` 對應翻譯（`tests/Feature/CodesControllerTest.php::testCodesTableDescKeysStayInParityWithConfig` 會擋下遺漏，兩份語言檔缺一都會讓該測試失敗）。
 
 ### 步驟 7：受 token API 的機器化寫入管道註冊
 

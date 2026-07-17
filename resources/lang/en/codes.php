@@ -45,6 +45,7 @@ return [
         'BIOG_TEXT_DATA' => 'Biographical Text Data',
         'CBDB__NAME_FTS' => 'Person Name Full-Text Index',
         'CBDB__TRAD_SIMP_MAP' => 'Traditional-Simplified Character Map',
+        'char_variant_map' => 'Variant Character Landing-Replacement Map',
         'CHORONYM_CODES' => 'Choronym Codes',
         'COUNTRY_CODES' => 'Country / Region Codes',
         'DYNASTIES' => 'Dynasty Information',

@@ -325,6 +325,15 @@ Route::get('app/office/create', 'OfficeEntityController@appCreate')
     ->middleware('inertia')->name('app.office.create');
 Route::get('app/office/{id}/edit', 'OfficeEntityController@appEdit')
     ->middleware('inertia')->name('app.office.edit')->whereNumber('id');
+
+// 社會機構實體聚合 CRUD（/app/social-institution/*）——上層聚合入口，
+// 寫入走 mutation API（resource=social-institution）。同官職：create 先於 {id}/edit。
+Route::get('app/social-institution', 'SocialInstitutionEntityController@appIndex')
+    ->middleware('inertia')->name('app.social-institution.index');
+Route::get('app/social-institution/create', 'SocialInstitutionEntityController@appCreate')
+    ->middleware('inertia')->name('app.social-institution.create');
+Route::get('app/social-institution/{id}/edit', 'SocialInstitutionEntityController@appEdit')
+    ->middleware('inertia')->name('app.social-institution.edit')->whereNumber('id');
 Route::get('codes/{table_name}/create', 'CodesController@create')->name('codes.create');
 Route::post('codes/{table_name}/proposal', 'CodesController@proposalStore')->name('codes.propose.store');
 Route::get('codes/{table_name}/proposals/{operation}/edit', 'CodesController@proposalEdit')->name('codes.proposals.edit');

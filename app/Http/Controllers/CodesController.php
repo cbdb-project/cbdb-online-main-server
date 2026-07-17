@@ -48,6 +48,11 @@ class CodesController extends Controller {
         // 注意：這同時擋掉裸表 proposal——實體級提案就緒前為有意取捨（§4.5）。
         // 回退：自本清單移除即可恢復裸表寫入。
         'OFFICE_CODES',
+        // 社會機構為三表複合實體（NAME_CODES 去重＋CODES＋ADDR），同上封寫；
+        // 實體級入口＝/app/social-institution（識別＝c_inst_code 單鍵）。
+        'SOCIAL_INSTITUTION_CODES',
+        'SOCIAL_INSTITUTION_NAME_CODES',
+        'SOCIAL_INSTITUTION_ADDR',
     ];
     /**
      * Copyright notices for specific tables.

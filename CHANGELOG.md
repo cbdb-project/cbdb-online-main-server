@@ -4,6 +4,14 @@
 
 ## 2026-07
 
+### 社會機構實體聚合推進至 step 4：/app/social-institution 上線、三張裸表封寫（#1159）
+- **實體識別定案＝`c_inst_code` 單鍵**：生產庫 4011 列 c_inst_code 全數唯一，複合主鍵 `(c_inst_code, c_inst_name_code)` 是「當前名稱冗餘進主鍵」的儲存層遺留；`c_inst_name_code` 為屬性、由聚合根內部解析（名稱去重）。詳見設計文件 §2.5。
+- `SocialInstituteImportService` 補齊 `load()／update()／delete()／referenceCount()`：update 整體覆寫 CODES 非鍵欄、名稱走去重解析、ADDR 集合對賬（同鍵改值、僅增刪差異）；referenceCount 數齊 **BIOG_INST_DATA／ENTRY_DATA／ASSOC_DATA／POSTED_TO_OFFICE_DATA 四張** CASCADE 引用表。
+- 新增 `SocialInstituteUpdateHandler`／`SocialInstituteDeleteHandler`（resource=social-institution）：刪除護欄（被引用回 409）；**改名護欄**（被引用時改名回 409——人物表存 (inst_code, name_code) 對，改名會使既存引用失配）；孤兒名碼不回收。
+- `/app/social-institution/*` 三頁：Index 與裸表頁 feature parity 超集（全欄位、排序、逐欄＋布林篩選、公開讀＋排序篩選登入門檻，加機構名 joined 欄與地址數計算欄）；Create 對齊批量匯入語義；Edit 為全欄位＋多地址列編輯，被引用時名稱欄預先鎖定並提示。
+- 側欄「社會機構編碼表」改指 `/app/social-institution`；`SOCIAL_INSTITUTION_CODES`／`NAME_CODES`／`ADDR` 三表加入 `$readOnlyTables` 封寫（讀取開放；`SOCIAL_INSTITUTION_TYPES` 為扁平字典維持可寫）。回退＝自清單移除。
+- 測試 `tests/Feature/ApiV2MutateSocialInstituteEntityTest.php`、`tests/Feature/SocialInstitutionEntityIndexTest.php`；設計文件 §2.5／§5 同步更新。
+
 ### 官職實體聚合推進至 step 4：/app/office 成為唯一寫入入口、OFFICE_CODES 裸表封寫（#1159）
 - `/app/office` 列表補齊與 `app/codes/OFFICE_CODES` 的 feature parity 並成為超集：全部 OFFICE_CODES 欄位、任意欄排序＋主鍵 tie-breaker、逐欄篩選（含 AND/OR/NOT 布林模式，复用 `ColumnFilterExpression` 與 codes 同組 i18n）、關鍵字全欄搜尋、朝代標籤、全表匯出連結，另加聚合特有的 `type_count` 計算欄（OFFICE_CODE_TYPE_REL 關聯數，exact 比對）。
 - 訪問模型對齊 codes 頁：列表公開可讀；排序／篩選需登入且已激活（鏡像 `guardSortFilterRequiresAuth`）；新增／編輯／刪除仍需 `canWriteDirectly`。

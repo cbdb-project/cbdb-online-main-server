@@ -253,8 +253,9 @@ class Navigation {
             self::codeItem('appointment-codes', 'codes.appointment_codes', 'fas fa-briefcase', 'APPOINTMENT_CODES'),
             // 官職改指實體聚合頁（/app/office，feature parity 的超集）；裸表 /app/codes/OFFICE_CODES
             // 已封寫、僅供讀取回退。active.pages 保留 'OFFICE_CODES' 讓直訪裸表頁時仍高亮此節點。
-            self::officeEntityItem(),
-            self::codeItem('social-institution-codes', 'codes.social_institution_codes', 'fas fa-university', 'SOCIAL_INSTITUTION_CODES'),
+            self::entityItem('office-codes', 'codes.office_codes', 'fas fa-id-badge', 'app.office.index', 'OFFICE_CODES', 'app.office.*'),
+            // 社會機構改指實體聚合頁（/app/social-institution）；裸表已封寫、僅供讀取回退。
+            self::entityItem('social-institution-codes', 'codes.social_institution_codes', 'fas fa-university', 'app.social-institution.index', 'SOCIAL_INSTITUTION_CODES', 'app.social-institution.*'),
             self::codeItem('text-codes', 'codes.text_codes', 'fas fa-book', 'TEXT_CODES'),
             self::codeItem('text-instance-data', 'codes.text_instance_data', 'fas fa-book-open', 'TEXT_INSTANCE_DATA'),
         ];
@@ -352,21 +353,16 @@ class Navigation {
     }
 
     /**
-     * 任官編碼表節點：href 指向官職實體聚合頁（app.office.index）。與 codeItem 不同，
-     * 這是「上層實體」入口而非裸表；路由不存在時回退裸表頁（防呆，正常部署不會發生）。
+     * 實體聚合頁節點（官職／社會機構）：href 指向上層實體入口（/app/*），而非裸表。
+     * active.pages 保留裸表名（$page_title）讓直訪裸表頁時仍高亮此節點；
+     * 路由不存在時回退裸表頁（防呆，正常部署不會發生）。
      *
      * @return array<string, mixed>
      */
-    protected static function officeEntityItem(): array {
-        $href = self::routeUrl('app.office.index') ?? '/codes/OFFICE_CODES';
-        $node = self::item(
-            'office-codes',
-            'codes.office_codes',
-            'fas fa-id-badge',
-            $href,
-            ['pages' => ['OFFICE_CODES'], 'patterns' => ['app.office.*']]
-        );
-        $node['suffix'] = '(OFFICE_CODES)';
+    protected static function entityItem(string $key, string $label, string $icon, string $route, string $table, string $pattern): array {
+        $href = self::routeUrl($route) ?? '/codes/' . $table;
+        $node = self::item($key, $label, $icon, $href, ['pages' => [$table], 'patterns' => [$pattern]]);
+        $node['suffix'] = '(' . $table . ')';
 
         return $node;
     }

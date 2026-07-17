@@ -46,12 +46,21 @@ CBDB 目前**只有「人物」做到了這一點**，其餘實體都停在「�
 - 類型樹：`OFFICE_TYPE_TREE`
 - 聚合語義：新增一個官職 = `OFFICE_CODES`（`c_office_id = max+1`、派生 `c_office_pinyin`、`c_dy`、來源）＋**必須**一併寫入 `OFFICE_CODE_TYPE_REL` 的類型關聯。少寫關聯即為殘缺實體。
 
-### 2.5 社交機構（Social Institution）— ⚠ 洩漏
+### 2.5 社交機構（Social Institution）— ✅ 已收斂（2026-07）
 - 名稱代碼：`SOCIAL_INSTITUTION_NAME_CODES`（帶去重：已存在則複用名稱碼）
 - 機構本體：`SOCIAL_INSTITUTION_CODES`（`c_inst_code = max+1`、類型、起始朝代）
 - 地址：`SOCIAL_INSTITUTION_ADDR`（複合鍵、地址類型、座標）
-- 類型：`SOCIAL_INSTITUTION_TYPES`
+- 類型：`SOCIAL_INSTITUTION_TYPES`（扁平字典，維持裸 CRUD，不入聚合）
 - 聚合語義：新增一個機構橫跨**三張表**、含**名稱去重**與朝代／類型／地址解析。
+- **實體識別決策（2026-07 定案）**：實體識別＝**`c_inst_code` 單鍵**。底層
+  `SOCIAL_INSTITUTION_CODES` 的複合主鍵 `(c_inst_code, c_inst_name_code)` 是把「當前名稱」
+  冗餘進主鍵的儲存層遺留——生產庫 4011 列 `c_inst_code` 全數唯一（零「一碼多名」），
+  `c_inst_name_code` 為指向名稱字典的**屬性**（555 個名碼被多機構複用，正是去重本意），
+  由聚合根內部解析與維護。推論：改名＝換 name_code＝底層 PK 變更，且人物表
+  （`BIOG_INST_DATA`／`ENTRY_DATA`／`ASSOC_DATA`／`POSTED_TO_OFFICE_DATA`）存的是
+  `(inst_code, name_code)` 對——**被引用時改名會使既存引用失配**（庫中已有 16 筆歷史失配），
+  故 update 僅在引用數為 0 時允許改名；孤兒化的舊名碼不回收（名碼被多機構共享、且被
+  人物表 CASCADE 引用，誤刪代價不對稱）。實作見 `SocialInstituteImportService` 類註。
 
 ---
 
@@ -119,7 +128,7 @@ CBDB 目前**只有「人物」做到了這一點**，其餘實體都停在「�
 | 書籍／文本 | TEXT_CODES ＋ INSTANCE ＋ BIBLCAT… | ❌ | 僅裸 TEXT_CODES CRUD | ❌ | ❌ | ❌（退化下層）|
 | 地點 | ADDRESSES ＋ ADDR_CODES ＋ … | ❌ | ❌ | ❌ | ❌ | ❌ |
 | 官職 | OFFICE_CODES ＋ TYPE_REL | ✅ | ✅ CRUD | ✅（/app/office，與裸表頁 feature parity 的超集；側欄「任官編碼表」已改指此頁）| ✅（codes 寫入封閉，讀取／匯出開放）| ❌（裸表提案一併封閉、標示未支援，待實體級提案）|
-| 社交機構 | NAME_CODES ＋ CODES ＋ ADDR | ❌ | ❌ | ❌ | ❌ | ❌ |
+| 社交機構 | NAME_CODES ＋ CODES ＋ ADDR | ✅ | ✅ CRUD | ✅（/app/social-institution，識別＝c_inst_code；側欄「社會機構編碼表」已改指此頁）| ✅（NAME_CODES／CODES／ADDR 三表 codes 寫入封閉，讀取開放）| ❌（裸表提案一併封閉、標示未支援，待實體級提案）|
 
 （🟡＝進行中／部分；本表隨實作推進更新。）
 

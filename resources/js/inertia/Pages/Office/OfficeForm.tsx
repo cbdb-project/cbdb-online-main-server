@@ -8,7 +8,9 @@ import { useTranslation } from '../../hooks/useTranslation';
 
 export interface OfficeUrls {
     index: string;
+    create: string;
     edit_template: string;
+    export: string;
     api_create: string;
     api_mutate: string;
     api_delete: string;

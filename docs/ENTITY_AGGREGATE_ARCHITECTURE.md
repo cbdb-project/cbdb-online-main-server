@@ -118,7 +118,7 @@ CBDB 目前**只有「人物」做到了這一點**，其餘實體都停在「�
 | 人物 | BIOG_MAIN ＋ 12 子資源 | ✅ | ✅ CRUD | ✅（13 編輯器）| N/A（子資源即實體單位）| ✅ |
 | 書籍／文本 | TEXT_CODES ＋ INSTANCE ＋ BIBLCAT… | ❌ | 僅裸 TEXT_CODES CRUD | ❌ | ❌ | ❌（退化下層）|
 | 地點 | ADDRESSES ＋ ADDR_CODES ＋ … | ❌ | ❌ | ❌ | ❌ | ❌ |
-| 官職 | OFFICE_CODES ＋ TYPE_REL | 🟡 雛形（僅 create）| 🟡 create | ❌ | ❌ | ❌ |
+| 官職 | OFFICE_CODES ＋ TYPE_REL | ✅ | ✅ CRUD | ✅（/app/office，與裸表頁 feature parity 的超集；側欄「任官編碼表」已改指此頁）| ✅（codes 寫入封閉，讀取／匯出開放）| ❌（裸表提案一併封閉、標示未支援，待實體級提案）|
 | 社交機構 | NAME_CODES ＋ CODES ＋ ADDR | ❌ | ❌ | ❌ | ❌ | ❌ |
 
 （🟡＝進行中／部分；本表隨實作推進更新。）

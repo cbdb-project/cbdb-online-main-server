@@ -4,6 +4,13 @@
 
 ## 2026-07
 
+### 官職實體聚合推進至 step 4：/app/office 成為唯一寫入入口、OFFICE_CODES 裸表封寫（#1159）
+- `/app/office` 列表補齊與 `app/codes/OFFICE_CODES` 的 feature parity 並成為超集：全部 OFFICE_CODES 欄位、任意欄排序＋主鍵 tie-breaker、逐欄篩選（含 AND/OR/NOT 布林模式，复用 `ColumnFilterExpression` 與 codes 同組 i18n）、關鍵字全欄搜尋、朝代標籤、全表匯出連結，另加聚合特有的 `type_count` 計算欄（OFFICE_CODE_TYPE_REL 關聯數，exact 比對）。
+- 訪問模型對齊 codes 頁：列表公開可讀；排序／篩選需登入且已激活（鏡像 `guardSortFilterRequiresAuth`）；新增／編輯／刪除仍需 `canWriteDirectly`。
+- 側欄「任官編碼表」改指 `/app/office`（`Navigation::officeEntityItem()`），active 保留 `OFFICE_CODES` page-title 相容直訪裸表頁。
+- `OFFICE_CODES` 加入 `CodesController::$readOnlyTables`：裸表 create／edit／update／destroy／proposal 全部封閉（讀取與匯出開放）。裸表 proposal 一併封閉是實體級提案（§4.5）就緒前的有意取捨；回退＝自 `$readOnlyTables` 移除一行。
+- 測試 `tests/Feature/OfficeEntityIndexTest.php`；設計文件 §5 差距表同步更新。
+
 ### mutation API 支援 code 表寫入（先接 TEXT_CODES，resource=text-codes）
 - 讓單主鍵 code 表可經 `/api/v2/{create,delete}` 與 `batch_mutate` 機器化寫入（token、`operations` + AuditLog、可回滾），補上目前 codes 網頁表單/書目導入工具缺的統一審計。
 - config 驅動（`config/code_table_writes.php`）：每張表定 `resource/aliases/table/key_column/auto_assign_id/allowed_fields`。新增 `CodeTableCreateHandler` / `CodeTableDeleteHandler`（獨立於 person-subresource 基底，因 code 表無 c_personid）。

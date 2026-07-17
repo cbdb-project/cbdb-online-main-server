@@ -42,6 +42,12 @@ class CodesController extends Controller {
         'CBDB__TRAD_SIMP_MAP',
         'DYNASTIES',
         'GANZHI_CODES',
+        // 官職為複合實體（OFFICE_CODES + OFFICE_CODE_TYPE_REL），裸表直寫會產出殘缺聚合
+        // （docs/ENTITY_AGGREGATE_ARCHITECTURE.md §3.1）。實體級入口（/app/office，含
+        // create/update/delete 與側欄連結）就緒後在此封寫；讀取與匯出維持開放。
+        // 注意：這同時擋掉裸表 proposal——實體級提案就緒前為有意取捨（§4.5）。
+        // 回退：自本清單移除即可恢復裸表寫入。
+        'OFFICE_CODES',
     ];
     /**
      * Copyright notices for specific tables.

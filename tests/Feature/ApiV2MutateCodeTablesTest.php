@@ -169,6 +169,26 @@ class ApiV2MutateCodeTablesTest extends TestCase {
     }
 
     #[Test]
+    public function testGanzhiDirectUpdateStillRejectsIntegerValueForTextField(): void {
+        // 迴歸：validateFields() 為 char_variant_map.c_strict_excluded 開放了 integer_fields 白名單機制，
+        // 但只限該表登記的欄位——其他表（如本表 c_ganzhi_py，一般拼音文字欄，未登記 integer_fields）
+        // 仍必須拒絕整數值，確認放寬沒有波及全域。
+        $this->actingAs($this->makeUser(email: 'ganzhi-int-reject@example.com'));
+        DB::table('GANZHI_CODES')->insert(['c_ganzhi_code' => 3, 'c_ganzhi_chn' => '丙寅', 'c_ganzhi_py' => null]);
+
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'ganzhi_codes',
+            'person_id' => 0,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_ganzhi_code' => 3]],
+            'changes' => ['c_ganzhi_py' => 123],
+        ])->assertStatus(422);
+
+        $this->assertDatabaseHas('GANZHI_CODES', ['c_ganzhi_code' => 3, 'c_ganzhi_py' => null]);
+    }
+
+    #[Test]
     public function testCodeTableForcesPersonIdZeroEvenIfCallerSendsNonZero(): void {
         $this->actingAs($this->makeUser(email: 'ganzhi-pid@example.com'));
         DB::table('GANZHI_CODES')->insert(['c_ganzhi_code' => 2, 'c_ganzhi_chn' => '乙丑', 'c_ganzhi_py' => null]);

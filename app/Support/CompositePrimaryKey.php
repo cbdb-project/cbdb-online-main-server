@@ -182,6 +182,9 @@ class CompositePrimaryKey {
         'ADDR_CODES' => [
             'c_addr_id',
         ],
+        'CHAR_VARIANT_MAP' => [
+            'id',
+        ],
     ];
 
     /**

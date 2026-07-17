@@ -5,12 +5,22 @@ namespace App\Services\Mutations;
 use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
 use App\Services\BracketNormalizer;
+use App\Services\CharVariantMapService;
 use App\Services\NameSearchIndexService;
 use App\Support\PinyinUmlaut;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Schema;
 
 class AltnameCreateHandler extends AbstractPersonSubresourceCreateHandler {
     protected NameSearchIndexService $nameSearchIndexService;
+
+    /**
+     * 本次 preprocessCreateData() 對 c_alt_name_chn 實際套用的異體字替換
+     * （異體字 => 參考字）。handleDirect()／handleProposal() 併入回應的 notices。
+     *
+     * @var array<string,string>
+     */
+    protected array $variantReplaced = [];
 
     public function __construct(
         OperationRepository $operationRepository,
@@ -67,17 +77,39 @@ class AltnameCreateHandler extends AbstractPersonSubresourceCreateHandler {
         $data = $this->normalizeSentinelValues($data, ['c_alt_name_type_code', 'c_source']);
 
         // #71：非 PK 碼欄 c_source 完全幂等（null/''/-999→0），對齊已修的 AltnameMutationHandler。
-        return $this->normalizeEmptyCodeFields($data, ['c_source']);
-    }
+        $data = $this->normalizeEmptyCodeFields($data, ['c_source']);
 
-    protected function handleDirect(int $personId, array $actualPk, array $rowData, string $comment): \Illuminate\Http\JsonResponse {
-        $response = parent::handleDirect($personId, $actualPk, $rowData, $comment);
-
-        if ($response->getStatusCode() === 200) {
-            $this->syncAltnameIndexAfterCreate($rowData);
+        // 異體字落地替換（嚴格模式）。發生在 extractPkFromRow() 之前（見
+        // AbstractPersonSubresourceCreateHandler::handle() 119-122 行），替換後的值
+        // 自然成為新 PK 的一部分（見 docs/CHAR_VARIANT_MAP_CALL_SITE_WIRING_PLAN.md
+        // 待決事項 3）。
+        if (array_key_exists('c_alt_name_chn', $data)) {
+            $replaced = CharVariantMapService::replaceStrict((string) $data['c_alt_name_chn']);
+            $data['c_alt_name_chn'] = $replaced['text'];
+            $this->variantReplaced = $replaced['replaced'];
         }
 
-        return $response;
+        return $data;
+    }
+
+    protected function handleDirect(int $personId, array $actualPk, array $rowData, string $comment): JsonResponse {
+        $response = parent::handleDirect($personId, $actualPk, $rowData, $comment);
+
+        if ($response->getStatusCode() !== 200) {
+            return $response;
+        }
+
+        $this->syncAltnameIndexAfterCreate($rowData);
+
+        return CharVariantMapService::withNotices($response, $this->variantReplaced);
+    }
+
+    protected function handleProposal(int $personId, array $actualPk, array $rowData, string $comment): JsonResponse {
+        $response = parent::handleProposal($personId, $actualPk, $rowData, $comment);
+
+        return $response->getStatusCode() === 200
+            ? CharVariantMapService::withNotices($response, $this->variantReplaced)
+            : $response;
     }
 
     protected function syncAltnameIndexAfterCreate(array $rowData): void {

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\TextCode;
 use App\Models\User;
+use App\Services\CharVariantMapService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -115,6 +116,31 @@ class BasicInformationAltnamesControllerTest extends TestCase {
             'c_name_type_code' => 1,
             'c_name_type_desc_chn' => '測試別名類型',
         ]);
+
+        // char_variant_map：與 database/migrations/2026_07_15_000000_create_char_variant_map_table.php
+        // 相同的 7 筆種子資料，供 altnameStoreById()/altnameUpdateById() 的異體字落地替換查詢使用。
+        Schema::dropIfExists('char_variant_map');
+        Schema::create('char_variant_map', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->string('c_variant_char', 10);
+            $table->string('c_reference_char', 10);
+            $table->tinyInteger('c_strict_excluded')->default(1);
+            $table->string('c_notes', 255)->nullable();
+            $table->timestamps();
+
+            $table->unique('c_variant_char', 'char_variant_map_c_variant_char_unique');
+        });
+
+        DB::table('char_variant_map')->insert([
+            ['c_variant_char' => '愼', 'c_reference_char' => '慎', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '槀', 'c_reference_char' => '稿', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '峯', 'c_reference_char' => '峰', 'c_strict_excluded' => 1],
+            ['c_variant_char' => '靑', 'c_reference_char' => '青', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '頴', 'c_reference_char' => '穎', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '淸', 'c_reference_char' => '清', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '厰', 'c_reference_char' => '廠', 'c_strict_excluded' => 0],
+        ]);
+        CharVariantMapService::reset();
     }
 
     protected function tearDown(): void {
@@ -124,6 +150,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
         Schema::dropIfExists('ALTNAME_CODES');
         Schema::dropIfExists('operations');
         Schema::dropIfExists('audit_log');
+        Schema::dropIfExists('char_variant_map');
         Schema::dropIfExists('users');
         parent::tearDown();
     }
@@ -172,6 +199,71 @@ class BasicInformationAltnamesControllerTest extends TestCase {
         $this->assertNotNull($log->operation_id);
         $new_data = json_decode($log->new_data, true);
         $this->assertEquals('新增別名', $new_data['c_alt_name_chn']);
+    }
+
+    #[Test]
+    public function testStoreReplacesStrictModeVariantAndFlashesNotice(): void {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'altname-legacy-store-variant@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 1, 'c_name_chn' => '測試人物']);
+
+        $response = $this->actingAs($user)->post('/basicinformation/1/altnames', [
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '淸X',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+        ]);
+
+        $response->assertStatus(302);
+
+        // legacy Blade 與 v2 API 走的是平行的兩條寫入路徑（見計畫文件待決事項 3 修正段落）：
+        // 落地驗證同一份輸入在 legacy Blade 路徑也確實替換，不能只有 v2 API 有效。
+        $this->assertDatabaseHas('ALTNAME_DATA', [
+            'c_personid' => 1,
+            'c_alt_name_chn' => '清X',
+        ]);
+        $this->assertDatabaseMissing('ALTNAME_DATA', [
+            'c_personid' => 1,
+            'c_alt_name_chn' => '淸X',
+        ]);
+
+        $flash = session('flash_notification', collect())->toArray();
+        $messages = array_column($flash, 'message');
+        $this->assertTrue(
+            (bool) array_filter($messages, static fn ($m) => str_contains($m, '淸') && str_contains($m, '清')),
+            '應有一則含異體字落地替換內容的 flash 訊息'
+        );
+    }
+
+    #[Test]
+    public function testStoreDoesNotReplaceStrictExcludedVariant(): void {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'altname-legacy-store-excluded@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 1, 'c_name_chn' => '測試人物']);
+
+        $this->actingAs($user)->post('/basicinformation/1/altnames', [
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '峯X',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+        ])->assertStatus(302);
+
+        $this->assertDatabaseHas('ALTNAME_DATA', [
+            'c_personid' => 1,
+            'c_alt_name_chn' => '峯X',
+        ]);
     }
 
     #[Test]
@@ -433,6 +525,182 @@ class BasicInformationAltnamesControllerTest extends TestCase {
         $this->assertNotNull($operation);
         $resourceData = json_decode($operation->resource_data, true);
         $this->assertEquals('測試備註', $resourceData['__note'] ?? null);
+    }
+
+    #[Test]
+    public function testUpdateQueryReplacesStrictModeVariantAndFlashesNotice(): void {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'altname-legacy-update-variant@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 1, 'c_name_chn' => '測試人物']);
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '舊別名',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+        ]);
+
+        $response = $this->actingAs($user)->patch(
+            '/basicinformation/1/altnames/update?c_personid=1&c_sequence=1&c_alt_name_chn=舊別名&c_alt_name_type_code=1',
+            [
+                'c_sequence' => 1,
+                'c_alt_name_chn' => '淸X',
+                'c_alt_name_type_code' => '1',
+                'c_source' => 0,
+            ]
+        );
+
+        $response->assertStatus(302);
+
+        $this->assertDatabaseHas('ALTNAME_DATA', [
+            'c_personid' => 1,
+            'c_alt_name_chn' => '清X',
+        ]);
+        $this->assertDatabaseMissing('ALTNAME_DATA', [
+            'c_personid' => 1,
+            'c_alt_name_chn' => '淸X',
+        ]);
+
+        $flash = session('flash_notification', collect())->toArray();
+        $messages = array_column($flash, 'message');
+        $this->assertTrue(
+            (bool) array_filter($messages, static fn ($m) => str_contains($m, '淸') && str_contains($m, '清')),
+            '應有一則含異體字落地替換內容的 flash 訊息'
+        );
+    }
+
+    #[Test]
+    public function testUpdateQueryDoesNotReplaceStrictExcludedVariant(): void {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'altname-legacy-update-excluded@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 1, 'c_name_chn' => '測試人物']);
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '舊別名',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+        ]);
+
+        $this->actingAs($user)->patch(
+            '/basicinformation/1/altnames/update?c_personid=1&c_sequence=1&c_alt_name_chn=舊別名&c_alt_name_type_code=1',
+            [
+                'c_sequence' => 1,
+                'c_alt_name_chn' => '峯X',
+                'c_alt_name_type_code' => '1',
+                'c_source' => 0,
+            ]
+        )->assertStatus(302);
+
+        $this->assertDatabaseHas('ALTNAME_DATA', [
+            'c_personid' => 1,
+            'c_alt_name_chn' => '峯X',
+        ]);
+    }
+
+    #[Test]
+    public function testUpdateReplacesStrictModeVariantAndFlashesNotice(): void {
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'altname-legacy-update-path-variant@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 1, 'c_name_chn' => '測試人物']);
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '舊別名',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+        ]);
+
+        $response = $this->actingAs($user)->patch('/basicinformation/1/altnames/1-舊別名-1', [
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '淸X',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+        ]);
+
+        $response->assertStatus(302);
+
+        $this->assertDatabaseHas('ALTNAME_DATA', [
+            'c_personid' => 1,
+            'c_alt_name_chn' => '清X',
+        ]);
+        $this->assertDatabaseMissing('ALTNAME_DATA', [
+            'c_personid' => 1,
+            'c_alt_name_chn' => '淸X',
+        ]);
+
+        $flash = session('flash_notification', collect())->toArray();
+        $messages = array_column($flash, 'message');
+        $this->assertTrue(
+            (bool) array_filter($messages, static fn ($m) => str_contains($m, '淸') && str_contains($m, '清')),
+            '應有一則含異體字落地替換內容的 flash 訊息'
+        );
+    }
+
+    #[Test]
+    public function testUpdateQueryDetectsPkConflictUsingReplacedValue(): void {
+        // 替換後的新 c_alt_name_chn（淸X → 清X）與同一人物下另一筆既有別名衝突：
+        // 既有的括號衝突偵測邏輯須用替換後的值判斷，而非替換前的原始輸入。
+        $user = User::create([
+            'name' => 'Test User',
+            'email' => 'altname-legacy-update-conflict@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 1, 'c_name_chn' => '測試人物']);
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '舊別名',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+        ]);
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => 2,
+            'c_alt_name_chn' => '清X',
+            'c_alt_name_type_code' => '1',
+            'c_source' => 0,
+        ]);
+
+        $response = $this->actingAs($user)->patch(
+            '/basicinformation/1/altnames/update?c_personid=1&c_sequence=1&c_alt_name_chn=舊別名&c_alt_name_type_code=1',
+            [
+                'c_sequence' => 1,
+                'c_alt_name_chn' => '淸X',
+                'c_alt_name_type_code' => '1',
+                'c_source' => 0,
+            ]
+        );
+
+        $response->assertRedirect();
+        $response->assertSessionHas('flash_notification');
+
+        // 原始「舊別名」未被替換覆蓋（衝突擋下，未更新）。
+        $this->assertDatabaseHas('ALTNAME_DATA', [
+            'c_personid' => 1,
+            'c_alt_name_chn' => '舊別名',
+        ]);
     }
 
     #[Test]

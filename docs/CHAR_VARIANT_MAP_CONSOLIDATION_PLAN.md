@@ -2,7 +2,7 @@
 
 > English version: [CHAR_VARIANT_MAP_CONSOLIDATION_PLAN.en.md](./CHAR_VARIANT_MAP_CONSOLIDATION_PLAN.en.md)
 
-> **狀態：規劃中**。本文件目前只涵蓋新表的 schema 設計、migration 設計與現有 7 筆資料的遷移方式；「呼叫點串接方向」一節描述的是**未來**要把 `AdminBatchLoadBookTitlesController::TITLE_VARIANT_MAP` 與 BIOG_MAIN／ALTNAME_DATA 人名相關寫入路徑改接這張表的方向，尚未實作，將於後續另開任務執行。
+> **狀態：第一階段（schema 設計、migration）已完成**。本文件涵蓋新表的 schema 設計、migration 設計與現有 7 筆資料的遷移方式；「呼叫點串接方向」一節描述的呼叫點改接方向，已展開為具體實作計畫，見 [CHAR_VARIANT_MAP_CALL_SITE_WIRING_PLAN.md](./CHAR_VARIANT_MAP_CALL_SITE_WIRING_PLAN.md)（第二階段）。
 
 ## 背景與目標
 

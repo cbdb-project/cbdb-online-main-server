@@ -9,6 +9,7 @@ use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
 use App\Services\BracketNormalizer;
+use App\Services\CharVariantMapService;
 use App\Services\NameSearchIndexService;
 use App\Support\CompositePrimaryKey;
 use App\Support\PinyinUmlaut;
@@ -117,7 +118,7 @@ class BiogMainMutationHandler extends AbstractMutationHandler {
             $this->nameSearchIndexService->reindexPerson($updated);
         }
 
-        return response()->json([
+        $response = [
             'ok' => true,
             'resource' => 'basicinformation',
             'mode' => 'direct',
@@ -128,11 +129,18 @@ class BiogMainMutationHandler extends AbstractMutationHandler {
                 'operation_id' => $result['operation_id'] ?? null,
                 'row' => $updated ? $updated->toArray() : null,
             ],
-        ]);
+        ];
+
+        $notices = CharVariantMapService::buildNotices($result['variant_replaced'] ?? []);
+        if ($notices !== []) {
+            $response['notices'] = $notices;
+        }
+
+        return response()->json($response);
     }
 
     protected function handleProposalUpdate(int $personId, array $updatedFields, array $merged, BiogMain $original, array $meta): JsonResponse {
-        $proposalData = $this->prepareProposalPayload($merged);
+        ['payload' => $proposalData, 'replaced' => $variantReplaced] = $this->prepareProposalPayload($merged);
         $validator = Validator::make($proposalData, $this->validationRules($original), $this->validationMessages());
         if ($validator->fails()) {
             return $this->errorResponse('參數校驗失敗', 422, $validator->errors()->toArray());
@@ -164,7 +172,7 @@ class BiogMainMutationHandler extends AbstractMutationHandler {
             $original->toArray()
         );
 
-        return response()->json([
+        $response = [
             'ok' => true,
             'resource' => 'basicinformation',
             'mode' => 'proposal',
@@ -175,7 +183,14 @@ class BiogMainMutationHandler extends AbstractMutationHandler {
                 'status' => 'proposal_updated',
                 'operation_id' => $operation?->id,
             ],
-        ]);
+        ];
+
+        $notices = CharVariantMapService::buildNotices($variantReplaced);
+        if ($notices !== []) {
+            $response['notices'] = $notices;
+        }
+
+        return response()->json($response);
     }
 
     protected function buildMergedPayload(BiogMain $original, array $changes): array {
@@ -193,8 +208,20 @@ class BiogMainMutationHandler extends AbstractMutationHandler {
         return [$payload, array_keys($allowedChanges)];
     }
 
+    /**
+     * @return array{payload: array, replaced: array<string,string>}
+     */
     protected function prepareProposalPayload(array $payload): array {
-        $payload['c_name_chn'] = ($payload['c_surname_chn'] ?? '').($payload['c_mingzi_chn'] ?? '');
+        // 異體字落地替換（嚴格模式）：先替換姓／名分欄，再組出 c_name_chn，維持
+        // c_name_chn === c_surname_chn.c_mingzi_chn 的既有 invariant（見
+        // docs/CHAR_VARIANT_MAP_CALL_SITE_WIRING_PLAN.md 待決事項 1）。
+        $surnameReplaced = CharVariantMapService::replaceStrict((string) ($payload['c_surname_chn'] ?? ''));
+        $mingziReplaced = CharVariantMapService::replaceStrict((string) ($payload['c_mingzi_chn'] ?? ''));
+        $variantReplaced = array_merge($surnameReplaced['replaced'], $mingziReplaced['replaced']);
+        $payload['c_surname_chn'] = $surnameReplaced['text'];
+        $payload['c_mingzi_chn'] = $mingziReplaced['text'];
+
+        $payload['c_name_chn'] = $surnameReplaced['text'].$mingziReplaced['text'];
         $payload['c_name'] = trim(($payload['c_surname'] ?? '').' '.($payload['c_mingzi'] ?? ''));
         $payload['c_name_proper'] = trim(($payload['c_mingzi_proper'] ?? '').' '.($payload['c_surname_proper'] ?? ''));
         $payload['c_name_rm'] = trim(($payload['c_mingzi_rm'] ?? '').' '.($payload['c_surname_rm'] ?? ''));
@@ -212,7 +239,7 @@ class BiogMainMutationHandler extends AbstractMutationHandler {
         $payload['c_dy_intercalary'] = (int) ($payload['c_dy_intercalary'] ?? 0);
         $payload = BiogMainRepository::nullifyEmptyForeignKeys($payload);
 
-        return (new ToolsRepository())->timestamp($payload);
+        return ['payload' => (new ToolsRepository())->timestamp($payload), 'replaced' => $variantReplaced];
     }
 
     protected function validationRules(BiogMain $original): array {

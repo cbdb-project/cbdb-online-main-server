@@ -145,6 +145,7 @@ return [
     'batch_col_line' => 'Line',
     'batch_col_author_id' => 'Author ID',
     'batch_col_title_cleaned' => 'Title (cleaned)',
+    'batch_variant_replaced_hint' => 'Variant characters normalized: :pairs',
     'batch_col_title_pinyin' => 'Title Pinyin',
     'batch_col_source_textid' => 'Source TEXT_ID',
     'batch_col_dynasty' => 'Dynasty',

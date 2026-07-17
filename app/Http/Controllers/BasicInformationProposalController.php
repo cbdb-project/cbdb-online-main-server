@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Operation;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
+use App\Services\CharVariantMapService;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -488,6 +489,29 @@ class BasicInformationProposalController extends Controller {
     }
 
     protected function normalizePayloadForTable(string $table, array $payload): array {
+        // 異體字落地替換（嚴格模式）：legacy Blade 提案路徑不經過
+        // BiogMainMutationHandler::prepareProposalPayload()，需在此另外掛鉤，否則
+        // 同一份輸入走 legacy 提案與走 v2 API 提案，c_name_chn 落地結果會不一致
+        // （見 docs/CHAR_VARIANT_MAP_CALL_SITE_WIRING_PLAN.md 步驟 3）。先替換分欄、
+        // 再組出 c_name_chn，維持 c_name_chn === c_surname_chn.c_mingzi_chn 的 invariant。
+        if ($table === 'BIOG_MAIN') {
+            $surnameReplaced = CharVariantMapService::replaceStrict((string) ($payload['c_surname_chn'] ?? ''));
+            $mingziReplaced = CharVariantMapService::replaceStrict((string) ($payload['c_mingzi_chn'] ?? ''));
+            $payload['c_surname_chn'] = $surnameReplaced['text'];
+            $payload['c_mingzi_chn'] = $mingziReplaced['text'];
+            $payload['c_name_chn'] = $surnameReplaced['text'].$mingziReplaced['text'];
+        }
+
+        // ALTNAME_DATA 同理：legacy Blade 提案路徑（BasicInformationAltnamesController::
+        // store()/update()/updateQuery() 的 action=proposal 分支）也不經過
+        // AltnameCreateHandler/AltnameMutationHandler 的 preprocessCreateData()/
+        // preprocessUpdateData()，需在此另外掛鉤，否則同一份輸入走 legacy 提案與走
+        // legacy direct／v2 API，c_alt_name_chn 落地結果會不一致（見
+        // docs/CHAR_VARIANT_MAP_CALL_SITE_WIRING_PLAN.md 步驟 5）。
+        if ($table === 'ALTNAME_DATA' && array_key_exists('c_alt_name_chn', $payload)) {
+            $payload['c_alt_name_chn'] = CharVariantMapService::replaceStrict((string) $payload['c_alt_name_chn'])['text'];
+        }
+
         if ($table === 'BIOG_SOURCE_DATA') {
             $payload['c_pages'] = (string) ($payload['c_pages'] ?? '');
 

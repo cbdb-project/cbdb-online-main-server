@@ -6,6 +6,7 @@ use App\Models\Operation;
 use App\Models\TextCode;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
+use App\Services\CharVariantMapService;
 use App\Services\PinyinDictionary;
 use App\Services\VariantCharNormalizer;
 use App\Support\PinyinUmlaut;
@@ -17,19 +18,6 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class AdminBatchLoadBookTitlesController extends Controller {
-    /**
-     * 書名字形標準化對照表（異體字 → 標準字）。
-     *
-     * 與 VariantCharNormalizer 的差異：此對照表會「改寫存入 TEXT_CODES.c_title_chn
-     * 的書名本身」，而非僅用於拼音轉換。只放確定要把原始書名一併標準化的字形，
-     * 例如「峯」一律正規化為「峰」（兩者皆為繁體，屬同字異形，非繁簡轉換）。
-     */
-    private const TITLE_VARIANT_MAP = [
-        '峯' => '峰',
-        '靑' => '青',
-        '頴' => '穎',
-    ];
-
     /**
      * @var OperationRepository
      */
@@ -172,6 +160,7 @@ class AdminBatchLoadBookTitlesController extends Controller {
                     'created_by' => $payload['c_created_by'] ?? null,
                     'created_date' => $payload['c_created_date'] ?? null,
                     'c_textid' => $nextId,
+                    'variant_replacements' => $row['variant_replacements'] ?? [],
                 ];
             }
         });
@@ -468,14 +457,17 @@ class AdminBatchLoadBookTitlesController extends Controller {
                 continue;
             }
 
+            $standardized = $this->standardizeTitleVariants($title);
+
             $rows[] = [
                 'line' => $lineNumber,
                 'author_id' => (int) $authorId,
                 // 在書名「誕生處」一次性標準化字形（峯→峰），讓後續所有
                 // 消費端（c_title_chn、拼音、無拼音檢查）都只看到標準化後的書名，
                 // 避免任一路徑漏做而三者不一致。
-                'title' => $this->standardizeTitleVariants($title),
+                'title' => $standardized['title'],
                 'source' => $source,
+                'variant_replacements' => $standardized['variant_replacements'],
             ];
         }
 
@@ -592,16 +584,26 @@ class AdminBatchLoadBookTitlesController extends Controller {
     }
 
     /**
-     * Standardize variant glyphs in the title (峯→峰). Unlike VariantCharNormalizer
-     * (which only affects the pinyin lookup and leaves the title untouched), this
-     * rewrites the stored 中文書名 itself. It is applied ONCE in parseEntries() when
-     * the row's title is first built, so every downstream consumer — c_title_chn,
-     * the pinyin (c_title) and the unpinyinable check — receives an already
-     * standardized title and the three can never disagree on which character the
-     * title contains.
+     * Standardize variant glyphs in the title (峯→峰) via char_variant_map, lenient
+     * mode (every row in the table applies, c_strict_excluded is ignored — this is
+     * a book-title context, not a person name). Unlike VariantCharNormalizer (which
+     * only affects the pinyin lookup and leaves the title untouched), this rewrites
+     * the stored 中文書名 itself. It is applied ONCE in parseEntries() when the row's
+     * title is first built, so every downstream consumer — c_title_chn, the pinyin
+     * (c_title) and the unpinyinable check — receives an already standardized title
+     * and the three can never disagree on which character the title contains.
+     *
+     * @return array{title: string, variant_replacements: array<int,array{from:string,to:string}>}
      */
-    protected function standardizeTitleVariants(string $title): string {
-        return strtr($title, self::TITLE_VARIANT_MAP);
+    protected function standardizeTitleVariants(string $title): array {
+        $result = CharVariantMapService::replaceLenient($title);
+
+        $variantReplacements = [];
+        foreach ($result['replaced'] as $from => $to) {
+            $variantReplacements[] = ['from' => $from, 'to' => $to];
+        }
+
+        return ['title' => $result['text'], 'variant_replacements' => $variantReplacements];
     }
 
     /**

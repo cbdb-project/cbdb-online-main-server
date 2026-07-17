@@ -5,13 +5,23 @@ namespace App\Services\Mutations;
 use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
 use App\Services\BracketNormalizer;
+use App\Services\CharVariantMapService;
 use App\Services\NameSearchIndexService;
 use App\Support\PinyinUmlaut;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class AltnameMutationHandler extends AbstractPersonSubresourceMutationHandler {
     protected NameSearchIndexService $nameSearchIndexService;
+
+    /**
+     * 本次 preprocessUpdateData() 對 c_alt_name_chn 實際套用的異體字替換
+     * （異體字 => 參考字）。handleDirect()／handleProposal() 併入回應的 notices。
+     *
+     * @var array<string,string>
+     */
+    protected array $variantReplaced = [];
 
     public function __construct(
         OperationRepository $operationRepository,
@@ -70,6 +80,18 @@ class AltnameMutationHandler extends AbstractPersonSubresourceMutationHandler {
         // sentinel 完全幂等：c_source（legacy 哨兵 0=Unknown）的 null/'' 也→0（normalizeSentinelValues 只做 -999）。
         $data = $this->normalizeEmptyCodeFields($data, ['c_source']);
 
+        // 異體字落地替換（嚴格模式）。發生在 buildNewPk() 之前（見
+        // AbstractPersonSubresourceMutationHandler::handle() 135 行早於 handleDirect()
+        // 內 212 行的 buildNewPk()），替換後的值自然成為新 PK 的一部分，
+        // performUpdate() 的 PK 衝突偵測與 syncAltnameIndexAfterUpdate() 都讀取
+        // 替換後的 updateData（見 docs/CHAR_VARIANT_MAP_CALL_SITE_WIRING_PLAN.md
+        // 待決事項 3）。
+        if (array_key_exists('c_alt_name_chn', $data)) {
+            $replaced = CharVariantMapService::replaceStrict((string) $data['c_alt_name_chn']);
+            $data['c_alt_name_chn'] = $replaced['text'];
+            $this->variantReplaced = $replaced['replaced'];
+        }
+
         return $data;
     }
 
@@ -97,18 +119,30 @@ class AltnameMutationHandler extends AbstractPersonSubresourceMutationHandler {
         parent::performUpdate($targetPk, $updateData);
     }
 
-    protected function handleDirect(int $personId, array $targetPk, array $updateData, array $originalArray, string $comment): \Illuminate\Http\JsonResponse {
+    protected function handleDirect(int $personId, array $targetPk, array $updateData, array $originalArray, string $comment): JsonResponse {
         // 記錄原始狀態以便更新搜尋索引
         $originalObject = $this->findOriginalRow($targetPk);
 
         $response = parent::handleDirect($personId, $targetPk, $updateData, $originalArray, $comment);
 
+        if ($response->getStatusCode() !== 200) {
+            return $response;
+        }
+
         // 更新搜尋索引
-        if ($response->getStatusCode() === 200 && $originalObject) {
+        if ($originalObject) {
             $this->syncAltnameIndexAfterUpdate($originalObject, $updateData, $targetPk);
         }
 
-        return $response;
+        return CharVariantMapService::withNotices($response, $this->variantReplaced);
+    }
+
+    protected function handleProposal(int $personId, array $targetPk, array $updateData, array $originalArray, string $comment): JsonResponse {
+        $response = parent::handleProposal($personId, $targetPk, $updateData, $originalArray, $comment);
+
+        return $response->getStatusCode() === 200
+            ? CharVariantMapService::withNotices($response, $this->variantReplaced)
+            : $response;
     }
 
     /**

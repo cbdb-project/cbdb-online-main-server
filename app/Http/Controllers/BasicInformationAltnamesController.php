@@ -7,6 +7,7 @@ use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
 use App\Services\BracketNormalizer;
+use App\Services\CharVariantMapService;
 use App\Services\NameSearchIndexService;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
@@ -136,6 +137,11 @@ class BasicInformationAltnamesController extends Controller {
                 $data['c_alt_name_type_code'],
                 $data['c_alt_name_chn']
             );
+        }
+
+        // 非阻塞提示：異體字落地替換（嚴格模式），比照既有 flash(..., 'info') 慣例。
+        foreach (CharVariantMapService::buildNotices($data['__variant_replaced'] ?? []) as $notice) {
+            flash($notice.' @ '.Carbon::now(), 'info');
         }
 
         flash('Store success @ '.Carbon::now(), 'success');
@@ -273,11 +279,12 @@ class BasicInformationAltnamesController extends Controller {
             abort(404, 'ALTNAME_DATA 記錄不存在');
         }
 
-        // 手動調用索引服務
+        // 手動調用索引服務：用 $newPk（repository 回傳，已含異體字落地替換後的值）而非
+        // 重新讀 $request->all()——後者是替換前的原始輸入，若用它判斷是否改名／建索引，
+        // 會讓 CBDB__NAME_FTS 索引到替換前的舊字形，與實際存入 ALTNAME_DATA 的字不一致。
         if ($ori && Schema::hasTable('CBDB__NAME_FTS')) {
-            $data = $request->all();
-            $nameChanged = $ori->c_alt_name_chn !== ($data['c_alt_name_chn'] ?? $ori->c_alt_name_chn);
-            $typeChanged = $ori->c_alt_name_type_code !== ($data['c_alt_name_type_code'] ?? $ori->c_alt_name_type_code);
+            $nameChanged = $ori->c_alt_name_chn !== $newPk['c_alt_name_chn'];
+            $typeChanged = $ori->c_alt_name_type_code !== $newPk['c_alt_name_type_code'];
 
             if ($nameChanged || $typeChanged) {
                 // 刪除舊索引
@@ -290,14 +297,25 @@ class BasicInformationAltnamesController extends Controller {
                 }
 
                 // 創建新索引
-                $newAltNameChn = $data['c_alt_name_chn'] ?? $ori->c_alt_name_chn;
-                if (!empty($newAltNameChn)) {
+                if (!empty($newPk['c_alt_name_chn'])) {
                     $this->nameSearchIndexService->indexAltname(
                         $id,
-                        $data['c_alt_name_type_code'] ?? $ori->c_alt_name_type_code,
-                        $newAltNameChn
+                        $newPk['c_alt_name_type_code'],
+                        $newPk['c_alt_name_chn']
                     );
                 }
+            }
+        }
+
+        // 非阻塞提示：異體字落地替換（嚴格模式），比照既有 flash(..., 'info') 慣例。
+        // 於此重新對提交值做一次替換純粹是為了取得 replaced 組通知文字（同一份
+        // char_variant_map 快取、無額外查表成本），實際落地寫入已在
+        // altnameUpdateById() 內完成，這裡不影響儲存結果。
+        $submittedAltNameChn = $request->input('c_alt_name_chn');
+        if ($submittedAltNameChn !== null) {
+            $noticeReplaced = CharVariantMapService::replaceStrict((string) $submittedAltNameChn)['replaced'];
+            foreach (CharVariantMapService::buildNotices($noticeReplaced) as $notice) {
+                flash($notice.' @ '.Carbon::now(), 'info');
             }
         }
 
@@ -482,8 +500,6 @@ class BasicInformationAltnamesController extends Controller {
             abort(404, 'ALTNAME_DATA 記錄不存在');
         }
 
-        // 保留原始請求資料供索引差異判斷
-        $data = $request->all();
         $newPk = $this->biogMainRepository->altnameUpdateById($request, $id, $originalPk);
         if ($newPk === 'bracket_conflict') {
             flash('此別名經括號格式正規化後，會與現有同類型別名重複，請先手動整理後再儲存。 @ '.Carbon::now(), 'error');
@@ -494,10 +510,11 @@ class BasicInformationAltnamesController extends Controller {
             abort(404, 'ALTNAME_DATA 記錄不存在');
         }
 
-        // 更新索引
+        // 更新索引：用 $newPk（repository 回傳，已含異體字落地替換後的值）而非重新讀
+        // $request->all()——後者是替換前的原始輸入，見 update() 同樣的修正說明。
         if ($ori && Schema::hasTable('CBDB__NAME_FTS')) {
-            $nameChanged = ($ori->c_alt_name_chn ?? null) !== ($data['c_alt_name_chn'] ?? $originalPk['c_alt_name_chn'] ?? null);
-            $typeChanged = ($ori->c_alt_name_type_code ?? null) !== ($data['c_alt_name_type_code'] ?? $originalPk['c_alt_name_type_code'] ?? null);
+            $nameChanged = ($ori->c_alt_name_chn ?? null) !== $newPk['c_alt_name_chn'];
+            $typeChanged = ($ori->c_alt_name_type_code ?? null) !== $newPk['c_alt_name_type_code'];
 
             if ($nameChanged || $typeChanged) {
                 if ($ori->c_alt_name_chn) {
@@ -508,14 +525,22 @@ class BasicInformationAltnamesController extends Controller {
                     );
                 }
 
-                $newAltNameChn = $data['c_alt_name_chn'] ?? $originalPk['c_alt_name_chn'] ?? null;
-                if (!empty($newAltNameChn)) {
+                if (!empty($newPk['c_alt_name_chn'])) {
                     $this->nameSearchIndexService->indexAltname(
                         $newPk['c_personid'] ?? $originalPk['c_personid'],
-                        $data['c_alt_name_type_code'] ?? $originalPk['c_alt_name_type_code'] ?? null,
-                        $newAltNameChn
+                        $newPk['c_alt_name_type_code'],
+                        $newPk['c_alt_name_chn']
                     );
                 }
+            }
+        }
+
+        // 非阻塞提示：異體字落地替換（嚴格模式），比照既有 flash(..., 'info') 慣例。
+        $submittedAltNameChn = $request->input('c_alt_name_chn');
+        if ($submittedAltNameChn !== null) {
+            $noticeReplaced = CharVariantMapService::replaceStrict((string) $submittedAltNameChn)['replaced'];
+            foreach (CharVariantMapService::buildNotices($noticeReplaced) as $notice) {
+                flash($notice.' @ '.Carbon::now(), 'info');
             }
         }
 

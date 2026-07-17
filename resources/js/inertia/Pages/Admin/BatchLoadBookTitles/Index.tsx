@@ -9,6 +9,11 @@ import { getCsrfToken } from '../../../components/PersonBrowser/shared/csrf';
 import type { SharedProps } from '../../../types/page';
 import { cn } from '../../../lib/utils';
 
+interface VariantReplacement {
+    from: string;
+    to: string;
+}
+
 interface ResultRow {
     line: number;
     author_id: string | number;
@@ -20,6 +25,7 @@ interface ResultRow {
     created_by: string | null;
     created_date: string | null;
     c_textid: number;
+    variant_replacements?: VariantReplacement[];
 }
 
 interface Toast {
@@ -391,7 +397,16 @@ export default function BatchLoadBookTitles() {
                                         <tr key={`${r.line}-${r.c_textid}`} className="border-t border-border">
                                             <td className="px-3 py-1.5">{r.line}</td>
                                             <td className="px-3 py-1.5">{r.author_id}</td>
-                                            <td className="px-3 py-1.5">{r.title}</td>
+                                            <td className="px-3 py-1.5">
+                                                <div>{r.title}</div>
+                                                {r.variant_replacements && r.variant_replacements.length > 0 && (
+                                                    <div className="text-xs text-muted-foreground">
+                                                        {t('batch_variant_replaced_hint', {
+                                                            pairs: r.variant_replacements.map((v) => `${v.from}→${v.to}`).join('、'),
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </td>
                                             <td className="px-3 py-1.5">
                                                 {batch_id && editId === r.c_textid ? (
                                                     <div className="flex flex-col gap-1">

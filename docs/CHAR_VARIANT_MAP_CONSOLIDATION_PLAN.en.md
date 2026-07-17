@@ -2,7 +2,7 @@
 
 > 中文版：[CHAR_VARIANT_MAP_CONSOLIDATION_PLAN.md](./CHAR_VARIANT_MAP_CONSOLIDATION_PLAN.md)
 
-> **Status: Planning**. This document currently covers only the new table's schema design, migration design, and the migration of the existing 7 rows of data. The "Call-site integration direction" section describes the **future** direction for rewiring `AdminBatchLoadBookTitlesController::TITLE_VARIANT_MAP` and the BIOG_MAIN/ALTNAME_DATA person-name write paths onto this table; that has not been implemented yet and will be a separate follow-up task.
+> **Status: Phase 1 (schema design, migration) complete**. This document covers the new table's schema design, migration design, and the migration of the existing 7 rows of data. The direction described in the "Call-site integration direction" section has been expanded into a concrete implementation plan — see [CHAR_VARIANT_MAP_CALL_SITE_WIRING_PLAN.md](./CHAR_VARIANT_MAP_CALL_SITE_WIRING_PLAN.md) (Phase 2, Chinese only).
 
 ## Background and Goals
 

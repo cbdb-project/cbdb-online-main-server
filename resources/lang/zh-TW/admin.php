@@ -145,6 +145,7 @@ return [
     'batch_col_line' => '行號',
     'batch_col_author_id' => '作者 ID',
     'batch_col_title_cleaned' => '書名（已清理）',
+    'batch_variant_replaced_hint' => '異體字已正規化：:pairs',
     'batch_col_title_pinyin' => '書名拼音',
     'batch_col_source_textid' => '來源 TEXT_ID',
     'batch_col_dynasty' => '書籍朝代',

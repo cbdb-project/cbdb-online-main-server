@@ -46,6 +46,8 @@
 
 **索引**：`c_variant_char` 唯一鍵（`char_variant_map_c_variant_char_unique`）——每個異體字只對應一個參考字，也讓查詢（依原字找參考字）可以直接用主鍵式唯一鍵，不需要額外索引。
 
+**collation 沿用資料庫預設值，不特別指定 binary collation**：`c_variant_char`/`c_reference_char` 不顯式設定 `utf8mb4_bin` 等 binary collation，沿用專案預設（`utf8mb4_general_ci`/`utf8mb4_unicode_ci`）。這與 `pinyin` 表的 `c_chn`（同樣是單一 CJK 字元、以索引查詢的欄位——實際是 `(c_chn, c_lastname)` 複合唯一鍵並另外加一個 `c_chn` 一般索引，見 `2026_07_10_000000_restructure_pinyin_table.php:79-80`）做法一致——`ci` collation 的等價折疊主要影響拉丁字母的大小寫/變音符號比較，對本表目前 7 筆種子資料涵蓋的相異 Han 字元（如「峯」與「峰」）不構成誤判唯一鍵或查詢結果的風險。**已知限制**：若未來收錄的異體字對照涉及變體選擇符（variation selector）或相容表意文字（compatibility ideograph）等可能被正規化折疊的組合，需要重新評估是否對 `c_variant_char` 改用 binary collation，本計畫不預先為這個假設情境做設計。
+
 **為什麼不用 `CBDB__TRAD_SIMP_MAP` 的 `VARBINARY(4)` 設計**：那個設計是為了繞過「MySQL 8.0 對 utf8mb4 非 BMP 字符索引」的已知 bug（見 `2025_11_13_000000_create_internal_name_search_tables.php:35-37` 註解）。嚴謹來說該 bug 描述的是 utf8mb4 4-byte（非 BMP）字符的索引問題，不一定僅限於 PRIMARY KEY，`c_variant_char` 若未來收錄到超出 BMP 的罕見異體字，理論上唯一鍵也可能受影響；但本專案生產環境是 **MariaDB 10.3**（見 `AGENTS.md`），不是 MySQL 8.0，該 bug 的前提本身在本專案不成立，且 `pinyin` 表已用 `varchar(10)` + 唯一鍵在同一套 MariaDB 10.3 環境穩定運作多時，因此不採用 `VARBINARY` 設計。
 
 **`c_variant_char`/`c_reference_char` 為何用 `varchar(10)` 而非更緊湊的長度**：實際資料都是單一 CJK 字元（`varchar(n)` 在 MySQL/MariaDB 中的 `n` 是字元數，非位元組數；utf8mb4 下每字元最多 4 bytes），`varchar(10)` 只是比照 `pinyin` 表既有的 `c_chn varchar(10)` 慣例留出安全餘裕（例如未來若需容納變體選擇符 variation selector 等組合字符），並非資料本身需要 10 字元，儲存成本可忽略不計。
@@ -79,15 +81,15 @@ return new class () extends Migration {
             $table->unique('c_variant_char', 'char_variant_map_c_variant_char_unique');
         });
 
-        // 種子資料（7 筆），完整理由見下方「現有資料遷移」一節。
+        // 種子資料（7 筆），c_notes 內容與下方「現有資料遷移」表格一致。
         DB::table('char_variant_map')->insert([
-            ['c_variant_char' => '愼', 'c_reference_char' => '慎', 'c_strict_excluded' => 0],
-            ['c_variant_char' => '槀', 'c_reference_char' => '稿', 'c_strict_excluded' => 0],
-            ['c_variant_char' => '峯', 'c_reference_char' => '峰', 'c_strict_excluded' => 1],
-            ['c_variant_char' => '靑', 'c_reference_char' => '青', 'c_strict_excluded' => 0],
-            ['c_variant_char' => '頴', 'c_reference_char' => '穎', 'c_strict_excluded' => 0],
-            ['c_variant_char' => '淸', 'c_reference_char' => '清', 'c_strict_excluded' => 0],
-            ['c_variant_char' => '厰', 'c_reference_char' => '廠', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '愼', 'c_reference_char' => '慎', 'c_strict_excluded' => 0, 'c_notes' => '原 VariantCharNormalizer::$fallbackMap；愼/慎無歧義風險，可安全落地替換於任何場合，含人名'],
+            ['c_variant_char' => '槀', 'c_reference_char' => '稿', 'c_strict_excluded' => 0, 'c_notes' => '原 VariantCharNormalizer::$fallbackMap；槀/稿無歧義風險，可安全落地替換於任何場合，含人名'],
+            ['c_variant_char' => '峯', 'c_reference_char' => '峰', 'c_strict_excluded' => 1, 'c_notes' => '原 TITLE_VARIANT_MAP；書名等場合的落地替換可用，但 BIOG_MAIN（人物本名）與 ALTNAME_DATA（人物別名）場合的落地替換須排除，峯本身是合法人名用字，不應被強制改寫'],
+            ['c_variant_char' => '靑', 'c_reference_char' => '青', 'c_strict_excluded' => 0, 'c_notes' => '原 TITLE_VARIANT_MAP；靑/青無歧義風險，可安全落地替換於任何場合，含人名'],
+            ['c_variant_char' => '頴', 'c_reference_char' => '穎', 'c_strict_excluded' => 0, 'c_notes' => '原 TITLE_VARIANT_MAP；頴/穎無歧義風險，可安全落地替換於任何場合，含人名'],
+            ['c_variant_char' => '淸', 'c_reference_char' => '清', 'c_strict_excluded' => 0, 'c_notes' => '新增；淸/清無歧義風險，可安全落地替換於任何場合，含人名'],
+            ['c_variant_char' => '厰', 'c_reference_char' => '廠', 'c_strict_excluded' => 0, 'c_notes' => '新增；厰/廠無歧義風險，可安全落地替換於任何場合，含人名'],
         ]);
     }
 
@@ -124,7 +126,7 @@ return new class () extends Migration {
 1. **`AdminBatchLoadBookTitlesController::TITLE_VARIANT_MAP`／`standardizeTitleVariants()`**（同檔案 26-30、512-514 行）：改為查詢 `char_variant_map` 全表（目前全部 7 筆：愼、槀、峯、靑、頴、淸、厰）做 `strtr()` 落地替換。書名入口屬於「寬鬆模式」，`c_strict_excluded` 值不影響——只要在表裡就套用，這 7 筆（含峯→峰）都套用。
 
 2. **BIOG_MAIN 人名寫入路徑**：實際盤點後，create 與 update 兩條路徑的現況並不對稱，實作階段需要分開處理：
-   - **Update／proposal 路徑**：`BiogMainMutationHandler::prepareProposalPayload()`（`app/Services/Mutations/BiogMainMutationHandler.php:196-200`）與 `BiogMainRepository::updateById()`（`app/Repositories/BiogMainRepository.php:246`）都各自組合 `c_surname_chn`+`c_mingzi_chn` 成 `c_name_chn`，是明確的掛鉤點，查詢條件為 `c_strict_excluded = 0`（嚴格模式，目前對應 6 筆：愼、槀、靑、頴、淸、厰；「峯」因 `c_strict_excluded=1` 被排除）。
+   - **Update／proposal 路徑**：`BiogMainMutationHandler::prepareProposalPayload()`（`app/Services/Mutations/BiogMainMutationHandler.php:196-200`）與 `BiogMainRepository::updateById()`（`app/Repositories/BiogMainRepository.php:246`）都各自組合 `c_surname_chn`+`c_mingzi_chn` 成 `c_name_chn`，是明確的掛鉤點，查詢條件為 `c_strict_excluded = 0`（嚴格模式，目前對應 6 筆：愼、槀、靑、頴、淸、厰；「峯」因 `c_strict_excluded=1` 被排除）。**待決事項**：實作時必須明確決定替換順序——是先對 `c_surname_chn`/`c_mingzi_chn` 這兩個分欄各自做落地替換、再組出 `c_name_chn`（維持 `c_name_chn === c_surname_chn.c_mingzi_chn` 這個現行 invariant），還是只替換組合後的 `c_name_chn`（會讓 `c_name_chn` 與分欄內容不一致）。本計畫傾向前者（分欄先替換再組字），但實作階段需要在動工前於程式碼與測試中明確寫死這個順序，不能兩條路徑各自假設不同做法。
    - **Create 路徑**：`BiogMainCreateHandler.php` 本身沒有組字邏輯，只在欄位白名單列出 `c_name_chn`/`c_surname_chn`/`c_mingzi_chn`，實際委派給 `app/Repositories/BiogMainRepository.php:353-365` 的 `store(Request $request)`。`store()` 以 `$data = $request->all()` 起手，接著依序跑 `timestamp()`、`auto_pinyin($data)`、`BracketNormalizer::normalizeBiogMain()`、`PinyinUmlaut::normalizeFields()`（355-361 行）才 `BiogMain::create($data)`——**這些既有步驟都不會重新推導 `c_name_chn`**，換言之新建人物時 `c_name_chn` 全程是前端送來的原始字串，沒有從 `c_surname_chn`+`c_mingzi_chn` 重新組字的邏輯。這代表 create 路徑**沒有現成的「落地替換」掛鉤點可以修改**（不像 update 路徑本來就有組字邏輯可以就地加條件），要套用異體字落地替換得在 `store()` 內**新增**一段正規化程式碼——這是比 update 路徑更大的實作範圍，且屬於全新行為（現行 create 完全不做人名異體字替換），需要在後續任務規劃時把 create／update 分開估工，不能假設兩者對稱。
 
 3. **ALTNAME_DATA（人物別名）寫入路徑**：與 BIOG_MAIN 不同，`AltnameCreateHandler`／`AltnameMutationHandler` 已經各自有明確的預處理掛鉤點（`AltnameCreateHandler::preprocessCreateData()` 61-71 行、`AltnameMutationHandler::preprocessUpdateData()` 61-66 行附近），現行已在這兩個方法內對 `c_alt_name_pinyin` 等欄位做 `BracketNormalizer`/`PinyinUmlaut::normalizeFields` 正規化，是比 BIOG_MAIN create 路徑更現成的掛鉤點。查詢條件同樣是 `c_strict_excluded = 0`（嚴格模式），套用在 `c_alt_name_chn` 欄位上（`c_alt_name_chn` 是 `ALTNAME_DATA` 複合主鍵的一部分：`c_personid + c_alt_name_chn + c_alt_name_type_code`，改寫這個欄位屬於「複合主鍵值變更」而非單純欄位更新，實作時需要跟現行改名／改主鍵的既有處理方式〔如 `AltnameMutationHandler` 對主鍵變更的處理邏輯〕保持一致，不能簡化成普通欄位覆寫)。
@@ -144,7 +146,7 @@ return new class () extends Migration {
 
 - **`CBDB__TRAD_SIMP_MAP`（繁簡轉換）機制不動**。`CBDB__TRAD_SIMP_MAP` 的功能是檢索比對（讓同一人名同時以繁簡兩種寫法被索引到，供姓名搜尋使用），跟本表的資料落地替換是不同層次的功能，不涉及合併問題，本計畫不涉及。
 - **`VariantCharNormalizer::$fallbackMap` 的拼音正規化需求**：改由直接在 `pinyin` 表為對應異體字新增讀音資料處理，屬於 `pinyin` 表的資料維護工作，與本表的 schema 設計無關，不在本文件範圍內。
-- **`VariantCharNormalizer` 類別本身的後續清理**：`pinyin` 表已補齊 `$fallbackMap` 原本 7 個字（菴、攷、嶽、愼、註、于、槀）各自的讀音（見 `/app/codes/pinyin`），`VariantCharNormalizer::normalize()` 這層轉換因此已經失去存在意義——每個字都能直接從 `pinyin` 表查到正確讀音，不再需要查表前的字元替換。可以整個刪除 `app/Services/VariantCharNormalizer.php`（`$fallbackMap`、`normalize()`、`ensureLoaded()`、`reset()`、`getMappingCount()`），並移除呼叫端（`BiogMainRepository::auto_pinyin()`、`ApiController::buildPinyinWord()`、`AdminBatchLoadBookTitlesController::buildPinyin()`/`collectUnpinyinableHan()`）對 `normalize()` 的呼叫。這項清理**依賴條件已滿足**，可獨立於本表的 schema 實作另開任務執行，不在本文件範圍內。
+- **`VariantCharNormalizer` 類別本身的後續清理**：`pinyin` 表已補齊 `$fallbackMap` 原本 7 個字（菴、攷、嶽、愼、註、于、槀）各自的讀音（見 `/app/codes/pinyin`），`VariantCharNormalizer::normalize()` 這層轉換因此已經失去存在意義——每個字都能直接從 `pinyin` 表查到正確讀音，不再需要查表前的字元替換。可以整個刪除 `app/Services/VariantCharNormalizer.php`（`$fallbackMap`、`normalize()`、`ensureLoaded()`、`reset()`、`getMappingCount()`），並移除呼叫端（`BiogMainRepository::auto_pinyin()`、`ApiController::buildPinyinWord()`、`AdminBatchLoadBookTitlesController::buildPinyin()`/`collectUnpinyinableHan()`）對 `normalize()` 的呼叫。這項清理**依賴條件已滿足**，可獨立於本表的 schema 實作另開任務執行，不在本文件範圍內。**待決事項（留給該清理任務）**：`BiogMainRepository::auto_pinyin()` 會用 normalize 過的姓名做姓氏最長前綴匹配，這個匹配邏輯依賴 `pinyin` 表 `c_lastname` 欄位的語意，而不只是「有沒有讀音」；清理該類別前，需要另外確認上述 7 個字在 `pinyin` 表對應列的 `c_lastname` 值是否已正確設定（尤其是這些字實際出現在姓氏場合的情況），而不能只驗證讀音存在。
 - **`TITLE_VARIANT_MAP` / BIOG_MAIN / ALTNAME_DATA 寫入路徑的程式碼改動**：本文件的「呼叫點串接方向」一節只記錄方向，實際程式碼變更、測試補強、`config/codes.php` 註冊皆留待後續任務執行，並各自走一輪 review 節點（見下方實作步驟）。
 
 ## 風險與待決事項
@@ -152,6 +154,7 @@ return new class () extends Migration {
 - **`c_strict_excluded` 是全域欄位，非逐表例外清單**：見上方「為什麼 `c_strict_excluded` 是全域單一欄位」一節。目前消費者是 BIOG_MAIN 與 ALTNAME_DATA（人名相關資料視為同一組），若未來出現這兩者之間或與其他表衝突的排除需求，需要重新設計。
 - **`down()` 無安全閘門**：見上方 Migration 設計一節，回滾整表刪除是本表（全新表、7 筆種子資料）可接受的行為，與 `pinyin` 表整併時的情境不同。
 - **BIOG_MAIN create／update 兩條路徑必須分開實作，不能假設對稱**：見上方「呼叫點串接方向」第 2 點——update／proposal 路徑已有組字邏輯可以就地加條件，但 create 路徑（`BiogMainRepository::store()`）完全沒有對應的組字/替換邏輯可改，需要新增程式碼。若只改到 update 路徑、漏掉 create 路徑，會導致新建人物與更新人物的正規化行為不一致。
+- **BIOG_MAIN 落地替換必須維持 `c_name_chn === c_surname_chn.c_mingzi_chn` invariant**：見上方「呼叫點串接方向」第 2 點待決事項——替換順序須是「先替換 `c_surname_chn`/`c_mingzi_chn` 分欄、再組出 `c_name_chn`」，不能只替換組合後的 `c_name_chn`，否則會造成分欄與組合欄不一致，破壞現行 invariant。
 
 ## 實作步驟（每步完成後跑 review 機制才能進下一步）
 

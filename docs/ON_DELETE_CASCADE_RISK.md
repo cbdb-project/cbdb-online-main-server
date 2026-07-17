@@ -2,7 +2,7 @@
 
 > English version: [ON_DELETE_CASCADE_RISK.en.md](./ON_DELETE_CASCADE_RISK.en.md)
 >
-> 撰寫日期：2026-07-07 ｜ 依據：`database/migrations/2025_01_01_000000_import_cbdb_schema.php`（生產 MariaDB schema 的入庫來源）
+> 撰寫日期：2026-07-07 ｜ 修訂：2026-07-16（依團隊決議新增 §6 實施方案設計）｜ 依據：`database/migrations/2025_01_01_000000_import_cbdb_schema.php`（生產 MariaDB schema 的入庫來源）
 >
 > **本文目的**：說明本專案 schema 目前處於「物理刪除 × 級聯刪除」這個對資料資產最危險的組合中，
 > 解釋其原理性風險（這在資料庫應用領域本應是共識）；並給出破局矩陣——**去級聯（RESTRICT）與
@@ -24,7 +24,7 @@
    | **軟刪除 / deprecate** | 帶電的陷阱（僅靠約定護體，違約即災難） | **目標形態** |
 
    必須至少打破一個因子；兩個都打破才是完整方案。**去級聯是保險絲（出錯時的後果封頂），軟刪除是產品語義（正常路徑不再發生刪除）——層次不同，互補而非替代。**
-4. 改造路徑：先翻約束（一個 migration，成本最低的止血步），再上詞表生命週期（deprecate 為主、重複合併為輔、零引用才允許真刪）。兩步互相成就：全面軟刪除後沒有合法硬刪流程，翻 RESTRICT 阻力為零；翻了 RESTRICT 後，軟刪除約定被違反時有兜底。詳見 §5。
+4. 改造路徑：先翻約束（一個 migration，成本最低的止血步），再上詞表生命週期（deprecate 為主、重複合併為輔、零引用才允許真刪）。兩步互相成就：全面軟刪除後沒有合法硬刪流程，翻 RESTRICT 阻力為零；翻了 RESTRICT 後，軟刪除約定被違反時有兜底。詳見 §5；**2026-07 團隊決議後的實施設計見 §6（三階段：RESTRICT 先行、合併工具次之、生命週期 registry 按需後置）**。
 
 ---
 
@@ -216,7 +216,7 @@ RESTRICT 的失敗模式是「煩人但無害」（fail-closed），CASCADE 的�
 
 **Step 2：應用層補課（每項獨立 PR）**
 1. **引用檢查服務**：輸入（詞表, 主鍵值），輸出各引用表的計數與樣例——資料來源就是 Step 0 的外鍵清單，可直接由 `information_schema` 驅動，不必手工維護映射。
-2. **詞表生命週期**：詞表加 `c_deprecated` 狀態欄（僅詞表、非資料表；**新增欄位須先經 executive committee 討論，離線發佈版的對齊規則與匯出更新見 §5.3，匯出更新與本欄位同一里程碑交付**）；選擇器/搜尋端點過濾退役詞條，顯示 JOIN 不過濾；`/codes` 的「刪除」改為「退役」，物理刪除僅在引用數為零時開放；廢除 `deleteBatch` 刪 `operations` 紀錄的行為。
+2. **詞表生命週期**（**依 2026-07 決議整項降為按需後置，見 §6.1 Phase 3**；若啟動，儲存採 §6.3 的集中式生命週期側表，不在詞表加欄）：選擇器/搜尋端點過濾退役詞條，顯示 JOIN 不過濾；`/codes` 的「刪除」改為「退役」，物理刪除僅在引用數為零時開放。廢除 `deleteBatch` 刪 `operations` 紀錄的行為則**提前至 Phase 1**（§6.1）。離線發佈對齊規則見 §5.3 與 §6.3；executive committee 討論仍為前置條件（議題見 §6.4）。
 3. **合併＋重定向工具**：把 A 詞條的全部引用批次改指到 B 詞條，受審計、可回退，A 退役留重定向——這也是日後「人物合併」的同構地基。
 4. **顯式級聯刪除服務**：覆蓋 Step 1 標記為「組合」的少數關係（參考 `OfficePostingRepository` 現行寫法，補齊快照與同 operation_id 分組）。
 
@@ -261,7 +261,9 @@ ALTER TABLE ALTNAME_DATA
 
 ### 5.3 離線發佈（SQLite / Access）與治理對齊
 
-線上系統與離線發佈版在結構上分離，由匯出功能保證發佈版與 Access 架構一致。`c_deprecated` 落地時，離線發佈有兩件事必須同步處理：
+> **2026-07 更新**：本節撰寫時假設退役狀態以詞表欄位 `c_deprecated` 承載。依團隊決議與 §6 的設計，退役狀態改存於**純內部的生命週期側表**、共享概念表不加任何欄位，因此本節 (1) 的「匯出不帶 `c_deprecated` 欄」自動達成、(2) 的討論主題由 schema 變更轉為政策變更。**按引用數分兩檔的匯出規則仍然有效**（更新版見 §6.3），本節保留作為該規則的完整論證。
+
+線上系統與離線發佈版在結構上分離，由匯出功能保證發佈版與 Access 架構一致。退役狀態落地時，離線發佈有兩件事必須同步處理：
 
 **(1) 匯出排除規則——deprecated codes 與人物軟刪除結構不同，不能照搬整批排除。**
 
@@ -279,6 +281,108 @@ ALTER TABLE ALTNAME_DATA
 **(2) 治理前提——新增欄位須經 executive committee 討論。**
 
 線上系統新增欄位一律需經 executive committee 討論。由於 `c_deprecated` 只存在於線上系統、依上表規則**不匯出到 Access**，對 committee 而言這不是共享 schema 的變更，而是**詞表生命週期政策的變更**（「刪除」變為「退役／合併」，以及發佈版本的收錄規則）。提交討論時準備一頁說明：`c_deprecated` 的語義、上述匯出規則、以及發佈的 Access 版本 schema 保持不變。此討論是 Step 2 里程碑 2 的前置條件。
+
+## 6. 實施方案設計（依 2026-07 團隊決議）
+
+> 撰寫於 2026-07-16。團隊已就方向達成決議（§6.0）。本節給出落地方案：**三階段路線（§6.1）——RESTRICT 先行、合併工具次之、生命週期 registry 按需後置**；以及第三階段的設計研究（§6.2 儲存方案比較、§6.3 registry 草案與匯出規則）。本節與 §5 有出入之處，以本節為準（差異清單見 §6.4）。
+
+### 6.0 團隊決議（本節設計的邊界條件）
+
+1. **逐步移除 `ON DELETE CASCADE`**：在各資料庫系統中以其相應的 schema 語法或管理工具完成去級聯。
+2. **終端使用者拿到的資料庫 schema 與行為保持不變**：不新增欄位，也不出現「本應被刪除」的多餘資料列。
+3. **「刪除原因」必須以可回查的形式保存**，日後能查明一筆記錄為何消失。
+4. **設計原則：內部維護模型（internal maintenance model）與公開資料模型（public data model）分離。**
+5. **線上編輯系統必須包含審計、恢復、歷史重建所需的額外 metadata**；發佈的 Access 與 SQLite 版本繼續向終端使用者呈現並匯出同一個概念模型。
+
+### 6.1 三階段路線：RESTRICT 先行，deprecate 按需後置
+
+單獨檢視 RESTRICT 翻轉，它獨力解除絕大部分顧慮：
+
+- **資料安全**：刪仍被引用的詞條被 DB 以 1451 擋下（fail-closed），矩陣從 ① 直接落到 ②，災難場景不復存在；
+- **可恢復性**：能刪除成功的只剩**零引用列**；刪除路徑刪前寫 audit_log（old_data 全影像）＋ operations，復原即重插一行——被刪列本無人引用，重插無外鍵障礙；
+- **刪除原因（決議 3）**：最小落點是刪除的 operations／audit 紀錄帶必填 reason，不需要新表；
+- **錯誤／重複詞條**（觸發「刪詞條」需求的大宗，§4.2）：走「合併＋重定向 → 引用清零 → 物理刪除（帶 reason）」即有完整解法，全程不需要 deprecate 狀態。
+
+**deprecate 的獨有增量因此收窄到一種場景：「退役但保留既有引用」**——既有引用史實正確、不應改指，但禁止新引用（authority-file 意義的真退役），附帶「選擇器立即乾淨、引用慢慢清」的治理時序優勢。此需求在 CBDB 實務中的頻率是經驗問題，**未經驗證前不建**；registry 是純增量機制（不動共享表、不改前兩階段任何產出），後置零遷移成本。
+
+這也修正 §5.1「應用層先行、約束殿後」的順序論證：避免行為斷崖只需薄墊片，不需先完成整個 Step 2。
+
+| 階段 | 內容 | 交付的價值 |
+|---|---|---|
+| **Phase 1：墊片＋翻約束** | 刪除路徑捕捉 1451 → 友好報錯「仍被 N 處引用」；刪除一律先寫 operations／audit_log ＋必填 reason；廢除 `deleteBatch` 刪 operations 紀錄；隨後分批翻轉（下述） | 災難場景解除；零引用刪除可復原；決議 1／2／3 全數滿足 |
+| **Phase 2：合併＋重定向工具** | 受審計批次 re-point ＋清零後物理刪除 | 錯誤／重複詞條（大宗需求）有正規出口；亦是人物合併的同構地基 |
+| **Phase 3：lifecycle registry（按需）** | §6.2–§6.3 | 僅當「退役但保留引用」需求被實務驗證時啟動 |
+
+**Phase 1 翻轉的執行細節**（細化 §5.1 Step 3）——分批單位＝被引用表，順序按 §1 入邊數：`NIAN_HAO`(24) → `YEAR_RANGE_CODES`(23) → `TEXT_CODES`(22) → `ADDR_CODES`(11) → `GANZHI_CODES`/`DYNASTIES`(各 9) → 其餘詞表 → 最後 `BIOG_MAIN` 的 25 條入邊（配套是顯式級聯刪除服務與既有人物軟刪除，§4.4）。每批流程：
+
+1. **前置**：墊片就緒、staging 演練通過；
+2. **執行**（維護窗口）：MariaDB 不支援原地修改外鍵行為，同一 `ALTER` 內 DROP＋ADD；`foreign_key_checks=0` 時 ADD FK 不掃描既有資料（一致性由原約束保證），`ALTER` 近乎即時，僅短暫 metadata lock，先在 staging 對最大表量測：
+
+   ```sql
+   SET SESSION foreign_key_checks = 0;
+   ALTER TABLE BIOG_MAIN
+     DROP FOREIGN KEY BIOG_MAIN_ibfk_2,
+     ADD CONSTRAINT BIOG_MAIN_ibfk_2 FOREIGN KEY (c_by_nh_code)
+         REFERENCES NIAN_HAO (c_nianhao_id)
+         ON DELETE RESTRICT ON UPDATE CASCADE;   -- UPDATE 行為本階段不動
+   SET SESSION foreign_key_checks = 1;
+   ```
+
+3. **驗證**：附錄 B 查詢確認該批 `DELETE_RULE` 全為 `RESTRICT`；抽測「刪被引用詞條 → 擋下且資料一列不少」；
+4. **觀察期**（1–2 週再下一批）：監控 1451（`Cannot delete or update a parent row`）——出現＝漏網硬刪路徑，fail-closed 零損失，修應用層即可；
+5. **回滾預案**：反向 `ALTER` 改回 CASCADE，單條語句、無資料風險。
+
+其他要點：RESTRICT 與 NO ACTION 在 InnoDB 等價，統一顯式寫 `RESTRICT`；每批同步提交 migration（新裝環境一致）；SQLite 測試環境無外鍵，驗證必須在 MariaDB 上做（CI 起 MariaDB 容器為長期項，§5 Step 5）；**`operations` 表自身也有一條 CASCADE 指向 `BIOG_MAIN`（人物被級聯刪時操作紀錄一併消失，審計軌跡不設防），納入 `BIOG_MAIN` 批次一併翻轉**；`ON UPDATE CASCADE`（187 條）本階段保留（§5 Step 5 單獨立項）。
+
+### 6.2 第三階段設計研究：軟刪除狀態怎麼存
+
+需求（來自決議與 §4）：**R1** 狀態標記供選用端點過濾（顯示 JOIN 不過濾）；**R2** 原因；**R3** when/who、串回 operations/audit_log；**R4** 合併重定向指標；**R5** 公開模型不變；**R6** 相容 Query Builder＋複合主鍵架構（Eloquent SoftDeletes 大多不可用）。
+
+| 方案 | 作法 | 評估 |
+|---|---|---|
+| **A 名稱標記** | 借用資料欄寫魔法字串（現行 `BIOG_MAIN.c_name_chn='<待删除>'`） | 零 schema 變更，但佔用**展示欄位**（引用處顯示垃圾）、R2/R3/R4 全存不下、無法索引。定為歷史遺留，不推廣；長期把 BIOG_MAIN 遷到 E |
+| **B 布林欄** | 各詞表加 `c_deprecated` | 過濾最簡單，但 R2–R4 缺（還得另建機制）；每詞表一個 migration；線上與發佈 schema 出現欄位差異，匯出須逐表剝欄；共享表加欄須逐表過 committee |
+| **C 時間戳欄** | 各詞表加 `c_deprecated_at`，NULL=有效 | 比 B 多存 when，其餘缺點同 B；Laravel SoftDeletes 慣例紅利在本專案落空（R6）；`deleted_at` 命名誤導——詞條是退役非刪除 |
+| **D 完整狀態欄組** | 各詞表加 status/reason/redirect 欄 | R2–R4 可滿足，但 schema 侵入與匯出剝除面最大；when/who 與 audit_log 職能重疊 |
+| **E 集中式側表（推薦）** | 一張純內部表登記任何表任何列的狀態 | **R5 由構造保證**：共享表零變更、匯出零剝除、committee 議題降為純政策；R2–R4 為本表欄位；定位模式 `(table_name, row_pk)` 與 audit_log 同構（R6） |
+
+**E 的三個代價與評估**：
+
+1. **過濾成本**：實際受影響面小——需要過濾的只有**選用面**（選擇器／autocomplete／新引用寫入驗證，個位數端點）；顯示 JOIN、傳記資料查詢、Query Playground 研究型 SQL 按設計**不過濾**（deprecated 而仍被引用的詞條必須可見）。deprecate 鍵集是 10⁰–10³ 量級的低頻治理事件，`LifecycleService` 快取後過濾退化為 `WHERE pk NOT IN (短清單)`，成本與 B/C 的 `WHERE c_deprecated=0` 同量級，不需真 JOIN。
+2. **無真外鍵**：registry 指向已消失列——無害，孤兒掃描清理；目標列**改鍵**（187 條 `ON UPDATE CASCADE`）會讓標記靜默脫鉤（fail-open）——改鍵工具必須同一交易更新 registry，並納入孤兒掃描核對。
+3. **可發現性**：手寫 raw SQL 在詞表裡看不見退役狀態。屬**二階問題**：危險操作（DELETE）由 RESTRICT 在 DB 層兜底，漏看最壞是分析輕微失真或給退役詞條添新引用（可用合併工具修復），不丟資料；且依決議 2/5，發佈版在**任何方案**下都不帶退役狀態，差距僅存於內部使用者。緩解：內部 view（不動基表、不匯出）＋一律經 `LifecycleService`（新端點漏接 service 與 B/C 忘寫 `WHERE` 是同一個工程紀律問題，靠 code review 與回歸測試）。
+
+**為何不借用既有 `audit_log`／`operations`**：兩者是**事件日誌**（回答「發生過什麼」），registry 是**現行狀態**（回答「現在什麼狀態」）。從日誌推導當前 deprecated 鍵集須對每鍵聚合最新事件，恰是最貴的掃描，registry 就是該推導的物化；deprecate 不改動目標列任何欄位，audit_log（契約為記錄列的 old/new 影像）無自然條目可記，reason／redirect 亦無欄位可放；operations 是人物中心的工作流佇列（`c_personid` NOT NULL，且該外鍵本身是 CASCADE）。registry 每列帶 `operation_id` 串回日誌——歷史仍由舊機制承載，並非重複建設。部分例外是墓碑（`deleted`）：物理刪除本就在 audit_log 留有 DELETE 事件與 old_data，缺的只是 reason——這正是 Phase 1 不需要 registry 的原因；registry 的必要性來自 deprecated／merged 的現行狀態。
+
+### 6.3 registry 草案與匯出規則（Phase 3 啟動時適用）
+
+`record_lifecycle`（草案，命名沿用 `audit_log` 慣例）：
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `id` | bigint PK | — |
+| `table_name` | varchar(64) | 目標表 |
+| `row_pk` / `row_pk_text` | json / varchar(512) | 目標列主鍵（支援複合主鍵，同 `audit_log`）；唯一索引 `(table_name, row_pk_text)`——一列僅一個現行狀態 |
+| `status` | varchar(16) | `deprecated`（退役：列在、選用隱藏、顯示照常）／`merged`（已合併：引用已改指 `redirect_pk`，本列即重定向紀錄）／`deleted`（墓碑：列已物理刪除，本列存原因、影像在 audit_log.old_data） |
+| `reason` | text | 原因，**必填**（決議 3 的落點） |
+| `redirect_pk` | json NULL | `merged` 時：引用被改指到的目標鍵 |
+| `operation_id` / `actor_id` / `created_at` | — | 串回 operations／audit_log |
+
+配套：單一 `LifecycleService` 封裝登記／撤銷／查詢／過濾（含鍵集快取），選用端點一律經由它；registry **純內部、永不匯出**（決議 2 由此滿足）；`BIOG_MAIN` 現行 `<待删除>` 標記暫不動，列為長期遷移項。
+
+匯出規則：§5.3 按引用數分兩檔的規則不變，機制簡化——`deprecated`/`merged` 且**零引用**→ 該詞條列排除；**仍有引用** → 照常匯出（線上詞表本無多餘欄位，無須剝除，對 Access 天然透明）；`deleted` 列本已不存在。沿用 8930d73 模式（過濾集中於 query 建構處、fail-closed、回歸測試）；匯出更新與 registry 同一里程碑交付。
+
+### 6.4 對 §5 路線圖的差異清單
+
+| §5 原文 | 依本節更新為 |
+|---|---|
+| §5.1 順序：「應用層先行、約束殿後」，整個 Step 2 為翻約束前置 | 薄墊片（1451 友好報錯＋刪前落 audit/reason）即可翻轉（§6.1 Phase 1）；Step 2 深層配套後置 |
+| Step 2-2：詞表加 `c_deprecated` 狀態欄 | 整項降為 Phase 3 按需項；若啟動，採 `record_lifecycle` registry（§6.3），共享表零變更 |
+| Step 2-2 前置：committee 討論「新增欄位」 | 議題改為**純政策**（「刪除」改「退役／合併」、發佈收錄規則）；仍為 Phase 3 前置 |
+| §5.3(1)：有引用者匯出「不帶 `c_deprecated` 欄」 | 自動達成——欄位不存在；兩檔規則不變（§6.3） |
+| 決議 3「刪除原因」（§5 未涵蓋） | Phase 1 起刪除紀錄必填 reason；Phase 3 起統一存 registry |
+
+其餘步驟（Step 0／1／4／5）不變。
 
 ---
 

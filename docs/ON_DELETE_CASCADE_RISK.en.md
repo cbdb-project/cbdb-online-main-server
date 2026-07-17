@@ -2,7 +2,7 @@
 
 > 中文版（權威版本）: [ON_DELETE_CASCADE_RISK.md](./ON_DELETE_CASCADE_RISK.md) — this is a translation; in case of discrepancy the Chinese version prevails.
 >
-> Written: 2026-07-07 ｜ Based on: `database/migrations/2025_01_01_000000_import_cbdb_schema.php` (the source from which the production MariaDB schema was imported)
+> Written: 2026-07-07 ｜ Revised: 2026-07-16 (added §6, the implementation design following the team's decisions) ｜ Based on: `database/migrations/2025_01_01_000000_import_cbdb_schema.php` (the source from which the production MariaDB schema was imported)
 >
 > **Purpose of this document**: to show that this project's schema currently sits in the combination most dangerous to a data asset — "physical delete × cascading delete" — and to explain the principled risk (which should be common knowledge in database practice); to present the escape matrix — **what de-cascading (RESTRICT) and soft deletion (deprecate) each solve, and why the two are complementary rather than either/or** — and to lay out an executable migration roadmap.
 >
@@ -22,7 +22,7 @@
    | **Soft delete / deprecate** | A live trap (protected only by convention; one violation is a disaster) | **Target state** |
 
    At least one factor must be broken; breaking both is the complete solution. **De-cascading is the fuse (it caps the consequences when something goes wrong); soft deletion is the product semantics (deletion no longer happens on the normal path) — they operate at different layers and complement rather than replace each other.**
-4. Migration path: flip the constraints first (one migration, the cheapest bleeding-stop), then introduce the code-table lifecycle (deprecate as the primary path, merge for duplicates, physical delete only at zero references). The two steps reinforce each other: once soft deletion is universal there is no legitimate hard-delete flow left, so flipping to RESTRICT meets zero resistance; once RESTRICT is in place, violations of the soft-delete convention hit a backstop. See §5.
+4. Migration path: flip the constraints first (one migration, the cheapest bleeding-stop), then introduce the code-table lifecycle (deprecate as the primary path, merge for duplicates, physical delete only at zero references). The two steps reinforce each other: once soft deletion is universal there is no legitimate hard-delete flow left, so flipping to RESTRICT meets zero resistance; once RESTRICT is in place, violations of the soft-delete convention hit a backstop. See §5; **the implementation design following the July 2026 team decisions is in §6 (three phases: RESTRICT first, the merge tool second, the lifecycle registry deferred until demanded)**.
 
 ---
 
@@ -214,7 +214,7 @@ Deliverable: a decision table (one row per constraint: current → target rule �
 
 **Step 2: Application-layer catch-up (one independent PR each)**
 1. **Reference-check service**: input (code table, key value); output per-referencing-table counts and samples — the data source is exactly Step 0's foreign-key list, drivable directly from `information_schema`, no hand-maintained mapping needed.
-2. **Code-table lifecycle**: add a `c_deprecated` status column to the code tables (code tables only, not data tables; **adding a column requires prior discussion by the executive committee; the alignment rules for the offline release and the export update are in §5.3, and the export update ships in the same milestone as this column**); selector/search endpoints filter retired entries while display JOINs do not; `/codes` "delete" becomes "retire," with physical deletion available only at zero references; abolish `deleteBatch`'s deletion of `operations` records.
+2. **Code-table lifecycle** (**per the July 2026 decisions, this whole item is deferred until demanded — see §6.1 Phase 3**; if started, storage uses the centralized lifecycle sidecar table of §6.3, with no column added to the code tables): selector/search endpoints filter retired entries while display JOINs do not; `/codes` "delete" becomes "retire," with physical deletion available only at zero references. Abolishing `deleteBatch`'s deletion of `operations` records is **pulled forward into Phase 1** (§6.1). Offline-release alignment rules are in §5.3 and §6.3; the executive committee discussion remains a prerequisite (topic in §6.4).
 3. **Merge + redirect tool**: re-point all references from entry A to entry B in bulk — audited, restorable, A retired with a redirect left behind. This is also the isomorphic foundation for future "person merge."
 4. **Explicit cascade-deletion service**: covering the few relationships Step 1 labels "composition" (following the current `OfficePostingRepository` pattern, adding snapshots and same-operation_id grouping).
 
@@ -259,7 +259,9 @@ No step on this route is a "big bang": the application-layer PRs are independent
 
 ### 5.3 Offline Releases (SQLite / Access) and Governance Alignment
 
-The online system and the offline releases are structurally separated, with the export function guaranteeing that released versions stay consistent with the Access schema. When `c_deprecated` lands, two things about the offline release must be handled in lockstep:
+> **July 2026 update**: this section was written under the assumption that the deprecated state would live in a `c_deprecated` column on the code tables. Per the team decisions and the design in §6, the state now lives in a **purely internal lifecycle sidecar table** and no column is added to any shared conceptual table — so point (1)'s "export without the `c_deprecated` column" is achieved automatically, and point (2)'s discussion topic shifts from a schema change to a policy change. **The two-tier export rule by reference count remains in force** (updated version in §6.3); this section is kept as the full argument for that rule.
+
+The online system and the offline releases are structurally separated, with the export function guaranteeing that released versions stay consistent with the Access schema. When the deprecated state lands, two things about the offline release must be handled in lockstep:
 
 **(1) Export exclusion rules — deprecated codes are structurally different from the person soft delete, and cannot be excluded wholesale the same way.**
 
@@ -277,6 +279,108 @@ The export update ships **in the same milestone** as the `c_deprecated` column i
 **(2) Governance prerequisite — adding a column requires executive committee discussion.**
 
 Any new column in the online system must first be discussed by the executive committee. Since `c_deprecated` exists only in the online system and — per the table above — is **not exported to Access**, for the committee this is not a change to the shared schema but a **change to the code-table lifecycle policy** ("delete" becomes "deprecate / merge," plus the inclusion rules for released versions). For the discussion, prepare a one-page brief: the semantics of `c_deprecated`, the export rules above, and confirmation that released Access versions keep an unchanged schema. This discussion is a prerequisite for Step 2 milestone 2.
+
+## 6. Implementation Design (per the July 2026 Team Decisions)
+
+> Written 2026-07-16. The team has reached decisions on direction (§6.0). This section lays out the delivery plan: **a three-phase route (§6.1) — RESTRICT first, the merge tool second, the lifecycle registry deferred until demanded** — plus the design study for the third phase (§6.2 storage-option comparison, §6.3 registry draft and export rules). Where this section differs from §5, this section prevails (delta list in §6.4).
+
+### 6.0 Team Decisions (Boundary Conditions for This Design)
+
+1. **Move away from `ON DELETE CASCADE` step by step**, using each database system's appropriate schema syntax or management tooling.
+2. **The end user's database schema and behavior stay unchanged**: no new fields, and no extra rows that were supposed to be deleted.
+3. **The "deletion reason" must be preserved in a form we can later refer back to**, so it is possible to understand why a record is gone.
+4. **Design principle: separate the internal maintenance model from the public data model.**
+5. **The online editing system must contain the additional metadata needed for auditing, recovery, and historical reconstruction**; the released Access and SQLite databases continue to present and export the same conceptual model to end users.
+
+### 6.1 The Three-Phase Route: RESTRICT First, Deprecation Deferred Until Demanded
+
+Examined in isolation, the RESTRICT flip removes most of the concern single-handedly:
+
+- **Data safety**: deleting a still-referenced code entry is blocked by the DB with error 1451 (fail-closed); the matrix drops from ① straight to ②, and the disaster scenario no longer exists;
+- **Recoverability**: the only deletes that can succeed are **zero-reference rows**; with delete paths writing audit_log (full old_data image) + operations before deleting, restoration is re-inserting one row — the deleted row had no referrers, so re-insertion faces no foreign-key obstacle;
+- **Deletion reason (decision 3)**: the minimal landing spot is a required reason on the deletion's operations/audit record — no new table needed;
+- **Erroneous/duplicate entries** (the dominant trigger of "delete this entry," §4.2): fully solved by "merge + redirect → references reach zero → physical delete (with reason)"; no deprecated state needed anywhere along the way.
+
+**Deprecation's unique increment therefore narrows to one scenario: "retired but existing references preserved"** — existing references are historically correct and must not be re-pointed, yet new references are forbidden (true authority-file deprecation), with the side benefit of governance timing ("selectors clean immediately, references cleaned up at leisure"). How often this arises in CBDB practice is an empirical question — **do not build it before it is validated**; the registry is purely additive (touches no shared table, changes nothing the first two phases deliver), so deferring it has zero migration cost.
+
+This also revises §5.1's ordering argument ("application layer first, constraints last"): avoiding the behavioral cliff requires only a thin shim, not all of Step 2.
+
+| Phase | Content | Value delivered |
+|---|---|---|
+| **Phase 1: shim + flip** | Delete paths catch 1451 → friendly error "still referenced in N places"; every delete writes operations/audit_log + a required reason first; abolish `deleteBatch`'s deletion of operations records; then flip in batches (below) | The disaster scenario is gone; zero-reference deletes are restorable; decisions 1/2/3 fully satisfied |
+| **Phase 2: merge + redirect tool** | Audited bulk re-pointing + physical delete once references reach zero | A proper outlet for erroneous/duplicate entries (the dominant need); also the isomorphic foundation for person merge |
+| **Phase 3: lifecycle registry (on demand)** | §6.2–§6.3 | Started only when the "retired but still referenced" need is validated in practice |
+
+**Execution details for the Phase 1 flip** (refining §5.1 Step 3) — batch unit = referenced table, ordered by §1's incoming-edge counts: `NIAN_HAO` (24) → `YEAR_RANGE_CODES` (23) → `TEXT_CODES` (22) → `ADDR_CODES` (11) → `GANZHI_CODES`/`DYNASTIES` (9 each) → the remaining code tables → finally `BIOG_MAIN`'s 25 incoming edges (whose counterpart is the explicit cascade-deletion service and the existing person soft delete, §4.4). Per batch:
+
+1. **Gate**: shim in place, staging walkthrough passed;
+2. **Execution** (maintenance window): MariaDB cannot modify a foreign key's behavior in place — DROP + ADD within one `ALTER`; with `foreign_key_checks = 0`, ADD FK does not scan existing data (consistency is already guaranteed by the original constraint), so the `ALTER` is near-instant with only a brief metadata lock; measure the largest tables on staging first:
+
+   ```sql
+   SET SESSION foreign_key_checks = 0;
+   ALTER TABLE BIOG_MAIN
+     DROP FOREIGN KEY BIOG_MAIN_ibfk_2,
+     ADD CONSTRAINT BIOG_MAIN_ibfk_2 FOREIGN KEY (c_by_nh_code)
+         REFERENCES NIAN_HAO (c_nianhao_id)
+         ON DELETE RESTRICT ON UPDATE CASCADE;   -- leave UPDATE behavior alone at this stage
+   SET SESSION foreign_key_checks = 1;
+   ```
+
+3. **Verification**: the Appendix B query confirms every `DELETE_RULE` in the batch is `RESTRICT`; spot-test "delete a referenced entry → blocked, not one row of data lost";
+4. **Observation period** (1–2 weeks before the next batch): monitor for 1451 (`Cannot delete or update a parent row`) — an occurrence means a hard-delete path slipped through: fail-closed, zero loss, fix the application layer;
+5. **Rollback plan**: the reverse `ALTER` back to CASCADE — one statement, no data risk.
+
+Other points: RESTRICT and NO ACTION are equivalent in InnoDB — write `RESTRICT` explicitly and uniformly; each batch ships with its migration (fresh installs stay consistent); the SQLite test environment has no foreign keys, so verification must run on MariaDB (a MariaDB container in CI is the long-term item, §5 Step 5); **the `operations` table itself has a CASCADE pointing at `BIOG_MAIN`** (a person's operation records vanish with a cascade-deleted person — the audit trail itself is unprotected), flipped together with the `BIOG_MAIN` batch; **`ON UPDATE CASCADE` (187 of them) is retained at this stage** (separate project, §5 Step 5).
+
+### 6.2 Phase 3 Design Study: How to Store the Soft-Delete State
+
+Requirements (from the decisions and §4): **R1** a state flag for pick endpoints to filter on (display JOINs do not filter); **R2** the reason; **R3** when/who, linkable to operations/audit_log; **R4** the merge-redirect pointer; **R5** public model unchanged; **R6** fits the Query Builder + composite-key architecture (Eloquent SoftDeletes largely unavailable).
+
+| Option | Mechanism | Assessment |
+|---|---|---|
+| **A Name marker** | Hijack a data column with a magic string (the current `BIOG_MAIN.c_name_chn='<待删除>'`) | Zero schema change, but it occupies a **display column** (referencing pages show garbage), R2/R3/R4 cannot be stored, unindexable. Legacy only — never extend; long term migrate BIOG_MAIN to E |
+| **B Boolean column** | Add `c_deprecated` per code table | Simplest filtering, but R2–R4 missing (yet another mechanism needed); one migration per code table; online and released schemas diverge, export must strip the column table by table; each shared-table column needs committee review |
+| **C Timestamp column** | Add `c_deprecated_at` per table, NULL = active | Encodes when in addition to B; all other drawbacks identical; Laravel SoftDeletes' convention dividend is unavailable here (R6); `deleted_at`-style naming misleads — the entry is retired, not deleted |
+| **D Full status column set** | status/reason/redirect columns per table | Satisfies R2–R4 but with the largest schema intrusion and export-stripping surface; when/who duplicates audit_log |
+| **E Centralized sidecar table (recommended)** | One purely internal table registering any row of any table | **R5 guaranteed by construction**: zero change to shared tables, zero export stripping, the committee topic becomes pure policy; R2–R4 are columns of this table; the addressing scheme `(table_name, row_pk)` is isomorphic to audit_log (R6) |
+
+**E's three costs, assessed**:
+
+1. **Filtering cost**: the affected surface is small — only the **pick surface** needs filtering (selectors/autocomplete/new-reference write validation, a single-digit number of endpoints); display JOINs, biographical-data queries, and research SQL via Query Playground do **not** filter by design (a deprecated-but-referenced entry must stay visible). The deprecated key set is a 10⁰–10³-scale, low-churn governance artifact; with `LifecycleService` caching it, the filter degenerates to `WHERE pk NOT IN (short list)` — same order as B/C's `WHERE c_deprecated = 0`, no actual JOIN needed.
+2. **No true foreign key**: a registry row pointing at a vanished row is harmless (orphan scan cleans it up); a target-row **key change** (the 187 `ON UPDATE CASCADE`s) silently detaches the flag (fail-open) — any key-change tool must update the registry in the same transaction, and the orphan scan checks registry keys for existence.
+3. **Discoverability**: hand-written raw SQL sees no retirement state in the code table. A **second-order** problem: the dangerous operation (DELETE) is backstopped by RESTRICT at the DB layer; the worst outcome of missing the state is a mildly skewed analysis or a new reference to a retired entry (repairable with the merge tool) — no data loss. And per decisions 2/5, the released databases carry no retirement state under **any** option, so the gap exists only for internal users. Mitigations: internal views (no base-table change, not exported) + everything through `LifecycleService` (an endpoint bypassing the service is the same engineering-discipline issue as a forgotten `WHERE` under B/C — code review and regression tests).
+
+**Why not reuse the existing `audit_log` / `operations`**: those are **event logs** ("what happened"); the registry is **current state** ("what is the status now"). Deriving the current key set from a log means aggregating to the latest event per key — exactly the expensive scan; the registry is that derivation materialized. Deprecating changes no column of the target row, so audit_log (whose contract is old/new row images) has no natural entry to record, and there is no column for reason/redirect; operations is a person-centric workflow queue (`c_personid` NOT NULL, and that FK is itself a CASCADE). Every registry row carries an `operation_id` linking back to the logs — history stays with the existing machinery; this is not duplication. The partial exception is the tombstone (`deleted`): a physical delete already leaves a DELETE event with old_data in audit_log, missing only the reason — which is exactly why Phase 1 needs no registry; the registry's necessity comes from the current state of deprecated/merged.
+
+### 6.3 Registry Draft and Export Rules (Applicable When Phase 3 Starts)
+
+`record_lifecycle` (draft; naming follows `audit_log` conventions):
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigint PK | — |
+| `table_name` | varchar(64) | Target table |
+| `row_pk` / `row_pk_text` | json / varchar(512) | Target row's primary key (composite keys supported, as in `audit_log`); unique index on `(table_name, row_pk_text)` — one current state per row |
+| `status` | varchar(16) | `deprecated` (retired: row remains, hidden in pickers, displayed as usual) / `merged` (references re-pointed to `redirect_pk`; this row is the redirect record) / `deleted` (tombstone: row physically deleted, this row keeps the reason, the image is in audit_log.old_data) |
+| `reason` | text | The reason, **required** (where decision 3 lands) |
+| `redirect_pk` | json NULL | For `merged`: the key references were re-pointed to |
+| `operation_id` / `actor_id` / `created_at` | — | Links back to operations/audit_log |
+
+Supporting machinery: a single `LifecycleService` encapsulating register/withdraw/query/filter (with the cached key set), every pick endpoint goes through it; the registry is **purely internal and never exported** (which satisfies decision 2); the current `<待删除>` marker on `BIOG_MAIN` stays untouched for now, listed as a long-term migration item.
+
+Export rules: §5.3's two-tier rule by reference count stands, with the mechanism simplified — `deprecated`/`merged` with **zero references** → the code row is excluded; **still referenced** → exported as-is (the online code table has no extra column, nothing to strip, naturally transparent to Access); `deleted` rows no longer exist. The 8930d73 pattern carries over (filtering centralized at query construction, fail-closed, regression tests); the export update ships in the same milestone as the registry.
+
+### 6.4 Delta List Against the §5 Roadmap
+
+| §5 original | Updated by this section to |
+|---|---|
+| §5.1 ordering: "application layer first, constraints last," with all of Step 2 as a flip prerequisite | A thin shim (1451 friendly error + audit/reason before delete) suffices to flip (§6.1 Phase 1); Step 2's deeper machinery comes later |
+| Step 2-2: add a `c_deprecated` status column to code tables | The whole item is deferred to Phase 3 on demand; if started, use the `record_lifecycle` registry (§6.3), zero change to shared tables |
+| Step 2-2 prerequisite: committee discussion of "adding a column" | The topic becomes **pure policy** ("delete" becomes "deprecate/merge," plus release inclusion rules); still a Phase 3 prerequisite |
+| §5.3(1): still-referenced entries exported "without the `c_deprecated` column" | Achieved automatically — the column never exists; the two-tier rule itself is unchanged (§6.3) |
+| Decision 3, "deletion reason" (not covered by §5) | From Phase 1: a required reason on deletion records; from Phase 3: stored uniformly in the registry |
+
+The remaining steps (Step 0 / 1 / 4 / 5) are unchanged.
 
 ---
 

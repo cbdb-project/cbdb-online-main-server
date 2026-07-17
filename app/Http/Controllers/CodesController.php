@@ -42,17 +42,10 @@ class CodesController extends Controller {
         'CBDB__TRAD_SIMP_MAP',
         'DYNASTIES',
         'GANZHI_CODES',
-        // 官職為複合實體（OFFICE_CODES + OFFICE_CODE_TYPE_REL），裸表直寫會產出殘缺聚合
-        // （docs/ENTITY_AGGREGATE_ARCHITECTURE.md §3.1）。實體級入口（/app/office，含
-        // create/update/delete 與側欄連結）就緒後在此封寫；讀取與匯出維持開放。
-        // 注意：這同時擋掉裸表 proposal——實體級提案就緒前為有意取捨（§4.5）。
-        // 回退：自本清單移除即可恢復裸表寫入。
-        'OFFICE_CODES',
-        // 社會機構為三表複合實體（NAME_CODES 去重＋CODES＋ADDR），同上封寫；
-        // 實體級入口＝/app/social-institution（識別＝c_inst_code 單鍵）。
-        'SOCIAL_INSTITUTION_CODES',
-        'SOCIAL_INSTITUTION_NAME_CODES',
-        'SOCIAL_INSTITUTION_ADDR',
+        // 被實體聚合認領的下層表（OFFICE_CODES、SOCIAL_INSTITUTION_* 等）不列在此——
+        // 由 config/entity_aggregates.php 的 closed_code_tables 推導（見 isReadOnlyTable()）：
+        // 實體上線即自動封寫，回退＝改 config。裸表 proposal 一併封閉為實體級提案（§4.5）
+        // 就緒前的有意取捨。
     ];
     /**
      * Copyright notices for specific tables.
@@ -1879,7 +1872,20 @@ class CodesController extends Controller {
      * @return bool
      */
     protected function isReadOnlyTable(string $table): bool {
-        return in_array(strtoupper($table), $this->readOnlyTables, true);
+        $upper = strtoupper($table);
+        if (in_array($upper, $this->readOnlyTables, true)) {
+            return true;
+        }
+
+        // 實體聚合認領的下層表一律唯讀（docs/ENTITY_AGGREGATE_ARCHITECTURE.md §4.4／§6.5）：
+        // 寫入路徑由實體頁（/app/office、/app/social-institution…）獨佔，讀取／匯出開放。
+        foreach (config('entity_aggregates.entities', []) as $entity) {
+            if (in_array($upper, array_map('strtoupper', $entity['closed_code_tables'] ?? []), true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

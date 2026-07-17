@@ -29,7 +29,7 @@ use Illuminate\Support\Facades\DB;
  *
  * 寫入方法皆不自開交易，於呼叫端交易內執行以保留「全有或全無」語意；呼叫端須先過濾非法輸入。
  */
-class OfficeImportService {
+class OfficeImportService implements EntityAggregateService {
     use SharesImportHelpers;
 
     public function __construct(
@@ -58,7 +58,7 @@ class OfficeImportService {
      * （POSTED_TO_ADDR_DATA 依附於 POSTED_TO_OFFICE_DATA，擋下後者即涵蓋。）
      */
     public function referenceCount(int $officeId): int {
-        return (int) DB::table('POSTED_TO_OFFICE_DATA')->where('c_office_id', $officeId)->count();
+        return $this->countReferences([['POSTED_TO_OFFICE_DATA', 'c_office_id']], $officeId);
     }
 
     /** 載入單一官職聚合（供編輯頁與 API 讀取）；不存在回 null。 */
@@ -132,9 +132,7 @@ class OfficeImportService {
      * @return array{office_id:int,pinyin:string,type_ids:array,operation_id_office:?int,operation_id_rel:?int}
      */
     public function create(array $input, int $actorPersonId = 0): array {
-        // lockForUpdate 序列化並發的 max()+1 配號：兩個同時到達的請求若讀到同一 max，
-        // 後者 insert 會撞主鍵而 500。MariaDB 生效；SQLite（測試）grammar 編譯為 no-op。
-        $officeId = max(0, (int) DB::table('OFFICE_CODES')->lockForUpdate()->max('c_office_id')) + 1;
+        $officeId = $this->allocateNextId('OFFICE_CODES', 'c_office_id');
         $columns = $this->officeColumns($input);
         $pinyin = $columns['c_office_pinyin'];
 
@@ -180,7 +178,8 @@ class OfficeImportService {
             $actorPersonId
         );
 
-        // REL 集合對賬：只刪不再需要的、只加尚未存在的，逐筆記 op（可個別復原）。
+        // REL 集合對賬（reconcileRowSet）：只刪不再需要的、只加尚未存在的，逐筆記 op
+        // （可個別復原）。純關聯表無非鍵欄，同鍵永不改寫（updatableColumns=null）。
         $desired = $this->typeIdList($input);
         $current = DB::table('OFFICE_CODE_TYPE_REL')
             ->where('c_office_id', $officeId)
@@ -190,16 +189,16 @@ class OfficeImportService {
         $toAdd = array_values(array_diff($desired, $current));
         $toRemove = array_values(array_diff($current, $desired));
 
-        foreach ($toRemove as $tid) {
-            $pk = ['c_office_id' => $officeId, 'c_office_tree_id' => $tid];
-            DB::table('OFFICE_CODE_TYPE_REL')->where('c_office_id', $officeId)->where('c_office_tree_id', $tid)->delete();
-            $this->recordDelete('OFFICE_CODE_TYPE_REL', $pk, $pk, $actorPersonId);
-        }
-        foreach ($toAdd as $tid) {
-            $payload = ['c_office_id' => $officeId, 'c_office_tree_id' => $tid];
-            DB::table('OFFICE_CODE_TYPE_REL')->insert($payload);
-            $this->recordOp('OFFICE_CODE_TYPE_REL', $payload, $payload, $actorPersonId);
-        }
+        $relRow = fn (string $tid) => ['c_office_id' => $officeId, 'c_office_tree_id' => $tid];
+        $this->reconcileRowSet(
+            'OFFICE_CODE_TYPE_REL',
+            array_combine($current, array_map($relRow, $current)),
+            array_combine($desired, array_map($relRow, $desired)),
+            fn (array $row) => $row,
+            fn (array $row) => $row,
+            null,
+            $actorPersonId
+        );
 
         return [
             'office_id' => $officeId,

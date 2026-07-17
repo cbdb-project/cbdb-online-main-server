@@ -3,9 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\Import\OfficeImportService;
-use App\Support\ColumnFilterExpression;
-use App\Support\ColumnFilterParseException;
-use Illuminate\Http\RedirectResponse;
+use App\Support\EntityTableBrowser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -51,15 +49,8 @@ class OfficeEntityController extends Controller {
 
     public function __construct(
         protected OfficeImportService $service,
-        protected ColumnFilterExpression $columnFilterExpression,
+        protected EntityTableBrowser $browser,
     ) {
-    }
-
-    /** 瀏覽需登入且帳號有效。 */
-    protected function ensureActive(): void {
-        if (!Auth::check() || !Auth::user()->isActive()) {
-            abort(403);
-        }
     }
 
     /** 新增／編輯需直接寫入權限（與 mutation API authorizeDirect 對齊）。 */
@@ -97,213 +88,27 @@ class OfficeEntityController extends Controller {
     /**
      * 官職列表：與 app/codes/OFFICE_CODES 裸表頁 feature parity（全欄位、任意欄排序＋主鍵
      * tie-breaker、逐欄篩選含布林模式、關鍵字搜尋、朝代標籤、公開可讀），另加聚合特有的
-     * type_count 計算欄位。此頁是側欄「任官編碼表」的新入口，裸表頁封寫後為唯一編輯入口。
+     * type_count 計算欄位。瀏覽機制由 EntityTableBrowser 描述子驅動（§6.5）。
+     * 此頁是側欄「任官編碼表」的新入口，裸表頁封寫後為唯一編輯入口。
      */
     public function appIndex(Request $request) {
-        // 對齊 codes 頁的訪問模型：讀取公開；排序／篩選需登入且已激活
-        // （見 docs/CODES_SORT_FILTER_AUTH_GATE.md 的成本理由）。
-        $guardRedirect = $this->guardSortFilterRequiresAuth($request);
+        $guardRedirect = $this->browser->guard($request, 'app.office.index');
         if ($guardRedirect !== null) {
             return $guardRedirect;
         }
 
-        $thead = array_merge(self::OFFICE_COLUMNS, array_keys(self::COMPUTED_COLUMNS));
+        $payload = $this->browser->payload($request, [
+            'table' => 'OFFICE_CODES',
+            'columns' => self::OFFICE_COLUMNS,
+            'computed' => self::COMPUTED_COLUMNS,
+            'key_column' => 'c_office_id',
+        ]);
 
-        $query = DB::table('OFFICE_CODES')->select('OFFICE_CODES.*');
-        foreach (self::COMPUTED_COLUMNS as $name => $definition) {
-            $query->selectRaw($definition['expression'].' as '.$name);
-        }
-
-        // 關鍵字搜尋：所有實體欄位 %term%（與 codes 頁 determineSearchableColumns 一致）。
-        $q = trim((string) $request->query('q', ''));
-        if ($q !== '') {
-            $query->where(function ($sub) use ($q) {
-                foreach (self::OFFICE_COLUMNS as $column) {
-                    $sub->orWhere($column, 'like', '%'.$q.'%');
-                }
-            });
-        }
-
-        // 逐欄篩選（欄位間 AND；布林模式逐欄解析，失敗記錯誤並略過，不轉字面）。
-        $filters = $this->sanitizeColumnFilters($request->query('filters', []), $thead);
-        $booleanAvailable = (bool) config('codes.boolean_filter_enabled', true);
-        $booleanEnabled = $booleanAvailable && $request->boolean('filter_bool');
-        $appliedFilters = [];
-        $filterErrors = [];
-        $filterDescriptions = [];
-        $descLabels = $booleanEnabled ? [
-            'contains' => (string) __('codes.filter_desc_contains'),
-            'not' => (string) __('codes.filter_desc_not'),
-            'and' => (string) __('codes.filter_desc_and'),
-            'or' => (string) __('codes.filter_desc_or'),
-        ] : [];
-        foreach ($filters as $column => $value) {
-            if ($value === '') {
-                continue;
-            }
-            $filterColumn = $this->resolveColumnForQuery($column);
-            $matchMode = self::COMPUTED_COLUMNS[$column]['match_mode'] ?? 'contains';
-            if ($matchMode === 'exact' && !$booleanEnabled && !is_numeric($value)) {
-                // 非數字輸入略過：避免 MySQL 將字串隱式轉 0，誤命中 count=0 的列。
-                continue;
-            }
-
-            if ($booleanEnabled) {
-                try {
-                    $ast = $this->columnFilterExpression->parse($value);
-                } catch (ColumnFilterParseException $e) {
-                    $filterErrors[$column] = $e->errorCode;
-
-                    continue;
-                }
-                $this->columnFilterExpression->applyToBuilder($query, $filterColumn, $ast, $matchMode);
-                $termLabels = $descLabels;
-                if ($matchMode === 'exact') {
-                    $termLabels['contains'] = (string) __('codes.filter_desc_exact');
-                }
-                $filterDescriptions[$column] = $this->columnFilterExpression->describe($ast, $termLabels);
-            } elseif ($matchMode === 'exact') {
-                // SQLite 對運算式比對字串繫結值不做數字轉換，先轉數字再綁定（MySQL 亦相容）。
-                $query->where($filterColumn, '=', $value + 0);
-            } else {
-                $query->where($filterColumn, 'like', '%'.$value.'%');
-            }
-
-            $appliedFilters[$column] = $value;
-        }
-
-        // 排序 + 主鍵 tie-breaker（未指定排序時維持原本的 ID 倒序瀏覽體驗）。
-        [$sortBy, $sortDir] = $this->sanitizeSortParameters(
-            (string) $request->query('sort_by', ''),
-            (string) $request->query('sort_dir', 'asc'),
-            $thead
-        );
-        if ($sortBy !== '') {
-            $query->orderBy($this->resolveColumnForQuery($sortBy), $sortDir);
-            $query->orderBy('c_office_id', 'asc');
-        } else {
-            $query->orderByDesc('c_office_id');
-        }
-
-        // 分頁連結只攜帶實際套用的 filters（排除語法錯誤欄位），其餘 query 參數原樣保留。
-        $appendQuery = $request->except(['page', 'filters']);
-        if (!empty($appliedFilters)) {
-            $appendQuery['filters'] = $appliedFilters;
-        }
-        $paginator = $query->paginate((int) config('codes.per_page', 20))->appends($appendQuery);
-
-        $dynastyMap = DB::table('DYNASTIES')->pluck('c_dynasty_chn', 'c_dy')->all();
-
-        return Inertia::render('Office/Index', [
-            'thead' => $thead,
-            'rows' => array_map(fn ($r) => (array) $r, $paginator->items()),
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'last_page' => $paginator->lastPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
-                'from' => $paginator->firstItem(),
-                'to' => $paginator->lastItem(),
-            ],
-            'q' => $q,
-            'dynasty_map' => (object) $dynastyMap,
-            'key_columns' => ['c_office_id'],
-            'computed_columns' => array_keys(self::COMPUTED_COLUMNS),
-            'filters' => (object) $filters,
-            'sort_by' => $sortBy,
-            'sort_dir' => $sortDir,
-            'boolean_enabled' => $booleanEnabled,
-            'boolean_filter_available' => $booleanAvailable,
-            'filter_errors' => (object) $filterErrors,
-            'filter_descriptions' => (object) $filterDescriptions,
+        return Inertia::render('Office/Index', array_merge($payload, [
             'can_write' => Auth::check() && Auth::user()->canWriteDirectly(),
             'urls' => $this->urls(),
             'page_translations' => $this->translations(),
-        ]);
-    }
-
-    /**
-     * 排序／篩選需登入且已激活（鏡像 CodesController::guardSortFilterRequiresAuth；
-     * 理由與行為一致：未登入導回登入頁記 intended、未激活 flash 後導回）。
-     */
-    protected function guardSortFilterRequiresAuth(Request $request): ?RedirectResponse {
-        $hasSortBy = trim((string) $request->query('sort_by', '')) !== '';
-
-        $hasFilter = false;
-        $filters = $request->query('filters', []);
-        if (is_array($filters)) {
-            foreach ($filters as $value) {
-                if (is_scalar($value) && trim((string) $value) !== '') {
-                    $hasFilter = true;
-
-                    break;
-                }
-            }
-        }
-
-        if (!$hasSortBy && !$hasFilter) {
-            return null;
-        }
-
-        if (!Auth::check()) {
-            return redirect()->guest(route('login'));
-        }
-
-        if (!Auth::user()->isActive()) {
-            flash('該用戶沒有權限使用排序／篩選功能，請聯絡管理員', 'error');
-
-            return redirect()->route('app.office.index');
-        }
-
-        return null;
-    }
-
-    /** 欄位名 → 查詢用欄位（計算欄位還原為原始運算式，供 WHERE／ORDER BY 使用）。 */
-    protected function resolveColumnForQuery(string $column): \Illuminate\Contracts\Database\Query\Expression|string {
-        if (isset(self::COMPUTED_COLUMNS[$column])) {
-            return DB::raw(self::COMPUTED_COLUMNS[$column]['expression']);
-        }
-
-        return $column;
-    }
-
-    /**
-     * 只保留 thead 白名單內、scalar、trim 後的 filters（鏡像 CodesController::sanitizeColumnFilters）。
-     *
-     * @param mixed $rawFilters
-     * @return array<string, string>
-     */
-    protected function sanitizeColumnFilters($rawFilters, array $thead): array {
-        if (!is_array($rawFilters)) {
-            return [];
-        }
-
-        $filters = [];
-        foreach ($rawFilters as $column => $value) {
-            if (!in_array($column, $thead, true) || !is_scalar($value)) {
-                continue;
-            }
-            $trimmed = trim((string) $value);
-            if ($trimmed !== '') {
-                $filters[$column] = $trimmed;
-            }
-        }
-
-        return $filters;
-    }
-
-    /**
-     * 排序參數白名單化（鏡像 CodesController::sanitizeSortParameters）。
-     *
-     * @return array{0: string, 1: string}
-     */
-    protected function sanitizeSortParameters(string $sortBy, string $sortDir, array $thead): array {
-        $sortBy = trim($sortBy);
-        if ($sortBy === '' || !in_array($sortBy, $thead, true)) {
-            return ['', 'asc'];
-        }
-
-        return [$sortBy, strtolower($sortDir) === 'desc' ? 'desc' : 'asc'];
+        ]));
     }
 
     /** 新增官職表單頁。 */

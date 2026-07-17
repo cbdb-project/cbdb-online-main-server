@@ -39,7 +39,7 @@ use Illuminate\Support\Facades\DB;
  * 供 mutation API 與前端聚合編輯頁共用。update() 對 SOCIAL_INSTITUTION_ADDR 做集合對賬
  * （同鍵改值、僅增刪差異）。delete() 前須先 referenceCount() 檢查四張人物表引用。
  */
-class SocialInstituteImportService {
+class SocialInstituteImportService implements EntityAggregateService {
     use SharesImportHelpers;
 
     public function __construct(
@@ -91,10 +91,12 @@ class SocialInstituteImportService {
      * 改名同樣受此護欄約束：人物表存 (inst_code, name_code) 對，改名會使既存引用失配。
      */
     public function referenceCount(int $instCode): int {
-        return (int) DB::table('BIOG_INST_DATA')->where('c_inst_code', $instCode)->count()
-            + (int) DB::table('ENTRY_DATA')->where('c_inst_code', $instCode)->count()
-            + (int) DB::table('ASSOC_DATA')->where('c_inst_code', $instCode)->count()
-            + (int) DB::table('POSTED_TO_OFFICE_DATA')->where('c_inst_code', $instCode)->count();
+        return $this->countReferences([
+            ['BIOG_INST_DATA', 'c_inst_code'],
+            ['ENTRY_DATA', 'c_inst_code'],
+            ['ASSOC_DATA', 'c_inst_code'],
+            ['POSTED_TO_OFFICE_DATA', 'c_inst_code'],
+        ], $instCode);
     }
 
     /** 載入單一機構聚合（識別＝c_inst_code；供編輯頁與 API 讀取）；不存在回 null。 */
@@ -179,8 +181,7 @@ class SocialInstituteImportService {
             ];
         }
 
-        // lockForUpdate 序列化並發的 max()+1 配號，避免撞主鍵（同上，SQLite no-op）。
-        $nameCode = max(0, (int) DB::table('SOCIAL_INSTITUTION_NAME_CODES')->lockForUpdate()->max('c_inst_name_code')) + 1;
+        $nameCode = $this->allocateNextId('SOCIAL_INSTITUTION_NAME_CODES', 'c_inst_name_code');
         $namePinyin = $this->buildPinyin($name);
         $payload = [
             'c_inst_name_code' => $nameCode,
@@ -249,7 +250,7 @@ class SocialInstituteImportService {
         $nameCreated = $resolved['name_created'];
         $namePinyin = $resolved['name_pinyin'];
 
-        $instCode = max(0, (int) DB::table('SOCIAL_INSTITUTION_CODES')->lockForUpdate()->max('c_inst_code')) + 1;
+        $instCode = $this->allocateNextId('SOCIAL_INSTITUTION_CODES', 'c_inst_code');
 
         // 只插入非 null 欄：null 即欄位預設值，維持與原批量工具位元級一致的 insert 語義。
         $codePayload = array_merge(
@@ -393,46 +394,23 @@ class SocialInstituteImportService {
             'c_pages' => $r['pages'],
             'c_notes' => $r['notes'],
         ];
-        $addrWhere = fn (array $r) => DB::table('SOCIAL_INSTITUTION_ADDR')
-            ->where('c_inst_code', $instCode)
-            ->where('c_inst_addr_id', $r['addr_id'])
-            ->where('c_inst_addr_type_code', $r['addr_type_code'])
-            ->where('inst_xcoord', $r['xcoord'])
-            ->where('inst_ycoord', $r['ycoord']);
-
-        $added = 0;
-        $removed = 0;
-        foreach ($current as $key => $r) {
-            if (!isset($desired[$key])) {
-                $addrWhere($r)->delete();
-                $this->recordDelete('SOCIAL_INSTITUTION_ADDR', $addrPk($r), $addrPayload($r), $actorPersonId);
-                $removed++;
-            }
-        }
-        foreach ($desired as $key => $r) {
-            if (!isset($current[$key])) {
-                DB::table('SOCIAL_INSTITUTION_ADDR')->insert($addrPayload($r));
-                $this->recordOp('SOCIAL_INSTITUTION_ADDR', $addrPk($r), $addrPayload($r), $actorPersonId);
-                $added++;
-            } elseif ($current[$key] !== $r) {
-                // 同鍵改非鍵值（起訖年、來源、頁碼、備註）。
-                $addrWhere($r)->update([
-                    'c_inst_addr_begin_year' => $r['begin_year'],
-                    'c_inst_addr_end_year' => $r['end_year'],
-                    'c_source' => $r['source_id'],
-                    'c_pages' => $r['pages'],
-                    'c_notes' => $r['notes'],
-                ]);
-                $this->recordUpdate('SOCIAL_INSTITUTION_ADDR', $addrPk($r), $addrPayload($current[$key]), $addrPayload($r), $actorPersonId);
-            }
-        }
+        // reconcileRowSet：同鍵改非鍵值（起訖年、來源、頁碼、備註）、僅增刪差異。
+        $result = $this->reconcileRowSet(
+            'SOCIAL_INSTITUTION_ADDR',
+            $current,
+            $desired,
+            $addrPk,
+            $addrPayload,
+            ['c_inst_addr_begin_year', 'c_inst_addr_end_year', 'c_source', 'c_pages', 'c_notes'],
+            $actorPersonId
+        );
 
         return [
             'inst_code' => $instCode,
             'name_code' => $nameCode,
             'name_changed' => $nameChanged,
-            'addr_added' => $added,
-            'addr_removed' => $removed,
+            'addr_added' => $result['added'],
+            'addr_removed' => $result['removed'],
             'operation_id_code' => $codeOp?->id,
         ];
     }

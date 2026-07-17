@@ -4,6 +4,15 @@
 
 ## 2026-07
 
+### 實體聚合橫向複用架構（entity aggregate framework，#1159 §6.5）
+- 行為凍結重構：把 office／social institution 兩輪實作中重複的機制抽成四件套，後續實體（code+type-rel 家族、text、place）不再整套重寫。
+- **`config/entity_aggregates.php` 實體註冊表（單一真源）**：聲明 resource／Service／識別鍵／認領表／`closed_code_tables`／側欄 nav。codes UI 封寫改由 registry 推導（`isReadOnlyTable()`，實體上線即自動封寫、回退＝改 config）；側欄實體節點由 `Navigation::entityNavItem()` 依 config 生成。
+- **`EntityAggregateService` 介面**＋`SharesImportHelpers` 新增三基元：`allocateNextId()`、`countReferences()`、`reconcileRowSet()`（配套列集合對賬：同鍵改非鍵值、僅增刪差異、逐筆記 op）；兩個 Service 遷移使用，audit payload 逐位不變。
+- **`Support/EntityTableBrowser`**：描述子驅動的 parity 列表引擎，兩個實體 Controller 的 appIndex 各縮至 ~20 行；刻意不合併 CodesController（cursor 分頁／JOIN config 為裸表專屬）。
+- **前端 `EntityIndexPage` 通用組件**：兩份 ~380 行的 Index.tsx 合併，各實體頁縮成注入 `{i18nGroup, resource, pkField, dynastyColumns}` 的薄殼。表單刻意不抽象（真領域 UI）。
+- 設計文件新增 §6.5（含第二梯隊 code+type-rel 家族路線與 §4.5 實體級提案「對介面做一次」的落地路徑）。
+- 全套測試 2310 綠（行為凍結驗證）；無新增功能。
+
 ### 社會機構實體聚合推進至 step 4：/app/social-institution 上線、三張裸表封寫（#1159）
 - **實體識別定案＝`c_inst_code` 單鍵**：生產庫 4011 列 c_inst_code 全數唯一，複合主鍵 `(c_inst_code, c_inst_name_code)` 是「當前名稱冗餘進主鍵」的儲存層遺留；`c_inst_name_code` 為屬性、由聚合根內部解析（名稱去重）。詳見設計文件 §2.5。
 - `SocialInstituteImportService` 補齊 `load()／update()／delete()／referenceCount()`：update 整體覆寫 CODES 非鍵欄、名稱走去重解析、ADDR 集合對賬（同鍵改值、僅增刪差異）；referenceCount 數齊 **BIOG_INST_DATA／ENTRY_DATA／ASSOC_DATA／POSTED_TO_OFFICE_DATA 四張** CASCADE 引用表。

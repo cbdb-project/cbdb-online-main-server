@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Operation;
 use App\Models\User;
+use App\Services\CharVariantMapService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -32,6 +33,7 @@ class ApiV2MutateTest extends TestCase {
         $this->createAltnameTable();
         $this->createSourceTable();
         $this->createTextCodesTable();
+        $this->createCharVariantMapTable();
     }
 
     protected function tearDown(): void {
@@ -39,11 +41,40 @@ class ApiV2MutateTest extends TestCase {
         Schema::dropIfExists('BIOG_SOURCE_DATA');
         Schema::dropIfExists('ALTNAME_DATA');
         Schema::dropIfExists('BIOG_MAIN');
+        Schema::dropIfExists('char_variant_map');
         Schema::dropIfExists('audit_log');
         Schema::dropIfExists('operations');
         Schema::dropIfExists('personal_access_tokens');
         Schema::dropIfExists('users');
         parent::tearDown();
+    }
+
+    /**
+     * 與 database/migrations/2026_07_15_000000_create_char_variant_map_table.php
+     * 相同的 7 筆種子資料，供 BIOG_MAIN 異體字落地替換測試使用。
+     */
+    protected function createCharVariantMapTable(): void {
+        Schema::create('char_variant_map', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->string('c_variant_char', 10);
+            $table->string('c_reference_char', 10);
+            $table->tinyInteger('c_strict_excluded')->default(1);
+            $table->string('c_notes', 255)->nullable();
+            $table->timestamps();
+
+            $table->unique('c_variant_char', 'char_variant_map_c_variant_char_unique');
+        });
+
+        DB::table('char_variant_map')->insert([
+            ['c_variant_char' => '愼', 'c_reference_char' => '慎', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '槀', 'c_reference_char' => '稿', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '峯', 'c_reference_char' => '峰', 'c_strict_excluded' => 1],
+            ['c_variant_char' => '靑', 'c_reference_char' => '青', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '頴', 'c_reference_char' => '穎', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '淸', 'c_reference_char' => '清', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '厰', 'c_reference_char' => '廠', 'c_strict_excluded' => 0],
+        ]);
+        CharVariantMapService::reset();
     }
 
     protected function createUsersTable(): void {
@@ -489,6 +520,136 @@ class ApiV2MutateTest extends TestCase {
         $this->assertSame('Lü', $payload['c_surname']);    // 提交時歸一化
         $this->assertSame('Lü Zhong', $payload['c_name']); // c_name 由分量重算後亦為 ü
         $this->assertSame('Lv', $payload['c_surname_rm']); // Wade-Giles：不轉
+    }
+
+    #[Test]
+    public function testDirectBiogMainUpdateDoesNotReplaceStrictExcludedVariant() {
+        $user = $this->makeUser(email: 'biog-variant-strict-excluded@example.com');
+        $this->actingAs($user);
+        $this->seedBiogMain();
+
+        // 峯（c_strict_excluded=1）僅在寬鬆模式可替換，嚴格模式（人名）須排除。
+        $response = $this->postJson('/api/v2/mutate', [
+            'resource' => 'biogmain',
+            'person_id' => 138841,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_personid' => 138841]],
+            'changes' => [
+                'c_mingzi_chn' => '峯',
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonMissing(['notices' => []]);
+        $this->assertArrayNotHasKey('notices', $response->json());
+
+        $this->assertDatabaseHas('BIOG_MAIN', [
+            'c_personid' => 138841,
+            'c_surname_chn' => '張',
+            'c_mingzi_chn' => '峯',
+            'c_name_chn' => '張峯',
+        ]);
+    }
+
+    #[Test]
+    public function testDirectBiogMainUpdateReplacesStrictModeVariantAndReturnsNotice() {
+        $user = $this->makeUser(email: 'biog-variant-strict-replace@example.com');
+        $this->actingAs($user);
+        $this->seedBiogMain();
+
+        // 淸（c_strict_excluded=0）在嚴格模式也可替換：分欄先替換，再組出 c_name_chn，
+        // 維持 c_name_chn === c_surname_chn.c_mingzi_chn 的 invariant。
+        $response = $this->postJson('/api/v2/mutate', [
+            'resource' => 'biogmain',
+            'person_id' => 138841,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_personid' => 138841]],
+            'changes' => [
+                'c_mingzi_chn' => '淸',
+            ],
+        ]);
+
+        $response->assertOk();
+        $body = $response->json();
+        $this->assertArrayHasKey('notices', $body);
+        $this->assertStringContainsString('淸', $body['notices'][0]);
+        $this->assertStringContainsString('清', $body['notices'][0]);
+
+        $this->assertDatabaseHas('BIOG_MAIN', [
+            'c_personid' => 138841,
+            'c_surname_chn' => '張',
+            'c_mingzi_chn' => '清',
+            'c_name_chn' => '張清',
+        ]);
+    }
+
+    #[Test]
+    public function testProposalBiogMainUpdateReplacesStrictModeVariantInPayloadAndReturnsNotice() {
+        $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'biog-proposal-variant@example.com');
+        $this->actingAs($user);
+        $this->seedBiogMain();
+
+        $response = $this->postJson('/api/v2/mutate', [
+            'resource' => 'basicinformation',
+            'person_id' => 138841,
+            'mode' => 'proposal',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_personid' => 138841]],
+            'changes' => [
+                'c_mingzi_chn' => '淸',
+            ],
+            'meta' => ['comment' => '提案修正名字異體字'],
+        ]);
+
+        $response->assertOk();
+        $body = $response->json();
+        $this->assertArrayHasKey('notices', $body);
+        $this->assertStringContainsString('淸', $body['notices'][0]);
+        $this->assertStringContainsString('清', $body['notices'][0]);
+
+        $operation = DB::table('operations')
+            ->where('resource', 'BIOG_MAIN')
+            ->where('op_type', Operation::TYPE_PROPOSAL_UPDATE)
+            ->first();
+        $payload = json_decode($operation->resource_data, true);
+
+        $this->assertSame('清', $payload['c_mingzi_chn']);
+        $this->assertSame('張清', $payload['c_name_chn']);
+        // 提案未核准前，BIOG_MAIN 本身不應變更。
+        $this->assertDatabaseHas('BIOG_MAIN', ['c_personid' => 138841, 'c_mingzi_chn' => '忠']);
+    }
+
+    #[Test]
+    public function testProposalBiogMainUpdateDoesNotReplaceStrictExcludedVariantInPayload() {
+        $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'biog-proposal-variant-excluded@example.com');
+        $this->actingAs($user);
+        $this->seedBiogMain();
+
+        $response = $this->postJson('/api/v2/mutate', [
+            'resource' => 'basicinformation',
+            'person_id' => 138841,
+            'mode' => 'proposal',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_personid' => 138841]],
+            'changes' => [
+                'c_mingzi_chn' => '峯',
+            ],
+            'meta' => ['comment' => '提案修正名字'],
+        ]);
+
+        $response->assertOk();
+        $this->assertArrayNotHasKey('notices', $response->json());
+
+        $operation = DB::table('operations')
+            ->where('resource', 'BIOG_MAIN')
+            ->where('op_type', Operation::TYPE_PROPOSAL_UPDATE)
+            ->first();
+        $payload = json_decode($operation->resource_data, true);
+
+        $this->assertSame('峯', $payload['c_mingzi_chn']);
+        $this->assertSame('張峯', $payload['c_name_chn']);
     }
 
     #[Test]

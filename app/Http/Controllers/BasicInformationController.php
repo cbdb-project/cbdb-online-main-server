@@ -14,6 +14,7 @@ use App\Repositories\ToolsRepository;
 use App\Repositories\YearRangeRepository;
 use App\Services\AuditLogService;
 use App\Services\BracketNormalizer;
+use App\Services\CharVariantMapService;
 use App\Services\NameSearchIndexService;
 use App\Services\PersonBrowserService;
 use App\Support\CompositePrimaryKey;
@@ -1602,10 +1603,16 @@ class BasicInformationController extends Controller {
             return redirect()->route('basicinformation.index');
         } else {
             // 使用 Repository 進行儲存（內含事務與審計）
-            $flight = $this->biogMainRepository->store($request);
+            $storeResult = $this->biogMainRepository->store($request);
+            $flight = $storeResult['model'];
 
             if (Schema::hasTable('CBDB__NAME_FTS')) {
                 $this->nameSearchIndexService->reindexPerson($flight);
+            }
+
+            // 非阻塞提示：異體字落地替換（嚴格模式），比照既有 flash(..., 'info') 慣例。
+            foreach (CharVariantMapService::buildNotices($storeResult['replaced']) as $notice) {
+                flash($notice.' @ '.Carbon::now(), 'info');
             }
 
             flash('Create success @ '.Carbon::now(), 'success');
@@ -1778,6 +1785,11 @@ class BasicInformationController extends Controller {
             flash('無實質更新，資料未變更 @ '.Carbon::now(), 'info');
 
             return redirect()->route('basicinformation.edit', $id);
+        }
+
+        // 非阻塞提示：異體字落地替換（嚴格模式），比照既有 flash(..., 'info') 慣例。
+        foreach (CharVariantMapService::buildNotices($result['variant_replaced'] ?? []) as $notice) {
+            flash($notice.' @ '.Carbon::now(), 'info');
         }
 
         //20190531判別是否為眾包用戶

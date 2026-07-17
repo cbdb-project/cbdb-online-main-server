@@ -94,6 +94,8 @@ export default function BasicInfoEditor({
     const [pinyinDone, setPinyinDone] = useState(false);
     // 非阻塞提示：生成拼音時偵測到關係稱謂，但括號內之人不在此人親屬名單中（後端已改用一般拼音轉換）。
     const [pinyinKinshipHint, setPinyinKinshipHint] = useState(false);
+    // 非阻塞提示：儲存時姓名含異體字，後端已落地替換為參考字（char_variant_map 嚴格模式）。
+    const [variantReplacedNotice, setVariantReplacedNotice] = useState<string | null>(null);
     const [comment, setComment] = useState('');
     const [deleting, setDeleting] = useState(false);
 
@@ -222,7 +224,7 @@ export default function BasicInfoEditor({
 
     // 回傳 boolean：成功 true、驗證失敗／無變更／出錯 false。供切分頁「儲存並繼續」判斷是否可放行導航。
     const save = async (mode: 'direct' | 'proposal'): Promise<boolean> => {
-        setSaving(true); setError(null); setMessage(null);
+        setSaving(true); setError(null); setMessage(null); setVariantReplacedNotice(null);
         const initial: Fields = JSON.parse(savedSnapshot);
         // 名（中）／拼音名「不可清空」（direct 與 proposal 一致，後端同規則）：
         // 原值非空、現值清空即阻擋；原本即為空的人物可維持空、照常編輯其他欄位。
@@ -260,6 +262,8 @@ export default function BasicInfoEditor({
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
             flashSaved(mode === 'proposal' ? tr('proposal_submitted', '已提交建議') : tr('save_success', '已儲存'));
+            const notices = Array.isArray(json?.notices) ? json.notices as string[] : [];
+            setVariantReplacedNotice(notices.length > 0 ? notices.join('；') : null);
             // direct 儲存後，從回傳列即時刷新「唯讀/後端重算」欄位，不必重整頁面：
             // 派生姓名（c_name*，後端 updateById 由姓/名重算）＋ 稽核欄（建檔/更新）。
             // 以函式式合併（保留請求期間使用者新輸入，修正 race：不可用已捕捉的舊 fields 覆寫）；
@@ -398,6 +402,7 @@ export default function BasicInfoEditor({
             {error ? <div style={gErrStyle}>{error}</div> : null}
             {pinyinDone ? <div style={gOkStyle}>{tr('basicinfo_pinyin_alert', '「生成拼音」已完成')}</div> : null}
             {pinyinKinshipHint ? <div style={gWarnStyle}>{tr('pinyin_kinship_unmatched_hint', '偵測到親屬關係詞，但此人親屬名單中查無此人，已改用一般拼音轉換。')}</div> : null}
+            {variantReplacedNotice ? <div style={gWarnStyle}>{variantReplacedNotice}</div> : null}
             {nameWarning ? <div style={gWarnStyle}>{tr('name_required_warning', '請確認「名（中）」與「拼音名」是否填寫。')}</div> : null}
 
             {/* 區塊一：姓名（資料流分組）。自上而下一條線、按鈕作橋：中文姓名 →〔生成姓名拼音〕→ 拼音 → 外文/羅馬字 → 自動生成框。 */}

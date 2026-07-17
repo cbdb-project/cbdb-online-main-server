@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Operation;
 use App\Models\User;
+use App\Services\CharVariantMapService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -29,6 +30,7 @@ class ApiV2CreateAltnameTest extends TestCase {
         $this->createOperationsTable();
         $this->createAuditLogTable();
         $this->createAltnameTable();
+        $this->createCharVariantMapTable();
     }
 
     protected function tearDown(): void {
@@ -36,8 +38,37 @@ class ApiV2CreateAltnameTest extends TestCase {
         Schema::dropIfExists('audit_log');
         Schema::dropIfExists('operations');
         Schema::dropIfExists('personal_access_tokens');
+        Schema::dropIfExists('char_variant_map');
         Schema::dropIfExists('users');
         parent::tearDown();
+    }
+
+    /**
+     * 與 database/migrations/2026_07_15_000000_create_char_variant_map_table.php
+     * 相同的 7 筆種子資料，供 AltnameCreateHandler 的異體字落地替換測試使用。
+     */
+    protected function createCharVariantMapTable(): void {
+        Schema::create('char_variant_map', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->string('c_variant_char', 10);
+            $table->string('c_reference_char', 10);
+            $table->tinyInteger('c_strict_excluded')->default(1);
+            $table->string('c_notes', 255)->nullable();
+            $table->timestamps();
+
+            $table->unique('c_variant_char', 'char_variant_map_c_variant_char_unique');
+        });
+
+        DB::table('char_variant_map')->insert([
+            ['c_variant_char' => '愼', 'c_reference_char' => '慎', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '槀', 'c_reference_char' => '稿', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '峯', 'c_reference_char' => '峰', 'c_strict_excluded' => 1],
+            ['c_variant_char' => '靑', 'c_reference_char' => '青', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '頴', 'c_reference_char' => '穎', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '淸', 'c_reference_char' => '清', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '厰', 'c_reference_char' => '廠', 'c_strict_excluded' => 0],
+        ]);
+        CharVariantMapService::reset();
     }
 
     // ── Table Setup ─────────────────────────────────────────
@@ -221,6 +252,71 @@ class ApiV2CreateAltnameTest extends TestCase {
             $stored = DB::table($T)->where(['c_personid' => 1000, 'c_alt_name_chn' => $chn, 'c_alt_name_type_code' => 5])->value('c_source');
             $this->assertSame($sent, (int) $stored, '合法非 0 值不得被誤清：'.$sent);
         }
+    }
+
+    // ── Variant-Character Landing Replacement (strict mode) ─
+
+    #[Test]
+    public function testDirectAltnameCreateDoesNotReplaceStrictExcludedVariant(): void {
+        $this->actingAs($this->makeUser(email: 'altname-variant-excluded@example.com'));
+
+        // 峯（c_strict_excluded=1）僅寬鬆模式可替換，嚴格模式（人名相關）須排除。
+        $response = $this->postJson('/api/v2/create', $this->createPayload([
+            'target' => ['pk' => ['c_alt_name_chn' => '峯X']],
+        ]))->assertOk();
+
+        $this->assertArrayNotHasKey('notices', $response->json());
+        $this->assertDatabaseHas('ALTNAME_DATA', [
+            'c_personid' => 1000,
+            'c_alt_name_chn' => '峯X',
+        ]);
+    }
+
+    #[Test]
+    public function testDirectAltnameCreateReplacesStrictModeVariantAndReturnsNotice(): void {
+        $this->actingAs($this->makeUser(email: 'altname-variant-replace@example.com'));
+
+        $response = $this->postJson('/api/v2/create', $this->createPayload([
+            'target' => ['pk' => ['c_alt_name_chn' => '淸X']],
+        ]))->assertOk();
+
+        $body = $response->json();
+        $this->assertArrayHasKey('notices', $body);
+        $this->assertStringContainsString('淸', $body['notices'][0]);
+        $this->assertStringContainsString('清', $body['notices'][0]);
+
+        $this->assertDatabaseHas('ALTNAME_DATA', [
+            'c_personid' => 1000,
+            'c_alt_name_chn' => '清X',
+        ]);
+        $this->assertDatabaseMissing('ALTNAME_DATA', [
+            'c_personid' => 1000,
+            'c_alt_name_chn' => '淸X',
+        ]);
+    }
+
+    #[Test]
+    public function testProposalAltnameCreateReplacesStrictModeVariantAndReturnsNotice(): void {
+        $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'altname-variant-proposal-create@example.com');
+        $this->actingAs($user);
+
+        $response = $this->postJson('/api/v2/create', $this->createPayload([
+            'mode' => 'proposal',
+            'target' => ['pk' => ['c_alt_name_chn' => '淸Y']],
+            'meta' => ['comment' => '提案新增別名（異體字）'],
+        ]))->assertOk();
+
+        $body = $response->json();
+        $this->assertArrayHasKey('notices', $body);
+        $this->assertStringContainsString('淸', $body['notices'][0]);
+        $this->assertStringContainsString('清', $body['notices'][0]);
+
+        $operation = DB::table('operations')
+            ->where('resource', 'ALTNAME_DATA')
+            ->where('op_type', Operation::TYPE_PROPOSAL_CREATE)
+            ->first();
+        $resourceData = json_decode($operation->resource_data, true);
+        $this->assertSame('清Y', $resourceData['c_alt_name_chn']);
     }
 
     // ── Direct Create Tests ─────────────────────────────────

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\CharVariantMapService;
 use App\Services\PinyinDictionary;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -87,6 +88,30 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             $table->unique(['c_chn', 'c_lastname']);
         });
 
+        // char_variant_map：與 database/migrations/2026_07_15_000000_create_char_variant_map_table.php
+        // 相同的 7 筆種子資料，供 standardizeTitleVariants() 走 CharVariantMapService::replaceLenient()。
+        Schema::create('char_variant_map', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->string('c_variant_char', 10);
+            $table->string('c_reference_char', 10);
+            $table->tinyInteger('c_strict_excluded')->default(1);
+            $table->string('c_notes', 255)->nullable();
+            $table->timestamps();
+
+            $table->unique('c_variant_char', 'char_variant_map_c_variant_char_unique');
+        });
+
+        DB::table('char_variant_map')->insert([
+            ['c_variant_char' => '愼', 'c_reference_char' => '慎', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '槀', 'c_reference_char' => '稿', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '峯', 'c_reference_char' => '峰', 'c_strict_excluded' => 1],
+            ['c_variant_char' => '靑', 'c_reference_char' => '青', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '頴', 'c_reference_char' => '穎', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '淸', 'c_reference_char' => '清', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '厰', 'c_reference_char' => '廠', 'c_strict_excluded' => 0],
+        ]);
+        CharVariantMapService::reset();
+
         // 書名逐字轉拼音走一般轉換路徑，需要真實字典資料才能跟現行
         // Pinyin::$dic 行為一致（見 docs/PINYIN_TABLE_CONSOLIDATION_PLAN.md 步驟4）。
         $this->seedPinyinDictionary();
@@ -94,6 +119,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
 
     protected function tearDown(): void {
         Schema::dropIfExists('pinyin');
+        Schema::dropIfExists('char_variant_map');
         Schema::dropIfExists('operations');
         Schema::dropIfExists('BIOG_MAIN');
         Schema::dropIfExists('TEXT_CODES');
@@ -600,6 +626,82 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $this->assertSame('穎集', $record->c_title_chn);
         $this->assertStringNotContainsString('頴', $record->c_title_chn);
         $this->assertSame('ying ji', $record->c_title);
+    }
+
+    #[Test]
+    public function test_newly_added_variant_glyph_qing_ti_is_standardized_in_stored_title(): void {
+        // 淸（U+6DF8）與厰（U+53B0）是 char_variant_map 新增收錄的 2 筆對照，原本不在
+        // 舊版 TITLE_VARIANT_MAP（僅峯／靑／頴 3 筆）裡；改接 CharVariantMapService::replaceLenient()
+        // 後，寬鬆模式套用全表 7 筆，這兩筆現在也會改寫書名本身——這是本步驟的行為擴張驗證。
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 295, 'c_dy' => '6']);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 795, 'c_title_chn' => '來源']);
+
+        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "295\t淸厰集\t795",
+        ]);
+
+        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $this->assertEmpty($response->getSession()->get('batch_errors', []));
+
+        $record = DB::table('TEXT_CODES')->where('c_textid', '>', 795)->orderByDesc('c_textid')->first();
+        $this->assertNotNull($record);
+        $this->assertSame('清廠集', $record->c_title_chn);
+        $this->assertStringNotContainsString('淸', $record->c_title_chn);
+        $this->assertStringNotContainsString('厰', $record->c_title_chn);
+    }
+
+    #[Test]
+    public function test_formerly_pinyin_only_variant_shen_now_also_rewrites_stored_title(): void {
+        // 愼（U+613C）原本只在 VariantCharNormalizer::$fallbackMap 裡、只影響拼音查詢，
+        // 不改動書名本身。char_variant_map 收錄後，寬鬆模式下這筆對照現在也會改寫書名——
+        // 這是「不分原本是哪個舊機制的資料，表裡任何一筆都套用」的行為擴張驗證。
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 296, 'c_dy' => '6']);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 796, 'c_title_chn' => '來源']);
+
+        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => "296\t愼獄集\t796",
+        ]);
+
+        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $this->assertEmpty($response->getSession()->get('batch_errors', []));
+
+        $record = DB::table('TEXT_CODES')->where('c_textid', '>', 796)->orderByDesc('c_textid')->first();
+        $this->assertNotNull($record);
+        $this->assertSame('慎獄集', $record->c_title_chn);
+        $this->assertStringNotContainsString('愼', $record->c_title_chn);
+    }
+
+    #[Test]
+    public function test_batch_results_include_variant_replacements_per_row(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 297, 'c_dy' => '6']);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 797, 'c_title_chn' => '來源']);
+
+        $entries = "297\t東坡集峯卷一\t797\n297\t普通書名\t797";
+
+        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+            'entries' => $entries,
+        ]);
+
+        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $this->assertEmpty($response->getSession()->get('batch_errors', []));
+
+        $results = $response->getSession()->get('batch_results', []);
+        $this->assertCount(2, $results);
+
+        $withVariant = collect($results)->firstWhere('line', 1);
+        $this->assertSame([['from' => '峯', 'to' => '峰']], $withVariant['variant_replacements']);
+
+        $withoutVariant = collect($results)->firstWhere('line', 2);
+        $this->assertSame([], $withoutVariant['variant_replacements']);
     }
 
     #[Test]

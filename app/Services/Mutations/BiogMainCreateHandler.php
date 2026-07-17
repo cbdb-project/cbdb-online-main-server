@@ -4,6 +4,7 @@ namespace App\Services\Mutations;
 
 use App\Models\BiogMain;
 use App\Repositories\BiogMainRepository;
+use App\Services\CharVariantMapService;
 use App\Services\NameSearchIndexService;
 use App\Support\CompositePrimaryKey;
 use Illuminate\Http\JsonResponse;
@@ -148,10 +149,13 @@ class BiogMainCreateHandler extends AbstractMutationHandler {
         $proxy = Request::create('/api/v2/create', 'POST', $rowData);
 
         try {
-            $flight = $this->biogMainRepository->store($proxy);
+            $storeResult = $this->biogMainRepository->store($proxy);
         } catch (\Throwable $e) {
             return $this->errorResponse('新增失敗：'.$e->getMessage(), 500);
         }
+
+        $flight = $storeResult['model'];
+        $variantReplaced = $storeResult['replaced'];
 
         if ($flight && Schema::hasTable('CBDB__NAME_FTS')) {
             $this->nameSearchIndexService->reindexPerson($flight);
@@ -159,7 +163,7 @@ class BiogMainCreateHandler extends AbstractMutationHandler {
 
         $row = BiogMain::find($personId);
 
-        return response()->json([
+        $response = [
             'ok' => true,
             'resource' => 'basicinformation',
             'mode' => 'direct',
@@ -168,7 +172,14 @@ class BiogMainCreateHandler extends AbstractMutationHandler {
                 'pk' => ['c_personid' => $personId],
                 'row' => $row ? $row->toArray() : ($flight ? $flight->toArray() : null),
             ],
-        ]);
+        ];
+
+        $notices = CharVariantMapService::buildNotices($variantReplaced);
+        if ($notices !== []) {
+            $response['notices'] = $notices;
+        }
+
+        return response()->json($response);
     }
 
     /**

@@ -7,6 +7,7 @@ use App\Models\Operation;
 use App\Models\User;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
+use App\Services\CharVariantMapService;
 use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -132,6 +133,32 @@ class BasicInformationProposalTest extends TestCase {
             $table->string('c_possession_desc')->nullable();
             $table->string('c_possession_desc_chn')->nullable();
         });
+
+        // char_variant_map：與 database/migrations/2026_07_15_000000_create_char_variant_map_table.php
+        // 相同的 7 筆種子資料，供 BasicInformationProposalController::normalizePayloadForTable()
+        // 對 BIOG_MAIN／ALTNAME_DATA 提案 payload 做異體字落地替換查詢使用。
+        Schema::dropIfExists('char_variant_map');
+        Schema::create('char_variant_map', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->string('c_variant_char', 10);
+            $table->string('c_reference_char', 10);
+            $table->tinyInteger('c_strict_excluded')->default(1);
+            $table->string('c_notes', 255)->nullable();
+            $table->timestamps();
+
+            $table->unique('c_variant_char', 'char_variant_map_c_variant_char_unique');
+        });
+
+        DB::table('char_variant_map')->insert([
+            ['c_variant_char' => '愼', 'c_reference_char' => '慎', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '槀', 'c_reference_char' => '稿', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '峯', 'c_reference_char' => '峰', 'c_strict_excluded' => 1],
+            ['c_variant_char' => '靑', 'c_reference_char' => '青', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '頴', 'c_reference_char' => '穎', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '淸', 'c_reference_char' => '清', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '厰', 'c_reference_char' => '廠', 'c_strict_excluded' => 0],
+        ]);
+        CharVariantMapService::reset();
     }
 
     protected function tearDown(): void {
@@ -145,6 +172,7 @@ class BasicInformationProposalTest extends TestCase {
         Schema::dropIfExists('KINSHIP_CODES');
         Schema::dropIfExists('POSSESSION_DATA');
         Schema::dropIfExists('ALTNAME_DATA');
+        Schema::dropIfExists('char_variant_map');
         Schema::dropIfExists('audit_log');
         Schema::dropIfExists('operations');
         Schema::dropIfExists('users');
@@ -388,6 +416,67 @@ class BasicInformationProposalTest extends TestCase {
         $this->assertSame('pending', $payload['__review_status']);
         $this->assertSame('新增測試別名', $payload['__proposal_meta']['comment']);
         $this->assertSame(['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code'], $payload['__key_columns']);
+    }
+
+    #[Test]
+    public function testProposalStoreReplacesVariantCharInAltNameChn() {
+        $user = $this->makeActiveUser();
+        $this->actingAs($user);
+
+        $response = $this->post(route('basicinformation.proposal.store', [
+            'personid' => 1,
+            'resource' => 'altnames',
+        ]), [
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '愼之',
+            'c_alt_name' => 'Test Name',
+            'c_alt_name_type_code' => 1,
+            '__proposal_comment' => '新增測試別名（異體字）',
+        ]);
+
+        $response->assertRedirect();
+
+        $operation = Operation::where('resource', 'ALTNAME_DATA')
+            ->where('op_type', Operation::TYPE_PROPOSAL_CREATE)
+            ->first();
+
+        $this->assertNotNull($operation);
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('慎之', $payload['c_alt_name_chn']);
+    }
+
+    #[Test]
+    public function testProposalUpdateReplacesVariantCharInAltNameChn() {
+        $user = $this->makeActiveUser();
+        $this->actingAs($user);
+
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1,
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '既有別名',
+            'c_alt_name_type_code' => 1,
+        ]);
+
+        $response = $this->post(route('basicinformation.proposal.update', [
+            'personid' => 1,
+            'resource' => 'altnames',
+            'id' => '1-既有別名-1',
+        ]), [
+            'c_sequence' => 1,
+            'c_alt_name_chn' => '愼之',
+            'c_alt_name_type_code' => 1,
+            '__proposal_comment' => '更新測試別名（異體字）',
+        ]);
+
+        $response->assertRedirect();
+
+        $operation = Operation::where('resource', 'ALTNAME_DATA')
+            ->where('op_type', Operation::TYPE_PROPOSAL_UPDATE)
+            ->first();
+
+        $this->assertNotNull($operation);
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('慎之', $payload['c_alt_name_chn']);
     }
 
     #[Test]

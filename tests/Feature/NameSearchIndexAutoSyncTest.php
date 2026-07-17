@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\BiogMain;
 use App\Models\User;
+use App\Services\CharVariantMapService;
 use App\Support\CompositePrimaryKey;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -148,6 +149,31 @@ class NameSearchIndexAutoSyncTest extends TestCase {
             ['c_name_type_code' => 4, 'c_name_type_desc' => 'zi', 'c_name_type_desc_chn' => '字'],
             ['c_name_type_code' => 5, 'c_name_type_desc' => 'hao', 'c_name_type_desc_chn' => '號'],
         ]);
+
+        // char_variant_map：與 database/migrations/2026_07_15_000000_create_char_variant_map_table.php
+        // 相同的 7 筆種子資料，供 BiogMainRepository::altnameStoreById()/altnameUpdateById() 的
+        // 異體字落地替換查詢使用（本測試走真實 controller，會實際觸發該查詢）。
+        Schema::create('char_variant_map', function ($table) {
+            $table->bigIncrements('id');
+            $table->string('c_variant_char', 10);
+            $table->string('c_reference_char', 10);
+            $table->tinyInteger('c_strict_excluded')->default(1);
+            $table->string('c_notes', 255)->nullable();
+            $table->timestamps();
+
+            $table->unique('c_variant_char', 'char_variant_map_c_variant_char_unique');
+        });
+
+        DB::table('char_variant_map')->insert([
+            ['c_variant_char' => '愼', 'c_reference_char' => '慎', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '槀', 'c_reference_char' => '稿', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '峯', 'c_reference_char' => '峰', 'c_strict_excluded' => 1],
+            ['c_variant_char' => '靑', 'c_reference_char' => '青', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '頴', 'c_reference_char' => '穎', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '淸', 'c_reference_char' => '清', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '厰', 'c_reference_char' => '廠', 'c_strict_excluded' => 0],
+        ]);
+        CharVariantMapService::reset();
     }
 
     protected function tearDown(): void {
@@ -158,6 +184,7 @@ class NameSearchIndexAutoSyncTest extends TestCase {
         Schema::dropIfExists('BIOG_MAIN');
         Schema::dropIfExists('audit_log');
         Schema::dropIfExists('operations');
+        Schema::dropIfExists('char_variant_map');
         Schema::dropIfExists('users');
         parent::tearDown();
     }
@@ -355,6 +382,89 @@ class NameSearchIndexAutoSyncTest extends TestCase {
             ->exists();
 
         $this->assertTrue($newExists, '新別名索引應該被創建');
+    }
+
+    #[Test]
+    public function test_creating_altname_with_variant_char_indexes_replaced_value(): void {
+        // 迴歸測試：CBDB__NAME_FTS 索引須與 ALTNAME_DATA 實際落地的值一致（都是異體字
+        // 落地替換後的值），而不是替換前的原始輸入——見
+        // docs/CHAR_VARIANT_MAP_CALL_SITE_WIRING_PLAN.md 步驟 5「實作時發現的第四個
+        // 掛鉤點」段落記錄的既存索引同步 bug。
+        $user = $this->createActiveExpert();
+
+        BiogMain::create([
+            'c_personid' => 2010,
+            'c_name_chn' => '測試人物',
+        ]);
+
+        $this->actingAs($user)
+            ->post('/basicinformation/2010/altnames', [
+                'c_sequence' => 1,
+                'c_alt_name_type_code' => 4,
+                'c_alt_name_chn' => '淸公',
+            ])
+            ->assertStatus(302);
+
+        $this->assertDatabaseHas('ALTNAME_DATA', [
+            'c_personid' => 2010,
+            'c_alt_name_chn' => '清公',
+        ]);
+
+        $indexedReplaced = DB::table('CBDB__NAME_FTS')
+            ->where('c_personid', 2010)
+            ->where('name_type_code', 4)
+            ->where('search_term', '清公')
+            ->exists();
+        $indexedOriginal = DB::table('CBDB__NAME_FTS')
+            ->where('c_personid', 2010)
+            ->where('search_term', '淸公')
+            ->exists();
+
+        $this->assertTrue($indexedReplaced, '索引應以落地替換後的字形建立');
+        $this->assertFalse($indexedOriginal, '索引不應殘留替換前的字形');
+    }
+
+    #[Test]
+    public function test_updating_altname_with_variant_char_reindexes_replaced_value(): void {
+        $user = $this->createActiveExpert();
+
+        BiogMain::create([
+            'c_personid' => 2011,
+            'c_name_chn' => '測試人物',
+        ]);
+
+        $this->actingAs($user)
+            ->post('/basicinformation/2011/altnames', [
+                'c_sequence' => 1,
+                'c_alt_name_type_code' => 5,
+                'c_alt_name_chn' => '舊號',
+            ])
+            ->assertStatus(302);
+
+        $this->actingAs($user)
+            ->put('/basicinformation/2011/altnames/2011-1-舊號-5', [
+                'c_sequence' => 1,
+                'c_alt_name_type_code' => 5,
+                'c_alt_name_chn' => '厰記',
+            ])
+            ->assertStatus(302);
+
+        $this->assertDatabaseHas('ALTNAME_DATA', [
+            'c_personid' => 2011,
+            'c_alt_name_chn' => '廠記',
+        ]);
+
+        $indexedReplaced = DB::table('CBDB__NAME_FTS')
+            ->where('c_personid', 2011)
+            ->where('search_term', '廠記')
+            ->exists();
+        $indexedOriginal = DB::table('CBDB__NAME_FTS')
+            ->where('c_personid', 2011)
+            ->where('search_term', '厰記')
+            ->exists();
+
+        $this->assertTrue($indexedReplaced, '更新後索引應以落地替換後的字形重建');
+        $this->assertFalse($indexedOriginal, '索引不應殘留替換前的字形');
     }
 
     #[Test]

@@ -30,6 +30,7 @@ use App\Services\AuditLogService;
 
 //20210625建安修改
 use App\Services\BracketNormalizer;
+use App\Services\CharVariantMapService;
 use App\Services\PinyinDictionary;
 use App\Services\VariantCharNormalizer;
 use App\Support\CompositePrimaryKey;
@@ -243,7 +244,16 @@ class BiogMainRepository {
     public function updateById($request, $id) {
         $data = $request->all();
 
-        $c_name_chn = $request->c_surname_chn.$request->c_mingzi_chn;
+        // 異體字落地替換（嚴格模式）：先替換姓／名分欄，再組出 c_name_chn，維持
+        // c_name_chn === c_surname_chn.c_mingzi_chn 的既有 invariant（見
+        // docs/CHAR_VARIANT_MAP_CALL_SITE_WIRING_PLAN.md 待決事項 1）。
+        $surnameReplaced = CharVariantMapService::replaceStrict((string) $request->c_surname_chn);
+        $mingziReplaced = CharVariantMapService::replaceStrict((string) $request->c_mingzi_chn);
+        $variantReplaced = array_merge($surnameReplaced['replaced'], $mingziReplaced['replaced']);
+        $data['c_surname_chn'] = $surnameReplaced['text'];
+        $data['c_mingzi_chn'] = $mingziReplaced['text'];
+
+        $c_name_chn = $surnameReplaced['text'].$mingziReplaced['text'];
         $c_name = trim($request->c_surname.' '.$request->c_mingzi);
         #20230626修改外文全名呈現順序
         #$c_name_proper = $request->c_surname_proper.' '.$request->c_mingzi_proper;
@@ -324,6 +334,7 @@ class BiogMainRepository {
         return [
             'no_changes' => false,
             'operation_id' => isset($operation) && $operation ? $operation->id : null,
+            'variant_replaced' => $variantReplaced,
         ];
     }
 
@@ -352,6 +363,28 @@ class BiogMainRepository {
 
     public function store(Request $request) {
         $data = $request->all();
+
+        // 異體字落地替換（嚴格模式）。v2 API 的 ALLOWED_FIELDS 允許呼叫端只送
+        // c_name_chn（不拆分姓／名，例如無明確姓氏的歷史人物），也允許送
+        // c_surname_chn/c_mingzi_chn（此時依「待決事項 2」無條件由分欄重組
+        // c_name_chn，不採信客戶端傳來的值，避免分欄與組合欄不同步）。若兩個分欄
+        // 都完全沒出現在請求裡（不是空字串，是 key 都不存在），代表呼叫端這次没有
+        // 送分欄，只能直接替換 c_name_chn 本身，不能無條件拿兩個不存在的分欄相加把
+        // c_name_chn 覆寫成空字串（見 tests/Feature/ApiV2CreateBiogMainTest.php
+        // 只送 c_name_chn 的既有使用情境）。
+        if (array_key_exists('c_surname_chn', $data) || array_key_exists('c_mingzi_chn', $data)) {
+            $surnameReplaced = CharVariantMapService::replaceStrict((string) ($data['c_surname_chn'] ?? ''));
+            $mingziReplaced = CharVariantMapService::replaceStrict((string) ($data['c_mingzi_chn'] ?? ''));
+            $variantReplaced = array_merge($surnameReplaced['replaced'], $mingziReplaced['replaced']);
+            $data['c_surname_chn'] = $surnameReplaced['text'];
+            $data['c_mingzi_chn'] = $mingziReplaced['text'];
+            $data['c_name_chn'] = $surnameReplaced['text'].$mingziReplaced['text'];
+        } else {
+            $nameChnReplaced = CharVariantMapService::replaceStrict((string) ($data['c_name_chn'] ?? ''));
+            $data['c_name_chn'] = $nameChnReplaced['text'];
+            $variantReplaced = $nameChnReplaced['replaced'];
+        }
+
         $data = (new ToolsRepository())->timestamp($data, true);
         $data = $this->auto_pinyin($data);
         // 括號正規化：全角轉半角、括號前後補空格
@@ -360,7 +393,7 @@ class BiogMainRepository {
         // 保存時拼音 v→ü 歸一化（Tier 1；冪等防禦：auto_pinyin 已先歸一化 c_surname/c_mingzi）
         $data = PinyinUmlaut::normalizeFields($data, PinyinUmlaut::BIOG_MAIN_PINYIN_V_FIELDS);
 
-        return DB::transaction(function () use ($data) {
+        return DB::transaction(function () use ($data, $variantReplaced) {
             $flight = BiogMain::create($data);
             $operation = (new OperationRepository())->store(Auth::id(), $data['c_personid'], 1, 'BIOG_MAIN', $data['c_personid'], $data);
 
@@ -375,7 +408,7 @@ class BiogMainRepository {
                 $operation ? (string) $operation->id : null
             );
 
-            return $flight;
+            return ['model' => $flight, 'replaced' => $variantReplaced];
         });
     }
 
@@ -3561,6 +3594,17 @@ class BiogMainRepository {
         $data['c_personid'] = $id;
         // 括號正規化：全角→半角（中文）、全角→半角+空格（拼音）
         $data = BracketNormalizer::normalizeAltname($data);
+
+        // 異體字落地替換（嚴格模式）：須在重複檢查之前，讓重複檢查看到的是替換後的
+        // 值（見 docs/CHAR_VARIANT_MAP_CALL_SITE_WIRING_PLAN.md 待決事項 3 修正段落，
+        // 這是 legacy Blade 專屬的第二條寫入路徑，與 AltnameCreateHandler 平行、不共用）。
+        $variantReplaced = [];
+        if (array_key_exists('c_alt_name_chn', $data)) {
+            $replaced = CharVariantMapService::replaceStrict((string) $data['c_alt_name_chn']);
+            $data['c_alt_name_chn'] = $replaced['text'];
+            $variantReplaced = $replaced['replaced'];
+        }
+
         // 重複檢查使用 3-key，c_sequence 不參與定位
         $duplicate = DB::table('ALTNAME_DATA')->where([
             ['c_personid', '=', $data['c_personid']],
@@ -3572,7 +3616,7 @@ class BiogMainRepository {
         }
         $data = (new ToolsRepository())->timestamp($data, true);
 
-        return DB::transaction(function () use ($id, $data) {
+        return DB::transaction(function () use ($id, $data, $variantReplaced) {
             DB::table('ALTNAME_DATA')->insert($data);
             $pk3 = [
                 'c_personid' => $data['c_personid'],
@@ -3592,7 +3636,9 @@ class BiogMainRepository {
                 $operation ? (string) $operation->id : null
             );
 
-            return $data;
+            // __variant_replaced 只附掛在回傳值上供呼叫端組非阻塞提示，不是資料表欄位，
+            // 在 insert() 之後才合併進來，不會被誤寫進 ALTNAME_DATA／operations／audit_log。
+            return array_merge($data, ['__variant_replaced' => $variantReplaced]);
         });
     }
 
@@ -3606,6 +3652,12 @@ class BiogMainRepository {
         $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment']);
         // 括號正規化：全角→半角（中文）、全角→半角+空格（拼音）
         $data = BracketNormalizer::normalizeAltname($data);
+
+        // 異體字落地替換（嚴格模式）：須在組出 $newPk3 之前，讓衝突檢查用的是替換後的
+        // 值（見 docs/CHAR_VARIANT_MAP_CALL_SITE_WIRING_PLAN.md 待決事項 3 修正段落）。
+        if (array_key_exists('c_alt_name_chn', $data)) {
+            $data['c_alt_name_chn'] = CharVariantMapService::replaceStrict((string) $data['c_alt_name_chn'])['text'];
+        }
 
         // 計算更新後的 3-key，若與原 PK 不同則檢查是否會與既有記錄衝突
         $newPk3 = [

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Operation;
 use App\Models\User;
+use App\Services\CharVariantMapService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -92,6 +93,31 @@ class BiogMainProposalTest extends TestCase {
             $table->tinyInteger('c_lastname')->default(0);
             $table->unique(['c_chn', 'c_lastname']);
         });
+
+        // char_variant_map：與 database/migrations/2026_07_15_000000_create_char_variant_map_table.php
+        // 相同的 7 筆種子資料，供 legacy Blade 提案路徑（BasicInformationProposalController::
+        // normalizePayloadForTable()）的異體字落地替換測試使用。
+        Schema::create('char_variant_map', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->string('c_variant_char', 10);
+            $table->string('c_reference_char', 10);
+            $table->tinyInteger('c_strict_excluded')->default(1);
+            $table->string('c_notes', 255)->nullable();
+            $table->timestamps();
+
+            $table->unique('c_variant_char', 'char_variant_map_c_variant_char_unique');
+        });
+
+        DB::table('char_variant_map')->insert([
+            ['c_variant_char' => '愼', 'c_reference_char' => '慎', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '槀', 'c_reference_char' => '稿', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '峯', 'c_reference_char' => '峰', 'c_strict_excluded' => 1],
+            ['c_variant_char' => '靑', 'c_reference_char' => '青', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '頴', 'c_reference_char' => '穎', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '淸', 'c_reference_char' => '清', 'c_strict_excluded' => 0],
+            ['c_variant_char' => '厰', 'c_reference_char' => '廠', 'c_strict_excluded' => 0],
+        ]);
+        CharVariantMapService::reset();
     }
 
     protected function tearDown(): void {
@@ -99,6 +125,7 @@ class BiogMainProposalTest extends TestCase {
         Schema::dropIfExists('operations');
         Schema::dropIfExists('audit_log');
         Schema::dropIfExists('pinyin');
+        Schema::dropIfExists('char_variant_map');
         Schema::dropIfExists('users');
         parent::tearDown();
     }
@@ -162,6 +189,176 @@ class BiogMainProposalTest extends TestCase {
 
         // 驗證數據庫原始資料未變更
         $this->assertSame('Original notes', DB::table('BIOG_MAIN')->where('c_personid', $personId)->value('c_notes'));
+    }
+
+    #[Test]
+    public function testLegacyBladeProposalReplacesStrictModeVariantAndKeepsNameChnInSync() {
+        $user = $this->makeActiveUser();
+        $this->actingAs($user);
+
+        $personId = 2;
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => $personId,
+            'c_name_chn' => '張忠',
+            'c_surname_chn' => '張',
+            'c_mingzi_chn' => '忠',
+        ]);
+
+        // legacy Blade 提案路徑（action=proposal）不經過 BiogMainMutationHandler::
+        // prepareProposalPayload()，走 BasicInformationProposalController::
+        // normalizePayloadForTable() 的另一個掛鉤點；淸（c_strict_excluded=0）在
+        // 嚴格模式應被替換，且 c_name_chn 須跟著分欄重組，不能維持前端送來的舊值。
+        $response = $this->patch(route('basicinformation.update', $personId), [
+            'action' => 'proposal',
+            'c_surname_chn' => '張',
+            'c_mingzi_chn' => '淸',
+            'c_name_chn' => '張淸',
+            '__proposal_comment' => '修改名字',
+        ]);
+
+        $response->assertRedirect(route('basicinformation.edit', $personId));
+
+        $operation = Operation::where('resource', 'BIOG_MAIN')
+            ->where('c_personid', $personId)
+            ->first();
+        $this->assertNotNull($operation);
+        $payload = json_decode($operation->resource_data, true);
+
+        $this->assertSame('清', $payload['c_mingzi_chn']);
+        $this->assertSame('張清', $payload['c_name_chn']);
+        $this->assertStringNotContainsString('淸', $payload['c_name_chn']);
+
+        // 原始資料未變更（提案未核准）。
+        $this->assertSame('忠', DB::table('BIOG_MAIN')->where('c_personid', $personId)->value('c_mingzi_chn'));
+    }
+
+    #[Test]
+    public function testLegacyBladeProposalDoesNotReplaceStrictExcludedVariant() {
+        $user = $this->makeActiveUser();
+        $this->actingAs($user);
+
+        $personId = 3;
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => $personId,
+            'c_name_chn' => '張忠',
+            'c_surname_chn' => '張',
+            'c_mingzi_chn' => '忠',
+        ]);
+
+        // 峯（c_strict_excluded=1）僅寬鬆模式可替換，嚴格模式（人名）須排除。
+        $response = $this->patch(route('basicinformation.update', $personId), [
+            'action' => 'proposal',
+            'c_surname_chn' => '張',
+            'c_mingzi_chn' => '峯',
+            'c_name_chn' => '張峯',
+            '__proposal_comment' => '修改名字',
+        ]);
+
+        $response->assertRedirect(route('basicinformation.edit', $personId));
+
+        $operation = Operation::where('resource', 'BIOG_MAIN')
+            ->where('c_personid', $personId)
+            ->first();
+        $this->assertNotNull($operation);
+        $payload = json_decode($operation->resource_data, true);
+
+        $this->assertSame('峯', $payload['c_mingzi_chn']);
+        $this->assertSame('張峯', $payload['c_name_chn']);
+    }
+
+    #[Test]
+    public function testLegacyBladeDirectUpdateReplacesStrictModeVariantAndFlashesNotice() {
+        $user = $this->makeActiveUser();
+        $this->actingAs($user);
+
+        $personId = 4;
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => $personId,
+            'c_name_chn' => '張忠',
+            'c_surname_chn' => '張',
+            'c_mingzi_chn' => '忠',
+        ]);
+
+        $response = $this->patch(route('basicinformation.update', $personId), [
+            'c_surname_chn' => '張',
+            'c_mingzi_chn' => '淸',
+            'c_mingzi' => 'Qing',
+            'c_by_intercalary' => 0,
+            'c_dy_intercalary' => 0,
+            'c_female' => 0,
+        ]);
+
+        $response->assertRedirect(route('basicinformation.edit', $personId));
+
+        $this->assertDatabaseHas('BIOG_MAIN', [
+            'c_personid' => $personId,
+            'c_mingzi_chn' => '清',
+            'c_name_chn' => '張清',
+        ]);
+
+        $flash = session('flash_notification', collect())->toArray();
+        $messages = array_column($flash, 'message');
+        $this->assertTrue(
+            (bool) array_filter($messages, static fn ($m) => str_contains($m, '淸') && str_contains($m, '清')),
+            '應有一則含異體字落地替換內容的 flash 訊息'
+        );
+    }
+
+    #[Test]
+    public function testLegacyBladeCreateReplacesStrictModeVariantAndFlashesNotice() {
+        $user = $this->makeActiveUser();
+        $this->actingAs($user);
+
+        $response = $this->post(route('basicinformation.store'), [
+            'c_personid' => 5,
+            'c_surname_chn' => '張',
+            'c_mingzi_chn' => '淸',
+            'c_mingzi' => 'Qing',
+            'c_by_intercalary' => 0,
+            'c_dy_intercalary' => 0,
+            'c_female' => 0,
+        ]);
+
+        $response->assertRedirect(route('basicinformation.edit', 5));
+
+        // 只斷言 c_name_chn（不斷言 auto_pinyin() 事後用姓氏字典重新拆出的
+        // c_surname_chn/c_mingzi_chn——那是既有、與本次改動無關的姓氏比對邏輯，
+        // 本測試環境未種入姓氏字典資料，拆分結果不在本測試驗證範圍內）。
+        $this->assertDatabaseHas('BIOG_MAIN', [
+            'c_personid' => 5,
+            'c_name_chn' => '張清',
+        ]);
+        $this->assertStringNotContainsString('淸', (string) DB::table('BIOG_MAIN')->where('c_personid', 5)->value('c_name_chn'));
+
+        $flash = session('flash_notification', collect())->toArray();
+        $messages = array_column($flash, 'message');
+        $this->assertTrue(
+            (bool) array_filter($messages, static fn ($m) => str_contains($m, '淸') && str_contains($m, '清')),
+            '應有一則含異體字落地替換內容的 flash 訊息'
+        );
+    }
+
+    #[Test]
+    public function testLegacyBladeCreateDoesNotReplaceStrictExcludedVariant() {
+        $user = $this->makeActiveUser();
+        $this->actingAs($user);
+
+        $response = $this->post(route('basicinformation.store'), [
+            'c_personid' => 6,
+            'c_surname_chn' => '張',
+            'c_mingzi_chn' => '峯',
+            'c_mingzi' => 'Feng',
+            'c_by_intercalary' => 0,
+            'c_dy_intercalary' => 0,
+            'c_female' => 0,
+        ]);
+
+        $response->assertRedirect(route('basicinformation.edit', 6));
+
+        $this->assertDatabaseHas('BIOG_MAIN', [
+            'c_personid' => 6,
+            'c_name_chn' => '張峯',
+        ]);
     }
 
     #[Test]

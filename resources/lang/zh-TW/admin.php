@@ -163,6 +163,14 @@ return [
     'batch_network_error' => '網路錯誤，請重試',
     'batch_copied_n' => '已複製 :count 筆',
     'batch_copy_failed' => '自動複製失敗，已展開下方文字框，請 Ctrl+C 手動複製',
+    'batch_check_rare_chars' => '罕見字檢測',
+    'batch_check_rare_chars_checking' => '檢測中…',
+    'batch_check_rare_chars_title' => '罕見字檢測結果（僅比對 pinyin 表，不含 opencc 退回）',
+    'batch_check_rare_chars_none' => '未發現罕見字：已檢測 :count 行書名，所有漢字皆在 pinyin 表內。',
+    'batch_check_rare_chars_summary' => '已檢測 :count 行書名，發現 :chars 個不在 pinyin 表的漢字（分佈於 :lines 行）：',
+    'batch_check_rare_chars_line' => '第 :line 行',
+    'batch_check_rare_chars_parse_note' => '另有 :count 行格式不符、未納入檢測：',
+    'batch_check_rare_chars_empty_input' => '請先輸入批次資料再進行檢測。',
 
     // batch_load_offices
     'batch_offices_page_title' => '批次匯入官職',

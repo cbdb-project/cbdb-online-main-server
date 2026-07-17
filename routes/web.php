@@ -463,6 +463,9 @@ Route::middleware('auth')->group(function () {
     // 逐列直接編輯拼音（回傳 JSON，React 以 fetch 呼叫並就地更新該列；重用既有 updatePinyin）
     Route::post('app/admin/batch-load-book-titles/update-pinyin', 'AdminBatchLoadBookTitlesController@updatePinyin')
         ->name('app.admin.batch-load-book-titles.update-pinyin');
+    // 罕見字檢測（回傳 JSON）：只查 pinyin 表，列出表未收的漢字與行號，匯入前先行檢查。
+    Route::post('app/admin/batch-load-book-titles/check-rare-chars', 'AdminBatchLoadBookTitlesController@checkRareChars')
+        ->name('app.admin.batch-load-book-titles.check-rare-chars');
     Route::get('admin/batch-load-social-institutes', 'AdminBatchLoadSocialInstitutesController@showForm')->name('admin.batch-load-social-institutes');
     Route::post('admin/batch-load-social-institutes', 'AdminBatchLoadSocialInstitutesController@store')->name('admin.batch-load-social-institutes.store');
     // Inertia + React 版（store 重用，依請求路徑重導）

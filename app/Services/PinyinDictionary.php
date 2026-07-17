@@ -88,6 +88,20 @@ class PinyinDictionary {
     }
 
     /**
+     * 判斷某個字元是否直接存在於人工策展的 `pinyin` 表（不含 opencc-pinyin
+     * 靜態字典的退回層）。供「罕見字檢測」使用：一個字若僅能靠 opencc 退回層
+     * 或完全查無讀音，isInTable() 會回傳 false，代表它不在權威表內。
+     *
+     * 注意：這裡刻意「只看表」，與 getPinyin()/getSyllables() 會退回 opencc
+     * 字典的行為不同——罕見字檢測的目的正是找出表未覆蓋的字。
+     */
+    public static function isInTable(string $char): bool {
+        self::ensureLoaded();
+
+        return array_key_exists($char, self::$cache);
+    }
+
+    /**
      * 載入整表快取（同一個 PHP request 生命週期內只查一次 DB）。
      *
      * 建構順序：先塞入 c_lastname=1（姓氏讀音）的資料當作退回值，

@@ -27,4 +27,20 @@ class AdminBatchLoadBookTitlesPinyinRouteTest extends TestCase {
             $route->getActionName()
         );
     }
+
+    #[Test]
+    public function app_check_rare_chars_route_is_registered_and_maps_to_controller() {
+        $this->assertTrue(
+            Route::has('app.admin.batch-load-book-titles.check-rare-chars'),
+            'app 版 check-rare-chars 路由必須存在，前端罕見字檢測按鈕才呼叫得到'
+        );
+
+        $route = Route::getRoutes()->getByName('app.admin.batch-load-book-titles.check-rare-chars');
+        $this->assertSame('app/admin/batch-load-book-titles/check-rare-chars', $route->uri());
+        $this->assertContains('POST', $route->methods());
+        $this->assertSame(
+            'App\Http\Controllers\AdminBatchLoadBookTitlesController@checkRareChars',
+            $route->getActionName()
+        );
+    }
 }

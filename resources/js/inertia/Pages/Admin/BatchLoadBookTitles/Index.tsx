@@ -82,7 +82,20 @@ interface BatchBooksPageProps extends SharedProps {
     batch_errors: string[];
     batch_id: string | null;
     toast: Toast | null;
-    urls: { store: string; undo: string; reset: string; update_pinyin: string };
+    urls: { store: string; undo: string; reset: string; update_pinyin: string; check_rare_chars: string };
+}
+
+interface RareCharMissingRow {
+    line: number;
+    title: string;
+    chars: { char: string; codepoint: string }[];
+}
+
+interface RareCharResult {
+    checked: number;
+    parse_errors: string[];
+    missing: RareCharMissingRow[];
+    unique_char_count: number;
 }
 
 export default function BatchLoadBookTitles() {
@@ -103,6 +116,11 @@ export default function BatchLoadBookTitles() {
     const [busyId, setBusyId] = useState<number | null>(null);
     const [rowStatus, setRowStatus] = useState<{ id: number; msg: string; kind: 'success' | 'error' } | null>(null);
 
+    // 罕見字檢測（只查 pinyin 表）狀態。發現的罕見字/解析錯誤顯示於既有的訊息窗口
+    // （與匯入錯誤共用同一個 box）；「未發現/空輸入/網路錯誤」等單行狀態走頁面既有的 toast。
+    const [rareChecking, setRareChecking] = useState(false);
+    const [rareResult, setRareResult] = useState<RareCharResult | null>(null);
+
     useEffect(() => {
         setToastShown(toast);
         if (toast) {
@@ -117,6 +135,7 @@ export default function BatchLoadBookTitles() {
         setEditId(null);
         setDraft('');
         setRowStatus(null);
+        setRareResult(null);
     }, [results]);
 
     const flashToast = (tt: Toast) => {
@@ -184,7 +203,58 @@ export default function BatchLoadBookTitles() {
         }
     };
 
+    const checkRareChars = async () => {
+        if (rareChecking) {
+            return;
+        }
+        if (form.data.entries.trim() === '') {
+            setRareResult(null);
+            flashToast({ msg: t('batch_check_rare_chars_empty_input'), type: 'warning' });
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+        setRareChecking(true);
+        try {
+            const res = await fetch(urls.check_rare_chars, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({ entries: form.data.entries }),
+            });
+            const json = await res.json().catch(() => null);
+            if (!res.ok || !json || json.ok === false) {
+                setRareResult(null);
+                flashToast({ msg: (json && json.message) || t('batch_network_error'), type: 'error' });
+                return;
+            }
+            const result: RareCharResult = {
+                checked: json.checked ?? 0,
+                parse_errors: Array.isArray(json.parse_errors) ? json.parse_errors : [],
+                missing: Array.isArray(json.missing) ? json.missing : [],
+                unique_char_count: json.unique_char_count ?? 0,
+            };
+            setRareResult(result);
+            // 有罕見字或解析錯誤 → 顯示於訊息窗口（下方 box）；否則全部通過 → 綠色 toast。
+            if (result.missing.length === 0 && result.parse_errors.length === 0) {
+                flashToast({ msg: t('batch_check_rare_chars_none', { count: String(result.checked) }), type: 'success' });
+            }
+        } catch {
+            setRareResult(null);
+            flashToast({ msg: t('batch_network_error'), type: 'error' });
+        } finally {
+            setRareChecking(false);
+            // 訊息窗口／toast 都在頁面頂端，檢測後捲回頂端讓結果立即可見。
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
+
     const submit = (force: boolean) => {
+        setRareResult(null);
         form.transform((d) => (force ? { entries: d.entries, force: '1' } : { entries: d.entries }));
         form.post(urls.store, { preserveScroll: true });
     };
@@ -224,12 +294,54 @@ export default function BatchLoadBookTitles() {
                     </div>
                 )}
 
-                {batch_errors.length > 0 && (
+                {(batch_errors.length > 0 || (rareResult && (rareResult.missing.length > 0 || rareResult.parse_errors.length > 0))) && (
                     <div className="mb-3 rounded border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-800">
-                        <p className="font-semibold">{t('batch_import_failed')}</p>
-                        <ul className="mt-1">
-                            {batch_errors.map((m, i) => <li key={i}>・{m}</li>)}
-                        </ul>
+                        {batch_errors.length > 0 && (
+                            <>
+                                <p className="font-semibold">{t('batch_import_failed')}</p>
+                                <ul className="mt-1">
+                                    {batch_errors.map((m, i) => <li key={i}>・{m}</li>)}
+                                </ul>
+                            </>
+                        )}
+                        {rareResult && (rareResult.missing.length > 0 || rareResult.parse_errors.length > 0) && (
+                            <div className={batch_errors.length > 0 ? 'mt-3 border-t border-red-200 pt-2' : ''}>
+                                <p className="font-semibold">{t('batch_check_rare_chars_title')}</p>
+                                {rareResult.missing.length > 0 && (
+                                    <>
+                                        <p className="mt-1">
+                                            {t('batch_check_rare_chars_summary', {
+                                                count: String(rareResult.checked),
+                                                chars: String(rareResult.unique_char_count),
+                                                lines: String(rareResult.missing.length),
+                                            })}
+                                        </p>
+                                        <ul className="mt-1 space-y-0.5">
+                                            {rareResult.missing.map((row) => (
+                                                <li key={row.line}>
+                                                    <span className="font-medium">{t('batch_check_rare_chars_line', { line: String(row.line) })}</span>
+                                                    {'：'}
+                                                    {row.chars.map((c, i) => (
+                                                        <span key={c.codepoint} className="font-mono">
+                                                            {i > 0 ? ' ' : ''}
+                                                            「{c.char}」({c.codepoint})
+                                                        </span>
+                                                    ))}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </>
+                                )}
+                                {rareResult.parse_errors.length > 0 && (
+                                    <div className={rareResult.missing.length > 0 ? 'mt-2 border-t border-red-200 pt-2' : 'mt-1'}>
+                                        <p>{t('batch_check_rare_chars_parse_note', { count: String(rareResult.parse_errors.length) })}</p>
+                                        <ul className="mt-1">
+                                            {rareResult.parse_errors.map((m, i) => <li key={i}>・{m}</li>)}
+                                        </ul>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -245,6 +357,9 @@ export default function BatchLoadBookTitles() {
                         <Button type="submit" disabled={form.processing}>{t('batch_submit')}</Button>
                         <Button type="button" variant="secondary" disabled={form.processing} onClick={() => setConfirmForce(true)}>
                             {t('batch_force_submit')}
+                        </Button>
+                        <Button type="button" variant="outline" disabled={rareChecking} onClick={checkRareChars}>
+                            {rareChecking ? t('batch_check_rare_chars_checking') : t('batch_check_rare_chars')}
                         </Button>
                         <a href={urls.reset} className="inline-flex items-center rounded-md border border-input px-4 py-2 text-sm hover:bg-muted">
                             {t('batch_clear_reset')}

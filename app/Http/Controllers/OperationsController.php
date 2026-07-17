@@ -1356,6 +1356,12 @@ class OperationsController extends Controller {
             'SOCIAL_INSTITUTION_ADDR' => ['c_inst_addr_id','c_inst_addr_type_code','c_inst_code','c_inst_name_code','inst_xcoord','inst_ycoord'],
             'ADMIN_CAT_CODES' => ['c_admin_cat_code'],
             'ADDR_CODES' => ['c_addr_id'],
+            // char_variant_map 的實際資料表名是小寫，AbstractCodeTableMutationHandler::handleDirect()/
+            // handleProposal() 傳給 OperationRepository::store() 的 $resource 參數就是 tableName()
+            // 回傳的原始表名字串（此處即小寫 'char_variant_map'），resourceKeyColumns() 這裡是直接依
+            // 字面值查陣列鍵、不像 CompositePrimaryKey::lookup() 會 strtoupper() 正規化，
+            // 因此鍵名必須完全比照實際表名大小寫，不能像其他 Phase B 表一樣使用大寫。
+            'char_variant_map' => ['id'],
         ];
 
         return $map[$resource] ?? [];

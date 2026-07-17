@@ -86,6 +86,10 @@ class ConfigCodeTableMutationHandler extends AbstractCodeTableMutationHandler {
         return $this->active['allowed_fields'];
     }
 
+    protected function integerFields(): array {
+        return $this->active['integer_fields'] ?? [];
+    }
+
     /**
      * §D-6 保存止血：對本表的 **Tier 1** 拼音欄靜默套用 v→ü 歸一化。
      * Tier 2（混西文）欄**不**在此轉——由前端 altname 式彈窗讓使用者決定（後端原樣寫入）。

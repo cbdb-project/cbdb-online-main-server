@@ -29,5 +29,14 @@ return [
                 'c_url_api', 'c_url_api_coda', 'c_url_homepage', 'c_notes', 'c_title_alt_chn',
             ],
         ],
+        'char_variant_map' => [
+            'resource' => 'char-variant-map',
+            'aliases' => ['char-variant-map', 'char_variant_map', 'charvariantmap'],
+            'table' => 'char_variant_map',
+            'display_name' => '異體字落地替換對照表',
+            'key_column' => 'id',
+            'auto_assign_id' => true,
+            'allowed_fields' => ['c_variant_char', 'c_reference_char', 'c_strict_excluded', 'c_notes'],
+        ],
     ],
 ];

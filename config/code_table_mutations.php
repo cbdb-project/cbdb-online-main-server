@@ -15,6 +15,10 @@
  *   - tier1_fields：保存時**後端靜默** v→ü 歸一化的欄（定義上即漢語拼音、無西文）。
  *   - tier2_fields：**可能含西文**的混合欄——後端**不**靜默轉（由前端 altname 式彈窗讓使用者決定）。
  *     tier1_fields ∪ tier2_fields 必等於 allowed_fields。依 §D-6 Tier 登錄表（實測定案）。
+ *   - integer_fields（可選，預設無）：allowed_fields 中允許以整數值更新的欄（見
+ *     AbstractCodeTableMutationHandler::validateFields()）。預設所有欄一律要求 string|null；
+ *     只有非拼音／文字的整數旗標欄（如 char_variant_map.c_strict_excluded）才需要登記，
+ *     且僅登記該欄本身——不影響同一張表或其他表未登記欄位仍要求 string|null 的既有行為。
  *
  * 目前僅 update；c_personid 一律 0（code 表為全域代碼）。
  */
@@ -150,6 +154,20 @@ return [
             'allowed_fields' => ['c_name'],
             'tier1_fields' => [],
             'tier2_fields' => ['c_name'],
+        ],
+        [
+            'resource' => 'char_variant_map',
+            'table' => 'char_variant_map',
+            'aliases' => ['char_variant_map', 'char-variant-map', 'charvariantmap'],
+            'display_name' => '異體字落地替換對照',
+            'key_columns' => ['id'],
+            'allowed_fields' => ['c_variant_char', 'c_reference_char', 'c_strict_excluded', 'c_notes'],
+            'tier1_fields' => [],
+            'tier2_fields' => ['c_variant_char', 'c_reference_char', 'c_strict_excluded', 'c_notes'],
+            // c_strict_excluded 是整數旗標欄（tinyint 0/1），非本檔其餘表清一色的拼音／文字欄；
+            // AbstractCodeTableMutationHandler::validateFields() 預設只接受 string|null，
+            // 這裡明確登記允許整數，且僅限這一欄——不影響本檔其他表仍要求 string|null 的既有行為。
+            'integer_fields' => ['c_strict_excluded'],
         ],
     ],
 ];

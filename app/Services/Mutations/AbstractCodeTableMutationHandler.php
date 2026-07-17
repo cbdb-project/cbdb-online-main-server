@@ -158,38 +158,48 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
         $operation = null;
         $newArray = [];
 
-        DB::transaction(function () use ($table, $pk, $resourceId, $updateData, $originalArray, $comment, $operationId, $personId, &$operation, &$newArray) {
-            $this->whereByPk(DB::table($table), $pk)->update($updateData);
+        try {
+            DB::transaction(function () use ($table, $pk, $resourceId, $updateData, $originalArray, $comment, $operationId, $personId, &$operation, &$newArray) {
+                $this->whereByPk(DB::table($table), $pk)->update($updateData);
 
-            $updatedRow = $this->findByPk($pk);
-            $newArray = $this->auditLogService->normalizeRow($updatedRow);
+                $updatedRow = $this->findByPk($pk);
+                $newArray = $this->auditLogService->normalizeRow($updatedRow);
 
-            $resourceData = array_merge($newArray, ['__operation_id' => $operationId]);
-            if ($comment !== '') {
-                $resourceData['__note'] = $comment;
+                $resourceData = array_merge($newArray, ['__operation_id' => $operationId]);
+                if ($comment !== '') {
+                    $resourceData['__note'] = $comment;
+                }
+
+                $operation = $this->operationRepository->store(
+                    Auth::id(),
+                    $personId,
+                    Operation::TYPE_UPDATE,
+                    $table,
+                    $resourceId,
+                    $resourceData,
+                    $originalArray
+                );
+
+                $this->auditLogService->write(
+                    $table,
+                    'UPDATE',
+                    $pk,
+                    $originalArray,
+                    $newArray,
+                    'user',
+                    (string) Auth::id(),
+                    $operationId
+                );
+            });
+        } catch (\Illuminate\Database\QueryException $e) {
+            // 部分表（如 char_variant_map 的 c_variant_char）在非主鍵欄位上另有唯一鍵；
+            // 更新撞到該唯一鍵須回 409（可重試/可提示），不能讓資料庫層例外冒出成 500。
+            if ($this->isUniqueConstraintViolation($e)) {
+                return $this->errorResponse('修改後的值與其他記錄的唯一鍵衝突', 409, ['changes' => ['conflict']]);
             }
 
-            $operation = $this->operationRepository->store(
-                Auth::id(),
-                $personId,
-                Operation::TYPE_UPDATE,
-                $table,
-                $resourceId,
-                $resourceData,
-                $originalArray
-            );
-
-            $this->auditLogService->write(
-                $table,
-                'UPDATE',
-                $pk,
-                $originalArray,
-                $newArray,
-                'user',
-                (string) Auth::id(),
-                $operationId
-            );
-        });
+            throw $e;
+        }
 
         return response()->json([
             'ok' => true,
@@ -246,14 +256,29 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
     }
 
     /**
-     * 欄位值校驗：預設對每個白名單欄做「字串或 null、長度 ≤ 255」檢查。
-     * 需要更嚴格規則的表可覆寫。
+     * 允許以整數值更新的欄位（預設無）。這組欄位存在的原因：本基底原本假設所有已登錄表的
+     * allowed_fields 都是拼音／文字欄，一律要求 string|null；char_variant_map 的
+     * c_strict_excluded 是第一個整數旗標欄，JSON 呼叫端會送整數（非字串）。刻意不對「所有」
+     * 欄位一律放寬接受 int，避免其他表原本合法的「送整數應被拒絕」行為被意外放寬
+     * （例如某拼音欄位不該接受數字型別）。需要整數欄位的子類／設定應覆寫或提供此清單。
+     *
+     * @return array<int,string>
+     */
+    protected function integerFields(): array {
+        return [];
+    }
+
+    /**
+     * 欄位值校驗：預設對每個白名單欄做「字串或 null、長度 ≤ 255」檢查；
+     * integerFields() 內列出的欄位額外接受整數。需要更嚴格規則的表可覆寫。
      */
     protected function validateFields(array $data): array {
         $errors = [];
+        $integerFields = $this->integerFields();
         foreach ($data as $field => $value) {
-            if ($value !== null && !is_string($value)) {
-                $errors[$field] = [$field . ' 必須為字串或 null'];
+            $allowInt = in_array($field, $integerFields, true);
+            if ($value !== null && !is_string($value) && !($allowInt && is_int($value))) {
+                $errors[$field] = [$field . ($allowInt ? ' 必須為字串、整數或 null' : ' 必須為字串或 null')];
             } elseif (is_string($value) && mb_strlen($value) > 255) {
                 $errors[$field] = [$field . ' 長度不可超過 255 字元'];
             }
@@ -285,5 +310,15 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
         }
 
         return $query;
+    }
+
+    private function isUniqueConstraintViolation(\Illuminate\Database\QueryException $e): bool {
+        $code = (int) ($e->errorInfo[1] ?? 0);
+        if (in_array($code, [1062, 19], true)) {
+            return true;
+        }
+        $msg = $e->getMessage();
+
+        return str_contains($msg, 'UNIQUE') || str_contains($msg, 'Duplicate entry');
     }
 }

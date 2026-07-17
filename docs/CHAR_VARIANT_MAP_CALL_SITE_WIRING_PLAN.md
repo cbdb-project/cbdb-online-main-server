@@ -230,9 +230,15 @@ class CharVariantMapService {
 ```
 ```php
 // app/Http/Controllers/OperationsController.php resourceKeyColumns()
-'CHAR_VARIANT_MAP' => ['id'],
+'char_variant_map' => ['id'],
 ```
-（比照既有 `TEXT_CODES`／`NIAN_HAO` 等 Phase B code 表的登錄方式，三處主鍵定義——`config/code_table_mutations.php` 的 `key_columns`、`CompositePrimaryKey::SCHEMAS`、`OperationsController::resourceKeyColumns()`——欄位順序須完全一致，這是 `AGENTS.md`「複合主鍵」一節與既有多張 Phase B 表共同遵守的規則。）
+（比照既有 `TEXT_CODES`／`NIAN_HAO` 等 Phase B code 表的登錄方式，三處主鍵定義——`config/code_table_mutations.php` 的 `key_columns`、`CompositePrimaryKey::SCHEMAS`、`OperationsController::resourceKeyColumns()`——欄位順序須完全一致，這是 `AGENTS.md`「複合主鍵」一節與既有多張 Phase B 表共同遵守的規則。**大小寫例外**：`CompositePrimaryKey::SCHEMAS` 的鍵須用大寫 `CHAR_VARIANT_MAP`（其 lookup 方法內部會 `strtoupper($table)` 正規化再查表），但 `OperationsController::resourceKeyColumns()` 的鍵須用小寫 `char_variant_map`（這裡是直接 `$map[$resource]` 字面值查表、不做大小寫正規化，而 `$resource` 實際上就是 `AbstractCodeTableMutationHandler::tableName()`／`CodeTableCreateHandler` 傳給 `OperationRepository::store()` 的原始表名字串，對本表而言就是小寫 `char_variant_map`）。原計畫草稿曾誤寫成兩處都用大寫，經 review agent／codex 覆核程式碼後確認並修正；之後若再登記新表，這一步都要重新確認兩處各自的大小寫慣例，不能照抄同一種寫法。）
+
+**Step 7 review 階段額外發現並修正兩個 `AbstractCodeTableMutationHandler`（`app/Services/Mutations/AbstractCodeTableMutationHandler.php`）共用基底類別的既存缺陷**（影響所有已登錄 Phase B 表，不只 `char_variant_map`，但是本表的欄位特性第一個踩到）：
+- **`validateFields()` 原本只接受 `string|null`**：`c_strict_excluded` 是本表新增的第一個整數旗標欄（其餘既有表的 `allowed_fields` 清一色是拼音／文字欄），JSON 呼叫端送整數 `0`/`1`（而非字串 `"0"`/`"1"`）會被誤擋 422，與 create 路徑（`CodeTableCreateHandler` 無此型別限制）行為不一致。**初版修正曾對「所有」表的「所有」欄位一律放寬接受 int**（`is_int($value)`），經 codex 覆核指出這會讓其他 12 張既有表（皆為拼音／文字欄）原本合法的「送整數應被拒絕」行為被意外放寬——已修正為新增 `integerFields()` 方法（預設回傳空陣列）＋ `config/code_table_mutations.php` 新增可選欄位 `integer_fields`，只有明確登記在該表 `integer_fields` 內的欄位才接受整數，`char_variant_map` 只登記 `c_strict_excluded` 一欄，不影響本表其他欄位或其他 12 張表仍要求 `string|null` 的既有行為。已補回歸測試（`ApiV2MutateCodeTablesTest::testGanzhiDirectUpdateStillRejectsIntegerValueForTextField`）驗證放寬沒有波及既有表。
+- **`handleDirect()` 的 `DB::transaction(...)` 原本沒有包 `try/catch`**：`c_variant_char` 是本表第一個「非主鍵、但有唯一鍵約束」且被列入 `allowed_fields` 的欄位（其餘既有表的可更新欄位都不帶唯一鍵約束），更新撞到唯一鍵衝突時原本會讓 `QueryException` 直接冒出成 500，而非像 create 路徑那樣友善轉成 409。已比照 `CodeTableCreateHandler::isUniqueConstraintViolation()` 的既有模式，在 `handleDirect()` 補上 try/catch，唯一鍵衝突回 409。
+
+兩項修正都已補上對應回歸測試（`tests/Feature/ApiV2MutateCodeTableCharVariantMapTest.php`），並確認既有 12 張 Phase B 表的既有測試（`tests/Feature/ApiV2MutateCodeTablesTest.php`、`ApiV2MutateCodeTableTextCodesTest.php`）不受影響。
 
 **`tier1_fields`/`tier2_fields` 分派說明**：`config/code_table_mutations.php` 的 docblock 明訂 `tier1_fields ∪ tier2_fields` 必須等於 `allowed_fields`（見該檔案第 17 行），且這組欄位是為 §D-6 拼音 v→ü 歸一化設計——tier1 = 保存時後端靜默做 v→ü 轉換的純拼音欄，tier2 = 可能混西文、後端不靜默轉、由前端彈窗讓使用者決定的欄。`char_variant_map` 的 4 個欄位全部**都不是**拼音／羅馬字欄（`c_variant_char`/`c_reference_char` 是漢字、`c_strict_excluded` 是整數、`c_notes` 是自由文字），嚴格來說沒有一個真正符合 tier1 或 tier2 原始設計的欄位語意。**決定**：全部 4 欄位放進 `tier2_fields`（而非 `tier1_fields`），理由：
   - tier1 語意是「後端保存時靜默套用 v→ü 轉換規則」，對非拼音欄套用是語意錯誤，且有極小機率誤傷（例如 `c_notes` 若剛好寫入含小寫 `v` 的文字，靜默轉換可能不是使用者原意）；tier2 語意是「不靜默轉、只在偵測到 v→ü pattern 時彈窗讓使用者選擇」——對這 4 個欄位而言，由於內容本來就不含拼音 pattern，彈窗實務上幾乎不會觸發，是更安全的預設。
@@ -260,3 +266,7 @@ class CharVariantMapService {
 - `VariantCharNormalizer` 類別本身的刪除清理（見前一份文件「不在本次範圍內」，依賴條件已滿足但屬於獨立任務）。
 - `CBDB__TRAD_SIMP_MAP` 繁簡轉換機制（與本表功能層次不同，見前一份文件）。
 - 對既有資料庫裡「已經含有這些異體字」的既有人物/書名記錄做批次回溯更新——本階段只處理「往後新增/修改時」的落地替換，不做歷史資料的批次校正（批次校正若有需要，屬於另一個獨立任務，且需要更謹慎的影響評估，不應該隨這次呼叫點串接一併做）。
+- **本階段只涵蓋 BIOG_MAIN 姓名欄、ALTNAME_DATA 別名欄、TITLE_VARIANT_MAP（書名）三類欄位，未涵蓋其他任意文本錄入入口**（使用者於 goal 執行中途提出、待下一階段評估，本階段刻意不處理）：
+  - Codes UI（`/codes/{table}`、`/app/codes/{table}`）對「所有」代碼表的「所有」文本欄位——目前落地替換只掛在 `char_variant_map` 本身被查詢的三個特定呼叫點，並未掛在 `CodesController` 通用的 `store()`/`update()` 寫入路徑上，也就是說透過 Codes UI 編輯任何其他代碼表（例如 `TEXT_CODES.c_title`、`OFFICE_CODES.c_office_chn` 等）時，若使用者輸入了這 7 個異體字之一，**不會**被落地替換。
+  - 各人物子資源 editor（複合主鍵子資源，如 `BIOG_SOURCE_DATA`／`POSTING_DATA`／`EVENTS_DATA`／`KIN_DATA` 等）中泛用的 `c_notes`／`c_pages` 等自由文字欄位——這些欄位目前完全沒有掛任何落地替換邏輯，使用者若在筆記或頁碼欄位輸入這些異體字，會原樣存入。
+  - 下一階段若要處理，需要先盤點：(1) 哪些欄位屬於「應該落地替換」的範疇（人名/書名等有明確歸一化需求的欄位）vs.「不應該替換」的範疇（例如 `c_notes` 這類引用原始文獻用字、逐字抄錄的欄位，替換後可能反而扭曲史料原貌，需要另外評估是否該用寬鬆或嚴格模式、甚至完全不替換）；(2) 是否要在 `CodesController`／各子資源 mutation handler 的通用寫入路徑上加一個「按欄位類型套用替換」的機制，而非像本階段一樣為每個呼叫點個別手動掛鉤（如果欄位範圍擴大到「所有代碼表所有文本欄位」的量級，個別手動掛鉤的作法會難以維護，值得重新評估是否要換一個更通用的機制，例如寫入前置中介層）。

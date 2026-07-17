@@ -81,6 +81,7 @@ class AdminBatchLoadBookTitlesController extends Controller {
                 'undo' => route('app.admin.batch-load-book-titles.undo', [], false),
                 'reset' => route('app.admin.batch-load-book-titles', [], false),
                 'update_pinyin' => route('app.admin.batch-load-book-titles.update-pinyin', [], false),
+                'check_rare_chars' => route('app.admin.batch-load-book-titles.check-rare-chars', [], false),
             ],
             'page_translations' => [
                 'admin' => is_array($t = trans('admin')) ? $t : [],
@@ -309,6 +310,85 @@ class AdminBatchLoadBookTitlesController extends Controller {
             'modified_by' => $stored->c_modified_by,
             'modified_date' => (string) $stored->c_modified_date,
         ]);
+    }
+
+    /**
+     * 罕見字檢測：逐行檢查書名中的漢字是否「直接存在於人工策展的 pinyin 表」，
+     * 把查不到的字連同行號列出，供管理員在正式匯入前先補齊表資料或人工確認。
+     *
+     * 與 store() 的匯入前檢查（collectUnpinyinableHan）刻意不同：
+     *   - 匯入檢查用 PinyinDictionary::getPinyin()，會退回 opencc-pinyin 靜態字典，
+     *     只有連 opencc 都查不到（極生僻字/非漢字）才擋。
+     *   - 本檢測用 PinyinDictionary::isInTable()，「只看 pinyin 表」，不吃 opencc 退回，
+     *     因此只要不在權威表內（即使 opencc 補得出讀音）都會被列為罕見字。
+     *
+     * 檢測範圍與匯入實際寫入 c_title 的拼音對齊：先 stripVolumeInfo() 去掉冒號後的
+     * 卷冊註記（那段不會進拼音），但不套 VariantCharNormalizer——異體字歸一化屬於
+     * 另一層退回機制，這裡同樣要如實回報「表未收此字形」。書名本身的字形標準化
+     * （峯→峰，TITLE_VARIANT_MAP）已在 parseEntries 完成，故檢測看到的是標準化後的書名。
+     */
+    public function checkRareChars(Request $request): JsonResponse {
+        $this->ensureAdmin();
+
+        $data = $request->validate([
+            'entries' => 'required|string',
+        ]);
+
+        [$rows, $parseErrors] = $this->parseEntries($data['entries']);
+
+        $missing = [];
+        $uniqueChars = [];
+
+        foreach ($rows as $row) {
+            $rareChars = $this->collectCharsMissingFromPinyinTable((string) $row['title']);
+            if (empty($rareChars)) {
+                continue;
+            }
+
+            $chars = [];
+            foreach ($rareChars as $ch) {
+                $chars[] = ['char' => $ch, 'codepoint' => sprintf('U+%04X', mb_ord($ch, 'UTF-8'))];
+                $uniqueChars[$ch] = true;
+            }
+
+            $missing[] = [
+                'line' => $row['line'],
+                'title' => $row['title'],
+                'chars' => $chars,
+            ];
+        }
+
+        return response()->json([
+            'ok' => true,
+            'checked' => count($rows),
+            'parse_errors' => array_values($parseErrors),
+            'missing' => $missing,
+            'unique_char_count' => count($uniqueChars),
+        ]);
+    }
+
+    /**
+     * 回傳書名中「不在 pinyin 表」的漢字（去重，保留出現順序）。
+     * 檢測步驟與 buildPinyin 對齊（去卷冊註記後逐字檢查），但改用 isInTable()
+     * 只查權威表、不吃 opencc 退回，也不套 VariantCharNormalizer 異體字歸一化。
+     *
+     * @return array<int,string>
+     */
+    protected function collectCharsMissingFromPinyinTable(string $title): array {
+        $titleWithoutVolume = $this->stripVolumeInfo($title);
+        $chars = preg_split('//u', $titleWithoutVolume, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        $missing = [];
+        foreach ($chars as $ch) {
+            if (!preg_match('/^\p{Han}$/u', $ch)) {
+                continue;
+            }
+            if (!PinyinDictionary::isInTable($ch)) {
+                $missing[$ch] = true;
+            }
+        }
+
+        return array_keys($missing);
     }
 
     /**

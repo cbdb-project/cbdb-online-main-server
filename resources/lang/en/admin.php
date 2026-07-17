@@ -163,6 +163,14 @@ return [
     'batch_network_error' => 'Network error, please try again',
     'batch_copied_n' => 'Copied :count record(s)',
     'batch_copy_failed' => 'Auto-copy failed. The text area below has been expanded — please copy manually with Ctrl+C',
+    'batch_check_rare_chars' => 'Detect Rare Characters',
+    'batch_check_rare_chars_checking' => 'Checking…',
+    'batch_check_rare_chars_title' => 'Rare-character check (pinyin table only, opencc fallback excluded)',
+    'batch_check_rare_chars_none' => 'No rare characters found: checked :count title line(s); every Han character is in the pinyin table.',
+    'batch_check_rare_chars_summary' => 'Checked :count title line(s); found :chars Han character(s) not in the pinyin table (across :lines line(s)):',
+    'batch_check_rare_chars_line' => 'Line :line',
+    'batch_check_rare_chars_parse_note' => ':count line(s) had a malformed format and were skipped:',
+    'batch_check_rare_chars_empty_input' => 'Please enter batch data before running the check.',
 
     // batch_load_offices
     'batch_offices_page_title' => 'Batch Load Offices',

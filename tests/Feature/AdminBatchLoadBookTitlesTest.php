@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\PinyinDictionary;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -1007,6 +1008,171 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $followUp->assertSee('class="pinyin-cell"', false);
         $followUp->assertSee('pinyin-edit-btn', false);
         $followUp->assertSee('pinyin-save-btn', false);
+    }
+
+    #[Test]
+    public function test_check_rare_chars_flags_table_missing_char_even_when_opencc_covers_it(): void {
+        // 罕見字檢測「只查 pinyin 表」：麤（U+9EA4）不在權威表，但 opencc-pinyin 靜態
+        // 字典查得到讀音（cu）。匯入檢查（getPinyin）會放行，但本檢測仍要把它列為罕見字。
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        $response = $this->postJson(route('app.admin.batch-load-book-titles.check-rare-chars'), [
+            'entries' => "1\t安石集\t2\n3\t麤俗編\t4",
+        ]);
+
+        $response->assertOk();
+        $json = $response->json();
+        $this->assertTrue($json['ok']);
+        $this->assertSame(2, $json['checked']);
+        $this->assertSame([], $json['parse_errors']);
+        // 只有含麤的第 2 行被列出，安石集整行皆在表內不列。
+        $this->assertCount(1, $json['missing']);
+        // 麤 位在輸入的第 2 行（第一欄的 3 是作者 ID，不是行號）。
+        $this->assertSame(2, $json['missing'][0]['line']);
+        $this->assertSame('麤俗編', $json['missing'][0]['title']);
+        $this->assertSame('麤', $json['missing'][0]['chars'][0]['char']);
+        $this->assertSame('U+9EA4', $json['missing'][0]['chars'][0]['codepoint']);
+        $this->assertSame(1, $json['unique_char_count']);
+
+        // 佐證差異點：麤在匯入路徑（含 opencc 退回）查得到拼音，不會被 store() 擋。
+        $this->assertSame('cu', PinyinDictionary::getPinyin('麤'));
+        $this->assertFalse(PinyinDictionary::isInTable('麤'));
+    }
+
+    #[Test]
+    public function test_check_rare_chars_returns_empty_missing_for_common_title(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        $response = $this->postJson(route('app.admin.batch-load-book-titles.check-rare-chars'), [
+            'entries' => "1\t安石集\t2",
+        ]);
+
+        $response->assertOk();
+        $json = $response->json();
+        $this->assertSame(1, $json['checked']);
+        $this->assertSame([], $json['missing']);
+        $this->assertSame(0, $json['unique_char_count']);
+    }
+
+    #[Test]
+    public function test_check_rare_chars_does_not_apply_variant_normalization(): void {
+        // 罕見字檢測刻意「不套 VariantCharNormalizer 異體字歸一化」：菴（U+83F4）不在
+        // pinyin 表，但 VariantCharNormalizer 會把它歸一為在表內的 庵。匯入路徑
+        // （collectUnpinyinableHan）會先歸一化故放行；本檢測不歸一化，仍須把 菴 列為罕見字。
+        // 這個 test 鎖住該設計差異——若有人把 normalize() 加進檢測，菴 會漏報而此測試失敗。
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        $response = $this->postJson(route('app.admin.batch-load-book-titles.check-rare-chars'), [
+            'entries' => "1\t菴集\t2",
+        ]);
+
+        $response->assertOk();
+        $json = $response->json();
+        $this->assertCount(1, $json['missing']);
+        $this->assertSame('菴', $json['missing'][0]['chars'][0]['char']);
+        $this->assertSame('U+83F4', $json['missing'][0]['chars'][0]['codepoint']);
+
+        // 佐證：菴 經 VariantCharNormalizer 歸一為在表內的 庵，故匯入路徑不會被擋。
+        $this->assertSame('庵', \App\Services\VariantCharNormalizer::normalize('菴'));
+        $this->assertTrue(PinyinDictionary::isInTable('庵'));
+        $this->assertFalse(PinyinDictionary::isInTable('菴'));
+    }
+
+    #[Test]
+    public function test_check_rare_chars_checks_stored_glyph_after_title_variant_standardization(): void {
+        // 設計決策（已與需求方確認）：罕見字檢測看的是「實際入庫的字形」，而非原始貼上字形。
+        // 峯（U+5CEF）不在 pinyin 表，但 TITLE_VARIANT_MAP 會在 parseEntries 就把書名本身
+        // 改寫成標準字形 峰（入庫的 c_title_chn 即為 峰），而 峰 在表內，故不列為罕見字。
+        // 此測試鎖住此決策：若有人改成檢測原始字形，峯 會被列出而此測試失敗。
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        $response = $this->postJson(route('app.admin.batch-load-book-titles.check-rare-chars'), [
+            'entries' => "1\t峯集\t2",
+        ]);
+
+        $response->assertOk();
+        $this->assertSame([], $response->json('missing'));
+    }
+
+    #[Test]
+    public function test_check_rare_chars_dedups_repeated_chars_but_counts_lines(): void {
+        // 同一罕見字重複出現：每行內去重（chars 不重複），unique_char_count 全域去重，
+        // 但每一含該字的行都各列一筆 missing。
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        $response = $this->postJson(route('app.admin.batch-load-book-titles.check-rare-chars'), [
+            'entries' => "1\t麤麤編\t2\n3\t麤俗集\t4",
+        ]);
+
+        $response->assertOk();
+        $json = $response->json();
+        // 兩行都含麤 → 兩筆 missing；但麤只算一個相異字。
+        $this->assertCount(2, $json['missing']);
+        $this->assertCount(1, $json['missing'][0]['chars']);
+        $this->assertSame('麤', $json['missing'][0]['chars'][0]['char']);
+        $this->assertSame(1, $json['unique_char_count']);
+    }
+
+    #[Test]
+    public function test_check_rare_chars_ignores_non_han_characters(): void {
+        // 非漢字（拉丁字母、數字、標點）不納入檢測。
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        $response = $this->postJson(route('app.admin.batch-load-book-titles.check-rare-chars'), [
+            'entries' => "1\tABC 123 安石集\t2",
+        ]);
+
+        $response->assertOk();
+        $this->assertSame([], $response->json('missing'));
+    }
+
+    #[Test]
+    public function test_check_rare_chars_ignores_chars_after_volume_separator(): void {
+        // 與 buildPinyin/匯入檢查一致：冒號後的卷冊註記不進拼音，也不納入罕見字檢測。
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        $response = $this->postJson(route('app.admin.batch-load-book-titles.check-rare-chars'), [
+            'entries' => "1\t安石集: 麤卷\t2",
+        ]);
+
+        $response->assertOk();
+        $this->assertSame([], $response->json('missing'));
+    }
+
+    #[Test]
+    public function test_check_rare_chars_reports_parse_errors_for_malformed_lines(): void {
+        $user = $this->makeUser();
+        $this->actingAs($user);
+
+        $response = $this->postJson(route('app.admin.batch-load-book-titles.check-rare-chars'), [
+            'entries' => "只有一欄\n1\t麤俗編\t2",
+        ]);
+
+        $response->assertOk();
+        $json = $response->json();
+        // 格式不符的行進 parse_errors；合法行仍照常檢測。
+        $this->assertNotEmpty($json['parse_errors']);
+        $this->assertStringContainsString('未找到三欄資料', implode("\n", $json['parse_errors']));
+        $this->assertSame(1, $json['checked']);
+        $this->assertCount(1, $json['missing']);
+    }
+
+    #[Test]
+    public function test_non_admin_cannot_check_rare_chars(): void {
+        $user = $this->makeUser(['is_admin' => 0]);
+        $this->actingAs($user);
+
+        $response = $this->postJson(route('app.admin.batch-load-book-titles.check-rare-chars'), [
+            'entries' => "1\t麤俗編\t2",
+        ]);
+        $response->assertStatus(403);
     }
 
     #[Test]

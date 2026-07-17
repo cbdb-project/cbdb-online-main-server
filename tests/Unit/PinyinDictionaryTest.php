@@ -142,6 +142,23 @@ class PinyinDictionaryTest extends TestCase {
     }
 
     #[Test]
+    public function is_in_table_only_checks_the_curated_table_not_the_opencc_fallback(): void {
+        // 先塞好所有資料再查詢：首次 isInTable() 會載入整表快取，之後的 insert 不會反映。
+        DB::table('pinyin')->insert(['c_chn' => '安', 'c_pinyin' => 'an', 'c_lastname' => 0]);
+        // 姓氏讀音（c_lastname=1）也算在表內。
+        DB::table('pinyin')->insert(['c_chn' => '單', 'c_pinyin' => 'Shan', 'c_lastname' => 1]);
+
+        // 安 在表內 → true。
+        $this->assertTrue(PinyinDictionary::isInTable('安'));
+        $this->assertTrue(PinyinDictionary::isInTable('單'));
+
+        // 峯 不在表內、但 opencc-pinyin 靜態字典查得到讀音（getPinyin 會回 feng）；
+        // isInTable() 刻意「只看表」，故仍回 false——這正是罕見字檢測要抓的對象。
+        $this->assertSame('feng', PinyinDictionary::getPinyin('峯'));
+        $this->assertFalse(PinyinDictionary::isInTable('峯'));
+    }
+
+    #[Test]
     public function reset_forces_cache_to_reload_from_database(): void {
         DB::table('pinyin')->insert(['c_chn' => '安', 'c_pinyin' => 'an', 'c_lastname' => 0]);
         $this->assertSame('an', PinyinDictionary::getPinyin('安'));

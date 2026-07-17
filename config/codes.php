@@ -59,6 +59,7 @@ return [
         'BIOG_TEXT_DATA' => '傳記文本資料表',
         'CBDB__NAME_FTS' => '人名全文檢索表',
         'CBDB__TRAD_SIMP_MAP' => '繁簡字對照表',
+        'char_variant_map' => '異體字落地替換對照表',
         'CHORONYM_CODES' => '郡望代碼表',
         'COUNTRY_CODES' => '國家地區代碼表',
         'DYNASTIES' => '朝代信息表',

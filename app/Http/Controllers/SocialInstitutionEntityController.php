@@ -184,7 +184,7 @@ class SocialInstitutionEntityController extends Controller {
 
         return Inertia::render('SocialInstitution/Edit', [
             'institution' => $aggregate,
-            // 改名護欄（見 SocialInstituteUpdateHandler）：被人物資料引用時後端會擋改名，
+            // 改名護欄（見 SocialInstitutionAggregateDefinition::guardWrite）：被人物資料引用時後端會擋改名，
             // 前端據此預先鎖名稱欄並提示，避免使用者改完才被 409。
             'reference_count' => $this->service->referenceCount($id),
             'initial_labels' => [

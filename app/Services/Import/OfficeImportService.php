@@ -23,7 +23,7 @@ use Illuminate\Support\Facades\DB;
  * operations + audit_log 承載。與 SocialInstituteImportService 一致。
  *
  * 除 create() 外亦提供 load()／update()／delete()，作為「官職實體」聚合 CRUD 的單一真源，
- * 供 mutation API（OfficeImportHandler / OfficeUpdateHandler / OfficeDeleteHandler）與前端
+ * 供 mutation API（通用 EntityAggregate*Handler → OfficeAggregateDefinition）與前端
  * 聚合編輯頁共用。update() 對 OFFICE_CODE_TYPE_REL 做集合對賬（僅增刪差異、不整批重寫），
  * 避免多類型官職被靜默刪去其他類型。delete() 前須先 referenceCount() 檢查是否仍被人物任官引用。
  *

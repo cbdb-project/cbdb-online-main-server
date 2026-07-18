@@ -18,6 +18,8 @@ return [
         [
             'resource' => 'office',
             'service' => \App\Services\Import\OfficeImportService::class,
+            // 通用 mutation handler 依此分派（EntityAggregate*Handler → definition）。
+            'definition' => \App\Services\Mutations\EntityAggregate\OfficeAggregateDefinition::class,
             'pk' => 'c_office_id',
             // 聚合認領的下層表（文件化用；封寫範圍以 closed_code_tables 為準——
             // 僅列 codes UI 實際可瀏覽的表）。
@@ -35,6 +37,7 @@ return [
         [
             'resource' => 'social-institution',
             'service' => \App\Services\Import\SocialInstituteImportService::class,
+            'definition' => \App\Services\Mutations\EntityAggregate\SocialInstitutionAggregateDefinition::class,
             'pk' => 'c_inst_code',
             'tables' => ['SOCIAL_INSTITUTION_NAME_CODES', 'SOCIAL_INSTITUTION_CODES', 'SOCIAL_INSTITUTION_ADDR'],
             'closed_code_tables' => ['SOCIAL_INSTITUTION_CODES', 'SOCIAL_INSTITUTION_NAME_CODES', 'SOCIAL_INSTITUTION_ADDR'],

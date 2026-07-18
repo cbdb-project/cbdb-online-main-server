@@ -152,22 +152,32 @@ office 與 social institution 兩輪實作驗證：每個複合實體都是同�
 配套列集合（對賬）＋字典引用校驗＋引用護欄（CASCADE 表計數）**；寫入永遠是
 `validate → guard → transaction → 逐列寫入＋記 op`，瀏覽永遠是同一套
 filter／sort／guard 機制，封閉永遠是「認領下層表＋換側欄＋唯讀」。
-據此抽出四件套，後續實體不再整套重寫：
+據此抽出五件套，後續實體不再整套重寫：
 
 1. **實體註冊表 `config/entity_aggregates.php`（單一真源）**：每個聚合聲明
-   resource／Service／識別鍵／認領表／`closed_code_tables`／側欄 nav。往下推導：
+   resource／Service／`definition`／識別鍵／認領表／`closed_code_tables`／側欄 nav。往下推導：
    - codes UI 封寫：`CodesController::isReadOnlyTable()` 對 `closed_code_tables` 內
      的表一律唯讀——**實體上線即自動封寫，不再手維護清單**；回退＝改 config。
    - 側欄節點：`Navigation::entityNavItem()` 依 nav 設定把裸表節點改指實體頁。
+   - mutation 分派：`EntityAggregateDefinitionRegistry` 依 `definition` 建 resource 索引。
 2. **`EntityAggregateService` 介面**＋Service 共用基元（`SharesImportHelpers`）：
    `allocateNextId()`（lockForUpdate max+1）、`countReferences()`（護欄計數）、
    `reconcileRowSet()`（配套列集合對賬：同鍵改非鍵值、僅增刪差異、逐筆記 op）。
    領域派生與不變量**留在各 Service 實作**——刻意不做 config DSL，避免把複雜度搬進配置。
-3. **`Support/EntityTableBrowser`**：描述子（表／欄位／計算欄／識別鍵）驅動的
+3. **通用 mutation handler（`EntityAggregateCreate/Update/DeleteHandler`）＋
+   `EntityAggregateDefinition` 契約**：三個通用 handler 承擔所有實體共通的骨架——
+   授權、resource 分派、`target.pk` 解析、404、`DB::transaction`、回應信封——**取代
+   原本每實體各自的 3 個 handler**（office／social institution 從 6 個 bespoke handler
+   收斂為 2 個 definition）。每個實體只實作 definition 的三處真差異：`validate()`
+   （校驗，create／update 可不同）、`guardWrite()`（引用護欄，如刪除／改名 409）、
+   `result()`（回應成形）。單筆與 `batch_mutate` 皆自動生效（同一 registry 分派）。
+   **這是第二梯隊 config 化的關鍵**：code+type-rel 家族可共用一個 config 驅動的
+   definition 服務多個實體，屆時新實體幾乎只寫 config。
+4. **`Support/EntityTableBrowser`**：描述子（表／欄位／計算欄／識別鍵）驅動的
    parity 列表引擎（全欄搜尋、逐欄＋布林篩選、排序＋tie-breaker、排序篩選登入門檻）。
    刻意**不合併** `CodesController::buildShowPayload`（裸表頁帶 cursor 分頁、JOIN config
    等專屬包袱）。
-4. **前端 `components/EntityBrowser/EntityIndexPage`**：與 browser 成對的通用列表組件；
+5. **前端 `components/EntityBrowser/EntityIndexPage`**：與 browser 成對的通用列表組件；
    各實體 Index 頁縮成注入 `{i18nGroup, resource, pkField, dynastyColumns}` 的薄殼。
    **表單不抽象**：Create／Edit 是真領域 UI，通用表單生成器會在聚合層重演
    proposalEdit 攤裸表欄位的錯誤（§3.3）。
@@ -187,7 +197,8 @@ filter／sort／guard 機制，封閉永遠是「認領下層表＋換側欄＋�
 `SOCIAL_INSTITUTION_ALTNAME_CODES/DATA` 生產庫 0 列（休眠 schema），留待有數據需求時併入
 機構聚合；`KIN_MOURNING`＋`KIN_MOURNING_STEPS` 視為扁平字典對待（§4.1）。
 
-**§4.5 實體級提案的落地路徑**：提案模型只需針對 `EntityAggregateService` 介面做一次
+**§4.5 實體級提案的落地路徑**：提案模型只需針對 `EntityAggregateService` 介面／
+`EntityAggregateDefinition` 契約做一次
 （`resource ＋ pk ＋ 已驗證 input 快照`入庫、審核通過調同一 `create/update`），
 direct 與 proposal 天然對等（§7 原則），不必每實體各接一遍。
 
@@ -206,6 +217,7 @@ direct 與 proposal 天然對等（§7 原則），不必每實體各接一遍�
 
 - `config/entity_aggregates.php`（實體註冊表：封寫／側欄接線的單一真源，§6.5）
 - `app/Services/Import/EntityAggregateService.php`（聚合根介面）
+- `app/Services/Mutations/EntityAggregate*Handler.php`＋`EntityAggregate/`（通用 mutation handler、definition 契約與分派 registry，§6.5）
 - `app/Services/Import/Concerns/SharesImportHelpers.php`（配號／護欄計數／集合對賬／審計基元）
 - `app/Support/EntityTableBrowser.php`＋`resources/js/inertia/components/EntityBrowser/EntityIndexPage.tsx`（parity 列表引擎，前後端成對）
 - `app/Services/Import/OfficeImportService.php`（聚合根實作：官職）

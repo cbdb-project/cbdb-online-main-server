@@ -6,7 +6,7 @@ use App\Services\Import\SocialInstituteImportService;
 use Illuminate\Support\Facades\DB;
 
 /**
- * 「社會機構實體」聚合輸入的解析與校驗（update 用；create 維持 SocialInstituteImportHandler
+ * 「社會機構實體」聚合輸入的解析與校驗（update 用；create 維持 SocialInstitutionAggregateDefinition::validateCreate
  * 既有語義以相容批量匯入）。必填核心與 create 一致（AGENTS.md：必填欄位 create／update 一致）：
  * name、type_code、dynasty_code、source_id、至少一列地址。其餘欄位選填，給值時校驗參照表存在。
  *

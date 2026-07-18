@@ -5,12 +5,13 @@
 ## 2026-07
 
 ### 實體聚合橫向複用架構（entity aggregate framework，#1159 §6.5）
-- 行為凍結重構：把 office／social institution 兩輪實作中重複的機制抽成四件套，後續實體（code+type-rel 家族、text、place）不再整套重寫。
-- **`config/entity_aggregates.php` 實體註冊表（單一真源）**：聲明 resource／Service／識別鍵／認領表／`closed_code_tables`／側欄 nav。codes UI 封寫改由 registry 推導（`isReadOnlyTable()`，實體上線即自動封寫、回退＝改 config）；側欄實體節點由 `Navigation::entityNavItem()` 依 config 生成。
+- 行為凍結重構：把 office／social institution 兩輪實作中重複的機制抽成五件套，後續實體（code+type-rel 家族、text、place）不再整套重寫。
+- **`config/entity_aggregates.php` 實體註冊表（單一真源）**：聲明 resource／Service／`definition`／識別鍵／認領表／`closed_code_tables`／側欄 nav。codes UI 封寫改由 registry 推導（`isReadOnlyTable()`，實體上線即自動封寫、回退＝改 config）；側欄實體節點由 `Navigation::entityNavItem()` 依 config 生成。
 - **`EntityAggregateService` 介面**＋`SharesImportHelpers` 新增三基元：`allocateNextId()`、`countReferences()`、`reconcileRowSet()`（配套列集合對賬：同鍵改非鍵值、僅增刪差異、逐筆記 op）；兩個 Service 遷移使用，audit payload 逐位不變。
+- **通用 mutation handler ＋ `EntityAggregateDefinition` 契約**：`EntityAggregateCreate/Update/DeleteHandler` 三個通用 handler 承擔授權／resource 分派／pk 解析／404／交易／回應信封等共通骨架，取代原本每實體各 3 個 handler——office／social institution 從 **6 個 bespoke handler 收斂為 2 個 definition**（各只實作 validate／guardWrite／result 三處真差異）。單筆與 `batch_mutate` 皆自動生效。回應逐位不變（唯 type_label／dynasty_label 未解析的 422 訊息由專屬文案改為通用「參數校驗失敗」，errors payload 不變、無測試斷言該文案）。
 - **`Support/EntityTableBrowser`**：描述子驅動的 parity 列表引擎，兩個實體 Controller 的 appIndex 各縮至 ~20 行；刻意不合併 CodesController（cursor 分頁／JOIN config 為裸表專屬）。
 - **前端 `EntityIndexPage` 通用組件**：兩份 ~380 行的 Index.tsx 合併，各實體頁縮成注入 `{i18nGroup, resource, pkField, dynastyColumns}` 的薄殼。表單刻意不抽象（真領域 UI）。
-- 設計文件新增 §6.5（含第二梯隊 code+type-rel 家族路線與 §4.5 實體級提案「對介面做一次」的落地路徑）。
+- 設計文件新增 §6.5（含通用 handler 分派層、第二梯隊 code+type-rel 家族路線與 §4.5 實體級提案「對介面做一次」的落地路徑）。
 - 全套測試 2310 綠（行為凍結驗證）；無新增功能。
 
 ### 社會機構實體聚合推進至 step 4：/app/social-institution 上線、三張裸表封寫（#1159）

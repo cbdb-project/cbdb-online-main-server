@@ -15,7 +15,7 @@ class McpSearchPersonByNameTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
         $this->createTables();
-        $this->seed();
+        $this->seedFixtures();
     }
 
     private function createTables(): void {
@@ -38,7 +38,7 @@ class McpSearchPersonByNameTest extends TestCase {
         )');
     }
 
-    private function seed(): void {
+    private function seedFixtures(): void {
         DB::table('DYNASTIES')->insert([
             ['c_dy' => 15, 'c_dynasty_chn' => '宋'],
             ['c_dy' => 19, 'c_dynasty_chn' => '明'],

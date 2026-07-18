@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
  * 「新增一個社會機構」的存儲過程之單一真源。
  *
  * 由 admin 批量表單（AdminBatchLoadSocialInstitutesController）與 mutation API
- * （SocialInstituteImportHandler）共用，確保名稱去重、派生（拼音）、自動 id、
+ * （通用 EntityAggregate*Handler → SocialInstitutionAggregateDefinition）共用，確保名稱去重、派生（拼音）、自動 id、
  * 配套地址行與審計（operations + AuditLog）只有一份實作、不漂移。
  * 共用的派生／校驗／審計基元見 SharesImportHelpers（與 OfficeImportService 共用）。
  *

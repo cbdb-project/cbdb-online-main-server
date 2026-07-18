@@ -8,6 +8,7 @@ use App\Mcp\Tools\ListAllowedTablesTool;
 use App\Mcp\Tools\QueryReadOnlySqlTool;
 use App\Mcp\Tools\QueryTableSchemaTool;
 use App\Mcp\Tools\QueryTableTool;
+use App\Mcp\Tools\SearchPersonByNameTool;
 use Laravel\Mcp\Server;
 
 class CbdbReadOnlyServer extends Server {
@@ -24,5 +25,6 @@ class CbdbReadOnlyServer extends Server {
         GetSampleDataTool::class,
         QueryTableTool::class,
         QueryReadOnlySqlTool::class,
+        SearchPersonByNameTool::class,
     ];
 }

@@ -91,9 +91,12 @@ return [
             'aliases' => ['text_instance_data', 'text_instance'],
             'display_name' => '文獻版本',
             'key_columns' => ['c_textid', 'c_text_edition_id', 'c_text_instance_id'],
-            'allowed_fields' => ['c_instance_title'],
+            'allowed_fields' => ['c_instance_title', 'c_pub_year', 'c_publisher'],
             'tier1_fields' => ['c_instance_title'],
-            'tier2_fields' => [],
+            // c_pub_year（出版年，整數）與 c_publisher（出版者，文字/可清空）非拼音欄，
+            // 放 tier2 以避開 tier1 的 v→ü 靜默正規化；c_pub_year 另登記為整數欄。
+            'tier2_fields' => ['c_pub_year', 'c_publisher'],
+            'integer_fields' => ['c_pub_year'],
         ],
         [
             'resource' => 'text_biblcat_codes',

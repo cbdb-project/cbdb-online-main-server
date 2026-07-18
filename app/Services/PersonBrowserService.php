@@ -64,17 +64,11 @@ class PersonBrowserService {
                 $idQuery->where('BIOG_MAIN.c_personid', '=', (int) $q)
                     ->orderBy('BIOG_MAIN.c_personid', $sortDirection);
             } else {
-                // 先嘗試倒排索引（僅中文查詢；拼音／拉丁查詢直接走下方 LIKE 回退）
+                // 先嘗試倒排索引（僅中文查詢；拼音／拉丁查詢直接走下方 LIKE 回退）。
+                // FTS 命中邏輯與 MCP 人名搜尋共用 NameSearchService::ftsPersonIds，避免兩套實現漂移。
                 $ftsIds = [];
                 if ($this->queryUsesFtsIndex($q)) {
-                    $ftsIds = DB::table('CBDB__NAME_FTS')
-                        ->where('search_term', 'LIKE', $q . '%')
-                        ->orderByRaw('LENGTH(search_term) ASC')
-                        ->limit(500)
-                        ->pluck('c_personid')
-                        ->unique()
-                        ->values()
-                        ->toArray();
+                    $ftsIds = app(NameSearchService::class)->ftsPersonIds($q);
 
                     if ($dynasty !== '' && !empty($ftsIds)) {
                         // 倒排索引結果需要過濾朝代
@@ -203,14 +197,7 @@ class PersonBrowserService {
                 // 否則朝代側欄會沿用 FTS 雜訊命中而與人物列表（已回退）不一致。
                 $ftsIds = [];
                 if ($this->queryUsesFtsIndex($q)) {
-                    $ftsIds = DB::table('CBDB__NAME_FTS')
-                        ->where('search_term', 'LIKE', $q . '%')
-                        ->orderByRaw('LENGTH(search_term) ASC')
-                        ->limit(500)
-                        ->pluck('c_personid')
-                        ->unique()
-                        ->values()
-                        ->toArray();
+                    $ftsIds = app(NameSearchService::class)->ftsPersonIds($q);
                 }
 
                 if (!empty($ftsIds)) {

@@ -94,7 +94,8 @@ GROUP BY REFERENCED_TABLE_NAME, DELETE_RULE;
 | 批次 | 被引用表（入邊數） | migration | 狀態 |
 |---|---|---|---|
 | **1** | NIAN_HAO(24)、YEAR_RANGE_CODES(23)、DYNASTIES(10)、GANZHI_CODES(9)＝**66 條** | `2026_07_20_000000_restrict_fks_referencing_dynasty_batch` | ✅ 已實作＋MariaDB 10.3 端到端驗（見 §9） |
-| 2… | TEXT_CODES(22)、ADDR_CODES(11)、其餘詞表 | 待做 | — |
+| **2** | TEXT_CODES(21)、ADDR_CODES(11)＝**32 條**（TEXT_CODES 另 1 條 `SET NULL` 本已正確、未觸碰） | `2026_07_21_000000_restrict_fks_referencing_text_addr_codes` | ✅ 已實作＋MariaDB 10.3 端到端驗（見 §9.1）；同 commit 為唯一活硬刪路徑 `AdminBatchLoadBookTitlesController::undo()` 補 1451 友好報錯垫片 |
+| 3… | 其餘小詞表（KINSHIP_CODES(6)、ASSOC_CODES(4)、OFFICE_CODES(3)、EVENT_CODES(3)…） | 待做 | — |
 | n | SOCIAL_INSTITUTION_CODES(5) | 待做——「一機構多名」安全前提（[SOCIAL_INSTITUTION_ENTITY_MODEL §5.9](./SOCIAL_INSTITUTION_ENTITY_MODEL.md)）；**前置**：先封 codes UI 對該表的刪除（社會機構 step 4） | — |
 | 末 | BIOG_MAIN(25)＋operations→BIOG_MAIN | 待做——需配套顯式級聯刪除服務 | — |
 
@@ -118,6 +119,27 @@ migration，再套用批次 1：
 > 註：全庫共 188 條 CASCADE（baseline 186 ＋後續 migration 新增 2，如 events_data 複合 FK／admin_cat）；
 > 另有 1 條既有正確的 `SET NULL`（`fk_merged_person_source`），全程未觸碰。
 > 翻轉近乎即時（`foreign_key_checks=0` 免掃描）、完全可逆。
+
+### 9.1 批次 2 端到端實測（fresh MariaDB 10.3，2026-07-21）
+
+同 §9 流程（乾淨 10.3 容器、app 容器全量 `php artisan migrate`）：
+
+| 檢查 | 結果 |
+|---|---|
+| 批次 2 翻轉 | ✅ `flipped 32`（TEXT_CODES 21＋ADDR_CODES 11；`fk_merged_person_source`→TEXT_CODES 的 `SET NULL` 未觸碰） |
+| 兩表入邊 `DELETE_RULE` | ✅ 全 `NO ACTION`（10.3 顯示，§3），CASCADE 歸零 |
+| 全庫 | ✅ `CASCADE 90`／`NO ACTION 98`／`SET NULL 1`（122−32＝90，其他批未動） |
+| 行為：刪被引用列 | ✅ 刪被 BIOG_SOURCE_DATA 引用的 TEXT_CODES → 1451 擋下；刪被 BIOG_ADDR_DATA 引用的 ADDR_CODES → 1451 擋下；資料一列不少 |
+| 行為：零引用刪除 | ✅ 引用移除後 DELETE 正常成功（物理刪除僅限零引用的目標行為成立） |
+| 可逆 | ✅ `migrate:rollback --step=1` 翻回 CASCADE（32 條），re-migrate 恢復 RESTRICT |
+
+> 註：風險文件附錄 A 稱 TEXT_CODES 有「22 CASCADE＋1 SET NULL」，實際 baseline 為 **21 CASCADE＋1 SET NULL**
+> （grep 的 22 次 `REFERENCES TEXT_CODES` 已含 SET NULL 那條）。以 information_schema 實測為準。
+>
+> 應用層垫片（同 commit）：`AdminBatchLoadBookTitlesController::undo()` 是 TEXT_CODES 唯一未封堵的
+> 硬刪路徑（只刪自己批次建立的列）。翻轉後批內列若已被引用，DELETE 撞 1451、整批交易回滾（含
+> operations 清理一併回滾）；已捕捉 errno 1451 轉為友好 toast（「整批撤回已取消，未刪除任何資料」），
+> 其他 QueryException 照舊上拋。`/codes` destroy 與 mutation `CodeTableDeleteHandler` 先前已無條件封堵，無需處理。
 
 ## 10. 對 `ON_DELETE_CASCADE_RISK.md` 的修正建議
 

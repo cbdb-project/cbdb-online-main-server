@@ -11,6 +11,7 @@ use App\Services\PinyinDictionary;
 use App\Services\VariantCharNormalizer;
 use App\Support\PinyinUmlaut;
 use App\Support\SimplifiedOnlyChars;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -188,24 +189,40 @@ class AdminBatchLoadBookTitlesController extends Controller {
 
         $marker = '['.$data['batch_id'].']';
 
-        $deleted = DB::transaction(function () use ($marker) {
-            $textIds = DB::table('TEXT_CODES')
-                ->where('c_notes', $marker)
-                ->pluck('c_textid')
-                ->map(fn ($v) => (string) $v)
-                ->all();
+        try {
+            $deleted = DB::transaction(function () use ($marker) {
+                $textIds = DB::table('TEXT_CODES')
+                    ->where('c_notes', $marker)
+                    ->pluck('c_textid')
+                    ->map(fn ($v) => (string) $v)
+                    ->all();
 
-            if (empty($textIds)) {
-                return 0;
+                if (empty($textIds)) {
+                    return 0;
+                }
+
+                DB::table('operations')
+                    ->where('resource', 'TEXT_CODES')
+                    ->whereIn('resource_id', $textIds)
+                    ->delete();
+
+                return DB::table('TEXT_CODES')->where('c_notes', $marker)->delete();
+            });
+        } catch (QueryException $e) {
+            // TEXT_CODES 入邊外鍵已翻成 ON DELETE RESTRICT（去級聯 Phase 1 批次 2）：
+            // 批內書目若已被其他資料引用（出處/著述/別名來源等），DELETE 會被 DB 以 1451 擋下、
+            // 整批交易回滾（含 operations 清理）。fail-closed、零資料損失，這裡轉為友好訊息。
+            if (($e->errorInfo[1] ?? null) !== 1451) {
+                throw $e;
             }
 
-            DB::table('operations')
-                ->where('resource', 'TEXT_CODES')
-                ->whereIn('resource_id', $textIds)
-                ->delete();
-
-            return DB::table('TEXT_CODES')->where('c_notes', $marker)->delete();
-        });
+            return redirect()
+                ->route($this->listRouteName($request))
+                ->with('toast', [
+                    'msg' => "批次 {$data['batch_id']} 中已有書目被其他資料引用，整批撤回已取消（未刪除任何資料）。請先移除引用，或改由管理員單筆處理。",
+                    'type' => 'error',
+                ]);
+        }
 
         return redirect()
             ->route($this->listRouteName($request))

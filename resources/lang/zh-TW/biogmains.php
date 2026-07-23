@@ -5,6 +5,8 @@ return [
     'save_directly' => '直接儲存',
     'submit_proposal' => '提交提案',
     'save_as' => '另存新檔',
+    'direct_save_prompt_title' => '直接保存還是提交提案？',
+    'direct_save_prompt_desc' => '您具有直接保存的權限。直接保存會立即套用變更；提交提案則需等待其他同事審核後才會套用。請選擇您想要的方式。',
 
     // ─── Modification note ─────────────────────────────────────────
     'modification_note_label' => '修改說明 / 提案理由（可選）',

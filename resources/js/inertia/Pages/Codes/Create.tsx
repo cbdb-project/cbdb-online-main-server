@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { FormField } from '../../components/ui/FormField';
 import { PinyinUmlautConfirmDialog } from '../../components/PinyinUmlautConfirmDialog';
+import { ProposalModeDialog } from '../../components/ui/ProposalModeDialog';
 import { collectUmlautConversions, type Tier2UmlautHit } from '../../utils/pinyinUmlaut';
 import { useTranslation } from '../../hooks/useTranslation';
 import type { SharedProps } from '../../types/page';
@@ -46,6 +47,9 @@ export default function CodesCreate() {
 
     const form = useForm<Record<string, string>>(initial);
     const [umlautPrompt, setUmlautPrompt] = useState<{ hits: Tier2UmlautHit[]; run: (overrides?: Record<string, string>) => void } | null>(null);
+    const [confirmProposalMode, setConfirmProposalMode] = useState(false);
+    // 具直接保存權限者（非眾包用戶）點擊「提交提案」前先確認是否改為直接保存。
+    const canWriteDirectly = !!props.auth.user?.can.write_directly;
 
     // 送出（Tier 2 確認後）：overrides 以 transform 保證此次提交送出使用者選擇的值，避免 setData 非同步問題。
     const submitPost = (url: string, overrides?: Record<string, string>) => {
@@ -65,6 +69,8 @@ export default function CodesCreate() {
         run();
     };
     const tableHints = COLUMN_HINTS[table] ?? {};
+    const saveDirect = () => gate((ov) => submitPost(urls.store, ov));
+    const propose = () => gate((ov) => submitPost(urls.propose, ov));
 
     return (
         <DashboardLayout
@@ -74,7 +80,7 @@ export default function CodesCreate() {
             <form
                 onSubmit={(e) => {
                     e.preventDefault();
-                    gate((ov) => submitPost(urls.store, ov));
+                    saveDirect();
                 }}
                 className="max-w-3xl space-y-3 rounded-lg border border-border bg-card p-4"
             >
@@ -120,7 +126,7 @@ export default function CodesCreate() {
 
                         <div className="flex gap-2">
                             <Button type="submit" disabled={form.processing}>{t('save_direct')}</Button>
-                            <Button type="button" variant="secondary" disabled={form.processing} onClick={() => gate((ov) => submitPost(urls.propose, ov))}>
+                            <Button type="button" variant="secondary" disabled={form.processing} onClick={() => (canWriteDirectly ? setConfirmProposalMode(true) : propose())}>
                                 {t('submit_proposal')}
                             </Button>
                         </div>
@@ -141,6 +147,19 @@ export default function CodesCreate() {
                     p.hits.forEach((h) => { overrides[h.field] = h.converted; form.setData(h.field, h.converted); });
                     p.run(overrides);
                 }}
+            />
+
+            <ProposalModeDialog
+                open={confirmProposalMode}
+                onOpenChange={setConfirmProposalMode}
+                title={t('direct_save_prompt_title')}
+                description={t('direct_save_prompt_desc')}
+                saveDirectLabel={t('save_direct')}
+                submitProposalLabel={t('submit_proposal')}
+                cancelLabel={tc('cancel')}
+                loading={form.processing}
+                onSaveDirect={() => { setConfirmProposalMode(false); saveDirect(); }}
+                onSubmitProposal={() => { setConfirmProposalMode(false); propose(); }}
             />
         </DashboardLayout>
     );

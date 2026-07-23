@@ -31,9 +31,11 @@ class ApiV2CreateAssociationTest extends TestCase {
         $this->createAssocTable();
         $this->createAssocCodesTable();
         $this->createKinshipCodesTable();
+        $this->createAiFillLogsTable();
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('ai_fill_logs');
         Schema::dropIfExists('KINSHIP_CODES');
         Schema::dropIfExists('ASSOC_CODES');
         Schema::dropIfExists('ASSOC_DATA');
@@ -199,6 +201,40 @@ class ApiV2CreateAssociationTest extends TestCase {
         ], $overrides);
     }
 
+    protected function createAiFillLogsTable(): void {
+        Schema::create('ai_fill_logs', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->unsignedBigInteger('user_id');
+            $table->integer('c_personid');
+            $table->string('category', 20)->default('posting');
+            $table->string('route_name', 255)->nullable();
+            $table->string('route_url', 500)->nullable();
+            $table->text('source_text')->nullable();
+            $table->longText('ai_raw')->nullable();
+            $table->longText('ai_matched')->nullable();
+            $table->longText('user_submitted')->nullable();
+            $table->boolean('success')->default(false);
+            $table->timestamp('submitted_at')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    /** 建立一筆待提交的 AI 填充日誌（預設 category='assoc'），回傳 log id。 */
+    protected function insertAiFillLog(int $userId, int $personId = 1000, string $category = 'assoc'): int {
+        return DB::table('ai_fill_logs')->insertGetId([
+            'user_id' => $userId,
+            'c_personid' => $personId,
+            'category' => $category,
+            'route_name' => 'app.basicinformation.assoc.editv2',
+            'route_url' => '/app/basicinformation/'.$personId.'/assoc/edit-v2',
+            'source_text' => '同年進士',
+            'ai_matched' => json_encode(['matched_codes' => [['code_id' => 100]]]),
+            'success' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
     protected function seedAssoc(array $overrides = []): void {
         DB::table('ASSOC_DATA')->insert(array_replace($this->pk(), [
             'c_source' => 10,
@@ -227,6 +263,98 @@ class ApiV2CreateAssociationTest extends TestCase {
                 'c_notes' => '新增社會關係',
             ],
         ], $overrides);
+    }
+
+    // ── AI 智能識別回寫 ai_fill_logs（回歸：React 遷移後 v2 create 未回寫 → 全部誤顯示「未提交」）─────
+
+    #[Test]
+    public function testDirectAssociationCreateWithAiFillLogIdMarksLogSubmitted(): void {
+        $user = $this->makeUser(email: 'create-assoc-ailog@example.com');
+        $this->actingAs($user);
+        $logId = $this->insertAiFillLog($user->id);
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'meta' => ['ai_fill_log_id' => $logId],
+        ]))->assertOk();
+
+        $log = DB::table('ai_fill_logs')->where('id', $logId)->first();
+        $this->assertNotNull($log->user_submitted, 'user_submitted 應回寫（已提交）');
+        $this->assertNotNull($log->submitted_at, 'submitted_at 應回寫');
+        $submitted = json_decode($log->user_submitted, true);
+        $this->assertSame(100, (int) $submitted['c_assoc_code']);
+    }
+
+    #[Test]
+    public function testDirectAssociationCreateWithoutAiFillLogIdLeavesLogUntouched(): void {
+        $user = $this->makeUser(email: 'create-assoc-noailog@example.com');
+        $this->actingAs($user);
+        $logId = $this->insertAiFillLog($user->id);
+
+        $this->postJson('/api/v2/create', $this->createPayload())->assertOk();
+
+        $log = DB::table('ai_fill_logs')->where('id', $logId)->first();
+        $this->assertNull($log->user_submitted, '無 log id 不應回寫');
+        $this->assertNull($log->submitted_at);
+    }
+
+    #[Test]
+    public function testAssocAiFillLogNotOverwrittenForOtherUsersLog(): void {
+        $owner = $this->makeUser(email: 'create-assoc-ailog-owner@example.com');
+        $actor = $this->makeUser(email: 'create-assoc-ailog-actor@example.com');
+        $logId = $this->insertAiFillLog($owner->id);
+
+        $this->actingAs($actor);
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'meta' => ['ai_fill_log_id' => $logId],
+        ]))->assertOk();
+
+        $log = DB::table('ai_fill_logs')->where('id', $logId)->first();
+        $this->assertNull($log->user_submitted, '他人日誌不得被覆寫');
+    }
+
+    #[Test]
+    public function testAssocAiFillLogNotOverwrittenForWrongCategory(): void {
+        // category 守衛：帶入非 assoc 類（如 status）的 log id 不得被 assoc handler 回寫。
+        $user = $this->makeUser(email: 'create-assoc-ailog-cat@example.com');
+        $this->actingAs($user);
+        $logId = $this->insertAiFillLog($user->id, 1000, 'status');
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'meta' => ['ai_fill_log_id' => $logId],
+        ]))->assertOk();
+
+        $log = DB::table('ai_fill_logs')->where('id', $logId)->first();
+        $this->assertNull($log->user_submitted, '不同 category 的日誌不得被回寫');
+    }
+
+    #[Test]
+    public function testAssocAiFillLogNotOverwrittenForDifferentPerson(): void {
+        $user = $this->makeUser(email: 'create-assoc-ailog-person@example.com');
+        $this->actingAs($user);
+        $logId = $this->insertAiFillLog($user->id, 999);
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'person_id' => 1000,
+            'meta' => ['ai_fill_log_id' => $logId],
+        ]))->assertOk();
+
+        $log = DB::table('ai_fill_logs')->where('id', $logId)->first();
+        $this->assertNull($log->user_submitted, '不同人物的日誌不得被回寫');
+    }
+
+    #[Test]
+    public function testProposalAssociationCreateDoesNotRecordAiFillSubmission(): void {
+        $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'create-assoc-ailog-proposal@example.com');
+        $this->actingAs($user);
+        $logId = $this->insertAiFillLog($user->id);
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'mode' => 'proposal',
+            'meta' => ['ai_fill_log_id' => $logId],
+        ]))->assertOk();
+
+        $log = DB::table('ai_fill_logs')->where('id', $logId)->first();
+        $this->assertNull($log->user_submitted, 'proposal 提交當下不回寫');
     }
 
     #[Test]

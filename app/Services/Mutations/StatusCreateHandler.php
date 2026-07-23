@@ -13,6 +13,11 @@ class StatusCreateHandler extends AbstractPersonSubresourceCreateHandler {
         parent::__construct($operationRepository, $auditLogService);
     }
 
+    /** 社會區分 create 經 AI 智能識別（category='status'）時，回寫 ai_fill_logs（見 RecordsAiFillSubmission）。 */
+    protected function aiFillCategory(): ?string {
+        return 'status';
+    }
+
     protected function resourceName(): string {
         return 'statuses';
     }

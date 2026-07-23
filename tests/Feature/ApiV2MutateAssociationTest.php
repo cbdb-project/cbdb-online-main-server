@@ -31,9 +31,11 @@ class ApiV2MutateAssociationTest extends TestCase {
         $this->createAssociationTable();
         $this->createAssocCodesTable();
         $this->createKinshipCodesTable();
+        $this->createAiFillLogsTable();
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('ai_fill_logs');
         Schema::dropIfExists('KINSHIP_CODES');
         Schema::dropIfExists('ASSOC_CODES');
         Schema::dropIfExists('ASSOC_DATA');
@@ -207,6 +209,40 @@ class ApiV2MutateAssociationTest extends TestCase {
 
     // ── Helpers ──────────────────────────────────────────────
 
+    protected function createAiFillLogsTable(): void {
+        Schema::create('ai_fill_logs', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->unsignedBigInteger('user_id');
+            $table->integer('c_personid');
+            $table->string('category', 20)->default('posting');
+            $table->string('route_name', 255)->nullable();
+            $table->string('route_url', 500)->nullable();
+            $table->text('source_text')->nullable();
+            $table->longText('ai_raw')->nullable();
+            $table->longText('ai_matched')->nullable();
+            $table->longText('user_submitted')->nullable();
+            $table->boolean('success')->default(false);
+            $table->timestamp('submitted_at')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    /** 建立一筆待提交的 AI 填充日誌（預設 category='assoc'），回傳 log id。 */
+    protected function insertAiFillLog(int $userId, int $personId = 1000, string $category = 'assoc'): int {
+        return DB::table('ai_fill_logs')->insertGetId([
+            'user_id' => $userId,
+            'c_personid' => $personId,
+            'category' => $category,
+            'route_name' => 'app.basicinformation.assoc.editv2',
+            'route_url' => '/app/basicinformation/'.$personId.'/assoc/edit-v2',
+            'source_text' => '同年進士',
+            'ai_matched' => json_encode(['matched_codes' => [['code_id' => 1]]]),
+            'success' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
     protected function seedAssociation(array $overrides = []): void {
         DB::table('ASSOC_DATA')->insert(array_replace([
             'c_personid' => 1000,
@@ -258,6 +294,111 @@ class ApiV2MutateAssociationTest extends TestCase {
         ];
 
         return array_replace_recursive($payload, $overrides);
+    }
+
+    // ── AI 智能識別回寫 ai_fill_logs（回歸：React 遷移後 v2 update 未回寫 → 誤顯示「未提交」）─────
+
+    #[Test]
+    public function testDirectAssociationUpdateWithAiFillLogIdMarksLogSubmitted(): void {
+        $user = $this->makeUser(email: 'assoc-ailog@example.com');
+        $this->actingAs($user);
+        $this->seedAssociation();
+        $logId = $this->insertAiFillLog($user->id);
+
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_notes' => '更新備註'],
+            'meta' => ['ai_fill_log_id' => $logId],
+        ]))->assertOk();
+
+        $log = DB::table('ai_fill_logs')->where('id', $logId)->first();
+        $this->assertNotNull($log->user_submitted, 'user_submitted 應回寫（已提交）');
+        $this->assertNotNull($log->submitted_at, 'submitted_at 應回寫');
+        $submitted = json_decode($log->user_submitted, true);
+        $this->assertSame('更新備註', $submitted['c_notes']);
+        $this->assertArrayNotHasKey('c_modified_by', $submitted, '不應含自動蓋的稽核欄');
+    }
+
+    #[Test]
+    public function testDirectAssociationUpdateWithoutAiFillLogIdLeavesLogUntouched(): void {
+        $user = $this->makeUser(email: 'assoc-noailog@example.com');
+        $this->actingAs($user);
+        $this->seedAssociation();
+        $logId = $this->insertAiFillLog($user->id);
+
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_notes' => '更新備註'],
+        ]))->assertOk();
+
+        $log = DB::table('ai_fill_logs')->where('id', $logId)->first();
+        $this->assertNull($log->user_submitted, '無 log id 不應回寫');
+        $this->assertNull($log->submitted_at);
+    }
+
+    #[Test]
+    public function testAssocUpdateAiFillLogNotOverwrittenForOtherUsersLog(): void {
+        $owner = $this->makeUser(email: 'assoc-ailog-owner@example.com');
+        $actor = $this->makeUser(email: 'assoc-ailog-actor@example.com');
+        $logId = $this->insertAiFillLog($owner->id);
+        $this->actingAs($actor);
+        $this->seedAssociation();
+
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_notes' => '更新備註'],
+            'meta' => ['ai_fill_log_id' => $logId],
+        ]))->assertOk();
+
+        $log = DB::table('ai_fill_logs')->where('id', $logId)->first();
+        $this->assertNull($log->user_submitted, '他人日誌不得被覆寫');
+    }
+
+    #[Test]
+    public function testAssocUpdateAiFillLogNotOverwrittenForWrongCategory(): void {
+        $user = $this->makeUser(email: 'assoc-ailog-cat@example.com');
+        $this->actingAs($user);
+        $this->seedAssociation();
+        $logId = $this->insertAiFillLog($user->id, 1000, 'status');
+
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_notes' => '更新備註'],
+            'meta' => ['ai_fill_log_id' => $logId],
+        ]))->assertOk();
+
+        $log = DB::table('ai_fill_logs')->where('id', $logId)->first();
+        $this->assertNull($log->user_submitted, '不同 category 的日誌不得被回寫');
+    }
+
+    #[Test]
+    public function testAssocUpdateAiFillLogNotOverwrittenForDifferentPerson(): void {
+        // 連結完整性：只回寫「同一人物」的日誌（c_personid 守衛，$personId 為 handler 權威值）。
+        $user = $this->makeUser(email: 'assoc-ailog-person@example.com');
+        $this->actingAs($user);
+        $this->seedAssociation();
+        $logId = $this->insertAiFillLog($user->id, 999);
+
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_notes' => '更新備註'],
+            'meta' => ['ai_fill_log_id' => $logId],
+        ]))->assertOk();
+
+        $log = DB::table('ai_fill_logs')->where('id', $logId)->first();
+        $this->assertNull($log->user_submitted, '不同人物的日誌不得被回寫');
+    }
+
+    #[Test]
+    public function testProposalAssociationUpdateDoesNotRecordAiFillSubmission(): void {
+        $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'assoc-ailog-proposal@example.com');
+        $this->actingAs($user);
+        $this->seedAssociation();
+        $logId = $this->insertAiFillLog($user->id);
+
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'mode' => 'proposal',
+            'changes' => ['c_notes' => '更新備註'],
+            'meta' => ['ai_fill_log_id' => $logId],
+        ]))->assertOk();
+
+        $log = DB::table('ai_fill_logs')->where('id', $logId)->first();
+        $this->assertNull($log->user_submitted, 'proposal 提交當下不回寫');
     }
 
     // ── Direct Update Tests ─────────────────────────────────

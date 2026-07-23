@@ -279,6 +279,11 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
         return $query->first();
     }
 
+    /** 社會關係 update 經 AI 智能識別（category='assoc'）時，回寫 ai_fill_logs（見 RecordsAiFillSubmission）。 */
+    protected function aiFillCategory(): ?string {
+        return 'assoc';
+    }
+
     protected function resourceName(): string {
         return 'associations';
     }

@@ -26,6 +26,8 @@ use Illuminate\Support\Str;
  * - 統一 response shape
  */
 abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHandler {
+    use \App\Services\Mutations\Concerns\RecordsAiFillSubmission;
+
     protected OperationRepository $operationRepository;
     protected AuditLogService $auditLogService;
 
@@ -134,7 +136,15 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
             return $this->handleProposal($personId, $actualPk, $rowData, $comment);
         }
 
-        return $this->handleDirect($personId, $actualPk, $rowData, $comment);
+        $response = $this->handleDirect($personId, $actualPk, $rowData, $comment);
+
+        // AI 智能識別：direct 新增成功後回寫 ai_fill_logs（見 RecordsAiFillSubmission）。
+        // 提交資料＝正規化後完整 row（PK + 白名單欄）；僅 aiFillCategory() 非 null 的資源實際回寫。
+        if ($response->getStatusCode() === 200) {
+            $this->recordAiFillSubmission($meta, $personId, $rowData);
+        }
+
+        return $response;
     }
 
     /**

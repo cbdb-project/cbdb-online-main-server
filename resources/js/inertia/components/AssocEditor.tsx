@@ -293,7 +293,11 @@ export default function AssocEditor({
         setMessage(tr('update_source_success', '已自動回填出處與頁碼'));
     };
 
-    const applyAiCode = (c: AiCandidate) => {
+    // AI 識別建立的 ai_fill_logs id：套用候選碼時記下，存檔時經 meta.ai_fill_log_id 回傳後端回寫
+    // user_submitted（否則 /admin/ai-fill-logs 恆顯示「未提交」）；存檔成功後清除，避免後續無關存檔誤標。
+    const aiFillLogId = useRef<number | null>(null);
+    const applyAiCode = (c: AiCandidate, logId: number | null) => {
+        aiFillLogId.current = logId;
         set('c_assoc_code', String(c.code_id));
         setLabel('c_assoc_code', `${c.code_id} ${c.desc_chn ?? ''} ${c.desc_en ?? ''}`.trim());
         setAssocHighlight(true);
@@ -374,10 +378,12 @@ export default function AssocEditor({
             }
         }
         try {
-            // #66：meta 可帶 comment（proposal）與 force（衝突警告中選「強制覆寫」時）。
+            // #66：meta 可帶 comment（proposal）與 force（衝突警告中選「強制覆寫」時）；
+            // 曾用 AI 智能識別（direct/proposal 皆可）時附帶 ai_fill_log_id 供後端回寫 user_submitted。
             const meta: Record<string, unknown> = {};
             if (comment) meta.comment = comment;
             if (force) meta.force = true;
+            if (aiFillLogId.current) meta.ai_fill_log_id = aiFillLogId.current;
             const res = await fetch(endpoint, {
                 method: 'POST',
                 headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
@@ -402,6 +408,7 @@ export default function AssocEditor({
             if (Object.keys(auditPatch).length > 0) setFields((prev) => ({ ...prev, ...auditPatch }));
             setSavedSnapshot(JSON.stringify({ ...fields, ...auditPatch }));
             setPairTouched(false); setKinPairTouched(false); setAssocKinPairTouched(false); // #88：存檔成功後重置三組配對 touched。
+            aiFillLogId.current = null; // 存檔成功後清除：後續無關存檔不再重複回寫此日誌（create 會 redirect，主要保護 edit）。
             if (mode === 'create') { redirectAfterSubresourceCreate(indexUrl, json, sm === 'direct'); } else if (sm === 'direct') {
                 // 改鍵後以實際送出的 PK 變更覆寫 originalPk（不可用 fields 重建，避免清空 Number('')=0 失準）。
                 const nextPk = { ...originalPk.current };

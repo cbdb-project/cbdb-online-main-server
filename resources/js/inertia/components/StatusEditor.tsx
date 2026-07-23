@@ -125,7 +125,11 @@ export default function StatusEditor({
     };
 
     // === AI 智能識別社會區分類別代碼（對齊 legacy btn-ai-code-lookup） ===
-    const applyAiCode = (c: AiCandidate) => {
+    // AI 識別建立的 ai_fill_logs id：套用候選碼時記下，存檔時經 meta.ai_fill_log_id 回傳後端回寫
+    // user_submitted（否則 /admin/ai-fill-logs 恆顯示「未提交」）；存檔成功後清除，避免後續無關存檔誤標。
+    const aiFillLogId = useRef<number | null>(null);
+    const applyAiCode = (c: AiCandidate, logId: number | null) => {
+        aiFillLogId.current = logId;
         set('c_status_code', String(c.code_id));
         setLabel('c_status_code', `${c.code_id} ${c.desc_chn} ${c.desc_en}`.trim());
         setStatusHighlight(true);
@@ -172,12 +176,16 @@ export default function StatusEditor({
             }
             if (Object.keys(changes).length === 0) { setSaving(false); setError(tr('no_change', '沒有變更')); return; }
         }
+        // meta：proposal 附帶審核備註；曾用 AI 智能識別（direct/proposal 皆可）時附帶 ai_fill_log_id 供後端回寫。
+        const meta: Record<string, unknown> = {};
+        if (comment) meta.comment = comment;
+        if (aiFillLogId.current) meta.ai_fill_log_id = aiFillLogId.current;
         try {
             const res = await fetch(endpoint, {
                 method: 'POST',
                 headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
-                body: JSON.stringify({ resource: 'statuses', person_id: personId, mode: sm, operation, target: { pk: target }, changes, ...(comment ? { meta: { comment } } : {}) }),
+                body: JSON.stringify({ resource: 'statuses', person_id: personId, mode: sm, operation, target: { pk: target }, changes, ...(Object.keys(meta).length ? { meta } : {}) }),
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json?.ok) throw new Error(json?.message || `HTTP ${res.status}`);
@@ -188,6 +196,7 @@ export default function StatusEditor({
             if (auditRow) { for (const k of ['c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date']) { if (auditRow[k] != null) auditPatch[k] = String(auditRow[k]); } }
             if (Object.keys(auditPatch).length > 0) setFields((prev) => ({ ...prev, ...auditPatch }));
             setSavedSnapshot(JSON.stringify({ ...fields, ...auditPatch }));
+            aiFillLogId.current = null; // 存檔成功後清除：後續無關存檔不再重複回寫此日誌（create 會 redirect，主要保護 edit）。
             if (mode === 'create') { redirectAfterSubresourceCreate(indexUrl, json, sm === 'direct'); }
             // 直接儲存若改了鍵：以「實際送出的 PK 變更」覆寫 originalPk（不可用 fields 重建，避免清空 Number('')=0 失準）。
             else if (sm === 'direct') {

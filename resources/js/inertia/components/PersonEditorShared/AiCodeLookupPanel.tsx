@@ -29,8 +29,12 @@ interface Props {
     title: string;
     placeholder?: string;
     hint?: string;
-    /** 點擊候選代碼後回填到對應欄位。 */
-    onApply: (c: AiCandidate) => void;
+    /**
+     * 點擊候選代碼後回填到對應欄位。第二參數 aiFillLogId 為本次 AI 識別（extract/suggest）建立的
+     * ai_fill_logs 記錄 id：父編輯器須於存檔時經 v2 mutation meta.ai_fill_log_id 回傳後端，後端據此
+     * 回寫 user_submitted，使 /admin/ai-fill-logs 正確顯示「已提交」（缺此回傳＝整條鏈斷、恆顯示未提交）。
+     */
+    onApply: (c: AiCandidate, aiFillLogId: number | null) => void;
     disabled?: boolean;
 }
 
@@ -59,6 +63,9 @@ export default function AiCodeLookupPanel({
         const q = query.trim();
         if (!q) { setError(t('ai_enter_description')); return; }
         if (!aiSuggestEndpoint) return;
+        // 每次重新識別先清空上一輪的 log id：若本輪回應未帶有效 ai_fill_log_id（如後端 insert 失敗回 null），
+        // 套用本輪候選不得沿用上一輪的舊 id（否則會把上一輪的日誌誤標為已提交）。
+        aiFillLogId.current = null;
         setBusy(true); setError(null); setCandidates(null); setNotFound([]); setSummary('');
         try {
             const res = await fetch(aiSuggestEndpoint, {
@@ -109,7 +116,7 @@ export default function AiCodeLookupPanel({
                                 {candidates.map((c) => (
                                     <button key={String(c.code_id)} type="button" title={c.reason}
                                         style={{ ...candidateBtnStyle, borderColor: relevanceColor(c.relevance) }}
-                                        onClick={() => onApply(c)}>
+                                        onClick={() => onApply(c, aiFillLogId.current)}>
                                         <strong>{c.code_id}</strong> {c.desc_chn ?? ''} {c.desc_en ? <small style={{ color: 'var(--muted-foreground)' }}>({c.desc_en})</small> : null}
                                     </button>
                                 ))}

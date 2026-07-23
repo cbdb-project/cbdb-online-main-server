@@ -116,6 +116,8 @@ return [
     'proposal_desc_hint' => 'Fill only when submitting a proposal (optional)',
     'save_direct' => 'Save Directly',
     'submit_proposal' => 'Submit Proposal',
+    'direct_save_prompt_title' => 'Save directly or submit a proposal?',
+    'direct_save_prompt_desc' => 'You have permission to save directly. Saving directly applies your changes immediately; submitting a proposal instead requires review by a colleague before it takes effect. Please choose how you would like to proceed.',
 
     // codes/edit.blade.php hint texts and JS strings
     'author_label' => 'Author',

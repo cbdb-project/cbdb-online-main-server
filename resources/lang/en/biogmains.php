@@ -5,6 +5,8 @@ return [
     'save_directly' => 'Save Directly',
     'submit_proposal' => 'Submit Proposal',
     'save_as' => 'Save As',
+    'direct_save_prompt_title' => 'Save directly or submit a proposal?',
+    'direct_save_prompt_desc' => 'You have permission to save directly. Saving directly applies your changes immediately; submitting a proposal instead requires review by a colleague before it takes effect. Please choose how you would like to proceed.',
 
     // ─── Modification note ─────────────────────────────────────────
     'modification_note_label' => 'Modification Note / Proposal Reason (optional)',

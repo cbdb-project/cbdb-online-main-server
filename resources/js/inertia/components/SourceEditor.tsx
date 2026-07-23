@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
+import { ProposalModeDialog } from './ui/ProposalModeDialog';
 import { redirectAfterSubresourceCreate } from './PersonEditorShared/afterCreate';
 import CodeAutocomplete from './PersonBrowser/shared/CodeAutocomplete';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
@@ -76,6 +77,7 @@ export default function SourceEditor({
     });
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [confirmProposalMode, setConfirmProposalMode] = useState(false);
     const [message, setMessage] = useState<string | null>(null);
     const flashSaved = (m: string) => { setMessage(m); if (msgTimer.current) window.clearTimeout(msgTimer.current); msgTimer.current = window.setTimeout(() => setMessage(null), 3000); };
     useEffect(() => () => { if (msgTimer.current) window.clearTimeout(msgTimer.current); }, []);
@@ -265,7 +267,7 @@ export default function SourceEditor({
 
             <div style={gSubmitRow}>
                 {canEdit ? <button type="button" style={gPrimaryBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
-                {(canEdit || canPropose) ? <button type="button" style={gInfoBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('proposal')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('submit_proposal', '提交建議')}</button> : null}
+                {(canEdit || canPropose) ? <button type="button" style={gInfoBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => (canEdit ? setConfirmProposalMode(true) : void save('proposal'))}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('submit_proposal', '提交建議')}</button> : null}
                 <ActionStatus saving={saving} deleting={deleting} message={message} error={error} t={t} />
                 <div style={gBtnGroupRight}>
                     {mode === 'edit' && canEdit && deleteEndpoint ? <button type="button" style={gDangerBtn} disabled={deleting} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
@@ -273,6 +275,18 @@ export default function SourceEditor({
                 </div>
             </div>
             {dirty ? <div style={{ marginTop: 8, color: 'var(--warning-subtle-foreground)', fontSize: '0.8rem' }}>{tr('unsaved_changes', '有未儲存的變更')}</div> : null}
+            <ProposalModeDialog
+                open={confirmProposalMode}
+                onOpenChange={setConfirmProposalMode}
+                title={tr('direct_save_prompt_title', '直接保存還是提交提案？')}
+                description={tr('direct_save_prompt_desc', '您具有直接保存的權限。直接保存會立即套用變更；提交提案則需等待其他同事審核後才會套用。請選擇您想要的方式。')}
+                saveDirectLabel={tr('save_directly', '直接保存')}
+                submitProposalLabel={tr('submit_proposal', '提交建議')}
+                cancelLabel={tr('cancel', '取消')}
+                loading={saving}
+                onSaveDirect={() => { setConfirmProposalMode(false); void save('direct'); }}
+                onSubmitProposal={() => { setConfirmProposalMode(false); void save('proposal'); }}
+            />
         </form>
     );
 }

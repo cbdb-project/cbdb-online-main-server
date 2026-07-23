@@ -114,6 +114,8 @@ return [
     'proposal_desc_hint' => '僅在提交提案時填寫（選填）',
     'save_direct' => '直接儲存',
     'submit_proposal' => '提交提案',
+    'direct_save_prompt_title' => '直接保存還是提交提案？',
+    'direct_save_prompt_desc' => '您具有直接保存的權限。直接保存會立即套用變更；提交提案則需等待其他同事審核後才會套用。請選擇您想要的方式。',
 
     // codes/edit.blade.php 說明文字與 JS 字串
     'author_label' => '作者',

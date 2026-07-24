@@ -45,7 +45,12 @@ class SourceMutationHandler extends AbstractMutationHandler {
                 ]);
             }
 
-            if ($this->biogSourceRepository->hasPendingCreateProposal($data)) {
+            // 核准提案時以 direct 重放本 handler，待審的那筆提案正是自己——排除之，否則自擋（§4.5）。
+            $approvingOperationId = isset($meta['__approving_operation_id'])
+                ? (int) $meta['__approving_operation_id']
+                : null;
+
+            if ($this->biogSourceRepository->hasPendingCreateProposal($data, $approvingOperationId)) {
                 return $this->errorResponse('相同主鍵已有待審核提案', 409, [
                     'target.pk' => ['pending_proposal_exists'],
                 ]);

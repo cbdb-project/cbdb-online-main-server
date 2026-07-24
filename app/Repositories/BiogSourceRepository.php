@@ -124,13 +124,23 @@ class BiogSourceRepository {
         return false;
     }
 
-    public function hasPendingCreateProposal(array $pk): bool {
+    /**
+     * @param ?int $excludeOperationId 排除此筆 operation——核准提案時重放 direct create，
+     *                                 待審的那筆正是自己，不排除會自擋（見 OperationsProposalController §4.5 重放）。
+     */
+    public function hasPendingCreateProposal(array $pk, ?int $excludeOperationId = null): bool {
         $resourceIds = $this->buildProposalResourceIds($pk);
 
-        return DB::table('operations')
+        $query = DB::table('operations')
             ->where('resource', self::RESOURCE)
             ->whereIn('resource_id', $resourceIds)
-            ->where('op_type', Operation::TYPE_PROPOSAL_CREATE)
+            ->where('op_type', Operation::TYPE_PROPOSAL_CREATE);
+
+        if ($excludeOperationId !== null) {
+            $query->where('id', '!=', $excludeOperationId);
+        }
+
+        return $query
             ->get()
             ->contains(function ($operation) {
                 $payload = json_decode($operation->resource_data ?? '[]', true);

@@ -448,6 +448,36 @@ class OperationsProposalControllerTest extends TestCase {
         $this->assertNotNull($row->c_created_date);
     }
 
+    /**
+     * §4.5 段一：核准 create 提案改由 v2 handler 重放，handler 的引用完整性校驗因此生效——
+     * c_textid 不存在於 TEXT_CODES 時 fail-closed（舊通用路徑會盲插一列殘缺資料）。
+     */
+    #[Test]
+    public function testApproveCreateProposalEnforcesHandlerValidation(): void {
+        $this->actingAs($this->makeAdmin());
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource' => 'BIOG_SOURCE_DATA',
+            'resource_id' => 'c_personid=138841&c_textid=424242&c_pages=',
+            'resource_data' => [
+                'c_personid' => 138841,
+                'c_textid' => 424242, // 不在 TEXT_CODES
+                'c_pages' => '',
+                'c_notes' => 'bad ref',
+                '__key_columns' => ['c_personid', 'c_textid', 'c_pages'],
+                '__review_status' => 'pending',
+            ],
+        ]);
+
+        $this->post(route('operations.proposals.approve', $operation))->assertRedirect();
+
+        // 未落庫、提案維持待審。
+        $this->assertSame(0, DB::table('BIOG_SOURCE_DATA')->where('c_textid', 424242)->count());
+        $operation->refresh();
+        $this->assertSame('pending', json_decode($operation->resource_data, true)['__review_status'] ?? null);
+    }
+
     #[Test]
     public function testApproveCreateEntryProposalSetsCreatedAuditFields() {
         $admin = $this->makeAdmin();

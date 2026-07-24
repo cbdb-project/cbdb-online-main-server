@@ -23,6 +23,11 @@ return [
     'btn_save' => '儲存',
     'btn_cancel' => '取消',
     'btn_back' => '返回列表',
+    'btn_propose' => '提交建議',
+    'proposal_submitted' => '已提交建議，等待管理員審核。',
+    'back_to_list' => '返回列表',
+    'proposal_confirm_title' => '提交方式',
+    'proposal_confirm_desc' => '您具有直接寫入權限。要直接保存，還是提交建議等待審核？',
 
     'field_name' => '官職名（中文）',
     'field_name_alt' => '官職名（異名）',

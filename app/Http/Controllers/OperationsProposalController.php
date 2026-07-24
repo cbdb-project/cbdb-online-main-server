@@ -88,6 +88,13 @@ class OperationsProposalController extends Controller {
         $keyColumns = $payload['__key_columns'] ?? [];
         $opType = (int) $operation->op_type;
 
+        // 實體聚合提案（§4.5）：resource 為聚合 API 名、跨多表，不走下方「單表列」機制。
+        // 以 mode=direct 重放對應 EntityAggregate handler（validate→guardWrite→service），
+        // direct 與 proposal 天然對等。
+        if ($payload['__entity_aggregate'] ?? false) {
+            return $this->approveEntityAggregateProposal($request, $operation, $payload);
+        }
+
         if (empty($keyColumns)) {
             flash('審核失敗：提案缺少主鍵資訊。', 'error');
 
@@ -194,6 +201,93 @@ class OperationsProposalController extends Controller {
         }
 
         flash('提案已核准並套用至資料表 @ '.Carbon::now(), 'success');
+
+        return redirect()->back();
+    }
+
+    /**
+     * 核准實體聚合提案（§4.5）：以 mode=direct 重放對應 EntityAggregate handler。
+     * handler 自身在交易內 validate→guardWrite→service（寫 operation＋audit＋配套表），
+     * 本處只負責重放、標記提案已核准，並把 handler 的友善錯誤（422/404/409）轉為 flash。
+     */
+    protected function approveEntityAggregateProposal(Request $request, Operation $operation, array $payload) {
+        $resource = (string) ($payload['__entity_resource'] ?? '');
+        $entityOperation = (string) ($payload['__entity_operation'] ?? '');
+        $entityPk = $payload['__entity_pk'] ?? null;
+        $changes = is_array($payload['changes'] ?? null) ? $payload['changes'] : [];
+        $personId = (int) ($operation->c_personid ?? 0);
+        $comment = trim((string) $request->input('review_comment', ''));
+
+        $definition = app(\App\Services\Mutations\EntityAggregate\EntityAggregateDefinitionRegistry::class)
+            ->forResource($resource);
+        if ($definition === null || !in_array($entityOperation, ['create', 'update', 'delete'], true)) {
+            flash('審核失敗：無法識別的實體聚合提案。', 'error');
+
+            return redirect()->back();
+        }
+
+        $handler = app(\App\Services\Mutations\MutationHandlerRegistry::class)
+            ->resolve($resource, 'direct', $entityOperation);
+        if ($handler === null) {
+            flash('審核失敗：找不到對應的實體寫入 handler。', 'error');
+
+            return redirect()->back();
+        }
+
+        $pkField = $definition->pkField();
+        $targetPk = $entityPk !== null ? [$pkField => $entityPk] : [];
+
+        try {
+            DB::transaction(function () use (
+                $handler,
+                $resource,
+                $entityOperation,
+                $personId,
+                $targetPk,
+                $changes,
+                $operation,
+                $comment,
+                $pkField
+            ) {
+                $response = $handler->handle($resource, 'direct', $entityOperation, $personId, $targetPk, $changes, []);
+                $status = $response->getStatusCode();
+                $body = json_decode($response->getContent(), true);
+                if ($status < 200 || $status >= 300) {
+                    $message = is_array($body) ? (string) ($body['message'] ?? '提案套用失敗') : '提案套用失敗';
+
+                    throw new \RuntimeException($message);
+                }
+
+                // create：把 handler 配發的新主鍵記回提案（resource_id 指向已建立的實體）。
+                $appliedPk = is_array($body['result']['pk'] ?? null) ? $body['result']['pk'] : null;
+                $this->updateProposalStatus(
+                    $operation,
+                    'approved',
+                    $comment,
+                    $entityOperation === 'create' ? $appliedPk : null,
+                    $entityOperation === 'create' ? [$pkField] : [],
+                    $entityOperation === 'create'
+                );
+            });
+        } catch (ValidationException $e) {
+            $detail = implode('；', $e->validator->errors()->all());
+            Log::warning('實體聚合提案核准失敗（驗證錯誤）', ['operation_id' => $operation->id, 'resource' => $resource, 'errors' => $detail]);
+            flash('審核失敗：'.$detail, 'error');
+
+            return redirect()->back();
+        } catch (\Throwable $e) {
+            Log::error('實體聚合提案核准失敗', [
+                'operation_id' => $operation->id,
+                'resource' => $resource,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+            ]);
+            flash('審核失敗：'.$e->getMessage(), 'error');
+
+            return redirect()->back();
+        }
+
+        flash('提案已核准並套用 @ '.Carbon::now(), 'success');
 
         return redirect()->back();
     }

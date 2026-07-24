@@ -6,11 +6,13 @@ import OfficeForm, { OfficeUrls } from './OfficeForm';
 
 interface Props {
     urls: OfficeUrls;
+    can_edit?: boolean;
+    can_propose?: boolean;
     [key: string]: unknown;
 }
 
 export default function OfficeCreate() {
-    const { urls } = usePage<Props>().props;
+    const { urls, can_edit = true, can_propose = false } = usePage<Props>().props;
     const t = useTranslation('office');
 
     return (
@@ -36,6 +38,8 @@ export default function OfficeCreate() {
                     }}
                     initialLabels={{ dynasty: null, source: null, types: {} }}
                     urls={urls}
+                    canEdit={can_edit}
+                    canPropose={can_propose}
                 />
             </div>
         </DashboardLayout>

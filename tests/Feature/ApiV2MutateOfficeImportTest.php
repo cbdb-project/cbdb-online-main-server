@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Operation;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -340,5 +341,102 @@ class ApiV2MutateOfficeImportTest extends TestCase {
 
         // 未刪：仍在。
         $this->assertDatabaseHas('OFFICE_CODES', ['c_office_id' => $officeId]);
+    }
+
+    // ── 實體級提案（§4.5）：mode=proposal 存意圖、核准時重放聚合 handler ──────────────
+
+    /** create 提案：存一筆 op_type=8 的 office operation，且**不落庫**（OFFICE_CODES 無新列）。 */
+    public function testProposalCreateStoresIntentWithoutWriting(): void {
+        $this->actingAs($this->makeUser(email: 'of-p-create@example.com'));
+
+        $res = $this->postJson('/api/v2/create', $this->payload(['mode' => 'proposal']));
+        $res->assertOk()->assertJson(['ok' => true, 'resource' => 'office', 'mode' => 'proposal', 'operation' => 'create']);
+
+        $this->assertSame(0, DB::table('OFFICE_CODES')->where('c_office_chn', '知府')->count());
+        $this->assertSame(1, DB::table('operations')
+            ->where('resource', 'office')->where('op_type', Operation::TYPE_PROPOSAL_CREATE)->count());
+    }
+
+    /** 核准 create 提案：重放聚合 create，OFFICE_CODES + TYPE_REL 同時落庫、提案標記 approved。 */
+    public function testApproveCreateProposalAppliesAggregate(): void {
+        $this->actingAs($this->makeUser(email: 'of-p-createok@example.com'));
+        $this->postJson('/api/v2/create', $this->payload(['mode' => 'proposal']))->assertOk();
+        $operation = Operation::where('resource', 'office')->firstOrFail();
+
+        $this->post(route('operations.proposals.approve', $operation))->assertRedirect();
+
+        $officeId = (int) DB::table('OFFICE_CODES')->where('c_office_chn', '知府')->value('c_office_id');
+        $this->assertGreaterThan(0, $officeId);
+        $this->assertDatabaseHas('OFFICE_CODES', ['c_office_id' => $officeId, 'c_dy' => 15, 'c_source' => 7596]);
+        $this->assertDatabaseHas('OFFICE_CODE_TYPE_REL', ['c_office_id' => $officeId, 'c_office_tree_id' => 'x01']);
+
+        $operation->refresh();
+        $this->assertSame('approved', json_decode($operation->resource_data, true)['__review_status']);
+    }
+
+    /** update 提案：先直建一官職，改名＋改類型提案，核准前不動，核准後聚合套用。 */
+    public function testProposalUpdateThenApprove(): void {
+        $this->actingAs($this->makeUser(email: 'of-p-upd@example.com'));
+        $this->postJson('/api/v2/create', $this->payload())->assertOk();
+        $officeId = (int) DB::table('OFFICE_CODES')->where('c_office_chn', '知府')->value('c_office_id');
+
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'office', 'mode' => 'proposal', 'operation' => 'update', 'person_id' => 0,
+            'target' => ['pk' => ['c_office_id' => $officeId]],
+            'changes' => ['name' => '知州', 'dynasty_code' => 15, 'type_id' => 'x02', 'source_id' => 7596],
+        ])->assertOk()->assertJson(['mode' => 'proposal', 'operation' => 'update']);
+
+        // 核准前：名字未變。
+        $this->assertDatabaseHas('OFFICE_CODES', ['c_office_id' => $officeId, 'c_office_chn' => '知府']);
+
+        $operation = Operation::where('op_type', Operation::TYPE_PROPOSAL_UPDATE)->firstOrFail();
+        $this->post(route('operations.proposals.approve', $operation))->assertRedirect();
+
+        $this->assertDatabaseHas('OFFICE_CODES', ['c_office_id' => $officeId, 'c_office_chn' => '知州']);
+        $this->assertDatabaseHas('OFFICE_CODE_TYPE_REL', ['c_office_id' => $officeId, 'c_office_tree_id' => 'x02']);
+    }
+
+    /** delete 提案的引用護欄在提交端即擋（guardWrite 與 direct 一致）：被任官引用 → 409、不存提案。 */
+    public function testProposalDeleteBlockedWhenReferenced(): void {
+        $this->actingAs($this->makeUser(email: 'of-p-delref@example.com'));
+        $this->postJson('/api/v2/create', $this->payload())->assertOk();
+        $officeId = (int) DB::table('OFFICE_CODES')->where('c_office_chn', '知府')->value('c_office_id');
+        DB::table('POSTED_TO_OFFICE_DATA')->insert(['c_personid' => 7, 'c_office_id' => $officeId, 'c_posting_id' => 1]);
+
+        $this->postJson('/api/v2/delete', [
+            'resource' => 'office', 'mode' => 'proposal', 'person_id' => 0,
+            'target' => ['pk' => ['c_office_id' => $officeId]],
+        ])->assertStatus(409);
+
+        $this->assertSame(0, DB::table('operations')->where('op_type', Operation::TYPE_PROPOSAL_DELETE)->count());
+    }
+
+    /** delete 提案（未被引用）：核准後聚合刪除官職與其類型關聯。 */
+    public function testProposalDeleteThenApprove(): void {
+        $this->actingAs($this->makeUser(email: 'of-p-del@example.com'));
+        $this->postJson('/api/v2/create', $this->payload())->assertOk();
+        $officeId = (int) DB::table('OFFICE_CODES')->where('c_office_chn', '知府')->value('c_office_id');
+
+        $this->postJson('/api/v2/delete', [
+            'resource' => 'office', 'mode' => 'proposal', 'person_id' => 0,
+            'target' => ['pk' => ['c_office_id' => $officeId]],
+        ])->assertOk()->assertJson(['mode' => 'proposal', 'operation' => 'delete']);
+
+        $this->assertDatabaseHas('OFFICE_CODES', ['c_office_id' => $officeId]);
+
+        $operation = Operation::where('op_type', Operation::TYPE_PROPOSAL_DELETE)->firstOrFail();
+        $this->post(route('operations.proposals.approve', $operation))->assertRedirect();
+
+        $this->assertSame(0, DB::table('OFFICE_CODES')->where('c_office_id', $officeId)->count());
+        $this->assertSame(0, DB::table('OFFICE_CODE_TYPE_REL')->where('c_office_id', $officeId)->count());
+    }
+
+    /** 眾包用戶不可 direct 寫實體，但可提案（authorizeProposal 只要 active）。 */
+    public function testCrowdsourcingUserCanProposeButNotDirect(): void {
+        $this->actingAs($this->makeUser(role: User::ROLE_CROWDSOURCING, email: 'of-p-crowd@example.com'));
+
+        $this->postJson('/api/v2/create', $this->payload())->assertStatus(403);
+        $this->postJson('/api/v2/create', $this->payload(['mode' => 'proposal']))->assertOk();
+        $this->assertSame(1, DB::table('operations')->where('op_type', Operation::TYPE_PROPOSAL_CREATE)->count());
     }
 }

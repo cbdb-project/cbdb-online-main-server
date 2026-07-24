@@ -4,6 +4,7 @@ import CodeAutocomplete from '../../components/PersonBrowser/shared/CodeAutocomp
 import { getCsrfToken } from '../../components/PersonBrowser/shared/csrf';
 import { Button } from '../../components/ui/Button';
 import { FormField } from '../../components/ui/FormField';
+import { ProposalModeDialog } from '../../components/ui/ProposalModeDialog';
 import { useTranslation } from '../../hooks/useTranslation';
 
 export interface OfficeUrls {
@@ -49,10 +50,14 @@ interface Props {
     initial: OfficeInitial;
     initialLabels: OfficeInitialLabels;
     urls: OfficeUrls;
+    /** 可直接寫入（active 專家）；false 時只能提交建議。 */
+    canEdit?: boolean;
+    /** 可提交建議（active 使用者，含眾包）。 */
+    canPropose?: boolean;
 }
 
 /** 官職實體聚合表單（新增／編輯共用）；寫入走 mutation API（/api/v2）。 */
-export default function OfficeForm({ mode, officeId, initial, initialLabels, urls }: Props) {
+export default function OfficeForm({ mode, officeId, initial, initialLabels, urls, canEdit = true, canPropose = false }: Props) {
     const t = useTranslation('office');
 
     const [name, setName] = useState(initial.name);
@@ -73,6 +78,8 @@ export default function OfficeForm({ mode, officeId, initial, initialLabels, url
     const [busy, setBusy] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [serverError, setServerError] = useState<string | null>(null);
+    const [proposalSubmitted, setProposalSubmitted] = useState(false);
+    const [confirmProposalMode, setConfirmProposalMode] = useState(false);
 
     const addType = (value: string, label: string) => {
         if (!value) return;
@@ -90,8 +97,7 @@ export default function OfficeForm({ mode, officeId, initial, initialLabels, url
         return code;
     };
 
-    const submit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const save = async (submitMode: 'direct' | 'proposal') => {
         setBusy(true);
         setErrors({});
         setServerError(null);
@@ -110,10 +116,11 @@ export default function OfficeForm({ mode, officeId, initial, initialLabels, url
             pages: nn(pages),
             notes: nn(notes),
         };
-        const body =
+        const base =
             mode === 'create'
                 ? { resource: 'office', person_id: 0, target: { pk: [] }, changes }
                 : { resource: 'office', operation: 'update', person_id: 0, target: { pk: { c_office_id: officeId } }, changes };
+        const body = submitMode === 'proposal' ? { ...base, mode: 'proposal' } : base;
         const endpoint = mode === 'create' ? urls.api_create : urls.api_mutate;
 
         try {
@@ -142,6 +149,12 @@ export default function OfficeForm({ mode, officeId, initial, initialLabels, url
                 setBusy(false);
                 return;
             }
+            if (submitMode === 'proposal') {
+                // 提案未落庫——不跳編輯頁，顯示等待審核提示。
+                setProposalSubmitted(true);
+                setBusy(false);
+                return;
+            }
             const newId = json?.result?.pk?.c_office_id ?? officeId;
             router.visit(urls.edit_template.replace('__ID__', String(newId)));
         } catch (err) {
@@ -150,10 +163,26 @@ export default function OfficeForm({ mode, officeId, initial, initialLabels, url
         }
     };
 
+    // 表單原生提交（Enter／主按鈕）：可直接寫者走 direct，否則可提案者走 proposal。
+    const submit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (canEdit) void save('direct');
+        else if (canPropose) void save('proposal');
+    };
+
     return (
         <form onSubmit={submit} className="space-y-4">
             {serverError && (
                 <div className="rounded border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-800">{serverError}</div>
+            )}
+
+            {proposalSubmitted && (
+                <div className="rounded border border-green-300 bg-green-50 px-4 py-2 text-sm text-green-800">
+                    {t('proposal_submitted')}{' '}
+                    <a href={urls.index} className="underline">
+                        {t('back_to_list')}
+                    </a>
+                </div>
             )}
 
             <FormField label={t('field_name')} htmlFor="office-name" error={errors.name}>
@@ -298,9 +327,21 @@ export default function OfficeForm({ mode, officeId, initial, initialLabels, url
             </FormField>
 
             <div className="flex gap-2 pt-2">
-                <Button type="submit" disabled={busy}>
-                    {t('btn_save')}
-                </Button>
+                {canEdit && (
+                    <Button type="button" disabled={busy} onClick={() => void save('direct')}>
+                        {t('btn_save')}
+                    </Button>
+                )}
+                {canPropose && (
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={busy}
+                        onClick={() => (canEdit ? setConfirmProposalMode(true) : void save('proposal'))}
+                    >
+                        {t('btn_propose')}
+                    </Button>
+                )}
                 <a
                     href={urls.index}
                     className="inline-flex items-center rounded-md border border-input px-4 py-2 text-sm hover:bg-muted"
@@ -308,6 +349,25 @@ export default function OfficeForm({ mode, officeId, initial, initialLabels, url
                     {t('btn_cancel')}
                 </a>
             </div>
+
+            <ProposalModeDialog
+                open={confirmProposalMode}
+                onOpenChange={setConfirmProposalMode}
+                title={t('proposal_confirm_title')}
+                description={t('proposal_confirm_desc')}
+                saveDirectLabel={t('btn_save')}
+                submitProposalLabel={t('btn_propose')}
+                cancelLabel={t('btn_cancel')}
+                loading={busy}
+                onSaveDirect={() => {
+                    setConfirmProposalMode(false);
+                    void save('direct');
+                }}
+                onSubmitProposal={() => {
+                    setConfirmProposalMode(false);
+                    void save('proposal');
+                }}
+            />
         </form>
     );
 }

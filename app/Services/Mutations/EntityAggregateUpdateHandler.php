@@ -17,7 +17,7 @@ class EntityAggregateUpdateHandler extends AbstractEntityAggregateHandler {
     }
 
     public function handle(string $resource, string $mode, string $operation, int $personId, array $targetPk, array $changes, array $meta = []): JsonResponse {
-        $authError = $this->authorizeDirect();
+        $authError = $mode === 'proposal' ? $this->authorizeProposal() : $this->authorizeDirect();
         if ($authError) {
             return $authError;
         }
@@ -43,6 +43,10 @@ class EntityAggregateUpdateHandler extends AbstractEntityAggregateHandler {
         $guard = $definition->guardWrite('update', $id, $input, $existing);
         if ($guard !== null) {
             return $this->errorResponse($guard[0], $guard[1], $guard[2]);
+        }
+
+        if ($mode === 'proposal') {
+            return $this->storeProposal($definition, 'update', $id, $personId, $changes, $meta);
         }
 
         $result = DB::transaction(fn () => $definition->result(

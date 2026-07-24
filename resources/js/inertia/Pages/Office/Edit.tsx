@@ -25,11 +25,13 @@ interface Props {
     office: OfficeAggregate;
     initial_labels: OfficeInitialLabels;
     urls: OfficeUrls;
+    can_edit?: boolean;
+    can_propose?: boolean;
     [key: string]: unknown;
 }
 
 export default function OfficeEdit() {
-    const { office, initial_labels, urls } = usePage<Props>().props;
+    const { office, initial_labels, urls, can_edit = true, can_propose = false } = usePage<Props>().props;
     const t = useTranslation('office');
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState<string | null>(null);
@@ -88,12 +90,16 @@ export default function OfficeEdit() {
                     }}
                     initialLabels={initial_labels}
                     urls={urls}
+                    canEdit={can_edit}
+                    canPropose={can_propose}
                 />
-                <div className="border-t border-border pt-3">
-                    <Button type="button" variant="destructive" disabled={busy} onClick={del}>
-                        {t('btn_delete')}
-                    </Button>
-                </div>
+                {can_edit && (
+                    <div className="border-t border-border pt-3">
+                        <Button type="button" variant="destructive" disabled={busy} onClick={del}>
+                            {t('btn_delete')}
+                        </Button>
+                    </div>
+                )}
             </div>
         </DashboardLayout>
     );

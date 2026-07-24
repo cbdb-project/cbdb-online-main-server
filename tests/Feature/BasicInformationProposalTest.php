@@ -1462,7 +1462,9 @@ class BasicInformationProposalTest extends TestCase {
 
         $flash = session('flash_notification', collect())->toArray();
         $this->assertNotEmpty($flash);
-        $this->assertStringContainsString('資料已存在', $flash[0]['message'] ?? '');
+        // 核准 create 改由 v2 handler 重放（§4.5），存在檢查與訊息以 handler 為準——
+        // handler 於 preprocessCreateData 正規化後才比對主鍵，比控制器側預檢查更準確。
+        $this->assertStringContainsString('目標主鍵已存在', $flash[0]['message'] ?? '');
         $operation->refresh();
         $payload = json_decode($operation->resource_data, true);
         $this->assertSame('pending', $payload['__review_status']);

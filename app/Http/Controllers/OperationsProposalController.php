@@ -387,15 +387,14 @@ class OperationsProposalController extends Controller {
         array $original,
         array $auxiliaryPayload
     ): array {
-        // 段一：已遷移的人物子資源 UPDATE／DELETE 改由 v2 direct handler 重放，使核准與直接編輯逐位一致
-        // （派生／護欄／audit／索引同步）。usedDirectWorkflow=true —— handler 自寫 operation + audit，approve() 不再補記。
+        // 段一：已遷移的人物子資源 CREATE／UPDATE／DELETE 一律由 v2 direct handler 重放，使核准與直接編輯
+        // 逐位一致（派生／護欄／audit／索引同步）。usedDirectWorkflow=true —— handler 自寫 operation + audit，
+        // approve() 不再補記。
         //
-        // CREATE 刻意排除、續走通用 applyCreateProposal：direct-create handler 帶「同主鍵已有待審核提案則拒」
-        // 去重護欄（AbstractPersonSubresourceCreateHandler／SourceMutationHandler），核准時那筆 pending 提案
-        // 正是自己、resource_id 相符會被自擋。要放行需把「被核准的 operation id」作為 excludeId 一路傳進各
-        // create handler 的護欄——跨切面較大，留待後續（段二）。
-        if (isset(self::HANDLER_ROUTED_RESOURCES[$table])
-            && (int) $operation->op_type !== Operation::TYPE_PROPOSAL_CREATE) {
+        // 「同主鍵已有待審核提案則拒」去重護欄與重放的關係：AbstractPersonSubresourceCreateHandler 的護欄在
+        // handleProposal() 內、direct 路徑不經過，故不受影響；SourceMutationHandler 的護欄在 mode 分派之前、
+        // direct 亦會跑，故以 meta.__approving_operation_id 排除「正在核准的自己」（見 applyViaMutationHandler）。
+        if (isset(self::HANDLER_ROUTED_RESOURCES[$table])) {
             return [$this->applyViaMutationHandler($operation, $table, $data, $keyColumns, $original), true];
         }
 
@@ -435,10 +434,10 @@ class OperationsProposalController extends Controller {
     }
 
     /**
-     * 段一核准重放：把 UPDATE／DELETE 提案還原成一次 direct mutation，交回同一個 v2 handler 落庫。
-     * （CREATE 不經此——見 applyProposal 的排除說明。）
+     * 段一核准重放：把提案還原成一次 direct mutation，交回同一個 v2 handler 落庫。
      *
-     * 存的 resource_data 是「合併後的行快照」（data = original ∪ updateData），據此還原意圖：
+     * 存的 resource_data 是「合併後的行快照」（update 時 data = original ∪ updateData），據此還原意圖：
+     *  - create：targetPk = data 的鍵欄；changes = data 去鍵欄（handler 內以 merge(targetPk, changes) 組回整列）。
      *  - update：targetPk = original 的鍵欄；changes = data 相對 original 有差異的欄位（含被改動的鍵欄，
      *            handler 內以 buildNewPk 處理改鍵）。因 data＝original∪updateData，差集恰為使用者變更。
      *  - delete：targetPk = original 的鍵欄；changes = []。
@@ -457,14 +456,18 @@ class OperationsProposalController extends Controller {
         $personId = (int) ($data['c_personid'] ?? $original['c_personid'] ?? ($operation->c_personid ?: 0));
 
         // update／delete 皆以 original 定位目標列；缺 original 無從定位——沿用通用路徑的清晰契約
-        // （比 handler 內「主鍵格式不正確」更有指向性）。
-        if ($original === []) {
+        // （比 handler 內「主鍵格式不正確」更有指向性）。create 無 original，不適用。
+        if ($original === [] && $opType !== Operation::TYPE_PROPOSAL_CREATE) {
             throw new \RuntimeException(
                 $opType === Operation::TYPE_PROPOSAL_DELETE ? '缺少原始資料，無法刪除。' : '缺少原始資料，無法更新。'
             );
         }
 
-        if ($opType === Operation::TYPE_PROPOSAL_DELETE) {
+        if ($opType === Operation::TYPE_PROPOSAL_CREATE) {
+            $handlerOperation = 'create';
+            $targetPk = $this->pickColumns($data, $keyColumns);
+            $changes = array_diff_key($data, array_flip($keyColumns));
+        } elseif ($opType === Operation::TYPE_PROPOSAL_DELETE) {
             $handlerOperation = 'delete';
             $targetPk = $this->pickColumns($original, $keyColumns);
             $changes = [];
@@ -481,7 +484,11 @@ class OperationsProposalController extends Controller {
             throw new \RuntimeException("找不到 {$resource}/{$handlerOperation} 的 mutation handler，無法套用提案。");
         }
 
-        $response = $handler->handle($resource, 'direct', $handlerOperation, $personId, $targetPk, $changes, []);
+        // __approving_operation_id：讓 handler 的「同主鍵已有待審核提案則拒」護欄排除正在核准的這一筆
+        // （否則核准 create 時會被自己擋下）。目前僅 SourceMutationHandler 於 direct 路徑跑該護欄。
+        $meta = ['__approving_operation_id' => $operation->id];
+
+        $response = $handler->handle($resource, 'direct', $handlerOperation, $personId, $targetPk, $changes, $meta);
         $status = $response->getStatusCode();
         $body = json_decode($response->getContent(), true);
         if ($status < 200 || $status >= 300) {

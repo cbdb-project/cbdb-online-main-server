@@ -60,6 +60,27 @@ class OfficeEntityController extends Controller {
         }
     }
 
+    /**
+     * 表單頁（新增／編輯）門檻：可直接寫或可提案者皆可進（active 使用者，含眾包）。
+     * 實際寫入由 mutation API 各自授權（direct→authorizeDirect、proposal→authorizeProposal），
+     * 前端依 can_edit／can_propose 顯示對應按鈕。
+     */
+    protected function ensureCanReachForm(): void {
+        if (!Auth::check() || !Auth::user()->canPropose()) {
+            abort(403);
+        }
+    }
+
+    /** 前端表單能力旗標（與人物子資源頁一致）。 */
+    protected function formCapabilities(): array {
+        $user = Auth::user();
+
+        return [
+            'can_edit' => $user ? $user->canWriteDirectly() : false,
+            'can_propose' => $user ? $user->canPropose() : false,
+        ];
+    }
+
     /** 前端共用的 API 端點與路由。 */
     protected function urls(): array {
         return [
@@ -113,17 +134,17 @@ class OfficeEntityController extends Controller {
 
     /** 新增官職表單頁。 */
     public function appCreate() {
-        $this->ensureWrite();
+        $this->ensureCanReachForm();
 
-        return Inertia::render('Office/Create', [
+        return Inertia::render('Office/Create', array_merge($this->formCapabilities(), [
             'urls' => $this->urls(),
             'page_translations' => $this->translations(),
-        ]);
+        ]));
     }
 
     /** 編輯官職表單頁：載入聚合 + 預備 picker 初始標籤。 */
     public function appEdit(Request $request, int $id) {
-        $this->ensureWrite();
+        $this->ensureCanReachForm();
 
         $aggregate = $this->service->load($id);
         if ($aggregate === null) {
@@ -155,7 +176,7 @@ class OfficeEntityController extends Controller {
             }
         }
 
-        return Inertia::render('Office/Edit', [
+        return Inertia::render('Office/Edit', array_merge($this->formCapabilities(), [
             'office' => $aggregate,
             'initial_labels' => [
                 'dynasty' => $dynastyLabel,
@@ -164,6 +185,6 @@ class OfficeEntityController extends Controller {
             ],
             'urls' => $this->urls(),
             'page_translations' => $this->translations(),
-        ]);
+        ]));
     }
 }

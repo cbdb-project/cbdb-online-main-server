@@ -47,6 +47,28 @@ class OperationsProposalController extends Controller {
         ],
     ];
 
+    /**
+     * 段一：以 v2 mutation handler 重放核准的人物子資源提案（表名 → API resource）。
+     *
+     * 這些表的提案原本落到通用行覆寫（applyCreate/Update/DeleteProposal），繞過聚合的
+     * 派生／護欄／audit／索引同步——「核准」退化成盲寫一行、與「直接編輯」行為分歧。
+     * 改為重建 {resource, 'direct', operation, personId, targetPk, changes} 重放 direct handler，
+     * 使核准與直接編輯逐位一致（見 docs/ENTITY_AGGREGATE_ARCHITECTURE.md §4.5）。
+     *
+     * 不含：委派檔（KIN_DATA／ASSOC_DATA／POSTED_TO_OFFICE_DATA／POSSESSION_DATA／EVENTS_DATA）
+     * 已走 legacy repository 委派、行為已對齊；code 表提案走 CodesController 自己的核准路徑、不經此。
+     * auth 無礙：canReviewProposals() 與 canWriteDirectly() 為同一謂詞，能到核准端點者必過 authorizeDirect()。
+     */
+    protected const HANDLER_ROUTED_RESOURCES = [
+        'ALTNAME_DATA' => 'altnames',
+        'BIOG_ADDR_DATA' => 'addresses',
+        'ENTRY_DATA' => 'entries',
+        'STATUS_DATA' => 'statuses',
+        'BIOG_TEXT_DATA' => 'texts',
+        'BIOG_SOURCE_DATA' => 'sources',
+        'BIOG_INST_DATA' => 'social_institutions',
+    ];
+
     public function __construct(
         OperationRepository $operationRepository,
         NameSearchIndexService $nameSearchIndexService,
@@ -271,6 +293,18 @@ class OperationsProposalController extends Controller {
         array $original,
         array $auxiliaryPayload
     ): array {
+        // 段一：已遷移的人物子資源 UPDATE／DELETE 改由 v2 direct handler 重放，使核准與直接編輯逐位一致
+        // （派生／護欄／audit／索引同步）。usedDirectWorkflow=true —— handler 自寫 operation + audit，approve() 不再補記。
+        //
+        // CREATE 刻意排除、續走通用 applyCreateProposal：direct-create handler 帶「同主鍵已有待審核提案則拒」
+        // 去重護欄（AbstractPersonSubresourceCreateHandler／SourceMutationHandler），核准時那筆 pending 提案
+        // 正是自己、resource_id 相符會被自擋。要放行需把「被核准的 operation id」作為 excludeId 一路傳進各
+        // create handler 的護欄——跨切面較大，留待後續（段二）。
+        if (isset(self::HANDLER_ROUTED_RESOURCES[$table])
+            && (int) $operation->op_type !== Operation::TYPE_PROPOSAL_CREATE) {
+            return [$this->applyViaMutationHandler($operation, $table, $data, $keyColumns, $original), true];
+        }
+
         if ((int) $operation->op_type === Operation::TYPE_PROPOSAL_DELETE) {
             return [$this->applyDeleteProposal($table, $keyColumns, $original), false];
         }
@@ -304,6 +338,100 @@ class OperationsProposalController extends Controller {
         }
 
         return [$this->applyUpdateProposal($table, $data, $keyColumns, $original), false];
+    }
+
+    /**
+     * 段一核准重放：把 UPDATE／DELETE 提案還原成一次 direct mutation，交回同一個 v2 handler 落庫。
+     * （CREATE 不經此——見 applyProposal 的排除說明。）
+     *
+     * 存的 resource_data 是「合併後的行快照」（data = original ∪ updateData），據此還原意圖：
+     *  - update：targetPk = original 的鍵欄；changes = data 相對 original 有差異的欄位（含被改動的鍵欄，
+     *            handler 內以 buildNewPk 處理改鍵）。因 data＝original∪updateData，差集恰為使用者變更。
+     *  - delete：targetPk = original 的鍵欄；changes = []。
+     */
+    protected function applyViaMutationHandler(
+        Operation $operation,
+        string $table,
+        array $data,
+        array $keyColumns,
+        array $original
+    ): array {
+        $resource = self::HANDLER_ROUTED_RESOURCES[$table];
+        $opType = (int) $operation->op_type;
+        // 這些子資源以 row 內 c_personid 為權威人物（handler 會校驗 target.pk.c_personid 與 person_id 一致）；
+        // operation->c_personid 對舊/測試資料可能為 0，故不可優先。用 null 合併避免 `0 ?? x` 的陷阱。
+        $personId = (int) ($data['c_personid'] ?? $original['c_personid'] ?? ($operation->c_personid ?: 0));
+
+        // update／delete 皆以 original 定位目標列；缺 original 無從定位——沿用通用路徑的清晰契約
+        // （比 handler 內「主鍵格式不正確」更有指向性）。
+        if ($original === []) {
+            throw new \RuntimeException(
+                $opType === Operation::TYPE_PROPOSAL_DELETE ? '缺少原始資料，無法刪除。' : '缺少原始資料，無法更新。'
+            );
+        }
+
+        if ($opType === Operation::TYPE_PROPOSAL_DELETE) {
+            $handlerOperation = 'delete';
+            $targetPk = $this->pickColumns($original, $keyColumns);
+            $changes = [];
+        } else {
+            $handlerOperation = 'update';
+            $targetPk = $this->pickColumns($original, $keyColumns);
+            $changes = $this->diffChangedColumns($original, $data);
+        }
+
+        /** @var \App\Services\Mutations\MutationHandlerRegistry $registry */
+        $registry = app(\App\Services\Mutations\MutationHandlerRegistry::class);
+        $handler = $registry->resolve($resource, 'direct', $handlerOperation);
+        if ($handler === null) {
+            throw new \RuntimeException("找不到 {$resource}/{$handlerOperation} 的 mutation handler，無法套用提案。");
+        }
+
+        $response = $handler->handle($resource, 'direct', $handlerOperation, $personId, $targetPk, $changes, []);
+        $status = $response->getStatusCode();
+        $body = json_decode($response->getContent(), true);
+        if ($status < 200 || $status >= 300) {
+            $message = is_array($body) ? (string) ($body['message'] ?? '提案套用失敗') : '提案套用失敗';
+
+            // 交回外層交易回滾；訊息不外洩底層細節（approve() 已有 ValidationException/QueryException 友善提示）。
+            throw new \RuntimeException("提案套用失敗（{$resource}/{$handlerOperation}）：{$message}");
+        }
+
+        if ($opType === Operation::TYPE_PROPOSAL_DELETE) {
+            // appliedRow 於刪除後僅供日誌，回傳刪除前的原始列即可（下游 updateProposalStatus 只在 create 用到）。
+            return $original;
+        }
+
+        // 讀回套用後的資料列：以 handler 回報的新主鍵定位（改鍵時 result.pk 為新鍵）。
+        $newPk = is_array($body) && isset($body['result']['pk']) && is_array($body['result']['pk'])
+            ? $this->pickColumns($body['result']['pk'], $keyColumns)
+            : $targetPk;
+
+        return $this->fetchAppliedRow($table, $newPk) ?? array_merge($original, $data);
+    }
+
+    /** 從 $row 取出 $columns 指定的欄位（缺欄跳過）。 */
+    protected function pickColumns(array $row, array $columns): array {
+        $out = [];
+        foreach ($columns as $column) {
+            if (array_key_exists($column, $row)) {
+                $out[$column] = $row[$column];
+            }
+        }
+
+        return $out;
+    }
+
+    /** $data 相對 $original 有差異（stringwise）的欄位；作為 direct update 的 changes。 */
+    protected function diffChangedColumns(array $original, array $data): array {
+        $changes = [];
+        foreach ($data as $column => $value) {
+            if (!array_key_exists($column, $original) || (string) $original[$column] !== (string) $value) {
+                $changes[$column] = $value;
+            }
+        }
+
+        return $changes;
     }
 
     protected function applyKinshipProposal(

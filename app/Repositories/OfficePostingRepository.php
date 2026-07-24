@@ -4,6 +4,7 @@ namespace App\Repositories;
 
 use App\Repositories\Concerns\DetectsModelChanges;
 use App\Services\AuditLogService;
+use App\Services\ExplicitCascadeLogger;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -607,12 +608,18 @@ class OfficePostingRepository {
                 ->where('c_posting_id', $row->c_posting_id)
                 ->where('c_personid', $c_personid)
                 ->delete();
-            DB::table('POSTING_DATA')->where('c_posting_id', $row->c_posting_id)->delete();
+            // 顯式級聯：POSTING_DATA 是 POSTED_TO_OFFICE_DATA／POSTED_TO_ADDR_DATA 的父列，
+            // 且同一 c_posting_id 可能被多列共用（prod 實測有 31 個共用 posting）。去級聯後
+            // 若仍有兄弟列引用而逕刪父列，會被 DB 以 1451 擋下；翻轉前的 CASCADE 則會靜默
+            // 刪掉那些兄弟列。故僅在無剩餘引用時才刪父列。
+            $deletedPosting = self::deletePostingIfUnreferenced($row->c_posting_id);
 
-            $officeOperation = (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'POSTED_TO_OFFICE_DATA', CompositePrimaryKey::buildStoredResourceId([
+            $officeResourceId = CompositePrimaryKey::buildStoredResourceId([
                 'c_office_id' => $addr_l[0],
                 'c_posting_id' => $addr_l[1],
-            ]), $row);
+            ]);
+
+            $officeOperation = (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'POSTED_TO_OFFICE_DATA', $officeResourceId, $row);
 
             $officeRowData = $auditLog->normalizeRow($row);
             $officeRowPk = $auditLog->buildRowPkFromData('POSTED_TO_OFFICE_DATA', $officeRowData);
@@ -626,15 +633,23 @@ class OfficePostingRepository {
                 $operationId
             );
 
-            foreach ($addrRows as $addrRow) {
-                $addrRowData = $auditLog->normalizeRow($addrRow);
-                $addrRowPk = $auditLog->buildRowPkFromData('POSTED_TO_ADDR_DATA', $addrRowData);
-                $auditLog->logChange(
-                    'POSTED_TO_ADDR_DATA',
-                    'DELETE',
-                    $addrRowPk,
-                    $addrRowData,
-                    null,
+            // 連帶刪除的子／父列同樣要進 operations（先前只寫了 audit_log，operations 缺席，
+            // 等於在 /operations 上看不到它們曾被刪除）。整組共用 $operationId、可整組回退。
+            $cascadeLogger = new ExplicitCascadeLogger();
+            $cascadeLogger->logDeletedRows(
+                'POSTED_TO_ADDR_DATA',
+                $officeResourceId,
+                $addrRows,
+                (int) $c_personid,
+                $operationId
+            );
+
+            if ($deletedPosting !== null) {
+                $cascadeLogger->logDeletedRows(
+                    'POSTING_DATA',
+                    (string) $row->c_posting_id,
+                    [$deletedPosting],
+                    (int) $c_personid,
                     $operationId
                 );
             }
@@ -659,5 +674,36 @@ class OfficePostingRepository {
                 ]
             );
         }
+    }
+
+    /**
+     * 僅在沒有任何 POSTED_TO_OFFICE_DATA／POSTED_TO_ADDR_DATA 列仍引用該 posting 時，才刪除
+     * POSTING_DATA 父列（顯式級聯的「最後一個引用者離開才收尾」語義）。
+     *
+     * 去級聯（ON DELETE RESTRICT）後逕刪仍被引用的父列會得到 1451；翻轉前的 CASCADE 則會
+     * 靜默刪掉共用同一 c_posting_id 的兄弟列（prod 實測 31 個 posting 被多列共用）。
+     *
+     * @return object|null 實際被刪除的 POSTING_DATA 列（供呼叫端寫 operations／audit_log）；未刪則 null
+     */
+    public static function deletePostingIfUnreferenced($postingId): ?object {
+        if ($postingId === null || $postingId === '') {
+            return null;
+        }
+
+        $stillReferenced = DB::table('POSTED_TO_OFFICE_DATA')->where('c_posting_id', $postingId)->exists()
+            || DB::table('POSTED_TO_ADDR_DATA')->where('c_posting_id', $postingId)->exists();
+
+        if ($stillReferenced) {
+            return null;
+        }
+
+        $postingRow = DB::table('POSTING_DATA')->where('c_posting_id', $postingId)->first();
+        if ($postingRow === null) {
+            return null;
+        }
+
+        DB::table('POSTING_DATA')->where('c_posting_id', $postingId)->delete();
+
+        return $postingRow;
     }
 }

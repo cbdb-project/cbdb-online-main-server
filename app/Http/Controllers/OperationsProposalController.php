@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Operation;
 use App\Repositories\BiogMainRepository;
+use App\Repositories\OfficePostingRepository;
 use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
+use App\Services\ExplicitCascadeLogger;
 use App\Services\NameSearchIndexService;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
@@ -767,7 +769,9 @@ class OperationsProposalController extends Controller {
 
         $deletedRow = $this->convertRowToArray($row);
 
-        // 連帶刪除副表
+        // 連帶刪除副表（顯式級聯）：子列先於父列。POSSESSION_ADDR 是 POSSESSION_DATA 的子表，
+        // 故於主列刪除前清掉；POSTING_DATA 反之是 POSTED_TO_OFFICE_DATA 的**父列**，必須等主列
+        // 刪掉之後才輪到它（見下方 deleteOfficeAuxiliaryTables／deletePostingParentIfUnreferenced）。
         if ($table === 'POSTED_TO_OFFICE_DATA') {
             $this->deleteOfficeAuxiliaryTables($deletedRow);
         } elseif ($table === 'POSSESSION_DATA') {
@@ -775,6 +779,18 @@ class OperationsProposalController extends Controller {
         }
 
         DB::table($table)->where($conditions)->delete();
+
+        if ($table === 'POSTED_TO_OFFICE_DATA') {
+            $deletedPosting = OfficePostingRepository::deletePostingIfUnreferenced($deletedRow['c_posting_id'] ?? null);
+            if ($deletedPosting !== null) {
+                (new ExplicitCascadeLogger())->logDeletedRows(
+                    'POSTING_DATA',
+                    (string) ($deletedRow['c_posting_id'] ?? ''),
+                    [$deletedPosting],
+                    (int) ($deletedRow['c_personid'] ?? 0)
+                );
+            }
+        }
 
         // 注意：社會關係反向鏡像刪除移至 approve() 於 logFinalOperation 之後執行，
         // 以便鏡像 audit 掛 final delete operation id（見 approve()）。
@@ -787,7 +803,11 @@ class OperationsProposalController extends Controller {
     }
 
     /**
-     * POSTED_TO_OFFICE_DATA 核准刪除時連帶刪除 POSTED_TO_ADDR_DATA 與 POSTING_DATA。
+     * POSTED_TO_OFFICE_DATA 核准刪除時連帶刪除 POSTED_TO_ADDR_DATA。
+     *
+     * 注意 POSTING_DATA **不在此處刪除**：它是 POSTED_TO_OFFICE_DATA／POSTED_TO_ADDR_DATA 的
+     * 父列，去級聯（ON DELETE RESTRICT）後必須等主列刪完、且確認無其他列共用該 posting 之後
+     * 才能刪，見 applyDeleteProposal() 末尾的 deletePostingIfUnreferenced()。
      */
     protected function deleteOfficeAuxiliaryTables(array $row): void {
         $officeId = $row['c_office_id'] ?? null;
@@ -805,11 +825,20 @@ class OperationsProposalController extends Controller {
             if ($personId !== null) {
                 $addrQuery->where('c_personid', $personId);
             }
-            $addrQuery->delete();
-        }
 
-        if (Schema::hasTable('POSTING_DATA')) {
-            DB::table('POSTING_DATA')->where('c_posting_id', $postingId)->delete();
+            // 刪除前先取出，連帶刪除的每一列都要留下 operations／audit_log 痕跡。
+            $addrRows = (clone $addrQuery)->get();
+            $addrQuery->delete();
+
+            (new ExplicitCascadeLogger())->logDeletedRows(
+                'POSTED_TO_ADDR_DATA',
+                CompositePrimaryKey::buildStoredResourceId([
+                    'c_office_id' => $officeId,
+                    'c_posting_id' => $postingId,
+                ]),
+                $addrRows,
+                (int) ($personId ?? 0)
+            );
         }
     }
 
@@ -823,7 +852,18 @@ class OperationsProposalController extends Controller {
         }
 
         if (Schema::hasTable('POSSESSION_ADDR')) {
-            DB::table('POSSESSION_ADDR')->where('c_possession_record_id', $recordId)->delete();
+            $addrQuery = DB::table('POSSESSION_ADDR')->where('c_possession_record_id', $recordId);
+
+            // 刪除前先取出，連帶刪除的每一列都要留下 operations／audit_log 痕跡。
+            $addrRows = (clone $addrQuery)->get();
+            $addrQuery->delete();
+
+            (new ExplicitCascadeLogger())->logDeletedRows(
+                'POSSESSION_ADDR',
+                (string) $recordId,
+                $addrRows,
+                (int) ($row['c_personid'] ?? 0)
+            );
         }
     }
 

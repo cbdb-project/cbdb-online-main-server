@@ -16,6 +16,7 @@
 * [升級指南](./docs/UPGRADE.md) - Laravel 框架升級記錄
 * [AdminLTE 在 CBDB Online 項目中的使用分析](./docs/ADMINLTE.md)
 * [Proposal / Approval Flows](./docs/APPROVAL_FLOWS.md)
+* [人物提案路徑現況](./docs/PERSON_PROPOSAL_PATHS.md) - 三條核准路徑與逐資源總表
 * [代碼表格前端實作比較](./docs/CODES.md)
 * [代碼表界面白名單維護](./docs/CODES_TABLES.md)
 * [代碼表界面效能優化](./docs/CODES_PERFORMANCE.md)
@@ -36,7 +37,7 @@
 * [AI 任官自動填充設計](./docs/AI_POSTING_AUTOFILL_DESIGN.md)
 * [API 認證方案](./docs/API_AUTHENTICATION.md)
 * [稽核日誌提案](./docs/AUDIT_LOG_PROPOSAL.md)
-* [人物提案流程計畫](./docs/BIOGMAIN_APPROVAL_FLOWS_PLAN.md)
+* [人物提案流程實作狀態](./docs/BIOGMAIN_APPROVAL_FLOWS_PLAN.md)
 * [BiogMain Repository 重構計畫](./docs/BIOGMAIN_REPOSITORY_REFACTOR_PLAN.md)
 * [CHGIS 地圖 Place Name 連結與浮出地圖](./docs/CHGIS_MAP_PLACE_LINK.md)
 * [複合主鍵 URL 設計](./docs/COMPOSITE_PRIMARY_KEY_URL_DESIGN.md)

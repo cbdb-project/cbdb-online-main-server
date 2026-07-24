@@ -115,6 +115,7 @@ php artisan cbdb:fetch-chgis-map        # 下載 CHGIS 底圖（缺檔才下載�
 - [CHANGELOG.md](./CHANGELOG.md)
 - [DATABASE.md](./DATABASE.md)
 - [docs/APPROVAL_FLOWS.md](./docs/APPROVAL_FLOWS.md)
+- [docs/PERSON_PROPOSAL_PATHS.md](./docs/PERSON_PROPOSAL_PATHS.md)（人物提案：三條核准路徑與逐資源現況；改動核准行為前必讀）
 - [docs/ZHWIKI_SOURCE_SYNC.md](./docs/ZHWIKI_SOURCE_SYNC.md)（中文維基連結增量維護：走 mutation API，勿用 WikiMaintenanceController 全量重灌）
 - [docs/VIEWS.md](./docs/VIEWS.md)
 - [docs/POSTING_OFFICE.md](./docs/POSTING_OFFICE.md)

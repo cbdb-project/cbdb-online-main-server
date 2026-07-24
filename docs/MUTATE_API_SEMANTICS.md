@@ -29,7 +29,7 @@
 - 前端 XHR / API 呼叫
 - 僅修改少量欄位（例如 `c_sequence`）
 - 預期 JSON 回應
-- 後續可能支援 `proposal` / 批量
+- 支援 `proposal` 模式（已實作；批量仍未做）
 
 若強行讓 `mutate == updateQuery()`，常見問題：
 
@@ -123,20 +123,22 @@
 
 這類資源通常不適合直接硬套舊 `updateById()`（尤其當舊邏輯排除主鍵欄位更新時）。
 
-## 建議的擴充方向（逐步）
+## 擴充方向與現況
 
-### Phase 1（已在做）
+### Phase 1（已完成）
 
 - `mode=direct`
-- `operation=update`
-- 僅支援部份資源、部份安全欄位（例如 `c_sequence`）
+- `operation=create` / `update` / `delete`
+- 涵蓋 `BIOG_MAIN`、12 個人物子資源與實體聚合（office／social-institution）
 
-### Phase 2
+### Phase 2（已完成）
 
-- `mode=proposal`
-- 同一請求協議，改走 proposal 寫入而非直接落表
+- `mode=proposal`——同一請求協議，改走 proposal 寫入而非直接落表。
+- 人物資源與實體聚合皆已支援；提交端由各 handler 的 proposal 分支處理。
+- 核准端對多數人物子資源已改為「重放同一 direct handler」，使 direct 與 proposal 對等；
+  各資源實際狀況見 [PERSON_PROPOSAL_PATHS.md](./PERSON_PROPOSAL_PATHS.md)。
 
-### Phase 3
+### Phase 3（未做）
 
 - 批量變更（例如整頁次序調整）
 - 明確定義批量成功/失敗與部分失敗策略

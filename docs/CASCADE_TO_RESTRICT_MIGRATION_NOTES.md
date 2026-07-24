@@ -1,6 +1,6 @@
 # CASCADE → RESTRICT：翻轉 migration 的機制與分批 rollout（MariaDB 10.3）
 
-> 狀態：實作中（分批進行）｜ 批次 1–3 已落地並實測（詞表入邊全數翻畢，剩 SOCIAL_INSTITUTION_*／資料表／BIOG_MAIN）
+> 狀態：實作中（分批進行）｜ 批次 1–4 已落地並實測（詞表入邊全數翻畢，剩資料表 POSTING_DATA／POSSESSION_DATA 與 BIOG_MAIN 共 28 條）
 > 上位文件：[docs/ON_DELETE_CASCADE_RISK.md](./ON_DELETE_CASCADE_RISK.md)（§6「RESTRICT 先行、按被引用表分批」）
 > 目的：把 §6.1 的翻轉方案落成可執行、可分批、可回滾的 migration，並記錄 §6.1 範例 SQL 在
 > **prod 版本 MariaDB 10.3** 上跑不起來的實測修正（該文件是在 10.11 驗的）。
@@ -96,7 +96,7 @@ GROUP BY REFERENCED_TABLE_NAME, DELETE_RULE;
 | **1** | NIAN_HAO(24)、YEAR_RANGE_CODES(23)、DYNASTIES(10)、GANZHI_CODES(9)＝**66 條** | `2026_07_20_000000_restrict_fks_referencing_dynasty_batch` | ✅ 已實作＋MariaDB 10.3 端到端驗（見 §9） |
 | **2** | TEXT_CODES(21)、ADDR_CODES(11)＝**32 條**（TEXT_CODES 另 1 條 `SET NULL` 本已正確、未觸碰） | `2026_07_21_000000_restrict_fks_referencing_text_addr_codes` | ✅ 已實作＋MariaDB 10.3 端到端驗（見 §9.1）；同 commit 為唯一活硬刪路徑 `AdminBatchLoadBookTitlesController::undo()` 補 1451 友好報錯垫片 |
 | **3** | 其餘全部小詞表／類型表／樹表 35 張＝**52 條**（KINSHIP_CODES(6)、ASSOC_CODES(4)、OFFICE_CODES(3)、TEXT_BIBLCAT_CODES／STATUS_CODES／ENTRY_CODES／COUNTRY_CODES／APPOINTMENT_CODES／OFFICE_TYPE_TREE／ADMIN_CAT_CODES(各 2)、其餘各 1，含自引用 pair FK 與 *_TYPE_REL 入邊） | `2026_07_23_000000_restrict_fks_referencing_small_code_tables` | ✅ 已實作＋MariaDB 10.3 端到端驗（見 §9.2）；同 commit 為唯一活硬刪路徑（office 實體刪除，經通用 `EntityAggregateDeleteHandler`）補 1451 友好報錯垫片 |
-| n | SOCIAL_INSTITUTION_CODES(5)＋SOCIAL_INSTITUTION_NAME_CODES(5) | 待做——「一機構多名」安全前提（社會機構實體模型 §5.9）；**前置**：先封 codes UI 對該表的刪除（社會機構 step 4）。其 *_TYPES 類型詞表無此顧慮，已納入批次 3 | — |
+| **4** | SOCIAL_INSTITUTION_CODES(5)＋SOCIAL_INSTITUTION_NAME_CODES(5)＝**10 條**（含 CODES→NAME_CODES pair FK；資料表仍為 dual-key 雙單欄 FK 形態、未改複合鍵） | `2026_07_23_000001_restrict_fks_referencing_social_institution_tables` | ✅ 已實作＋MariaDB 10.3 端到端驗（見 §9.3）。前置皆已就位：codes UI 三表封寫（step 4）、實體刪除為顯式級聯（`SocialInstituteImportService::delete()`）＋引用護欄、`EntityAggregateDeleteHandler` 通用 1451 垫片 |
 | n+1 | 資料表 POSTING_DATA(2)、POSSESSION_DATA(1) | 待做——app 有活刪除路徑依賴其子表級聯（`OperationsProposalController`、`OfficePostingRepository`、`BiogMainRepository`），需先改為顯式級聯刪除 | — |
 | 末 | BIOG_MAIN(25)＋operations→BIOG_MAIN | 待做——需配套顯式級聯刪除服務 | — |
 
@@ -177,6 +177,26 @@ migration，再套用批次 1：
 > 捕捉 errno 1451 轉友好 409（office／social-institution 等聚合實體通用），其他 QueryException
 > 照舊上拋。`/codes` destroy 與 `CodeTableDeleteHandler` 先前已無條件封堵；app 內無其他硬刪
 > 呼叫點（含 console commands）。
+
+### 9.3 批次 4 端到端實測（fresh MariaDB 10.3，2026-07-23）
+
+同 §9 流程（乾淨 10.3 容器、app 容器全量 `php artisan migrate`）：
+
+| 檢查 | 結果 |
+|---|---|
+| 批次 4 翻轉 | ✅ `flipped 10`（SOCIAL_INSTITUTION_CODES 5＋SOCIAL_INSTITUTION_NAME_CODES 5） |
+| 兩表入邊 `DELETE_RULE` | ✅ 全 `NO ACTION`（10.3 顯示，§3），CASCADE 歸零 |
+| 全庫 | ✅ `CASCADE 28`／`NO ACTION 160`／`SET NULL 1`；剩餘 28 條＝BIOG_MAIN(25)＋POSTING_DATA(2)＋POSSESSION_DATA(1)，與計畫排除項完全一致 |
+| 行為：§5.9 紅線場景 | ✅ 刪被 pair FK（`SOCIAL_INSTITUTION_CODES_ibfk_7`）引用的 name-entry → 1451 擋下、機構列一列不少（翻轉前會靜默級聯掉機構列並穿透其全部資料） |
+| 行為：刪被引用機構 | ✅ 刪被 SOCIAL_INSTITUTION_ADDR 引用的 CODES 列 → 1451 擋下 |
+| 行為：零引用刪除 | ✅ 引用移除後 ADDR→CODES→NAME_CODES 依序刪除正常成功 |
+| 可逆 | ✅ `migrate:rollback --step=1` 翻回 CASCADE（10 條），re-migrate 恢復 RESTRICT |
+
+> 應用層前置（無需新垫片）：codes UI 三表已封寫（step 4，`closed_code_tables` 推導）且
+> `performDestroy` 對全部碼表無條件封刪；實體刪除走 `SocialInstituteImportService::delete()`
+> 顯式級聯（先刪 ADDR 子列再刪 CODES 列，逐列 operations／audit）；`guardWrite` 引用護欄
+> （被人物資料引用回 409）＋`EntityAggregateDeleteHandler` 通用 1451 垫片（批次 3 落地）
+> 兜住漏網情形。app 內無其他 SOCIAL_INSTITUTION_* 硬刪呼叫點。
 
 ## 10. 對 `ON_DELETE_CASCADE_RISK.md` 的修正建議
 

@@ -297,21 +297,30 @@ class MergePreviewController extends Controller {
             }
         }
 
+        // 本表必須涵蓋**全部**指向 BIOG_MAIN.c_personid 的外鍵欄位（現為 25 條入邊）：腳本末尾的
+        // `DELETE FROM BIOG_MAIN` 在去級聯（ON DELETE RESTRICT）後，只要有任一欄位漏列、來源人物
+        // 仍被引用，該 DELETE 就會被 DB 以 1451 擋下（fail-closed）。翻轉前為 ON DELETE CASCADE，
+        // 漏列的後果反而更糟——那些列會被靜默連帶刪除，且腳本自帶的「確認為 0」檢查只掃本表列出的
+        // 欄位，因此檢查全過、資料照樣消失。新增指向 BIOG_MAIN 的外鍵時務必同步補進本表。
         $map = [
             'ALTNAME_DATA' => ['c_personid'],
-            'ASSOC_DATA' => ['c_personid', 'c_kin_id', 'c_assoc_id', 'c_assoc_kin_id'],
+            'ASSOC_DATA' => ['c_personid', 'c_kin_id', 'c_assoc_id', 'c_assoc_kin_id', 'c_tertiary_personid', 'c_assoc_claimer_id'],
             'BIOG_ADDR_DATA' => ['c_personid'],
             'BIOG_INST_DATA' => ['c_personid'],
             'BIOG_SOURCE_DATA' => ['c_personid'],
             'BIOG_TEXT_DATA' => ['c_personid'],
-            'ENTRY_DATA' => ['c_personid'],
+            'ENTRY_DATA' => ['c_personid', 'c_assoc_id', 'c_kin_id'],
+            'EVENTS_ADDR' => ['c_personid'],
             'EVENTS_DATA' => ['c_personid'],
             'KIN_DATA' => ['c_personid', 'c_kin_id'],
+            'POSSESSION_ADDR' => ['c_personid'],
             'POSSESSION_DATA' => ['c_personid'],
             'POSTED_TO_ADDR_DATA' => ['c_personid'],
             'POSTING_DATA' => ['c_personid'],
             'POSTED_TO_OFFICE_DATA' => ['c_personid'],
             'STATUS_DATA' => ['c_personid'],
+            // 編輯歷史隨人物一併歸併到存活者名下（該外鍵同樣會擋下 DELETE）。
+            'operations' => ['c_personid'],
         ];
 
         foreach ($map as $table => $columns) {

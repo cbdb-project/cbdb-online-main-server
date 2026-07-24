@@ -31,6 +31,7 @@ use App\Services\AuditLogService;
 //20210625建安修改
 use App\Services\BracketNormalizer;
 use App\Services\CharVariantMapService;
+use App\Services\ExplicitCascadeLogger;
 use App\Services\PinyinDictionary;
 use App\Services\VariantCharNormalizer;
 use App\Support\CompositePrimaryKey;
@@ -1740,8 +1741,16 @@ class BiogMainRepository {
         }
 
         DB::transaction(function () use ($id, $c_personid, $row) {
-            DB::table('POSSESSION_DATA')->where('c_possession_record_id', $id)->delete();
+            // 顯式級聯：必須「先子後父」——POSSESSION_ADDR.c_possession_record_id 外鍵指向
+            // POSSESSION_DATA，去級聯後（ON DELETE RESTRICT）若先刪父列會被 DB 以 1451 擋下。
+            // 子列在刪除前先取出，連帶刪除的每一列都要留下 operations／audit_log 痕跡
+            // （ON_DELETE_CASCADE_RISK.md §4.4：不可把 DB 級聯的盲區原樣搬到應用層）。
+            $addrRows = DB::table('POSSESSION_ADDR')
+                ->where('c_possession_record_id', $row->c_possession_record_id)
+                ->get();
+
             DB::table('POSSESSION_ADDR')->where('c_possession_record_id', $row->c_possession_record_id)->delete();
+            DB::table('POSSESSION_DATA')->where('c_possession_record_id', $id)->delete();
             $operation = (new OperationRepository())->store(Auth::id(), $c_personid, 4, 'POSSESSION_DATA', $id, $row);
             (new AuditLogService())->write(
                 'POSSESSION_DATA',
@@ -1751,6 +1760,14 @@ class BiogMainRepository {
                 null,
                 'user',
                 (string) Auth::id(),
+                $operation ? (string) $operation->id : null
+            );
+
+            (new ExplicitCascadeLogger())->logDeletedRows(
+                'POSSESSION_ADDR',
+                (string) $id,
+                $addrRows,
+                (int) $c_personid,
                 $operation ? (string) $operation->id : null
             );
         });

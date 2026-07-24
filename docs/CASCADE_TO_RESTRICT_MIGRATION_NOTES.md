@@ -97,8 +97,7 @@ GROUP BY REFERENCED_TABLE_NAME, DELETE_RULE;
 | **2** | TEXT_CODES(21)、ADDR_CODES(11)＝**32 條**（TEXT_CODES 另 1 條 `SET NULL` 本已正確、未觸碰） | `2026_07_21_000000_restrict_fks_referencing_text_addr_codes` | ✅ 已實作＋MariaDB 10.3 端到端驗（見 §9.1）；同 commit 為唯一活硬刪路徑 `AdminBatchLoadBookTitlesController::undo()` 補 1451 友好報錯垫片 |
 | **3** | 其餘全部小詞表／類型表／樹表 35 張＝**52 條**（KINSHIP_CODES(6)、ASSOC_CODES(4)、OFFICE_CODES(3)、TEXT_BIBLCAT_CODES／STATUS_CODES／ENTRY_CODES／COUNTRY_CODES／APPOINTMENT_CODES／OFFICE_TYPE_TREE／ADMIN_CAT_CODES(各 2)、其餘各 1，含自引用 pair FK 與 *_TYPE_REL 入邊） | `2026_07_23_000000_restrict_fks_referencing_small_code_tables` | ✅ 已實作＋MariaDB 10.3 端到端驗（見 §9.2）；同 commit 為唯一活硬刪路徑（office 實體刪除，經通用 `EntityAggregateDeleteHandler`）補 1451 友好報錯垫片 |
 | **4** | SOCIAL_INSTITUTION_CODES(5)＋SOCIAL_INSTITUTION_NAME_CODES(5)＝**10 條**（含 CODES→NAME_CODES pair FK；資料表仍為 dual-key 雙單欄 FK 形態、未改複合鍵） | `2026_07_23_000001_restrict_fks_referencing_social_institution_tables` | ✅ 已實作＋MariaDB 10.3 端到端驗（見 §9.3）。前置皆已就位：codes UI 三表封寫（step 4）、實體刪除為顯式級聯（`SocialInstituteImportService::delete()`）＋引用護欄、`EntityAggregateDeleteHandler` 通用 1451 垫片 |
-| n+1 | 資料表 POSTING_DATA(2)、POSSESSION_DATA(1) | 待做——app 有活刪除路徑依賴其子表級聯（`OperationsProposalController`、`OfficePostingRepository`、`BiogMainRepository`），需先改為顯式級聯刪除 | — |
-| 末 | BIOG_MAIN(25)＋operations→BIOG_MAIN | 待做——需配套顯式級聯刪除服務 | — |
+| **末批（尚未執行）** | BIOG_MAIN(25，含 operations→BIOG_MAIN)＋POSTING_DATA(2)＋POSSESSION_DATA(1)＝**28 條** | 待做 | 🟡 **應用層前置已完成並上線（見 §11），刻意進入觀察期後才翻轉**——一支 migration 即可收尾 |
 
 **節奏（§6.1「app-layer-first」）**：翻一批 → 觀察 1–2 週盯 1451（1451 會把漏網的 cascade
 依賴刪除路徑逼出，fail-closed 零損失）→ 修應用層 → 下一批。`ON UPDATE CASCADE`（187 條）本階段一律保留。
@@ -203,3 +202,72 @@ migration，再套用批次 1：
 1. §6.1「同一 `ALTER` 內 DROP＋ADD」→ 改為「**兩條獨立 ALTER**（先 DROP 再 ADD）」，註明 10.3 的 1826 限制。
 2. 附錄 B 驗證：`DELETE_RULE='RESTRICT'` → `DELETE_RULE IN ('RESTRICT','NO ACTION')`。
 3. 標註 prod 版本待確認（10.3 vs 10.11）；兩條 ALTER 為跨版本安全選擇。
+
+## 11. 末批前置：應用層顯式級聯（已完成，觀察期中）
+
+末批（28 條）的前置不是「再寫一支 migration」，而是**把連帶刪除從 DB 搬進應用層並讓它做對**。
+本節記錄前置的盤點結論與已落地的修正；**刻意先上線觀察一段時間，再翻末批約束**（§6.1
+「app-layer-first」節奏——真實流量會把漏網路徑逼出來，此時仍有 CASCADE 兜底、不會 500）。
+
+### 11.1 盤點：28 條入邊實際上只有 3 條有活刪除路徑
+
+| 被引用表 | 入邊 | 活的硬刪路徑 | 結論 |
+|---|---|---|---|
+| `BIOG_MAIN` | 25 | **無**——人物「刪除」是軟刪除（`c_name_chn = '<待删除>'`，`BiogMainDeleteHandler`，UPDATE 非 DELETE） | 翻轉成本趨近零 |
+| `POSTING_DATA` | 2 | `OfficePostingRepository::officeDeleteById`、`OperationsProposalController::applyDeleteProposal` | 需修（見 11.2） |
+| `POSSESSION_DATA` | 1 | `BiogMainRepository::possessionDeleteById`、同上核准路徑 | 需修（見 11.2） |
+
+唯一產生 `DELETE FROM BIOG_MAIN` 的地方是 `MergePreviewController`——它**生成給人工執行的 SQL 腳本**，
+應用本身不執行（見 11.3）。
+
+### 11.2 修正一：先子後父、父列僅在無剩餘引用時才刪
+
+| 位置 | 原行為 | 翻轉後會怎樣 | 修正 |
+|---|---|---|---|
+| `BiogMainRepository::possessionDeleteById` | 先刪父列 `POSSESSION_DATA`、再刪子列 `POSSESSION_ADDR` | 第一句就 1451 | 改為先子後父 |
+| `OperationsProposalController::applyDeleteProposal` | 主列 `POSTED_TO_OFFICE_DATA` 尚未刪，就先刪它的**父列** `POSTING_DATA` | 1451 | `POSTING_DATA` 移到主列刪除**之後** |
+| `OfficePostingRepository::officeDeleteById`、上述核准路徑 | 無條件刪 `POSTING_DATA` | 1451 | 抽出 `OfficePostingRepository::deletePostingIfUnreferenced()`：確認無 `POSTED_TO_OFFICE_DATA`／`POSTED_TO_ADDR_DATA` 仍引用才刪 |
+
+最後一項不只是為了翻轉——**prod 實測有 31 個 `c_posting_id` 被多列 `POSTED_TO_OFFICE_DATA` 共用**，
+現行 CASCADE 下逕刪父列會**靜默連坐刪掉兄弟列**（既有的資料遺失風險，非翻轉引入）。
+
+### 11.3 修正二：合併腳本漏列 7 個指向 BIOG_MAIN 的欄位
+
+`MergePreviewController` 生成的合併腳本把來源人物的引用改指到存活人物後，末尾執行
+`DELETE FROM BIOG_MAIN`。但其 `$map` 只涵蓋 18 個欄位，漏掉 7 個：`ASSOC_DATA.c_tertiary_personid`／
+`c_assoc_claimer_id`、`ENTRY_DATA.c_assoc_id`／`c_kin_id`、`EVENTS_ADDR.c_personid`、
+`POSSESSION_ADDR.c_personid`、`operations.c_personid`。
+
+後果分兩種，**現況更糟**：
+
+- **現行 CASCADE**：那 7 類列在 DELETE 時被**靜默連帶刪除**；而腳本自帶的「確認以下查詢結果皆為 0」
+  檢查只掃 `$map` 列出的欄位——**檢查全過、資料照樣消失**（正是 §3.3 的審計盲區）；
+- **翻成 RESTRICT**：DELETE 被 1451 擋下，fail-closed。
+
+已把 7 個欄位補進 `$map`（re-point 與驗證 SELECT 皆自動涵蓋），並在該處加註「新增指向 BIOG_MAIN
+的外鍵時務必同步補進本表」。
+
+### 11.4 修正三：連帶刪除的每一列都要進 operations
+
+搬進應用層若只記父列，等於把 DB 級聯的盲區原樣搬過來。盤點發現三處缺口：
+`POSTED_TO_ADDR_DATA` 只有 audit_log、沒有 operations；`POSTING_DATA`／`POSSESSION_ADDR` 兩者皆無。
+
+新增 `App\Services\ExplicitCascadeLogger`，三條路徑統一使用。紀錄形式沿用專案既有慣例
+（AGENTS.md 高風險區備忘）：同一組子列合寫**一筆** operations（`resource_data['rows']` 放全部被刪
+列、resource_id 沿用父資源格式）＋**逐列** audit_log before-image，整組共用同一 `operation_id`、
+可整組回退。
+
+回歸測試：[`tests/Feature/ExplicitCascadeDeleteTest.php`](../tests/Feature/ExplicitCascadeDeleteTest.php)
+（8 tests）——涵蓋父列保留/刪除、子列清理、operations＋audit 的逐列落帳與 operation_id 分組、
+合併腳本涵蓋全部 25 條入邊。SQLite 無外鍵、驗不到 1451 本身，故鎖定的是**與外鍵無關但翻轉後
+正確性所依賴**的刪除語義。
+
+### 11.5 觀察期要盯什麼
+
+上線後（仍是 CASCADE，故任何漏網都不會 500，只會靜默）重點觀察：
+
+- `/operations` 上 `POSTED_TO_ADDR_DATA`／`POSTING_DATA`／`POSSESSION_ADDR` 的 op_type=4 紀錄是否
+  如期出現——**若某條刪除路徑沒留下紀錄，就是還沒被本次修正覆蓋的路徑**，正是翻轉前要補的；
+- 任職刪除後 `POSTING_DATA` 是否仍有孤兒（無人引用卻殘留）或誤刪（兄弟列連坐消失）；
+- 觀察無虞後，末批 migration 依 §6 範式一次翻完 28 條（`REFERENCED_TABLES = ['BIOG_MAIN',
+  'POSTING_DATA', 'POSSESSION_DATA']`），並於 MariaDB 10.3 補 §9 同規格實測。

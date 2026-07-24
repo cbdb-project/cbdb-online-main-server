@@ -163,6 +163,12 @@ migration，再套用批次 1：
 > 清單漏了這條，該 FK 自此靜默遺失。EVENTS_DATA 亦無任何入邊 FK（EVENTS_ADDR→EVENTS_DATA
 > 複合 FK 同樣不在最終 schema）。是否補回（補回前需先清洗 `c_event_code=0` 等孤兒值）另案處理。
 >
+> **已補回**（`database/migrations/2026_07_24_000000_restore_events_addr_event_code_fk.php`）：
+> 補回前先查 orphan（`c_event_code` 在 `EVENT_CODES` 找不到對應值）， 若有則丟例外中止、
+> fail-closed，不靜默清資料；補回時直接落終態 `ON DELETE RESTRICT ON UPDATE CASCADE`，
+> 與同表已翻轉的 `EVENTS_DATA_ibfk_3` 一致（本批 `flip()` 只翻當下存在的 FK，事後補回的
+> CASCADE 邊不會被追溯翻轉，故直接落終態而非補回原 CASCADE 再等下一批）。
+>
 > 應用層垫片（同 commit）：office 實體刪除是本批詞表唯一活硬刪路徑
 > （`OfficeImportService::delete()`：先刪 OFFICE_CODE_TYPE_REL、有 POSTED_TO_OFFICE_DATA
 > 引用護欄回 409；bespoke `OfficeDeleteHandler` 已收斂進通用 `EntityAggregateDeleteHandler`

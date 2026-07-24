@@ -92,6 +92,19 @@ class OperationsProposalControllerTest extends TestCase {
             $table->dateTime('c_modified_date')->nullable();
         });
 
+        // BIOG_SOURCE_DATA 提案核准改走 SourceMutationHandler，會校驗 c_textid 存在於 TEXT_CODES
+        // （對齊 direct sources API 的引用完整性）。seed 哨兵 0 與測試用合法 textid。
+        Schema::dropIfExists('TEXT_CODES');
+        Schema::create('TEXT_CODES', function (Blueprint $table) {
+            $table->integer('c_textid')->primary();
+            $table->string('c_title')->nullable();
+        });
+        DB::table('TEXT_CODES')->insert([
+            ['c_textid' => 0, 'c_title' => '未詳'],
+            ['c_textid' => 500, 'c_title' => 'Book A'],
+            ['c_textid' => 700, 'c_title' => 'Book B'],
+        ]);
+
         Schema::dropIfExists('POSTED_TO_OFFICE_DATA');
         Schema::create('POSTED_TO_OFFICE_DATA', function (Blueprint $table) {
             $table->integer('c_personid');
@@ -126,6 +139,9 @@ class OperationsProposalControllerTest extends TestCase {
             $table->integer('c_assoc_id');
             $table->integer('c_inst_code');
             $table->integer('c_inst_name_code');
+            // 對齊真實 ENTRY_DATA：create handler 依 legacy 幂等會補寫這兩個哨兵 0 欄（缺列會令 insert 失敗）。
+            $table->integer('c_entry_addr_id')->default(0);
+            $table->integer('c_source')->default(0);
             $table->string('c_created_by')->nullable();
             $table->dateTime('c_created_date')->nullable();
             $table->string('c_modified_by')->nullable();
@@ -390,7 +406,7 @@ class OperationsProposalControllerTest extends TestCase {
 
         $resourceData = [
             'c_personid' => 138841,
-            'c_textid' => 99999,
+            'c_textid' => 500,
             'c_pages' => '',
             'c_notes' => 'Approved source',
             'c_main_source' => 1,
@@ -403,7 +419,7 @@ class OperationsProposalControllerTest extends TestCase {
         $operation = $this->proposalOperation([
             'op_type' => Operation::TYPE_PROPOSAL_CREATE,
             'resource' => 'BIOG_SOURCE_DATA',
-            'resource_id' => 'c_personid=138841&c_textid=99999&c_pages=',
+            'resource_id' => 'c_personid=138841&c_textid=500&c_pages=',
             'resource_data' => $resourceData,
         ]);
 
@@ -417,7 +433,7 @@ class OperationsProposalControllerTest extends TestCase {
 
         $this->assertDatabaseHas('BIOG_SOURCE_DATA', [
             'c_personid' => 138841,
-            'c_textid' => 99999,
+            'c_textid' => 500,
             'c_pages' => '',
             'c_notes' => 'Approved source',
             'c_main_source' => 1,
@@ -425,7 +441,7 @@ class OperationsProposalControllerTest extends TestCase {
 
         $row = DB::table('BIOG_SOURCE_DATA')->where([
             ['c_personid', '=', 138841],
-            ['c_textid', '=', 99999],
+            ['c_textid', '=', 500],
             ['c_pages', '=', ''],
         ])->first();
         $this->assertSame('admin', $row->c_created_by);

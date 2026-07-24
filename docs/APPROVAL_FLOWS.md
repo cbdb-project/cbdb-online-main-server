@@ -2,8 +2,13 @@
 
 本文件說明目前在 `/codes/*` 與 `/basicinformation/*` 模組導入的提案與審核流程，供後續擴充時參考。
 
-- 文檔版本：1.1
-- 最後更新：2026-02-14
+- 文檔版本：1.2
+- 最後更新：2026-07-24
+
+> **核准端已分三條路徑，本文只描述通則。** 人物相關資源的核准現已依資源分派到
+> 「重放 v2 handler」／「legacy 委派」／「通用行覆寫」三條路徑之一，行為與風險各不相同。
+> 逐資源 × 操作的現況矩陣見 **[PERSON_PROPOSAL_PATHS.md](./PERSON_PROPOSAL_PATHS.md)**。
+> 實體聚合（office 等）的提案見 [ENTITY_AGGREGATE_ARCHITECTURE.md](./ENTITY_AGGREGATE_ARCHITECTURE.md) §4.5。
 
 ## 背景
 
@@ -75,9 +80,15 @@
 
 - **核准**：
   - 進入操作紀錄頁面，管理員可見「核准」按鈕。
-  - 系統會依 `op_type` 執行 `insert`（提案新增）或 `update`（提案修改），套用至代碼表。
-  - 成功後更新提案紀錄：`__review_status = 'approved'`，並記錄審核者與時間，另新增一筆正式操作 (`op_type = 1/2`) 供追蹤。
-  - 會同步寫入 `audit_log`（`INSERT` 或 `UPDATE`）以保留資料面審計軌跡。
+  - 套用方式**依資源而定**（`OperationsProposalController::applyProposal()` 分派）：
+    - **重放 v2 handler**（多數人物子資源）：把提案還原成一次 direct mutation，交回與「直接編輯」
+      同一個 handler 落庫，派生／白名單／引用完整性／幂等正規化全部生效，`operations` 與
+      `audit_log` 由 handler 自行寫入。
+    - **legacy 委派 ／ 通用行覆寫**（其餘資源）：依 `op_type` 執行 `insert`／`update`／`delete`
+      套用資料表，`operations`（`op_type = 1/2/4`）與 `audit_log` 由核准端事後補記。
+    - 各資源實際落在哪一條，見 [PERSON_PROPOSAL_PATHS.md](./PERSON_PROPOSAL_PATHS.md) §3。
+  - 成功後更新提案紀錄：`__review_status = 'approved'`，並記錄審核者與時間。
+  - 任何一條路徑失敗都整筆交易回滾、提案維持待審（fail-closed）。
 - **退回**：
   - 於提案卡片點選「退回」，可填寫備註。
   - 提案紀錄會標示 `__review_status = 'rejected'` 與審核備註，但不變更原資料表內容。

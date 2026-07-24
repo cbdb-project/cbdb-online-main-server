@@ -48,21 +48,12 @@
 
 ## 3. 資源別狀態
 
-| 資源 | 狀態 | 說明 |
-|---|---|---|
-| `BIOG_MAIN` | 已實作 | 可提交修改提案，且可由審核流程核准寫回主表。 |
-| `ALTNAME_DATA` | 已實作 | 提案提交與審核流程可用（含複合主鍵處理）。 |
-| `BIOG_ADDR_DATA` | 已實作 | 提案提交與審核流程可用（含複合主鍵處理）。 |
-| `BIOG_TEXT_DATA` | 已實作 | 提案提交與審核流程可用（含複合主鍵處理）。 |
-| `STATUS_DATA` | 已實作 | 提案提交與審核流程可用。 |
-| `POSSESSION_DATA` | 已實作 | 提案提交與審核流程可用。 |
-| `POSTED_TO_OFFICE_DATA` | 已實作 | 提案提交與審核流程可用。 |
-| `ASSOC_DATA` | 已實作 | 提案提交與審核流程可用。 |
-| `ENTRY_DATA` | 已實作 | 提案提交與審核流程可用。 |
-| `EVENTS_DATA` | 已實作 | 提案提交與審核流程可用。 |
-| `KIN_DATA` | 已實作 | 提案提交與審核流程可用。 |
-| `BIOG_INST_DATA` | 已實作 | 提案提交與審核流程可用。 |
-| `BIOG_SOURCE_DATA` | 已實作 | 提案提交與審核流程可用。 |
+13 個資源（`BIOG_MAIN` ＋ 12 個人物子資源）**提案提交與審核流程皆已可用**。
+
+但「可用」不等於「核准＝直接編輯」——核准端目前分三條路徑（重放 v2 handler／legacy 委派／
+通用行覆寫），各資源落在哪一條、風險差異為何，**以
+[PERSON_PROPOSAL_PATHS.md](./PERSON_PROPOSAL_PATHS.md) §3 的逐資源 × 操作矩陣為準**，
+本文不再另列一份會漂移的狀態表。
 
 ## 4. 測試覆蓋（已存在）
 
@@ -77,6 +68,11 @@
 
 1. 提案者「修改/撤回」目前沿用 `CodesController` 的提案管理路由與頁面，流程可用但命名層面仍偏向 codes。
 2. 仍需持續維護各資源的 `__key_columns` 與實際 schema 一致性，避免提案審核階段出現主鍵誤判。
+3. **核准與直接編輯尚未全面對等**：委派檔 5 資源（kinship／associations／postings／possessions／
+   events）的 create／update 仍是與 v2 handler 並行的第二份寫實作，`BIOG_MAIN` 的核准仍是通用盲寫。
+   詳見 [PERSON_PROPOSAL_PATHS.md](./PERSON_PROPOSAL_PATHS.md) §5。
+4. **legacy 提交入口未下架**：`BasicInformationProposalController`
+   （`POST basicinformation/{personid}/{resource}/proposal`）仍掛著，會繞過 v2 handler 的提交端驗證。
 
 ## 6. 近期修正紀錄（2026-02-15）
 
@@ -105,6 +101,8 @@
 ## 7. 後續維護規則
 
 - 每次新增一個 basicinformation 子資源的 proposal 入口，需同步更新：
-  - 本文件第 3 節狀態表
+  - `PERSON_PROPOSAL_PATHS.md` §3 的逐資源矩陣（狀態單一真源）
   - `APPROVAL_FLOWS.md` 支援範圍
   - `CHANGELOG.md`（如屬對外可見變更）
+- 每次把一個資源的核准路徑收斂到「重放 v2 handler」，需同步更新 `PERSON_PROPOSAL_PATHS.md`
+  §3 矩陣與 §5 未處理項。

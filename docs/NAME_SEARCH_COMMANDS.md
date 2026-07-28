@@ -1,70 +1,71 @@
 # 姓名搜尋系統維護指令
 
-本文件說明姓名搜尋相關的 Artisan 指令，用於維護 `CBDB__TRAD_SIMP_MAP`（繁簡映射表）和 `CBDB__NAME_FTS`（姓名倒排索引表）兩個內部輔助表。
+本文件說明姓名搜尋相關的 Artisan 指令。姓名搜尋依賴兩份資料：繁簡對照（vendored 進版控的 OpenCC 原始
+字典檔 `third_party/opencc/TSCharacters.txt`）與 `CBDB__NAME_FTS`（姓名倒排索引表，內部輔助表）。
 
 ## 目錄
 
-- [繁簡映射表匯入](#繁簡映射表匯入)
+- [繁簡對照資料（vendored）](#繁簡對照資料vendored)
 - [姓名倒排索引重建](#姓名倒排索引重建)
 - [完整工作流程](#完整工作流程)
 - [故障排除](#故障排除)
 
 ---
 
-## 繁簡映射表匯入
+## 繁簡對照資料（vendored）
 
-### 指令
+繁簡對照**不是資料庫表**——原 `CBDB__TRAD_SIMP_MAP` 已於 2026-07 移除，改為原封不動 vendor 進版控的
+OpenCC 原始字典檔 `third_party/opencc/TSCharacters.txt`，由 `App\Support\TradSimpMap` 在**讀取當下直接
+解析**（行程內快取一次），**刻意不另外產生、提交任何衍生檔案**（例如預先編譯好的 PHP 陣列）。這個決定
+的理由：
+
+- 若額外維護一份衍生檔，每次更新 vendored 原始檔後都得記得手動重新產生衍生檔，兩者容易忘記同步；直接
+  解析原始檔可以讓「更新 vendored 檔案」變成唯一需要做的事
+- 三個消費點（`TradSimpMap` 本身、`NameSearchIndexService`、`RebuildNameSearchIndex`）都只是「解析一次、
+  整表讀進 PHP 關聯陣列」，解析成本可忽略（幾千行純文字），DB 索引查詢能力完全用不上
+- 更新後用 `git diff` 就能直接看到 OpenCC 上游實際變化了什麼字，比對比資料庫兩個時間點的快照更直接
+- 不再需要後台管理員按鈕即時觸發「下載並寫入資料庫」——這類操作在容器化／不可變部署下通常不被允許
+
+### 更新 vendored 檔案
 
 ```bash
-php artisan cbdb:import-trad-simp-map
+php artisan cbdb:sync-opencc-trad-simp
 ```
 
-### 用途
-
-從 OpenCC 專案下載並匯入繁體字 ↔ 簡體字映射資料，用於支援簡體字姓名搜尋。
+**這是開發環境／CI 執行的操作，不在生產環境執行**。這個指令**只下載並覆蓋 `TSCharacters.txt` 這一件
+事**，不解析、不產生任何衍生檔——覆蓋後直接 `git diff third_party/opencc/TSCharacters.txt` 審查變化，
+提交後隨一般部署流程上線，下次任何程式碼讀取都會自動反映新內容，不需要額外的「重新產生」步驟。
 
 ### 參數
 
 | 參數 | 類型 | 預設值 | 說明 |
 |------|------|--------|------|
-| `--url` | 選填 | OpenCC GitHub | 繁簡對照檔案的 URL |
-| `--truncate` | 選填 | false | 匯入前清空現有資料 |
-| `--skip-non-bmp` | 選填 | false | 跳過非 BMP 字符（不建議） |
-| `--batch` | 選填 | 1000 | 每批插入記錄數 |
+| `--url` | 選填 | OpenCC GitHub | 來源檔案的 URL |
+| `--output` | 選填 | `third_party/opencc/TSCharacters.txt` | 輸出檔案路徑（測試用） |
 
 ### 使用範例
 
-**標準匯入**（推薦）
+**標準更新**
 ```bash
-php artisan cbdb:import-trad-simp-map --truncate
-```
-
-**自訂批次大小**
-```bash
-php artisan cbdb:import-trad-simp-map --truncate --batch=500
+php artisan cbdb:sync-opencc-trad-simp
 ```
 
 **使用自訂字典檔案**
 ```bash
-php artisan cbdb:import-trad-simp-map \
-  --url=https://example.com/custom-dict.txt \
-  --truncate
+php artisan cbdb:sync-opencc-trad-simp --url=https://example.com/custom-dict.txt
 ```
 
 ### 執行輸出
 
 ```
-Loading dictionary from URL...
-Parsing mapping file…
-Including non-BMP mapping at line 1 (㑮 -> 𫝈); ensure utf8mb4 is configured end-to-end.
-...
-Parsed 4113 mappings (skipped 0 invalid, non-BMP seen 1149, skipped 0)
-Truncating CBDB__TRAD_SIMP_MAP before import.
-Starting batch insert (batch size: 1000)…
-Inserted 4113 / 4113 mappings (5 batches)…
-Batch insert completed: 4113 mappings in 5 batches.
-Imported 4113 mappings into CBDB__TRAD_SIMP_MAP.
+Downloading https://raw.githubusercontent.com/... ...
+Wrote /path/to/third_party/opencc/TSCharacters.txt (104516 bytes). Parses to 3222 trad->simp mappings (identity mappings excluded).
+請用 git diff 審查變化並提交，不需要任何額外的「重新產生」步驟。
 ```
+
+指令內部會用 `App\Support\TradSimpMap::parseFile()` 驗證寫入後的檔案至少能解析出映射，解析不到任何
+結果時視為來源格式有誤，不會留下無效檔案（回傳非 0 exit code，但已寫入的內容仍在——請用 `git diff`／
+`git checkout` 決定是否還原）。
 
 ### 資料來源
 
@@ -78,31 +79,25 @@ Imported 4113 mappings into CBDB__TRAD_SIMP_MAP.
   於	于 於
   ```
 
-### 映射規則
+### 解析規則（App\Support\TradSimpMap）
 
-當一個繁體字對應多個簡體字時（如 `乾	干 乾`），**只保留第一個簡體字**（`干`），其他變體被忽略。這是簡化的處理策略，優先保留最常用的簡體字。
+- 當一個繁體字對應多個簡體字時（如 `乾	干 乾`），**只保留第一個簡體字**（`干`），其他變體被忽略。
+- **同形映射（trad === simp）一律排除**：OpenCC 對「罕見簡化字可能無對應字型（tofu risk）」的字會保留
+  原字作為第一候選，或對某些字給出「原字本身也是合法簡體」的候選（如 `沈	沈 沉`）。這類映射對繁簡轉換
+  無實際作用（未命中時本就 fallback 回原字），解析時一律排除。
 
-### 技術細節
+### 人工補充映射
 
-**資料表結構**
-```sql
-CREATE TABLE CBDB__TRAD_SIMP_MAP (
-    trad_char VARBINARY(4) NOT NULL COMMENT '繁體字（UTF-8二進制）',
-    simp_char VARBINARY(4) NOT NULL COMMENT '簡體字（UTF-8二進制）',
-    PRIMARY KEY (trad_char)
-) ENGINE=InnoDB;
-```
-
-**非 BMP 字符支援**
-- 使用 `VARBINARY(4)` 繞過 MySQL 8.0 對 utf8mb4 非 BMP 字符主鍵索引的 bug
-- 支援 4 字節 UTF-8 字符（如 𫝈、𠌥 等）
-- 批量插入提升效能 50-100 倍
+OpenCC 未收錄、但人名資料中常見的異體/訛寫字（例如 `栢`→`柏`），獨立存放在
+`config/trad_simp_manual_overrides.php`，由 `App\Support\TradSimpManualOverrides` 讀取，經
+`App\Support\TradSimpMap::full()` 疊加套用在 vendored 基礎資料之上——**不寫入**
+`third_party/opencc/TSCharacters.txt`，更新 vendored 檔案完全不影響人工映射。
 
 ### 預期耗時
 
-- **資料量**：約 4,113 個映射
-- **耗時**：1-2 秒（批次大小 1000）
-- **資料庫大小**：約 100 KB
+- **資料量**：約 3,222 個映射（排除約 926 個同形映射後）
+- **下載耗時**：1-2 秒
+- **vendored 檔案大小**：約 100 KB（純文字，git diff 友善）
 
 ---
 
@@ -248,7 +243,7 @@ php artisan cbdb:rebuild-name-search --id-from=200001 &
 
 **3. 繁簡雙版本**
 
-使用 `CBDB__TRAD_SIMP_MAP` 轉換：
+使用 `App\Support\TradSimpMap::full()` 轉換：
 ```
 繁體：王安石 → [王安石, 安石, 石] (is_simplified=0)
 簡體：王安石 → [王安石, 安石, 石] (is_simplified=1)
@@ -337,28 +332,19 @@ ORDER BY LENGTH(search_term) ASC;
 php artisan migrate
 ```
 
-確保 `CBDB__TRAD_SIMP_MAP` 和 `CBDB__NAME_FTS` 表已建立。
+確保 `CBDB__NAME_FTS` 表已建立。繁簡對照資料（`third_party/opencc/TSCharacters.txt`）已隨程式碼 vendored
+提交，不需要額外的 migration 或匯入步驟。
 
-**步驟 2：匯入繁簡映射**
-```bash
-php artisan cbdb:import-trad-simp-map --truncate
-```
-
-預計耗時：1-2 秒
-
-**步驟 3：重建姓名索引**
+**步驟 2：重建姓名索引**
 ```bash
 php artisan cbdb:rebuild-name-search --truncate
 ```
 
 預計耗時：10-30 分鐘（依資料量而定）
 
-**步驟 4：驗證結果**
+**步驟 3：驗證結果**
 ```bash
-# 檢查繁簡映射表
 php artisan tinker
->>> DB::table('CBDB__TRAD_SIMP_MAP')->count();
-=> 4113
 
 # 檢查倒排索引表
 >>> DB::table('CBDB__NAME_FTS')->count();
@@ -366,13 +352,21 @@ php artisan tinker
 
 # 測試搜尋
 >>> DB::table('CBDB__NAME_FTS')->where('search_term', 'LIKE', '石%')->limit(5)->get();
+
+# 檢查繁簡對照資料（不是 DB 表，直接讀資料檔）
+>>> count(\App\Support\TradSimpMap::full());
+=> 3222 (基礎資料) + 人工補充映射筆數
 ```
 
 ### 定期維護
 
-**更新繁簡映射**（當 OpenCC 字典更新時）
+**更新繁簡對照**（當 OpenCC 字典更新時，本地/CI 執行，需 git 提交）
 ```bash
-php artisan cbdb:import-trad-simp-map --truncate
+php artisan cbdb:sync-opencc-trad-simp
+git diff third_party/opencc/TSCharacters.txt
+git add third_party/opencc/TSCharacters.txt
+git commit -m "..."
+# 隨一般部署流程上線，不需要任何額外的「重新產生」步驟
 ```
 
 **重建索引**（當人物姓名資料有大量變更時）
@@ -387,35 +381,20 @@ php artisan cbdb:rebuild-name-search --truncate
 
 ## 故障排除
 
-### 問題 1：繁簡映射匯入失敗
+### 問題 1：繁簡對照資料檔重新產生失敗
 
 **錯誤訊息**
 ```
-Failed to insert mapping (...): Duplicate entry '?' for key 'PRIMARY'
+無法下載 OpenCC 對照檔。
 ```
 
 **原因**
-- 資料庫連接未使用 utf8mb4 字符集
-- Migration 未正確執行
+- 目標主機無法連線到 GitHub（例如公司網路限制）
+- `--url` 指向的來源檔案格式不符預期
 
 **解決方案**
-1. 確認 `config/database.php` 已設定 PDO 選項：
-   ```php
-   'options' => extension_loaded('pdo_mysql') ? [
-       PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'",
-   ] : [],
-   ```
-
-2. 重新執行 migration：
-   ```bash
-   php artisan migrate:rollback --step=1
-   php artisan migrate
-   ```
-
-3. 清除配置快取：
-   ```bash
-   php artisan config:clear
-   ```
+1. 確認能連線到 `raw.githubusercontent.com`，或改用 `--url` 指向鏡像/本地檔案（支援 `file://` 路徑）
+2. 檢查來源檔案格式：每行一個映射，以 tab 分隔（見上方「資料來源」）
 
 ### 問題 2：姓名索引重建記憶體不足
 
@@ -455,22 +434,24 @@ php -d memory_limit=1G artisan cbdb:rebuild-name-search --truncate --batch=200
    CREATE INDEX idx_cbdb_name_type ON CBDB__NAME_FTS(name_type_code);
    ```
 
-### 問題 4：繁簡映射表不存在
+### 問題 4：繁簡對照 vendored 檔案遺失或損壞
 
-**錯誤訊息**
-```
-CBDB__TRAD_SIMP_MAP 表不存在，將跳過繁簡轉換
-```
+**症狀**
+- `third_party/opencc/TSCharacters.txt` 不存在或格式無法解析
+- `App\Support\TradSimpMap::baseMap()` 回傳空陣列
 
 **影響**
-- 姓名索引仍會建立
-- 但只有繁體版本（`is_simplified=0`）
-- 簡體字搜尋無法使用
+- 姓名索引仍會建立（`TradSimpMap::full()` 只剩人工補充映射，或完全沒有映射）
+- 但繁簡雙寫效果大幅退化，簡體字搜尋可能無法使用
 
 **解決方案**
 ```bash
-# 先匯入繁簡映射
-php artisan cbdb:import-trad-simp-map --truncate
+# 重新從上游下載，覆蓋 vendored 檔案
+php artisan cbdb:sync-opencc-trad-simp
+
+# 確認檔案存在且能正確解析
+php artisan tinker
+>>> count(\App\Support\TradSimpMap::baseMap());
 
 # 再重建索引
 php artisan cbdb:rebuild-name-search --truncate
@@ -507,11 +488,9 @@ DB_LOG_QUERIES=true
 
 **2. 上傳到可存取的 URL**
 
-**3. 執行匯入**
+**3. 執行更新**
 ```bash
-php artisan cbdb:import-trad-simp-map \
-  --url=https://example.com/custom-dict.txt \
-  --truncate
+php artisan cbdb:sync-opencc-trad-simp --url=https://example.com/custom-dict.txt
 ```
 
 ### 效能監控
@@ -523,7 +502,7 @@ SELECT
     ROUND(((data_length + index_length) / 1024 / 1024), 2) AS size_mb
 FROM information_schema.TABLES
 WHERE table_schema = DATABASE()
-  AND table_name IN ('CBDB__TRAD_SIMP_MAP', 'CBDB__NAME_FTS');
+  AND table_name IN ('CBDB__NAME_FTS');
 ```
 
 **查詢索引統計**

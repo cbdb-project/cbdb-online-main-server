@@ -85,35 +85,41 @@ exit
 
 以 `CBDB__` 前綴開頭的表格為內部輔助表，例如：
 - `CBDB__NAME_FTS` - 姓名搜索倒排索引，支援高效能後綴匹配查詢
-- `CBDB__TRAD_SIMP_MAP` - 繁簡字符映射，基於 OpenCC 標準，使用 VARBINARY(4) 支援非BMP字符
 
 這些表格通常在 `/codes` 頁面中為只讀模式。
 
+**繁簡對照已不再是資料庫表**：繁簡字符映射（原 `CBDB__TRAD_SIMP_MAP`）已改為原封不動 vendor 進版控的
+OpenCC 原始字典檔 `third_party/opencc/TSCharacters.txt`（唯一讀取入口 `App\Support\TradSimpMap`，於讀取
+當下直接解析、不另外產生衍生檔），不再是 DB 表、也不再出現在 `/codes` 頁面。見下方「內部表格維護」。
+
 ## 內部表格維護
 
-### 繁簡映射表（CBDB__TRAD_SIMP_MAP）
+### 繁簡對照資料（third_party/opencc/TSCharacters.txt）
 
-使用專用 Artisan 命令從 OpenCC 匯入最新繁簡對照：
+使用專用 Artisan 命令更新 vendored 的 OpenCC 原始字典檔（純本地/CI 操作，不寫資料庫、不在生產環境執行）：
 
 ```bash
-# 匯入繁簡映射（清空舊數據後重新匯入）
-php artisan cbdb:import-trad-simp-map --truncate
-
-# 調整批次大小（預設 1000）
-php artisan cbdb:import-trad-simp-map --truncate --batch=500
+php artisan cbdb:sync-opencc-trad-simp
 ```
 
+這個指令只下載並覆蓋 `TSCharacters.txt`，**不產生任何衍生檔**——`App\Support\TradSimpMap` 會在讀取當下
+直接解析這份檔案，覆蓋後不需要額外的「重新產生」步驟。覆蓋後用 `git diff` 審查變化，提交後隨一般部署
+流程上線——**不再有後台「重新匯入」按鈕**，管理員無法在生產環境即時觸發重新下載。
+
 **重要說明**：
-- `--truncate` 選項會先清空表格再匯入，確保數據最新
-- 映射數據基於 [OpenCC](https://github.com/BYVoid/OpenCC) 標準
-- 使用 `VARBINARY(4)` 類型以支援非 BMP（Basic Multilingual Plane）字符
+- 映射資料基於 [OpenCC](https://github.com/BYVoid/OpenCC) 標準，`TradSimpMap` 解析時同形（trad === simp）
+  的映射一律排除
+- 人工補充映射（OpenCC 未收錄但人名資料中常見的異體/訛寫字，例如 栢→柏）獨立存放在
+  `config/trad_simp_manual_overrides.php`，由 `App\Support\TradSimpManualOverrides` 讀取、在
+  `TradSimpMap::full()` 疊加套用，不寫入 `third_party/opencc/TSCharacters.txt`
+- 姓名索引建置（`NameSearchIndexService`／`RebuildNameSearchIndex`）一律透過 `TradSimpMap::full()`
+  取得完整對照表，不直接查資料庫
 
 ### 檢視內部表
 
 可以透過 `/codes` 頁面檢視內部表內容（只讀模式）：
 
 - 訪問 `/codes/CBDB__NAME_FTS` - 查看姓名搜索倒排索引
-- 訪問 `/codes/CBDB__TRAD_SIMP_MAP` - 查看繁簡字符映射
 
 **注意**：內部表在 `/codes` 頁面中為只讀模式，僅供查詢不可編輯。
 

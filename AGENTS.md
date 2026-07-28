@@ -87,7 +87,7 @@ npm install
 ./vendor/bin/phpunit --filter TestName
 npm run build
 php artisan cbdb:manage-user
-php artisan cbdb:import-trad-simp-map --truncate
+php artisan cbdb:sync-opencc-trad-simp   # 更新 vendored third_party/opencc/TSCharacters.txt，需 git diff 審查後提交
 php artisan cbdb:fetch-chgis-map        # 下載 CHGIS 底圖（缺檔才下載）
 ```
 

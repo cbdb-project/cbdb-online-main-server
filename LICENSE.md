@@ -12,14 +12,15 @@ The source code and data of this project (CBDB Online Main Server), except where
 
 ### OpenCC 繁簡字典數據 / OpenCC Traditional-Simplified Character Mapping Data
 
-本專案中的 `CBDB__TRAD_SIMP_MAP` 表格數據來自 [OpenCC（Open Chinese Convert）項目](https://github.com/BYVoid/OpenCC)，該數據以 [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) 授權。
+本專案中的 `third_party/opencc/TSCharacters.txt`（原 `CBDB__TRAD_SIMP_MAP` 資料表，2026-07 起改為原封不動 vendor 進版控的原始字典檔）數據來自 [OpenCC（Open Chinese Convert）項目](https://github.com/BYVoid/OpenCC)，該數據以 [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) 授權，授權全文另附於 [third_party/opencc/LICENSE](./third_party/opencc/LICENSE)。
 
-The data in the `CBDB__TRAD_SIMP_MAP` table comes from the [OpenCC (Open Chinese Convert) project](https://github.com/BYVoid/OpenCC) and is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+The data in `third_party/opencc/TSCharacters.txt` (formerly the `CBDB__TRAD_SIMP_MAP` table, vendored unmodified into version control in 2026-07) comes from the [OpenCC (Open Chinese Convert) project](https://github.com/BYVoid/OpenCC) and is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0), whose full text is also included at [third_party/opencc/LICENSE](./third_party/opencc/LICENSE).
 
 **相關文件 / Related Files:**
-- `database/migrations/2025_11_13_000000_create_internal_name_search_tables.php` (表結構定義)
-- `app/Console/Commands/ImportTradSimpMap.php` (數據導入指令)
-- OpenCC 源數據：`TSCharacters.txt` / `STCharacters.txt`
+- `third_party/opencc/TSCharacters.txt` (vendored 原始字典檔，未經修改)
+- `third_party/opencc/LICENSE` (Apache License 2.0 全文)
+- `app/Console/Commands/SyncOpenccTradSimpSource.php` (更新 vendored 檔案的指令)
+- `app/Support/TradSimpMap.php` (讀取入口，於讀取當下直接解析，不另外產生衍生檔)
 
 **Apache License 2.0 摘要 / Apache License 2.0 Summary:**
 

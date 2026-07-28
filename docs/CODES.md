@@ -11,10 +11,11 @@
   - 在新增／編輯時計入 `c_created_*`、`c_modified_*` 與 `operations` 日誌。
 - **只讀表**：部分表格設為只讀模式，僅供查詢，禁止新增、修改或刪除：
   - `CBDB__NAME_FTS`：姓名搜尋倒排索引（內部輔助表，由系統自動維護）
-  - `CBDB__TRAD_SIMP_MAP`：繁簡字符映射表（內部輔助表，透過 `cbdb:import-trad-simp-map` 指令匯入）
-    - ⚠️ **授權例外**：此表數據來自 [OpenCC 項目](https://github.com/BYVoid/OpenCC) 的字典文件，以 **Apache 2.0 License** 授權，而非 CBDB 其他部分使用的 CC BY-NC-SA 4.0 International 授權
   - `DYNASTIES`：朝代代碼
   - `GANZHI_CODES`：干支代碼
+  - 繁簡字符映射（原 `CBDB__TRAD_SIMP_MAP`）已不是代碼表，改為 vendored 原始字典檔
+    `third_party/opencc/TSCharacters.txt`（`php artisan cbdb:sync-opencc-trad-simp` 更新），見
+    [NAME_SEARCH_COMMANDS.md](./NAME_SEARCH_COMMANDS.md)
 
 ## 剩餘差異
 - **互動方式**： `/codes/*` 目前仍採伺服器端分頁＋單欄位搜尋，沒有即時過濾或頁碼捷徑；若未來需要可再評估加入前端元件。

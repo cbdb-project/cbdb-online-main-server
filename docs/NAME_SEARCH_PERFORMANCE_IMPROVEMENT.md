@@ -118,7 +118,12 @@ CREATE INDEX idx_cbdb_name_type ON CBDB__NAME_FTS(name_type_code);
 
 > `ALTNAME_DATA` 無自增鍵，建議統一使用 `altname:{c_personid}-{c_alt_name_type_code}-{c_alt_name_chn}` 形式存入 `source_key`，能唯一對應原始別名紀錄；本名則可用 `biog_main:{c_personid}`。
 
-### 繁簡轉換：CBDB__TRAD_SIMP_MAP
+### 繁簡轉換：CBDB__TRAD_SIMP_MAP（已於 2026-07 移除，改為 vendored 原始字典檔）
+
+> **後續變更**：本節描述的 DB 表設計已於 2026-07 移除，改為原封不動 vendor 進版控的 OpenCC 原始字典檔
+> `third_party/opencc/TSCharacters.txt`（`App\Support\TradSimpMap` 於讀取當下直接解析，不另外產生任何
+> 衍生檔，由 `php artisan cbdb:sync-opencc-trad-simp` 更新）。原因與現行做法見
+> [NAME_SEARCH_COMMANDS.md](./NAME_SEARCH_COMMANDS.md#繁簡對照資料vendored)。以下內容保留作為原始設計脈絡的歷史記錄。
 
 （同樣沿用 `CBDB__` 內部前綴，表達此對照表僅供倒排服務使用。）
 
@@ -139,7 +144,7 @@ CREATE TABLE CBDB__TRAD_SIMP_MAP (
 2. 當一個繁體字對應多個簡體字時（如 `乾	干 乾`），只保留第一個簡體字（`干`），其他變體被忽略。
 3. 批量插入（預設 batch size 1000）提升效能 50-100 倍，約 4,113 個映射在 1-2 秒內完成。
 
-詳細使用說明請參考 [NAME_SEARCH_COMMANDS.md](./NAME_SEARCH_COMMANDS.md#繁簡映射表匯入)。
+詳細使用說明請參考 [NAME_SEARCH_COMMANDS.md](./NAME_SEARCH_COMMANDS.md#繁簡對照資料vendored)。
 
 使用方式：
 - 在產生倒排 suffix 時，先寫入繁體字版本（`is_simplified=0`），再以 CBDB__TRAD_SIMP_MAP 查詢對應簡體字重新組合字串、設定 `is_simplified=1` 後寫入同一筆搜尋詞。

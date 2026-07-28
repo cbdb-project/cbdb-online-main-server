@@ -2,9 +2,13 @@
 
 > 中文版（權威版本）: [ON_DELETE_CASCADE_RISK.md](./ON_DELETE_CASCADE_RISK.md) — this is a translation; in case of discrepancy the Chinese version prevails.
 >
-> Written: 2026-07-07 ｜ Revised: 2026-07-16 (added §6, the implementation design following the team's decisions) ｜ Based on: `database/migrations/2025_01_01_000000_import_cbdb_schema.php` (the source from which the production MariaDB schema was imported)
+> Written: 2026-07-07 ｜ Revised: 2026-07-16 (added §6, the implementation design following the team's decisions); 2026-07-28 (backfilled §6.1 execution details from the MariaDB 10.3 results of the Phase 1 batch rollout, see the correction note below) ｜ Based on: `database/migrations/2025_01_01_000000_import_cbdb_schema.php` (the source from which the production MariaDB schema was imported)
 >
 > **Purpose of this document**: to show that this project's schema currently sits in the combination most dangerous to a data asset — "physical delete × cascading delete" — and to explain the principled risk (which should be common knowledge in database practice); to present the escape matrix — **what de-cascading (RESTRICT) and soft deletion (deprecate) each solve, and why the two are complementary rather than either/or** — and to lay out an executable migration roadmap.
+>
+> **Status (2026-07-28)**: §6.1 Phase 1 has been rolled out through batch 4 (all code-table inbound FKs flipped; only `BIOG_MAIN`/`POSTING_DATA`/`POSSESSION_DATA`, 28 FKs, remain — application-layer prep is done and the flip is in its observation window). Per-batch mechanics, MariaDB 10.3 test results, and the batch-by-batch rollout log live in
+> [docs/CASCADE_TO_RESTRICT_MIGRATION_NOTES.md](./CASCADE_TO_RESTRICT_MIGRATION_NOTES.md), which is
+> the authoritative execution record for this document's §6.1 — where the two disagree, that file wins.
 >
 > Every number in this document can be re-verified with the commands in Appendix A.
 
@@ -314,19 +318,31 @@ This also revises §5.1's ordering argument ("application layer first, constrain
 **Execution details for the Phase 1 flip** (refining §5.1 Step 3) — batch unit = referenced table, ordered by §1's incoming-edge counts: `NIAN_HAO` (24) → `YEAR_RANGE_CODES` (23) → `TEXT_CODES` (22) → `ADDR_CODES` (11) → `GANZHI_CODES`/`DYNASTIES` (9 each) → the remaining code tables → finally `BIOG_MAIN`'s 25 incoming edges (whose counterpart is the explicit cascade-deletion service and the existing person soft delete, §4.4). Per batch:
 
 1. **Gate**: shim in place, staging walkthrough passed;
-2. **Execution** (maintenance window): MariaDB cannot modify a foreign key's behavior in place — DROP + ADD within one `ALTER`; with `foreign_key_checks = 0`, ADD FK does not scan existing data (consistency is already guaranteed by the original constraint), so the `ALTER` is near-instant with only a brief metadata lock; measure the largest tables on staging first:
+2. **Execution** (maintenance window): MariaDB cannot modify a foreign key's behavior in place —
+   **two separate `ALTER` statements** (DROP first, then ADD; **correction**: doing DROP + ADD of a
+   same-named constraint within one `ALTER` fails on MariaDB 10.3 with
+   `ERROR 1826 (HY000): Duplicate FOREIGN KEY constraint name`, splitting into two statements works;
+   whether prod is 10.3 or 10.11 is still unconfirmed, but two separate `ALTER`s are safe on both, so
+   that's what we always use — see `CASCADE_TO_RESTRICT_MIGRATION_NOTES.md` §2 for the test); with
+   `foreign_key_checks = 0`, ADD FK does not scan existing data (consistency is already guaranteed by
+   the original constraint), so each `ALTER` is near-instant with only a brief metadata lock; measure
+   the largest tables on staging first:
 
    ```sql
    SET SESSION foreign_key_checks = 0;
+   ALTER TABLE BIOG_MAIN DROP FOREIGN KEY BIOG_MAIN_ibfk_2;
    ALTER TABLE BIOG_MAIN
-     DROP FOREIGN KEY BIOG_MAIN_ibfk_2,
      ADD CONSTRAINT BIOG_MAIN_ibfk_2 FOREIGN KEY (c_by_nh_code)
          REFERENCES NIAN_HAO (c_nianhao_id)
          ON DELETE RESTRICT ON UPDATE CASCADE;   -- leave UPDATE behavior alone at this stage
    SET SESSION foreign_key_checks = 1;
    ```
 
-3. **Verification**: the Appendix B query confirms every `DELETE_RULE` in the batch is `RESTRICT`; spot-test "delete a referenced entry → blocked, not one row of data lost";
+3. **Verification**: the Appendix B query confirms every `DELETE_RULE` in the batch is `RESTRICT`
+   (**correction**: on MariaDB 10.3, `information_schema.REFERENTIAL_CONSTRAINTS.DELETE_RULE` reports
+   an explicitly-written `RESTRICT` as `NO ACTION` — the two are equivalent in InnoDB, so the check
+   should be `DELETE_RULE IN ('RESTRICT','NO ACTION')`, or verify behavior directly); spot-test "delete
+   a referenced entry → blocked, not one row of data lost";
 4. **Observation period** (1–2 weeks before the next batch): monitor for 1451 (`Cannot delete or update a parent row`) — an occurrence means a hard-delete path slipped through: fail-closed, zero loss, fix the application layer;
 5. **Rollback plan**: the reverse `ALTER` back to CASCADE — one statement, no data risk.
 

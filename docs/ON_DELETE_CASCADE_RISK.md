@@ -2,11 +2,19 @@
 
 > English version: [ON_DELETE_CASCADE_RISK.en.md](./ON_DELETE_CASCADE_RISK.en.md)
 >
-> 撰寫日期：2026-07-07 ｜ 修訂：2026-07-16（依團隊決議新增 §6 實施方案設計）｜ 依據：`database/migrations/2025_01_01_000000_import_cbdb_schema.php`（生產 MariaDB schema 的入庫來源）
+> 撰寫日期：2026-07-07 ｜ 修訂：2026-07-16（依團隊決議新增 §6 實施方案設計）；2026-07-28（依 Phase 1
+> 分批翻轉的 MariaDB 10.3 實測結果回補 §6.1 執行細節，見下方修正說明）｜ 依據：
+> `database/migrations/2025_01_01_000000_import_cbdb_schema.php`（生產 MariaDB schema 的入庫來源）
 >
 > **本文目的**：說明本專案 schema 目前處於「物理刪除 × 級聯刪除」這個對資料資產最危險的組合中，
 > 解釋其原理性風險（這在資料庫應用領域本應是共識）；並給出破局矩陣——**去級聯（RESTRICT）與
 > 軟刪除（deprecate）各自解決什麼、為何兩者互補而非二選一**——以及可執行的改造路線圖。
+>
+> **現況（2026-07-28）**：本文 §6.1 Phase 1 已分批執行至批次 4（詞表入邊全數翻畢，僅剩
+> `BIOG_MAIN`／`POSTING_DATA`／`POSSESSION_DATA` 共 28 條入邊，應用層前置已完成、進入觀察期），
+> 每批機制細節、10.3 實測結果與逐批 rollout log 見
+> [docs/CASCADE_TO_RESTRICT_MIGRATION_NOTES.md](./CASCADE_TO_RESTRICT_MIGRATION_NOTES.md)——
+> 該文件是本文 §6.1 的執行紀錄與現行權威來源，兩文所述執行細節如有出入，以該文件為準。
 >
 > 文中所有數字皆可用附錄 A 的指令重跑驗證。
 
@@ -316,19 +324,27 @@ ALTER TABLE ALTNAME_DATA
 **Phase 1 翻轉的執行細節**（細化 §5.1 Step 3）——分批單位＝被引用表，順序按 §1 入邊數：`NIAN_HAO`(24) → `YEAR_RANGE_CODES`(23) → `TEXT_CODES`(22) → `ADDR_CODES`(11) → `GANZHI_CODES`/`DYNASTIES`(各 9) → 其餘詞表 → 最後 `BIOG_MAIN` 的 25 條入邊（配套是顯式級聯刪除服務與既有人物軟刪除，§4.4）。每批流程：
 
 1. **前置**：墊片就緒、staging 演練通過；
-2. **執行**（維護窗口）：MariaDB 不支援原地修改外鍵行為，同一 `ALTER` 內 DROP＋ADD；`foreign_key_checks=0` 時 ADD FK 不掃描既有資料（一致性由原約束保證），`ALTER` 近乎即時，僅短暫 metadata lock，先在 staging 對最大表量測：
+2. **執行**（維護窗口）：MariaDB 不支援原地修改外鍵行為，**兩條獨立 `ALTER`**（先 DROP 再 ADD，
+   **修正**：同名約束若寫在同一條 `ALTER` 內 DROP＋ADD，MariaDB 10.3 實測回
+   `ERROR 1826 (HY000): Duplicate FOREIGN KEY constraint name`，拆成兩條才成功；prod 版本
+   究竟 10.3 或 10.11 待確認，但兩條獨立 `ALTER` 在兩版皆安全，一律採用，細節與實測見
+   `CASCADE_TO_RESTRICT_MIGRATION_NOTES.md` §2）；`foreign_key_checks=0` 時 ADD FK 不掃描既有資料
+   （一致性由原約束保證），`ALTER` 近乎即時，僅短暫 metadata lock，先在 staging 對最大表量測：
 
    ```sql
    SET SESSION foreign_key_checks = 0;
+   ALTER TABLE BIOG_MAIN DROP FOREIGN KEY BIOG_MAIN_ibfk_2;
    ALTER TABLE BIOG_MAIN
-     DROP FOREIGN KEY BIOG_MAIN_ibfk_2,
      ADD CONSTRAINT BIOG_MAIN_ibfk_2 FOREIGN KEY (c_by_nh_code)
          REFERENCES NIAN_HAO (c_nianhao_id)
          ON DELETE RESTRICT ON UPDATE CASCADE;   -- UPDATE 行為本階段不動
    SET SESSION foreign_key_checks = 1;
    ```
 
-3. **驗證**：附錄 B 查詢確認該批 `DELETE_RULE` 全為 `RESTRICT`；抽測「刪被引用詞條 → 擋下且資料一列不少」；
+3. **驗證**：附錄 B 查詢確認該批 `DELETE_RULE` 全為 `RESTRICT`（**修正**：MariaDB 10.3 上
+   `information_schema.REFERENTIAL_CONSTRAINTS.DELETE_RULE` 會把顯式寫入的 `RESTRICT` 顯示為
+   `NO ACTION`——InnoDB 中兩者等價，故驗證條件應為 `DELETE_RULE IN ('RESTRICT','NO ACTION')`，
+   或直接驗行為）；抽測「刪被引用詞條 → 擋下且資料一列不少」；
 4. **觀察期**（1–2 週再下一批）：監控 1451（`Cannot delete or update a parent row`）——出現＝漏網硬刪路徑，fail-closed 零損失，修應用層即可；
 5. **回滾預案**：反向 `ALTER` 改回 CASCADE，單條語句、無資料風險。
 

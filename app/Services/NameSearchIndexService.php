@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
+use App\Support\TradSimpMap;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * 姓名搜尋索引服務
@@ -248,15 +248,7 @@ class NameSearchIndexService {
      * @return void
      */
     protected function loadTradSimpMap() {
-        if (!Schema::hasTable('CBDB__TRAD_SIMP_MAP')) {
-            return;
-        }
-
-        $rows = DB::table('CBDB__TRAD_SIMP_MAP')->get();
-
-        foreach ($rows as $row) {
-            $this->tradSimpMap[$row->trad_char] = $row->simp_char;
-        }
+        $this->tradSimpMap = TradSimpMap::full();
     }
 
     /**

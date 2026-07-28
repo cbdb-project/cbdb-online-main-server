@@ -16,14 +16,6 @@ use Symfony\Component\Console\Output\BufferedOutput;
 
 class CbdbTableMaintenanceController extends Controller {
     protected $tables = [
-        'CBDB__TRAD_SIMP_MAP' => [
-            'name' => 'CBDB__TRAD_SIMP_MAP',
-            'name_chn' => '繁簡映射表',
-            'description' => '儲存繁體字與簡體字的對照關係',
-            'command' => 'cbdb:import-trad-simp-map',
-            'icon' => 'language',
-            'color' => 'blue',
-        ],
         'CBDB__NAME_FTS' => [
             'name' => 'CBDB__NAME_FTS',
             'name_chn' => '姓名搜尋倒排索引',

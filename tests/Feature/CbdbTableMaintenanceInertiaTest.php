@@ -54,21 +54,20 @@ class CbdbTableMaintenanceInertiaTest extends TestCase {
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Admin/CbdbTableMaintenance/Index')
-                ->has('tables', 2)
-                ->where('tables.0.table_key', 'CBDB__TRAD_SIMP_MAP')
+                ->has('tables', 1)
+                ->where('tables.0.table_key', 'CBDB__NAME_FTS')
                 ->where('tables.0.exists', false)
-                ->where('tables.1.table_key', 'CBDB__NAME_FTS')
                 ->has('urls.rebuild')
                 ->has('page_translations.admin'));
     }
 
     #[Test]
     public function counts_existing_table(): void {
-        Schema::create('CBDB__TRAD_SIMP_MAP', function ($table) {
+        Schema::create('CBDB__NAME_FTS', function ($table) {
             $table->increments('id');
-            $table->string('trad')->nullable();
+            $table->string('search_term')->nullable();
         });
-        \Illuminate\Support\Facades\DB::table('CBDB__TRAD_SIMP_MAP')->insert([['trad' => '繁'], ['trad' => '體']]);
+        \Illuminate\Support\Facades\DB::table('CBDB__NAME_FTS')->insert([['search_term' => '繁'], ['search_term' => '體']]);
 
         $this->actingAs($this->admin())
             ->get(route('app.admin.cbdb-table-maintenance'))

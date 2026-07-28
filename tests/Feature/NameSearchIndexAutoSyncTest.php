@@ -131,12 +131,6 @@ class NameSearchIndexAutoSyncTest extends TestCase {
             $table->index('name_type_code', 'idx_cbdb__name_type');
         });
 
-        // CBDB__TRAD_SIMP_MAP 表（用於繁簡轉換）
-        Schema::create('CBDB__TRAD_SIMP_MAP', function ($table) {
-            $table->binary('trad_char', 4)->primary();
-            $table->binary('simp_char', 4);
-        });
-
         // ALTNAME_CODES 表（用於別名類型）
         Schema::create('ALTNAME_CODES', function ($table) {
             $table->integer('c_name_type_code')->primary();
@@ -178,7 +172,6 @@ class NameSearchIndexAutoSyncTest extends TestCase {
 
     protected function tearDown(): void {
         Schema::dropIfExists('ALTNAME_CODES');
-        Schema::dropIfExists('CBDB__TRAD_SIMP_MAP');
         Schema::dropIfExists('CBDB__NAME_FTS');
         Schema::dropIfExists('ALTNAME_DATA');
         Schema::dropIfExists('BIOG_MAIN');

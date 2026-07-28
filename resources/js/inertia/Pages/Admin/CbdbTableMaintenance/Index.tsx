@@ -49,7 +49,7 @@ export default function CbdbTableMaintenanceIndex() {
 
 function TableCard({ table, urls, t }: { table: TableInfo; urls: { rebuild: string; progress_base: string }; t: (k: string, r?: Record<string, string>) => string }) {
     const isNameFts = table.table_key === 'CBDB__NAME_FTS';
-    const [truncate, setTruncate] = useState(!isNameFts); // 繁簡映射表預設勾選，姓名索引預設不勾
+    const [truncate, setTruncate] = useState(!isNameFts); // 姓名索引預設不勾（增量重建為預設行為）
     const [idFrom, setIdFrom] = useState('');
     const [idTo, setIdTo] = useState('');
     const [busy, setBusy] = useState(false);
@@ -214,14 +214,7 @@ function InfoPanel({ t }: { t: (k: string) => string }) {
     return (
         <div className="rounded-lg border border-info-border bg-info-subtle/40 p-4 text-sm">
             <h3 className="mb-2 font-semibold"><i className="fa fa-info-circle mr-1" aria-hidden />{t('table_maint_info_title')}</h3>
-            <h4 className="mt-2 font-semibold">{t('table_maint_trad_simp_h4')}</h4>
-            <ul className="list-disc space-y-1 pl-5">
-                <li>{t('table_maint_trad_simp_li1')}</li>
-                <li>{t('table_maint_trad_simp_li2')}</li>
-                <li>{t('table_maint_trad_simp_li3')}</li>
-                <li>{t('table_maint_trad_simp_li4')}</li>
-            </ul>
-            <h4 className="mt-3 font-semibold">{t('table_maint_name_fts_h4')}</h4>
+            <h4 className="mt-2 font-semibold">{t('table_maint_name_fts_h4')}</h4>
             <ul className="list-disc space-y-1 pl-5">
                 <li>{t('table_maint_name_fts_li1')}</li>
                 <li>{t('table_maint_name_fts_li2')}</li>

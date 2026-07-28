@@ -67,16 +67,6 @@
                             {{ csrf_field() }}
                             <input type="hidden" name="table_name" value="{{ $tableName }}">
 
-                            {{-- 繁簡映射表：只需要清空 --}}
-                            @if($tableName == 'CBDB__TRAD_SIMP_MAP')
-                                <div class="checkbox">
-                                    <label>
-                                        <input type="checkbox" name="truncate" value="1" checked>
-                                        {{ __('admin.table_maint_truncate_rebuild') }}
-                                    </label>
-                                </div>
-                            @endif
-
                             {{-- 姓名搜索索引：需要清空, id_from, id_to --}}
                             @if($tableName == 'CBDB__NAME_FTS')
                                 <div class="form-group">
@@ -135,14 +125,6 @@
                 <h3 class="card-title"><i class="fa fa-info-circle"></i> {{ __('admin.table_maint_info_title') }}</h3>
             </div>
             <div class="card-body">
-                <h4>{{ __('admin.table_maint_trad_simp_h4') }}</h4>
-                <ul>
-                    <li>{{ __('admin.table_maint_trad_simp_li1') }}</li>
-                    <li>{{ __('admin.table_maint_trad_simp_li2') }}</li>
-                    <li>{{ __('admin.table_maint_trad_simp_li3') }}</li>
-                    <li>{{ __('admin.table_maint_trad_simp_li4') }}</li>
-                </ul>
-
                 <h4>{{ __('admin.table_maint_name_fts_h4') }}</h4>
                 <ul>
                     <li>{{ __('admin.table_maint_name_fts_li1') }}</li>

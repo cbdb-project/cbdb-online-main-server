@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\NameFtsProgressService;
+use App\Support\TradSimpMap;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -412,18 +413,8 @@ class RebuildNameSearchIndex extends Command {
      * 載入繁簡映射表
      */
     protected function loadTradSimpMap() {
-        if (!Schema::hasTable('CBDB__TRAD_SIMP_MAP')) {
-            $this->warn('CBDB__TRAD_SIMP_MAP 表不存在，將跳過繁簡轉換');
-
-            return;
-        }
-
         $this->info('載入繁簡映射表...');
-        $rows = DB::table('CBDB__TRAD_SIMP_MAP')->get();
-
-        foreach ($rows as $row) {
-            $this->tradSimpMap[$row->trad_char] = $row->simp_char;
-        }
+        $this->tradSimpMap = TradSimpMap::full();
 
         $this->info(sprintf('載入 %d 個繁簡映射', count($this->tradSimpMap)));
     }

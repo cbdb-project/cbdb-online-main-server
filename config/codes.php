@@ -8,7 +8,6 @@ return [
     // 僅從 /codes 首頁清單隱藏（不影響直連 /codes/{table}，也不影響 Query Playground / NL / MCP 白名單）。
     // 大小寫不敏感比對。設計見 docs/CODES_BOOLEAN_FILTER_DESIGN.md §9.1。
     'ui_hidden' => [
-        'CBDB__TRAD_SIMP_MAP',
         'CBDB__NAME_FTS',
     ],
 
@@ -58,7 +57,6 @@ return [
         'BIOG_SOURCE_DATA' => '傳記資料來源資料表',
         'BIOG_TEXT_DATA' => '傳記文本資料表',
         'CBDB__NAME_FTS' => '人名全文檢索表',
-        'CBDB__TRAD_SIMP_MAP' => '繁簡字對照表',
         'char_variant_map' => '異體字落地替換對照表',
         'CHORONYM_CODES' => '郡望代碼表',
         'COUNTRY_CODES' => '國家地區代碼表',

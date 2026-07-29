@@ -9,8 +9,9 @@ use Illuminate\Support\Facades\DB;
 /**
  * 外部資料庫引用瀏覽器（唯讀）。
  *
- * 瀏覽 BIOG_SOURCE_DATA 裡指向中文維基百科／維基數據／英文維基百科（c_textid
- * 60795/68942/68943）的人物條目引用。
+ * 瀏覽 BIOG_SOURCE_DATA 裡指向維基百科／維基數據／明清婦女著作數據庫／PersDB／
+ * 唐五代人物傳記與社會網絡資料庫等外部資料庫（見 $targetSourceIds 對應的 c_textid）
+ * 的人物條目引用。
  *
  * 這裡刻意不提供任何寫入功能（全量刪除、URL 匯入等）——正式的增修管道是
  * `/api/v2/mutate|create|delete|batch_mutate`（resource=sources），每筆異動走
@@ -20,11 +21,36 @@ use Illuminate\Support\Facades\DB;
  * 收益，也與其他管道（mutation API）的審計/回滾能力不對等。
  */
 class WikiMaintenanceController extends Controller {
-    protected $targetSourceIds = [60795, 68942, 68943];
+    protected $targetSourceIds = [60795, 68942, 68943, 9601, 9602, 32033, 71853];
     protected $sourceNames = [
         60795 => '中文維基百科 (Wikipedia)',
         68942 => '維基數據 (Wikidata)',
         68943 => '英文維基百科 (Wikipedia)',
+        9601 => '明清婦女著作數據庫 (MQWW)',
+        9602 => 'PersDB 人名權威資料（中研院史語所）',
+        32033 => '唐五代人物傳記與社會網絡資料庫 (1.0版)',
+        71853 => '唐五代人物傳記與社會網絡資料庫 (1.5版)',
+    ];
+
+    // 與 $sourceNames 一一對應，用於卡片圖示／顏色；顏色名稱同時是合法的 AdminLTE
+    // （Blade）與 Tailwind（React）色彩前綴，兩邊各自組出 bg-{color} / bg-{color}-500。
+    protected $sourceIcons = [
+        60795 => 'fab fa-wikipedia-w',
+        68942 => 'fas fa-globe',
+        68943 => 'fab fa-wikipedia-w',
+        9601 => 'fas fa-book',
+        9602 => 'fas fa-id-card',
+        32033 => 'fas fa-project-diagram',
+        71853 => 'fas fa-project-diagram',
+    ];
+    protected $sourceColors = [
+        60795 => 'blue',
+        68942 => 'green',
+        68943 => 'orange',
+        9601 => 'purple',
+        9602 => 'pink',
+        32033 => 'teal',
+        71853 => 'indigo',
     ];
 
     public function __construct() {
@@ -75,6 +101,8 @@ class WikiMaintenanceController extends Controller {
             'currentSourceId' => $sourceId,
             'targetSourceIds' => $this->targetSourceIds,
             'sourceNames' => $this->sourceNames,
+            'sourceIcons' => $this->sourceIcons,
+            'sourceColors' => $this->sourceColors,
             'stats' => $stats,
             'total' => $total,
             'page' => $page,
@@ -122,6 +150,8 @@ class WikiMaintenanceController extends Controller {
             'id' => $id,
             'name' => $this->sourceNames[$id],
             'count' => $data['stats'][$id],
+            'icon' => $this->sourceIcons[$id],
+            'color' => $this->sourceColors[$id],
         ], $data['targetSourceIds']);
 
         return \Inertia\Inertia::render('Admin/WikiMaintenance/Index', [

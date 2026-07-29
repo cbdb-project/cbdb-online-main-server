@@ -157,6 +157,10 @@ class WikiMaintenanceControllerTest extends TestCase {
         $response->assertSee('中文維基百科 (Wikipedia)');
         $response->assertSee('維基數據 (Wikidata)');
         $response->assertSee('英文維基百科 (Wikipedia)');
+        $response->assertSee('明清婦女著作數據庫 (MQWW)');
+        $response->assertSee('PersDB 人名權威資料（中研院史語所）');
+        $response->assertSee('唐五代人物傳記與社會網絡資料庫 (1.0版)');
+        $response->assertSee('唐五代人物傳記與社會網絡資料庫 (1.5版)');
     }
 
     protected function tearDown(): void {

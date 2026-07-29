@@ -78,7 +78,9 @@ class WikiMaintenanceInertiaTest extends TestCase {
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Admin/WikiMaintenance/Index')
                 ->where('current_source_id', 60795)
-                ->has('sources', 3)
+                ->has('sources', 7)
+                ->where('sources.0.icon', 'fab fa-wikipedia-w')
+                ->where('sources.0.color', 'blue')
                 ->where('records.0.c_personid', 1)
                 ->where('records.0.link', 'https://zh.wikipedia.org/wiki/%E6%9D%8E%E7%99%BD')
                 ->has('urls.index')

@@ -28,9 +28,12 @@ export function useTranslation(group: string) {
         return (key: string, replace?: Record<string, string>): string => {
             let value = groupDict?.[key] ?? key;
             if (replace) {
-                Object.entries(replace).forEach(([k, v]) => {
-                    value = value.replaceAll(`:${k}`, v);
-                });
+                // 依 key 長度由長到短取代，避免 :to 先吃掉 :total 的前綴（與 Laravel trans() 行為一致）
+                Object.entries(replace)
+                    .sort(([a], [b]) => b.length - a.length)
+                    .forEach(([k, v]) => {
+                        value = value.replaceAll(`:${k}`, v);
+                    });
             }
             return value;
         };

@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { router, usePage } from '@inertiajs/react';
+import type { ColumnDef } from '@tanstack/react-table';
 import DashboardLayout from '../../../Layouts/DashboardLayout';
-import { Button } from '../../../components/ui/Button';
+import { DataTable } from '../../../components/data-table/DataTable';
+import type { PaginationMeta } from '../../../components/ui/Pagination';
 import { useTranslation } from '../../../hooks/useTranslation';
 import type { SharedProps } from '../../../types/page';
 
@@ -31,7 +33,7 @@ interface WikiPageProps extends SharedProps {
     records: WikiRecord[];
     current_source_id: number;
     sources: SourceInfo[];
-    pagination: { page: number; per_page: number; total: number; has_next: boolean; has_prev: boolean };
+    pagination: PaginationMeta;
     urls: { index: string };
 }
 
@@ -39,16 +41,45 @@ export default function WikiMaintenanceIndex() {
     const props = usePage<WikiPageProps>().props;
     const { records, current_source_id, sources, pagination, urls } = props;
     const t = useTranslation('admin');
+    const tc = useTranslation('common');
 
     const goSource = (id: number) => router.get(urls.index, { source_id: id }, { preserveScroll: true });
     const goPage = (page: number) => router.get(urls.index, { source_id: current_source_id, page }, { preserveScroll: true });
 
-    const { page, per_page, total, has_next, has_prev } = pagination;
-    const lastPage = Math.max(1, Math.ceil(total / per_page));
-    const startPage = Math.max(1, page - 2);
-    const endPage = Math.min(lastPage, page + 2);
-    const pages: number[] = [];
-    for (let i = startPage; i <= endPage; i++) pages.push(i);
+    const columns = useMemo<ColumnDef<WikiRecord, unknown>[]>(() => [
+        {
+            accessorKey: 'c_personid',
+            header: t('wiki_col_person_id'),
+            cell: ({ row }) => (
+                <a
+                    className="text-primary hover:underline"
+                    href={`/app/basicinformation/${row.original.c_personid}/sources/edit-v2`}
+                    target="_blank"
+                    rel="noreferrer"
+                >
+                    {row.original.c_personid}
+                </a>
+            ),
+        },
+        {
+            accessorKey: 'c_name_chn',
+            header: t('wiki_col_name_chn'),
+            cell: ({ row }) => row.original.c_name_chn ?? '-',
+        },
+        { accessorKey: 'c_textid', header: t('wiki_col_text_id') },
+        {
+            accessorKey: 'c_pages',
+            header: t('wiki_col_page'),
+            cell: ({ row }) =>
+                row.original.link ? (
+                    <a className="text-primary hover:underline" href={row.original.link} target="_blank" rel="noreferrer">
+                        {row.original.c_pages}
+                    </a>
+                ) : (
+                    row.original.c_pages ?? '-'
+                ),
+        },
+    ], [t]);
 
     return (
         <DashboardLayout title={t('wiki_page_title')} breadcrumbs={[{ label: t('wiki_page_title') }]}>
@@ -75,52 +106,23 @@ export default function WikiMaintenanceIndex() {
 
                 <p className="text-sm text-muted-foreground">{t('wiki_maintenance_desc')}</p>
 
-                {/* 記錄列表 */}
-                <div className="overflow-x-auto rounded-md border border-border">
-                    <table className="w-full text-sm">
-                        <thead className="bg-muted/50">
-                            <tr>
-                                <th className="px-3 py-2 text-left font-medium">{t('wiki_col_person_id')}</th>
-                                <th className="px-3 py-2 text-left font-medium">{t('wiki_col_name_chn')}</th>
-                                <th className="px-3 py-2 text-left font-medium">{t('wiki_col_text_id')}</th>
-                                <th className="px-3 py-2 text-left font-medium">{t('wiki_col_page')}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {records.length === 0 && (
-                                <tr><td colSpan={4} className="px-3 py-6 text-center text-muted-foreground">{t('wiki_no_records')}</td></tr>
-                            )}
-                            {records.map((r) => (
-                                <tr key={`${r.c_personid}-${r.c_textid}-${r.c_pages}`} className="border-t border-border">
-                                    <td className="px-3 py-1.5">
-                                        <a className="text-primary hover:underline" href={`/app/basicinformation/${r.c_personid}/sources/edit-v2`} target="_blank" rel="noreferrer">{r.c_personid}</a>
-                                    </td>
-                                    <td className="px-3 py-1.5">{r.c_name_chn ?? '-'}</td>
-                                    <td className="px-3 py-1.5">{r.c_textid}</td>
-                                    <td className="px-3 py-1.5">
-                                        {r.link ? <a className="text-primary hover:underline" href={r.link} target="_blank" rel="noreferrer">{r.c_pages}</a> : (r.c_pages ?? '-')}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* 分頁 */}
-                {total > 0 && (
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-sm text-muted-foreground">
-                            {t('wiki_showing', { from: String((page - 1) * per_page + 1), to: String(Math.min(page * per_page, total)), total: total.toLocaleString() })}
-                        </p>
-                        <div className="flex items-center gap-1">
-                            <Button size="sm" variant="outline" disabled={!has_prev} onClick={() => goPage(page - 1)}>«</Button>
-                            {pages.map((i) => (
-                                <Button key={i} size="sm" variant={i === page ? 'default' : 'outline'} onClick={() => goPage(i)}>{i}</Button>
-                            ))}
-                            <Button size="sm" variant="outline" disabled={!has_next} onClick={() => goPage(page + 1)}>»</Button>
-                        </div>
-                    </div>
-                )}
+                <DataTable
+                    columns={columns}
+                    data={records}
+                    meta={pagination}
+                    onPageChange={goPage}
+                    getRowId={(r) => `${r.c_personid}-${r.c_textid}-${r.c_pages}`}
+                    labels={{
+                        empty: t('wiki_no_records'),
+                        loading: tc('loading'),
+                        exportCsv: 'CSV',
+                        print: tc('print'),
+                        previous: tc('previous'),
+                        next: tc('next'),
+                        // 以 {from}/{to}/{total} 佔位符版的 wiki_showing 當摘要模板，保留本地化文案。
+                        summaryTemplate: t('wiki_showing', { from: '{from}', to: '{to}', total: '{total}' }),
+                    }}
+                />
             </div>
         </DashboardLayout>
     );

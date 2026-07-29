@@ -39,6 +39,8 @@ interface DataTableProps<T> {
     exportTitle?: string;
     /** 工具列額外內容（如篩選器）放在匯出按鈕左側。 */
     toolbar?: React.ReactNode;
+    /** 穩定列 id（如複合主鍵）；省略時 TanStack 以 index 為 id。 */
+    getRowId?: (row: T, index: number) => string;
 }
 
 /**
@@ -58,10 +60,12 @@ export function DataTable<T>({
     exportFilename = 'export',
     exportTitle = 'Export',
     toolbar,
+    getRowId,
 }: DataTableProps<T>) {
     const table = useReactTable({
         data,
         columns,
+        getRowId,
         getCoreRowModel: getCoreRowModel(),
         manualPagination: true,
         manualSorting: true,

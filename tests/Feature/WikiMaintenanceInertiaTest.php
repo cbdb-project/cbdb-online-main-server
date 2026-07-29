@@ -83,6 +83,12 @@ class WikiMaintenanceInertiaTest extends TestCase {
                 ->where('sources.0.color', 'blue')
                 ->where('records.0.c_personid', 1)
                 ->where('records.0.link', 'https://zh.wikipedia.org/wiki/%E6%9D%8E%E7%99%BD')
+                ->where('pagination.current_page', 1)
+                ->where('pagination.last_page', 1)
+                ->where('pagination.per_page', 20)
+                ->where('pagination.total', 1)
+                ->where('pagination.from', 1)
+                ->where('pagination.to', 1)
                 ->has('urls.index')
                 ->has('page_translations.admin'));
     }

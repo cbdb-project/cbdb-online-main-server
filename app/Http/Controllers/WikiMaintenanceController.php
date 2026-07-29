@@ -161,12 +161,14 @@ class WikiMaintenanceController extends Controller {
             'records' => $records,
             'current_source_id' => (int) $data['currentSourceId'],
             'sources' => $sources,
+            // 標準 PaginationMeta 形狀，供共用 DataTable / Pagination 元件使用。
             'pagination' => [
-                'page' => $data['page'],
+                'current_page' => $data['page'],
+                'last_page' => max(1, (int) ceil($data['total'] / $data['perPage'])),
                 'per_page' => $data['perPage'],
                 'total' => $data['total'],
-                'has_next' => $data['hasNext'],
-                'has_prev' => $data['hasPrev'],
+                'from' => $data['total'] > 0 ? ($data['page'] - 1) * $data['perPage'] + 1 : null,
+                'to' => $data['total'] > 0 ? min($data['page'] * $data['perPage'], $data['total']) : null,
             ],
             'urls' => [
                 'index' => route('app.admin.wiki-maintenance', [], false),

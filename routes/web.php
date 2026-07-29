@@ -489,8 +489,9 @@ Route::middleware('auth')->group(function () {
         ->middleware('inertia')->name('app.admin.batch-load-offices');
     Route::post('app/admin/batch-load-offices', 'AdminBatchLoadOfficesController@store')
         ->middleware('inertia')->name('app.admin.batch-load-offices.store');
-    Route::get('admin/wiki-maintenance', 'WikiMaintenanceController@index')->name('admin.wiki-maintenance');
-    Route::get('app/admin/wiki-maintenance', 'WikiMaintenanceController@appIndex')->name('app.admin.wiki-maintenance')->middleware('inertia');
+    // 外部資料庫引用瀏覽器：已開放活躍帳號，路徑不再帶 admin 前綴（controller 沿用 WikiMaintenanceController 名稱）。
+    Route::get('external-db-link', 'WikiMaintenanceController@index')->name('external-db-link');
+    Route::get('app/external-db-link', 'WikiMaintenanceController@appIndex')->name('app.external-db-link')->middleware('inertia');
     Route::get('admin/cbdb-table-maintenance', 'CbdbTableMaintenanceController@index')->name('admin.cbdb-table-maintenance');
     Route::get('app/admin/cbdb-table-maintenance', 'CbdbTableMaintenanceController@appIndex')->name('app.admin.cbdb-table-maintenance')->middleware('inertia');
     Route::post('admin/cbdb-table-maintenance/rebuild', 'CbdbTableMaintenanceController@rebuild')->name('admin.cbdb-table-maintenance.rebuild');

@@ -1,8 +1,11 @@
-import React, { useMemo } from 'react';
-import { router, usePage } from '@inertiajs/react';
-import type { ColumnDef } from '@tanstack/react-table';
+import React, { useMemo, useState } from 'react';
+import { usePage } from '@inertiajs/react';
+import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import DashboardLayout from '../../../Layouts/DashboardLayout';
 import { DataTable } from '../../../components/data-table/DataTable';
+import { useDataTableQuery } from '../../../components/data-table/useDataTableQuery';
+import { Button } from '../../../components/ui/Button';
+import { Input } from '../../../components/ui/Input';
 import type { PaginationMeta } from '../../../components/ui/Pagination';
 import { useTranslation } from '../../../hooks/useTranslation';
 import type { SharedProps } from '../../../types/page';
@@ -10,6 +13,9 @@ import type { SharedProps } from '../../../types/page';
 interface WikiRecord {
     c_personid: number;
     c_name_chn: string | null;
+    c_dynasty_chn: string | null;
+    c_index_year: number | null;
+    c_index_addr_chn: string | null;
     c_textid: number;
     c_pages: string | null;
     link: string | null;
@@ -34,22 +40,53 @@ interface WikiPageProps extends SharedProps {
     current_source_id: number;
     sources: SourceInfo[];
     pagination: PaginationMeta;
+    filters: { search: string };
+    sort: string;
+    direction: 'asc' | 'desc';
     urls: { index: string };
 }
 
 export default function WikiMaintenanceIndex() {
     const props = usePage<WikiPageProps>().props;
-    const { records, current_source_id, sources, pagination, urls } = props;
+    const { records, current_source_id, sources, pagination, filters, sort, direction, urls } = props;
     const t = useTranslation('admin');
     const tc = useTranslation('common');
 
-    const goSource = (id: number) => router.get(urls.index, { source_id: id }, { preserveScroll: true });
-    const goPage = (page: number) => router.get(urls.index, { source_id: current_source_id, page }, { preserveScroll: true });
+    // 搜尋草稿：送出（Enter／按鈕）才觸發 reload；props.filters.search 是已生效值。
+    const [search, setSearch] = useState(filters.search ?? '');
+
+    const sorting: SortingState = useMemo(
+        () => (sort ? [{ id: sort, desc: direction === 'desc' }] : []),
+        [sort, direction]
+    );
+
+    // 換頁／排序／搜尋／切換來源都經由此 hook 同步進 URL query，連結可直接分享復現。
+    const { visit, onPageChange, onSortingChange } = useDataTableQuery({
+        params: {
+            source_id: current_source_id,
+            search: filters.search || undefined,
+            sort: sort || undefined,
+            direction: sort ? direction : undefined,
+        },
+        url: urls.index,
+        sorting,
+    });
+
+    const goSource = (id: number) => visit({ source_id: id, page: 1 });
+    const doSearch = (e: React.FormEvent) => {
+        e.preventDefault();
+        visit({ search: search.trim() || null, page: 1 });
+    };
+    const resetSearch = () => {
+        setSearch('');
+        visit({ search: null, page: 1 });
+    };
 
     const columns = useMemo<ColumnDef<WikiRecord, unknown>[]>(() => [
         {
             accessorKey: 'c_personid',
             header: t('wiki_col_person_id'),
+            enableSorting: true,
             cell: ({ row }) => (
                 <a
                     className="text-primary hover:underline"
@@ -64,12 +101,30 @@ export default function WikiMaintenanceIndex() {
         {
             accessorKey: 'c_name_chn',
             header: t('wiki_col_name_chn'),
+            enableSorting: true,
             cell: ({ row }) => row.original.c_name_chn ?? '-',
+        },
+        {
+            accessorKey: 'c_dynasty_chn',
+            header: t('wiki_col_dynasty'),
+            cell: ({ row }) => row.original.c_dynasty_chn ?? '-',
+        },
+        {
+            accessorKey: 'c_index_year',
+            header: t('wiki_col_index_year'),
+            enableSorting: true,
+            cell: ({ row }) => row.original.c_index_year ?? '-',
+        },
+        {
+            accessorKey: 'c_index_addr_chn',
+            header: t('wiki_col_index_addr'),
+            cell: ({ row }) => row.original.c_index_addr_chn ?? '-',
         },
         { accessorKey: 'c_textid', header: t('wiki_col_text_id') },
         {
             accessorKey: 'c_pages',
             header: t('wiki_col_page'),
+            enableSorting: true,
             cell: ({ row }) =>
                 row.original.link ? (
                     <a className="text-primary hover:underline" href={row.original.link} target="_blank" rel="noreferrer">
@@ -110,8 +165,24 @@ export default function WikiMaintenanceIndex() {
                     columns={columns}
                     data={records}
                     meta={pagination}
-                    onPageChange={goPage}
+                    onPageChange={onPageChange}
+                    sorting={sorting}
+                    onSortingChange={onSortingChange}
                     getRowId={(r) => `${r.c_personid}-${r.c_textid}-${r.c_pages}`}
+                    toolbar={
+                        <form onSubmit={doSearch} className="flex items-center gap-1">
+                            <Input
+                                value={search}
+                                placeholder={t('wiki_search_placeholder')}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="w-72"
+                            />
+                            <Button type="submit" variant="secondary" size="sm">{tc('search')}</Button>
+                            {filters.search && (
+                                <Button type="button" variant="secondary" size="sm" onClick={resetSearch}>{tc('reset')}</Button>
+                            )}
+                        </form>
+                    }
                     labels={{
                         empty: t('wiki_no_records'),
                         loading: tc('loading'),

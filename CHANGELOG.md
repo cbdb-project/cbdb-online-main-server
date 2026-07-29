@@ -4,6 +4,12 @@
 
 ## 2026-07
 
+### 外部資料庫引用瀏覽器改版：/external-db-link、開放活躍帳號、Blade 版下架
+- 原 admin/wiki-maintenance 頁面全面翻新：改用共用 DataTable（TanStack）元件，新增搜尋（人名／頁碼標題模糊、純數字比對人物 ID）、白名單欄位伺服器端排序，列表補朝代／指數年／指數地址欄；換頁／排序／搜尋／來源全同步進 URL query，連結可分享復現。
+- 權限自「活躍管理員」降為「活躍帳號」（唯讀瀏覽頁；排序／搜尋門檻與 codes 對齊），側欄項目自「管理工具」移入「專家工具」。
+- 路徑改為 `/app/external-db-link`（路由 `app.external-db-link`）；Blade 版刪除、無 flag 回退，`/external-db-link` 硬導向 React（同 Query Playground 模式）。後端 `WikiMaintenanceController` 等命名沿用。
+- 另修正 `useTranslation` 佔位符取代順序（`:to` 吃掉 `:total` 前綴致「160tal」）；`DataTable` 新增可選 `getRowId` 供複合主鍵列使用穩定 key。
+
 ### 實體聚合橫向複用架構（entity aggregate framework，#1159 §6.5）
 - 行為凍結重構：把 office／social institution 兩輪實作中重複的機制抽成五件套，後續實體（code+type-rel 家族、text、place）不再整套重寫。
 - **`config/entity_aggregates.php` 實體註冊表（單一真源）**：聲明 resource／Service／`definition`／識別鍵／認領表／`closed_code_tables`／側欄 nav。codes UI 封寫改由 registry 推導（`isReadOnlyTable()`，實體上線即自動封寫、回退＝改 config）；側欄實體節點由 `Navigation::entityNavItem()` 依 config 生成。

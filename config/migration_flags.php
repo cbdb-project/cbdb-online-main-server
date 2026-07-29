@@ -77,7 +77,7 @@ return [
             'batch-load-book-titles' => env('MIGRATION_FLAG_BATCH_BOOKS', 'new'),
             'batch-load-offices' => env('MIGRATION_FLAG_BATCH_OFFICES', 'new'),
             'batch-load-social-institutes' => env('MIGRATION_FLAG_BATCH_SOCIAL', 'new'),
-            'wiki-maintenance' => env('MIGRATION_FLAG_WIKI_MAINTENANCE', 'new'),
+            // wiki-maintenance（外部資料庫引用瀏覽器）已無 Blade 版：/external-db-link 硬導向 React，不走 flag。
             'cbdb-table-maintenance' => env('MIGRATION_FLAG_TABLE_MAINTENANCE', 'new'),
             'unidirectional-relationship-repair' => env('MIGRATION_FLAG_UNIDIRECTIONAL_REPAIR', 'new'),
         ],

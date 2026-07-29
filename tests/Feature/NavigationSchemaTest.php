@@ -43,11 +43,15 @@ class NavigationSchemaTest extends TestCase {
 
     public function test_active_non_admin_sees_expert_but_not_admin(): void {
         $user = User::factory()->create(['is_active' => User::STATUS_ACTIVE, 'is_admin' => User::ROLE_REGULAR]);
-        $topKeys = array_column(Navigation::tree($user), 'key');
+        $tree = Navigation::tree($user);
+        $topKeys = array_column($tree, 'key');
 
         $this->assertContains('expert', $topKeys);
         $this->assertNotContains('not-public', $topKeys);
         $this->assertNotContains('admin', $topKeys);
+
+        // 外部資料庫引用瀏覽器已移入專家工具，活躍一般用戶可見。
+        $this->assertContains('wiki-maintenance', $this->collectKeys($tree));
     }
 
     public function test_super_admin_sees_all_sections(): void {

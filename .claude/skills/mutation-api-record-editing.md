@@ -11,7 +11,7 @@ description: 使用 /api/v2 mutation 端點對 CBDB 人物子資源與 code 表�
 - 要把外部整理好的清單（如 `d1_build_*/round3/report_*.csv`）**增量**寫進 CBDB prod，而不是全量重灌。
 - 需要每筆變更都可審計、可回滾（`operations` 表 + AuditLog）。
 
-**不要**用 `WikiMaintenanceController`（`admin/wiki-maintenance/*`）做增量更新——它是首次全量導入用的，機制是「刪光某 `c_textid` 全部列再從 JSON 批量插」，會抹掉既有資料。維基／維基數據關聯的增量維護一律走本技能描述的 mutation API。
+**不要**用 `WikiMaintenanceController`（現路徑 `/external-db-link`，原 `admin/wiki-maintenance`）做增量更新——寫入功能已移除，它現在只是唯讀的外部資料庫引用瀏覽器。維基／維基數據關聯的增量維護一律走本技能描述的 mutation API。
 
 ## 端點總覽
 

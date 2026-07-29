@@ -106,6 +106,15 @@ class Navigation {
                     self::routeUrl('app.query-playground.index'),
                     ['pages' => ['Query Playground'], 'patterns' => ['app.query-playground.*']]
                 ),
+                // 唯讀外部資料庫引用瀏覽器：自管理工具移入，權限已降為活躍帳號。
+                // Blade 版已下架、無 flag 回退（/external-db-link 硬導向 React，同 Query Playground 模式）。
+                self::item(
+                    'wiki-maintenance',
+                    'admin.wiki_maintenance',
+                    'fab fa-wikipedia-w',
+                    self::routeUrl('app.external-db-link'),
+                    ['pages' => ['外部資料庫引用瀏覽器', 'Wiki 對照資料維護'], 'patterns' => []]
+                ),
             ], self::routeUrl('app.query-playground.index'), fn () => $isActive),
 
             // 暫不公開工具（需 superadmin）
@@ -206,13 +215,6 @@ class Navigation {
                     'fa fa-university',
                     self::url('admin.batch-load-social-institutes', 'admin.batch-load-social-institutes', 'app.admin.batch-load-social-institutes'),
                     ['pages' => ['批次匯入社會機構'], 'patterns' => ['app.admin.batch-load-social-institutes']]
-                ),
-                self::item(
-                    'wiki-maintenance',
-                    'admin.wiki_maintenance',
-                    'fab fa-wikipedia-w',
-                    self::url('admin.wiki-maintenance', 'admin.wiki-maintenance', 'app.admin.wiki-maintenance'),
-                    ['pages' => ['外部資料庫引用瀏覽器', 'Wiki 對照資料維護'], 'patterns' => []]
                 ),
                 self::item(
                     'table-maintenance',

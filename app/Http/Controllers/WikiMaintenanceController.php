@@ -58,14 +58,24 @@ class WikiMaintenanceController extends Controller {
 
     public function __construct() {
         $this->middleware('auth');
+        // 唯讀瀏覽頁，開放給所有活躍帳號（含一般用戶）；帶排序／搜尋的伺服器端查詢
+        // 仍需登入且活躍，與 codes 的 sort/filter 門檻精神一致（docs/CODES_SORT_FILTER_AUTH_GATE.md）。
         $this->middleware(function ($request, $next) {
-            if (!Auth::user() || !Auth::user()->canRunBatchImport()) {
-                abort(403, '此功能僅限活躍管理員使用');
+            if (!Auth::user() || !Auth::user()->isActive()) {
+                abort(403, '此功能僅限已啟用帳號使用');
             }
 
             return $next($request);
         });
     }
+
+    /** 可排序欄位 → 完整限定欄位名的白名單；不在名單內的 sort 參數一律忽略。 */
+    protected const SORTABLE_COLUMNS = [
+        'c_personid' => 'bsd.c_personid',
+        'c_name_chn' => 'bm.c_name_chn',
+        'c_index_year' => 'bm.c_index_year',
+        'c_pages' => 'bsd.c_pages',
+    ];
 
     protected function buildWikiListing(Request $request): array {
         $sourceId = $request->input('source_id', $this->targetSourceIds[0]);
@@ -77,14 +87,45 @@ class WikiMaintenanceController extends Controller {
 
         $page = (int) $request->input('page', 1);
         $perPage = 20;
+        $search = trim((string) $request->input('search', ''));
+        $sort = (string) $request->input('sort', '');
+        if (!isset(self::SORTABLE_COLUMNS[$sort])) {
+            $sort = '';
+        }
+        $direction = strtolower((string) $request->input('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
 
         // 查询指定 source_id 的记录，关联人名信息和文本链接信息
         $query = DB::table('BIOG_SOURCE_DATA as bsd')
             ->leftJoin('BIOG_MAIN as bm', 'bsd.c_personid', '=', 'bm.c_personid')
             ->leftJoin('TEXT_CODES as tc', 'bsd.c_textid', '=', 'tc.c_textid')
-            ->select('bsd.*', 'bm.c_name_chn', 'tc.c_url_api', 'tc.c_url_api_coda')
-            ->where('bsd.c_textid', $sourceId)
-            ->orderBy('bsd.c_personid');
+            ->leftJoin('DYNASTIES as dy', 'bm.c_dy', '=', 'dy.c_dy')
+            ->leftJoin('ADDR_CODES as addr', 'bm.c_index_addr_id', '=', 'addr.c_addr_id')
+            ->select(
+                'bsd.*',
+                'bm.c_name_chn',
+                'bm.c_index_year',
+                'dy.c_dynasty_chn',
+                'addr.c_name_chn as c_index_addr_chn',
+                'tc.c_url_api',
+                'tc.c_url_api_coda'
+            )
+            ->where('bsd.c_textid', $sourceId);
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('bm.c_name_chn', 'like', "%{$search}%")
+                    ->orWhere('bsd.c_pages', 'like', "%{$search}%");
+                if (ctype_digit($search)) {
+                    $q->orWhere('bsd.c_personid', (int) $search);
+                }
+            });
+        }
+
+        if ($sort !== '') {
+            $query->orderBy(self::SORTABLE_COLUMNS[$sort], $direction);
+        }
+        // 次要排序鍵，確保分頁順序穩定。
+        $query->orderBy('bsd.c_personid');
 
         $total = $query->count();
         $records = $query->skip(($page - 1) * $perPage)
@@ -112,25 +153,22 @@ class WikiMaintenanceController extends Controller {
             'perPage' => $perPage,
             'hasNext' => $total > $page * $perPage,
             'hasPrev' => $page > 1,
+            'search' => $search,
+            'sort' => $sort,
+            'direction' => $direction,
         ];
     }
 
+    /** 舊 Blade 版已下架：/external-db-link 硬導向 React 版（同 Query Playground 模式，保留 query 參數）。 */
     public function index(Request $request) {
-        $data = $this->buildWikiListing($request);
-
-        return view('admin.wiki-maintenance', array_merge($data, [
-            'page_title' => __('admin.wiki_maintenance'),
-            'page_title_key' => '外部資料庫引用瀏覽器',
-            'page_description' => __('admin.wiki_maintenance_desc'),
-            'page_url' => route('admin.wiki-maintenance'),
-        ]));
+        return redirect()->route('app.external-db-link', $request->query());
     }
 
     public function appIndex(Request $request) {
         $data = $this->buildWikiListing($request);
 
         $records = collect($data['records'])->map(function ($r) {
-            // 與 Blade 相同的條目連結組裝：c_url_api + (含中日韓字元則 rawurlencode) c_pages + c_url_api_coda。
+            // 條目連結組裝：c_url_api + (含中日韓字元則 rawurlencode) c_pages + c_url_api_coda。
             $link = null;
             if ($r->c_url_api && $r->c_textid && $r->c_pages) {
                 $urlPart = $r->c_pages;
@@ -143,6 +181,9 @@ class WikiMaintenanceController extends Controller {
             return [
                 'c_personid' => $r->c_personid,
                 'c_name_chn' => $r->c_name_chn,
+                'c_dynasty_chn' => $r->c_dynasty_chn,
+                'c_index_year' => $r->c_index_year,
+                'c_index_addr_chn' => $r->c_index_addr_chn,
                 'c_textid' => $r->c_textid,
                 'c_pages' => $r->c_pages,
                 'link' => $link,
@@ -161,6 +202,10 @@ class WikiMaintenanceController extends Controller {
             'records' => $records,
             'current_source_id' => (int) $data['currentSourceId'],
             'sources' => $sources,
+            // 已套用的搜尋／排序狀態；前端據此還原 UI，並在換頁時原樣帶回（URL 可分享）。
+            'filters' => ['search' => $data['search']],
+            'sort' => $data['sort'],
+            'direction' => $data['direction'],
             // 標準 PaginationMeta 形狀，供共用 DataTable / Pagination 元件使用。
             'pagination' => [
                 'current_page' => $data['page'],
@@ -171,7 +216,7 @@ class WikiMaintenanceController extends Controller {
                 'to' => $data['total'] > 0 ? min($data['page'] * $data['perPage'], $data['total']) : null,
             ],
             'urls' => [
-                'index' => route('app.admin.wiki-maintenance', [], false),
+                'index' => route('app.external-db-link', [], false),
             ],
             'page_translations' => [
                 'admin' => __('admin'),

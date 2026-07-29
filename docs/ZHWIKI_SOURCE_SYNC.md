@@ -1,7 +1,7 @@
 # 中文維基條目增量維護（BIOG_SOURCE_DATA）
 
 本文記錄「把 Wikidata P497 對照報表增量寫進 CBDB prod 的中文維基連結」的正確流程。
-**此為唯一做法；`admin/wiki-maintenance` 現已改為唯讀的外部資料庫引用瀏覽器，不再提供全量刪除重灌功能**，新增或修正一律走 `/api/v2/mutate`（resource=sources）。
+**此為唯一做法；外部資料庫引用瀏覽器（`/external-db-link`，原 `admin/wiki-maintenance`）為唯讀頁面，不再提供全量刪除重灌功能**，新增或修正一律走 `/api/v2/mutate`（resource=sources）。
 
 操作型技能：[.claude/skills/mutation-api-record-editing.md](../.claude/skills/mutation-api-record-editing.md)。
 

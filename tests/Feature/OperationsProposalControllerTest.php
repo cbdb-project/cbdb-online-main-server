@@ -111,6 +111,10 @@ class OperationsProposalControllerTest extends TestCase {
             $table->integer('c_office_id');
             $table->integer('c_posting_id');
             $table->text('c_notes')->nullable();
+            $table->string('c_created_by')->nullable();
+            $table->dateTime('c_created_date')->nullable();
+            $table->string('c_modified_by')->nullable();
+            $table->dateTime('c_modified_date')->nullable();
         });
 
         Schema::dropIfExists('POSTED_TO_ADDR_DATA');
@@ -119,6 +123,10 @@ class OperationsProposalControllerTest extends TestCase {
             $table->integer('c_posting_id');
             $table->integer('c_office_id');
             $table->integer('c_addr_id')->default(0);
+            $table->string('c_created_by')->nullable();
+            $table->dateTime('c_created_date')->nullable();
+            $table->string('c_modified_by')->nullable();
+            $table->dateTime('c_modified_date')->nullable();
         });
 
         Schema::dropIfExists('POSTING_DATA');
@@ -1246,6 +1254,68 @@ class OperationsProposalControllerTest extends TestCase {
             'resource' => 'POSTED_TO_OFFICE_DATA',
             'op_type' => Operation::TYPE_DELETE,
         ]);
+    }
+
+    /**
+     * 段二收斂回歸：postings 走 HANDLER_ROUTED_RESOURCES 重放 PostingMutationHandler 之後，
+     * 地址副表意圖（c_addr）從 __proposal_aux（而非主表欄位快照）正確合併進 changes 並同步
+     * POSTED_TO_ADDR_DATA——這是 applyViaMutationHandler() 新增 $auxiliaryPayload 合併要保住的行為。
+     */
+    #[Test]
+    public function testApproveOfficeUpdateProposalSyncsAddressAuxiliaryTable(): void {
+        DB::table('POSTED_TO_OFFICE_DATA')->insert([
+            'c_personid' => 1000,
+            'c_office_id' => 50,
+            'c_posting_id' => 7,
+            'c_notes' => 'original notes',
+        ]);
+        DB::table('POSTED_TO_ADDR_DATA')->insert([
+            'c_personid' => 1000, 'c_posting_id' => 7, 'c_office_id' => 50, 'c_addr_id' => 130,
+        ]);
+
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $original = [
+            'c_personid' => 1000,
+            'c_office_id' => 50,
+            'c_posting_id' => 7,
+            'c_notes' => 'original notes',
+        ];
+        $data = array_merge($original, ['c_notes' => 'updated notes']);
+
+        $resourceData = array_merge($data, [
+            '__key_columns' => ['c_office_id', 'c_posting_id'],
+            '__review_status' => 'pending',
+            '__proposal_meta' => ['action' => 'update'],
+            '__proposal_aux' => ['c_addr' => [140, 200]],
+        ]);
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+            'resource' => 'POSTED_TO_OFFICE_DATA',
+            'resource_id' => '50_._7',
+            'resource_data' => $resourceData,
+            'resource_original' => $original,
+        ]);
+        $operation->c_personid = 1000;
+        $operation->save();
+
+        $response = $this->post(route('operations.proposals.approve', $operation));
+        $response->assertRedirect();
+
+        $this->assertSame(
+            'updated notes',
+            DB::table('POSTED_TO_OFFICE_DATA')->where(['c_office_id' => 50, 'c_posting_id' => 7])->value('c_notes')
+        );
+
+        $addrIds = DB::table('POSTED_TO_ADDR_DATA')->where('c_posting_id', 7)
+            ->pluck('c_addr_id')->map(fn ($v) => (int) $v)->sort()->values()->all();
+        $this->assertSame([140, 200], $addrIds, '__proposal_aux 的 c_addr 應合併進 changes 並同步副表，而非被丟棄');
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status']);
     }
 
     #[Test]

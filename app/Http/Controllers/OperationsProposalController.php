@@ -4,12 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Operation;
 use App\Repositories\BiogMainRepository;
-use App\Repositories\OfficePostingRepository;
 use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
-use App\Services\ExplicitCascadeLogger;
 use App\Services\NameSearchIndexService;
-use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -50,15 +47,23 @@ class OperationsProposalController extends Controller {
     ];
 
     /**
-     * 段一：以 v2 mutation handler 重放核准的人物子資源提案（表名 → API resource）。
+     * 段一／段二：以 v2 mutation handler 重放核准的人物子資源提案（表名 → API resource）。
      *
-     * 這些表的提案原本落到通用行覆寫（applyCreate/Update/DeleteProposal），繞過聚合的
-     * 派生／護欄／audit／索引同步——「核准」退化成盲寫一行、與「直接編輯」行為分歧。
+     * 這些表的提案原本落到通用行覆寫（applyCreate/Update/DeleteProposal）或 legacy repository
+     * 委派（applyOffice/PossessionCreate/PossessionUpdate/EventProposal），繞過聚合的
+     * 派生／護欄／audit／索引同步，或與 direct 編輯是兩份獨立實作。
      * 改為重建 {resource, 'direct', operation, personId, targetPk, changes} 重放 direct handler，
      * 使核准與直接編輯逐位一致（見 docs/ENTITY_AGGREGATE_ARCHITECTURE.md §4.5）。
      *
-     * 不含：委派檔（KIN_DATA／ASSOC_DATA／POSTED_TO_OFFICE_DATA／POSSESSION_DATA／EVENTS_DATA）
-     * 已走 legacy repository 委派、行為已對齊；code 表提案走 CodesController 自己的核准路徑、不經此。
+     * 段二（postings／possessions／events）額外把 $auxiliaryPayload（地址副表意圖，
+     * c_addr／c_addr_id／c_addr_cleared，見 applyViaMutationHandler）併入 changes——這些欄位
+     * 從不屬於主表白名單，只存在 __proposal_aux，handler 的 handle() 本就會從 changes 抽出它們
+     * （對齊 PostingMutationHandler／PossessionMutationHandler／EventMutationHandler／
+     * *CreateHandler 既有的 direct 地址副表同步邏輯）。
+     *
+     * 不含：委派檔 KIN_DATA／ASSOC_DATA（兩人互為鏡像的親屬／社會關係，核准時的鏡像衝突語義
+     * 仍在 legacy 那側、需先裁定域邏輯才能收斂，見 docs/PERSON_PROPOSAL_PATHS.md §5.1）；
+     * code 表提案走 CodesController 自己的核准路徑、不經此。
      * auth 無礙：canReviewProposals() 與 canWriteDirectly() 為同一謂詞，能到核准端點者必過 authorizeDirect()。
      */
     protected const HANDLER_ROUTED_RESOURCES = [
@@ -69,6 +74,9 @@ class OperationsProposalController extends Controller {
         'BIOG_TEXT_DATA' => 'texts',
         'BIOG_SOURCE_DATA' => 'sources',
         'BIOG_INST_DATA' => 'social_institutions',
+        'POSTED_TO_OFFICE_DATA' => 'postings',
+        'POSSESSION_DATA' => 'possessions',
+        'EVENTS_DATA' => 'events',
     ];
 
     public function __construct(
@@ -397,7 +405,7 @@ class OperationsProposalController extends Controller {
         // handleProposal() 內、direct 路徑不經過，故不受影響；SourceMutationHandler 的護欄在 mode 分派之前、
         // direct 亦會跑，故以 meta.__approving_operation_id 排除「正在核准的自己」（見 applyViaMutationHandler）。
         if (isset(self::HANDLER_ROUTED_RESOURCES[$table])) {
-            return [$this->applyViaMutationHandler($operation, $table, $data, $keyColumns, $original), true];
+            return [$this->applyViaMutationHandler($operation, $table, $data, $keyColumns, $original, $auxiliaryPayload), true];
         }
 
         if ((int) $operation->op_type === Operation::TYPE_PROPOSAL_DELETE) {
@@ -412,22 +420,6 @@ class OperationsProposalController extends Controller {
             return [$this->applyAssocProposal($operation, $data, $original, $auxiliaryPayload), true];
         }
 
-        if ($table === 'POSTED_TO_OFFICE_DATA') {
-            return [$this->applyOfficeProposal($operation, $data, $original, $auxiliaryPayload), true];
-        }
-
-        if ($table === 'POSSESSION_DATA' && (int) $operation->op_type === Operation::TYPE_PROPOSAL_CREATE) {
-            return [$this->applyPossessionCreateProposal($operation, $data, $auxiliaryPayload), true];
-        }
-
-        if ($table === 'POSSESSION_DATA' && (int) $operation->op_type === Operation::TYPE_PROPOSAL_UPDATE) {
-            return [$this->applyPossessionUpdateProposal($operation, $data, $original, $auxiliaryPayload), true];
-        }
-
-        if ($table === 'EVENTS_DATA') {
-            return [$this->applyEventProposal($operation, $data, $original, $auxiliaryPayload), true];
-        }
-
         if ((int) $operation->op_type === Operation::TYPE_PROPOSAL_CREATE) {
             return [$this->applyCreateProposal($table, $data, $keyColumns), false];
         }
@@ -439,20 +431,38 @@ class OperationsProposalController extends Controller {
      * 段一核准重放：把提案還原成一次 direct mutation，交回同一個 v2 handler 落庫。
      *
      * 存的 resource_data 是「合併後的行快照」（update 時 data = original ∪ updateData），據此還原意圖：
-     *  - create：targetPk = data 的鍵欄；changes = data 去鍵欄（handler 內以 merge(targetPk, changes) 組回整列）。
+     *  - create：targetPk = data 的鍵欄；changes = data 全量（**含**鍵欄，不剔除）。鍵欄同時留在
+     *            changes 對 AbstractPersonSubresourceCreateHandler 系handler 是 no-op（其
+     *            allowedFields() 本含鍵欄，且 handle() 固定 merge(targetPk, changes) 組回整列）；
+     *            但對 bespoke 的 PostingCreateHandler 是必要的——c_office_id 既是 POSTED_TO_OFFICE_DATA
+     *            複合鍵之一，也是該 handler 直接從 changes 讀取（未經 targetPk 合併）的必填欄位，
+     *            剔除會導致「缺少 c_office_id」（段二踩坑，見下方 changes 賦值處註解）。
      *  - update：targetPk = original 的鍵欄；changes = data 相對 original 有差異的欄位（含被改動的鍵欄，
      *            handler 內以 buildNewPk 處理改鍵）。因 data＝original∪updateData，差集恰為使用者變更。
      *  - delete：targetPk = original 的鍵欄；changes = []。
+     *
+     * $auxiliaryPayload（postings／possessions／events 專用）：地址副表意圖（c_addr／c_addr_id／
+     * c_addr_cleared）從不屬於主表欄位白名單，提案送出時只存進 __proposal_aux（見
+     * PostingMutationHandler::proposalAuxiliaryPayload() 等），故 data/original 的差集抓不到它，
+     * 需顯式併入 changes——handler 的 handle() 本就會從 changes 抽出這些鍵（對齊其 direct 路徑）。
+     * 只挑 ADDRESS_AUX_KEYS 這幾個已知鍵合併，不整包塞入：__proposal_aux 舊資料可能還帶著
+     * legacy applyOfficeProposal() 時代寫入的 _id／_postingid／_officeid（僅供已刪除的 legacy
+     * 委派方法定位記錄用），這些鍵不是 handler 認得的欄位，整包合併會被白名單擋下（422／
+     * RuntimeException）。其餘 7 張已收斂的表無此類欄，過濾後恆為 []，合併為 no-op。
      */
+    private const ADDRESS_AUX_KEYS = ['c_addr', 'c_addr_id', 'c_addr_cleared'];
+
     protected function applyViaMutationHandler(
         Operation $operation,
         string $table,
         array $data,
         array $keyColumns,
-        array $original
+        array $original,
+        array $auxiliaryPayload = []
     ): array {
         $resource = self::HANDLER_ROUTED_RESOURCES[$table];
         $opType = (int) $operation->op_type;
+        $addressAux = array_intersect_key($auxiliaryPayload, array_flip(self::ADDRESS_AUX_KEYS));
         // 這些子資源以 row 內 c_personid 為權威人物（handler 會校驗 target.pk.c_personid 與 person_id 一致）；
         // operation->c_personid 對舊/測試資料可能為 0，故不可優先。用 null 合併避免 `0 ?? x` 的陷阱。
         $personId = (int) ($data['c_personid'] ?? $original['c_personid'] ?? ($operation->c_personid ?: 0));
@@ -468,7 +478,7 @@ class OperationsProposalController extends Controller {
         if ($opType === Operation::TYPE_PROPOSAL_CREATE) {
             $handlerOperation = 'create';
             $targetPk = $this->pickColumns($data, $keyColumns);
-            $changes = array_diff_key($data, array_flip($keyColumns));
+            $changes = array_merge($data, $addressAux);
         } elseif ($opType === Operation::TYPE_PROPOSAL_DELETE) {
             $handlerOperation = 'delete';
             $targetPk = $this->pickColumns($original, $keyColumns);
@@ -476,7 +486,7 @@ class OperationsProposalController extends Controller {
         } else {
             $handlerOperation = 'update';
             $targetPk = $this->pickColumns($original, $keyColumns);
-            $changes = $this->diffChangedColumns($original, $data);
+            $changes = array_merge($this->diffChangedColumns($original, $data), $addressAux);
         }
 
         /** @var \App\Services\Mutations\MutationHandlerRegistry $registry */
@@ -631,146 +641,6 @@ class OperationsProposalController extends Controller {
         ]) ?? array_merge($original, $result);
     }
 
-    protected function applyOfficeProposal(
-        Operation $operation,
-        array $data,
-        array $original,
-        array $auxiliaryPayload
-    ): array {
-        $personId = (int) ($operation->c_personid ?? $data['c_personid'] ?? $original['c_personid'] ?? 0);
-
-        // 更新提案：officeUpdateById() 需要表單隱藏欄位 _id, _postingid, _officeid 來定位原始記錄。
-        // 早期提案可能未將這些欄位存入 __proposal_aux，需從 $original 補齊。
-        if ((int) $operation->op_type !== Operation::TYPE_PROPOSAL_CREATE) {
-            if (!isset($auxiliaryPayload['_id'])) {
-                $auxiliaryPayload['_id'] = $personId;
-            }
-            if (!isset($auxiliaryPayload['_postingid'])) {
-                $auxiliaryPayload['_postingid'] = $original['c_posting_id'] ?? $data['c_posting_id'] ?? null;
-            }
-            if (!isset($auxiliaryPayload['_officeid'])) {
-                $auxiliaryPayload['_officeid'] = $original['c_office_id'] ?? null;
-            }
-        }
-
-        $request = Request::create('/', 'POST', array_merge($data, $auxiliaryPayload));
-
-        if ((int) $operation->op_type === Operation::TYPE_PROPOSAL_CREATE) {
-            $resourceId = $this->biogMainRepository->officeStoreById($request, $personId);
-        } else {
-            if (empty($original)) {
-                throw new \RuntimeException('缺少原始資料，無法更新。');
-            }
-
-            $result = $this->biogMainRepository->officeUpdateById(
-                $request,
-                $this->buildLegacyOfficeId($original),
-                $personId
-            );
-            $resourceId = is_array($result) ? ($result['id'] ?? null) : $result;
-        }
-
-        if (!is_string($resourceId) || $resourceId === '') {
-            throw new \RuntimeException('官名提案套用後無法取得主鍵。');
-        }
-
-        $pk = CompositePrimaryKey::parseStoredResourceId($resourceId, 'POSTED_TO_OFFICE_DATA');
-        if ($pk === null) {
-            throw new \RuntimeException('官名提案套用後無法解析主鍵。');
-        }
-
-        $row = $this->fetchAppliedRow('POSTED_TO_OFFICE_DATA', $pk);
-        if ($row === null) {
-            throw new \RuntimeException('官名提案套用後讀取資料失敗。');
-        }
-
-        return $row;
-    }
-
-    /**
-     * 財產新增提案核准：委派 possessionStoreById 配發 c_possession_record_id（交易內 max+1），
-     * 連帶寫主表 POSSESSION_DATA + 副表 POSSESSION_ADDR + operation + audit_log。
-     * 地址陣列存於 __proposal_aux['c_addr_id']；usedDirectWorkflow=true 由委派端自行寫 operation/audit，
-     * approve() 不再重複寫，避免 operation/audit 重複（比照 applyOfficeProposal）。
-     */
-    protected function applyPossessionCreateProposal(
-        Operation $operation,
-        array $data,
-        array $auxiliaryPayload
-    ): array {
-        $personId = (int) ($operation->c_personid ?? $data['c_personid'] ?? 0);
-
-        $addr = $auxiliaryPayload['c_addr_id'] ?? [];
-        if (!is_array($addr)) {
-            $addr = [$addr];
-        }
-
-        $request = Request::create('/', 'POST', array_merge($data, ['c_addr_id' => array_values($addr)]));
-
-        $newId = $this->biogMainRepository->possessionStoreById($request, $personId);
-
-        $row = $this->fetchAppliedRow('POSSESSION_DATA', ['c_possession_record_id' => $newId]);
-        if ($row === null) {
-            throw new \RuntimeException('財產提案套用後讀取資料失敗。');
-        }
-
-        return $row;
-    }
-
-    /**
-     * 套用財產更新提案：連帶同步 POSSESSION_ADDR（修補先前 update 提案走泛型單表套用、漏掉地址副表的缺口）。
-     * aux 帶 c_addr_id（陣列）時 possessionUpdateById 同步副表；未帶則保留既有地址（is_array 守衛）。
-     */
-    protected function applyPossessionUpdateProposal(
-        Operation $operation,
-        array $data,
-        array $original,
-        array $auxiliaryPayload
-    ): array {
-        $personId = (int) ($operation->c_personid ?? $data['c_personid'] ?? $original['c_personid'] ?? 0);
-        $recordId = (int) ($data['c_possession_record_id'] ?? $original['c_possession_record_id'] ?? 0);
-
-        $request = Request::create('/', 'POST', array_merge($data, $auxiliaryPayload));
-        $this->biogMainRepository->possessionUpdateById($request, $personId, $recordId);
-
-        $row = $this->fetchAppliedRow('POSSESSION_DATA', ['c_possession_record_id' => $recordId]);
-        if ($row === null) {
-            throw new \RuntimeException('財產提案套用後讀取資料失敗。');
-        }
-
-        return $row;
-    }
-
-    protected function applyEventProposal(
-        Operation $operation,
-        array $data,
-        array $original,
-        array $auxiliaryPayload
-    ): array {
-        $personId = (int) ($operation->c_personid ?? $data['c_personid'] ?? $original['c_personid'] ?? 0);
-        $request = Request::create('/', 'POST', array_merge($data, $auxiliaryPayload));
-
-        if ((int) $operation->op_type === Operation::TYPE_PROPOSAL_CREATE) {
-            $result = $this->biogMainRepository->eventStoreById($request, $personId);
-        } else {
-            if (empty($original)) {
-                throw new \RuntimeException('缺少原始資料，無法更新。');
-            }
-
-            $result = $this->biogMainRepository->eventUpdateById(
-                $request,
-                $personId,
-                $this->buildLegacyEventId($original)
-            );
-        }
-
-        return $this->fetchAppliedRow('EVENTS_DATA', [
-            'c_personid' => $personId,
-            'c_sequence' => $result['c_sequence'] ?? $original['c_sequence'] ?? null,
-            'c_event_code' => $result['c_event_code'] ?? $original['c_event_code'] ?? null,
-        ]) ?? array_merge($original, $result);
-    }
-
     protected function buildLegacyKinshipId(array $original): string {
         foreach (['c_personid', 'c_kin_id', 'c_kin_code'] as $column) {
             if (!array_key_exists($column, $original)) {
@@ -806,26 +676,6 @@ class OperationsProposalController extends Controller {
             $this->biogMainRepository->unionPKDef($original['c_text_title'] ?? ''),
             str_replace('-', '(minus)', $assocFirstYear),
         ]);
-    }
-
-    protected function buildLegacyOfficeId(array $original): string {
-        foreach (['c_office_id', 'c_posting_id'] as $column) {
-            if (!array_key_exists($column, $original)) {
-                throw new \RuntimeException("缺少 {$column}，無法更新官名提案。");
-            }
-        }
-
-        return $original['c_office_id'].'-'.$original['c_posting_id'];
-    }
-
-    protected function buildLegacyEventId(array $original): string {
-        foreach (['c_sequence', 'c_event_code'] as $column) {
-            if (!array_key_exists($column, $original)) {
-                throw new \RuntimeException("缺少 {$column}，無法更新事件提案。");
-            }
-        }
-
-        return $original['c_sequence'].'-'.$original['c_event_code'];
     }
 
     protected function fetchAppliedRow(string $table, array $conditions): ?array {
@@ -977,7 +827,9 @@ class OperationsProposalController extends Controller {
 
     /**
      * 套用刪除提案：以 __key_columns + original 的 PK 值定位目標列並刪除。
-     * offices(POSTED_TO_OFFICE_DATA)/possession(POSSESSION_DATA) 連帶刪除副表。
+     * POSTED_TO_OFFICE_DATA／POSSESSION_DATA 已收斂至 HANDLER_ROUTED_RESOURCES（段二），
+     * 副表連帶刪除改由 PostingDeleteHandler／PossessionDeleteHandler 委派既有 repository
+     * 方法處理，此處不再需要特例。
      * 回傳被刪除前的原始列（供 logFinalOperation/audit 使用）；目標列不存在則回傳空陣列。
      */
     protected function applyDeleteProposal(string $table, array $keyColumns, array $original): array {
@@ -998,28 +850,7 @@ class OperationsProposalController extends Controller {
 
         $deletedRow = $this->convertRowToArray($row);
 
-        // 連帶刪除副表（顯式級聯）：子列先於父列。POSSESSION_ADDR 是 POSSESSION_DATA 的子表，
-        // 故於主列刪除前清掉；POSTING_DATA 反之是 POSTED_TO_OFFICE_DATA 的**父列**，必須等主列
-        // 刪掉之後才輪到它（見下方 deleteOfficeAuxiliaryTables／deletePostingParentIfUnreferenced）。
-        if ($table === 'POSTED_TO_OFFICE_DATA') {
-            $this->deleteOfficeAuxiliaryTables($deletedRow);
-        } elseif ($table === 'POSSESSION_DATA') {
-            $this->deletePossessionAuxiliaryTables($deletedRow);
-        }
-
         DB::table($table)->where($conditions)->delete();
-
-        if ($table === 'POSTED_TO_OFFICE_DATA') {
-            $deletedPosting = OfficePostingRepository::deletePostingIfUnreferenced($deletedRow['c_posting_id'] ?? null);
-            if ($deletedPosting !== null) {
-                (new ExplicitCascadeLogger())->logDeletedRows(
-                    'POSTING_DATA',
-                    (string) ($deletedRow['c_posting_id'] ?? ''),
-                    [$deletedPosting],
-                    (int) ($deletedRow['c_personid'] ?? 0)
-                );
-            }
-        }
 
         // 注意：社會關係反向鏡像刪除移至 approve() 於 logFinalOperation 之後執行，
         // 以便鏡像 audit 掛 final delete operation id（見 approve()）。
@@ -1029,71 +860,6 @@ class OperationsProposalController extends Controller {
         }
 
         return $deletedRow;
-    }
-
-    /**
-     * POSTED_TO_OFFICE_DATA 核准刪除時連帶刪除 POSTED_TO_ADDR_DATA。
-     *
-     * 注意 POSTING_DATA **不在此處刪除**：它是 POSTED_TO_OFFICE_DATA／POSTED_TO_ADDR_DATA 的
-     * 父列，去級聯（ON DELETE RESTRICT）後必須等主列刪完、且確認無其他列共用該 posting 之後
-     * 才能刪，見 applyDeleteProposal() 末尾的 deletePostingIfUnreferenced()。
-     */
-    protected function deleteOfficeAuxiliaryTables(array $row): void {
-        $officeId = $row['c_office_id'] ?? null;
-        $postingId = $row['c_posting_id'] ?? null;
-        $personId = $row['c_personid'] ?? null;
-
-        if ($officeId === null || $postingId === null) {
-            return;
-        }
-
-        if (Schema::hasTable('POSTED_TO_ADDR_DATA')) {
-            $addrQuery = DB::table('POSTED_TO_ADDR_DATA')
-                ->where('c_office_id', $officeId)
-                ->where('c_posting_id', $postingId);
-            if ($personId !== null) {
-                $addrQuery->where('c_personid', $personId);
-            }
-
-            // 刪除前先取出，連帶刪除的每一列都要留下 operations／audit_log 痕跡。
-            $addrRows = (clone $addrQuery)->get();
-            $addrQuery->delete();
-
-            (new ExplicitCascadeLogger())->logDeletedRows(
-                'POSTED_TO_ADDR_DATA',
-                CompositePrimaryKey::buildStoredResourceId([
-                    'c_office_id' => $officeId,
-                    'c_posting_id' => $postingId,
-                ]),
-                $addrRows,
-                (int) ($personId ?? 0)
-            );
-        }
-    }
-
-    /**
-     * POSSESSION_DATA 核准刪除時連帶刪除 POSSESSION_ADDR。
-     */
-    protected function deletePossessionAuxiliaryTables(array $row): void {
-        $recordId = $row['c_possession_record_id'] ?? null;
-        if ($recordId === null) {
-            return;
-        }
-
-        if (Schema::hasTable('POSSESSION_ADDR')) {
-            $addrQuery = DB::table('POSSESSION_ADDR')->where('c_possession_record_id', $recordId);
-
-            // 刪除前先取出，連帶刪除的每一列都要留下 operations／audit_log 痕跡。
-            $addrRows = (clone $addrQuery)->get();
-            $addrQuery->delete();
-
-            (new ExplicitCascadeLogger())->logDeletedRows(
-                'POSSESSION_ADDR',
-                (string) $recordId,
-                $addrRows,
-                (int) ($row['c_personid'] ?? 0)
-            );
-        }
     }
 
     /**

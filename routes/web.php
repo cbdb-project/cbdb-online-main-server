@@ -491,12 +491,6 @@ Route::middleware('auth')->group(function () {
         ->middleware('inertia')->name('app.admin.batch-load-offices.store');
     Route::get('admin/wiki-maintenance', 'WikiMaintenanceController@index')->name('admin.wiki-maintenance');
     Route::get('app/admin/wiki-maintenance', 'WikiMaintenanceController@appIndex')->name('app.admin.wiki-maintenance')->middleware('inertia');
-    Route::post('admin/wiki-maintenance/delete-all', 'WikiMaintenanceController@deleteAll')->name('admin.wiki-maintenance.delete-all');
-    Route::post('admin/wiki-maintenance/reimport', 'WikiMaintenanceController@reimport')->name('admin.wiki-maintenance.reimport');
-    Route::post('admin/wiki-maintenance/import-url', 'WikiMaintenanceController@importFromUrl')->name('admin.wiki-maintenance.import-url');
-    Route::get('admin/wiki-maintenance/progress/{taskId}', 'WikiMaintenanceController@getImportProgress')->where('taskId', '[a-zA-Z0-9_]+')->name('admin.wiki-maintenance.progress');
-    Route::post('admin/wiki-maintenance/cancel/{taskId}', 'WikiMaintenanceController@cancelImport')->where('taskId', '[a-zA-Z0-9_]+')->name('admin.wiki-maintenance.cancel');
-    Route::get('admin/wiki-maintenance/test-progress', 'TestController@testProgress');
     Route::get('admin/cbdb-table-maintenance', 'CbdbTableMaintenanceController@index')->name('admin.cbdb-table-maintenance');
     Route::get('app/admin/cbdb-table-maintenance', 'CbdbTableMaintenanceController@appIndex')->name('app.admin.cbdb-table-maintenance')->middleware('inertia');
     Route::post('admin/cbdb-table-maintenance/rebuild', 'CbdbTableMaintenanceController@rebuild')->name('admin.cbdb-table-maintenance.rebuild');

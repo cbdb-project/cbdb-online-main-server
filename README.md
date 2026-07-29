@@ -28,7 +28,6 @@
 * [單向關係修復工具](./docs/UNIDIRECTIONAL_RELATIONSHIP_REPAIR.md)
 * [MERGE 工具說明](./docs/MERGE.md)
 * [檢視表總覽](./docs/VIEWS.md)
-* [Wiki 导入任务管理](./docs/WIKI_TASK_MANAGEMENT.md)
 * [姓名搜索索引管理](./docs/NAME_SEARCH_COMMANDS.md)
 * [SQLite 每週同步](#sqlite-每週同步) - 自動匯出並同步到 HuggingFace
 

@@ -22,6 +22,7 @@ const SOURCE_COLOR_CLASSES: Record<string, string> = {
     orange: 'bg-orange-500',
     purple: 'bg-purple-500',
     pink: 'bg-pink-500',
+    cyan: 'bg-cyan-500',
     teal: 'bg-teal-500',
     indigo: 'bg-indigo-500',
 };

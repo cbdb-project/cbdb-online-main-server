@@ -21,13 +21,14 @@ use Illuminate\Support\Facades\DB;
  * 收益，也與其他管道（mutation API）的審計/回滾能力不對等。
  */
 class WikiMaintenanceController extends Controller {
-    protected $targetSourceIds = [60795, 68942, 68943, 9601, 9602, 32033, 71853];
+    protected $targetSourceIds = [60795, 68942, 68943, 9601, 9602, 24309, 32033, 71853];
     protected $sourceNames = [
         60795 => '中文維基百科 (Wikipedia)',
         68942 => '維基數據 (Wikidata)',
         68943 => '英文維基百科 (Wikipedia)',
         9601 => '明清婦女著作數據庫 (MQWW)',
-        9602 => 'PersDB 人名權威資料（中研院史語所）',
+        9602 => '人名權威資料（中研院史語所）',
+        24309 => 'PersDB 唐代人物知識ベース',
         32033 => '唐五代人物傳記與社會網絡資料庫 (1.0版)',
         71853 => '唐五代人物傳記與社會網絡資料庫 (1.5版)',
     ];
@@ -40,6 +41,7 @@ class WikiMaintenanceController extends Controller {
         68943 => 'fab fa-wikipedia-w',
         9601 => 'fas fa-book',
         9602 => 'fas fa-id-card',
+        24309 => 'fas fa-user-circle',
         32033 => 'fas fa-project-diagram',
         71853 => 'fas fa-project-diagram',
     ];
@@ -48,7 +50,8 @@ class WikiMaintenanceController extends Controller {
         68942 => 'green',
         68943 => 'orange',
         9601 => 'purple',
-        9602 => 'pink',
+        9602 => 'cyan',
+        24309 => 'pink',
         32033 => 'teal',
         71853 => 'indigo',
     ];

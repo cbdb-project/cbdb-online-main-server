@@ -13,8 +13,8 @@
             <div class="col-md-4">
                 <a href="{{ route('admin.wiki-maintenance', ['source_id' => $id]) }}" style="text-decoration: none;">
                     <div class="info-box{{ $currentSourceId == $id ? ' info-box-selected' : '' }}">
-                        <span class="info-box-icon bg-{{ $id == 60795 ? 'blue' : ($id == 68942 ? 'green' : 'orange') }}">
-                            <i class="{{ $id == 68942 ? 'fas fa-globe' : 'fab fa-wikipedia-w' }}"></i>
+                        <span class="info-box-icon bg-{{ $sourceColors[$id] }}">
+                            <i class="{{ $sourceIcons[$id] }}"></i>
                         </span>
                         <div class="info-box-content">
                             <span class="info-box-text">{{ $sourceNames[$id] }}</span>

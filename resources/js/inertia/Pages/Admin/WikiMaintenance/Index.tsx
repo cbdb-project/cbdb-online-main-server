@@ -12,7 +12,19 @@ interface WikiRecord {
     c_pages: string | null;
     link: string | null;
 }
-interface SourceInfo { id: number; name: string; count: number }
+interface SourceInfo { id: number; name: string; count: number; icon: string; color: string }
+
+// Tailwind 的 JIT 掃描器抓不到動態組出的 class 名稱（例如樣板字串插值），
+// 必須以完整字面量列出才會被打包進最終 CSS。
+const SOURCE_COLOR_CLASSES: Record<string, string> = {
+    blue: 'bg-blue-500',
+    green: 'bg-green-500',
+    orange: 'bg-orange-500',
+    purple: 'bg-purple-500',
+    pink: 'bg-pink-500',
+    teal: 'bg-teal-500',
+    indigo: 'bg-indigo-500',
+};
 
 interface WikiPageProps extends SharedProps {
     records: WikiRecord[];
@@ -49,8 +61,8 @@ export default function WikiMaintenanceIndex() {
                             onClick={() => goSource(s.id)}
                             className={`flex items-center gap-3 rounded-lg border p-3 text-left transition hover:shadow ${s.id === current_source_id ? 'border-sky-500 ring-2 ring-sky-200' : 'border-border'}`}
                         >
-                            <span className={`flex h-12 w-12 items-center justify-center rounded text-white ${s.id === 60795 ? 'bg-blue-500' : s.id === 68942 ? 'bg-green-500' : 'bg-orange-500'}`}>
-                                <i className={s.id === 68942 ? 'fas fa-globe' : 'fab fa-wikipedia-w'} aria-hidden />
+                            <span className={`flex h-12 w-12 items-center justify-center rounded text-white ${SOURCE_COLOR_CLASSES[s.color] ?? 'bg-gray-500'}`}>
+                                <i className={s.icon} aria-hidden />
                             </span>
                             <span>
                                 <span className="block text-sm text-muted-foreground">{s.name}</span>

@@ -142,7 +142,7 @@ class WikiMaintenanceControllerTest extends TestCase {
         $response = $this->get('/admin/wiki-maintenance');
         $response->assertStatus(200);
         $response->assertViewIs('admin.wiki-maintenance');
-        $response->assertSee('Wiki 對照資料維護');
+        $response->assertSee('外部資料庫引用瀏覽器');
     }
 
     /**
@@ -157,92 +157,6 @@ class WikiMaintenanceControllerTest extends TestCase {
         $response->assertSee('中文維基百科 (Wikipedia)');
         $response->assertSee('維基數據 (Wikidata)');
         $response->assertSee('英文維基百科 (Wikipedia)');
-    }
-
-    /**
-     * 测试删除全部记录功能需要有效的 source_id
-     */
-    #[Test]
-    public function test_delete_all_records_validation() {
-        $this->actingAs($this->user);
-
-        $response = $this->post('/admin/wiki-maintenance/delete-all', [
-            'source_id' => 99999,  // 无效的 source_id
-        ]);
-
-        $response->assertRedirect();
-        $response->assertSessionHas('error');
-    }
-
-    /**
-     * 测试 URL 导入功能的输入验证
-     */
-    #[Test]
-    public function test_import_url_validation() {
-        $this->actingAs($this->user);
-
-        // 测试缺少 URL
-        $response = $this->postJson('/admin/wiki-maintenance/import-url', [
-            'target_source' => 60795,
-        ]);
-        $response->assertStatus(422);
-        $response->assertJsonValidationErrors(['import_url']);
-
-        // 测试无效 URL
-        $response = $this->postJson('/admin/wiki-maintenance/import-url', [
-            'import_url' => 'not-a-url',
-            'target_source' => 60795,
-        ]);
-        $response->assertStatus(422);
-        $response->assertJsonValidationErrors(['import_url']);
-
-        // 测试无效数据源
-        $response = $this->postJson('/admin/wiki-maintenance/import-url', [
-            'import_url' => 'https://example.com/data.json',
-            'target_source' => 99999,
-        ]);
-        $response->assertStatus(422);
-        $response->assertJsonValidationErrors(['target_source']);
-    }
-
-    /**
-     * 测试有效的 URL 导入请求返回正确响应
-     */
-    #[Test]
-    public function test_import_url_returns_success_response() {
-        $this->actingAs($this->user);
-
-        $response = $this->postJson('/admin/wiki-maintenance/import-url', [
-            'import_url' => 'https://example.com/data.json',
-            'target_source' => 60795,
-        ]);
-
-        $response->assertStatus(200);
-        $response->assertJson([
-            'success' => true,
-            'message' => '導入任務已開始',
-        ]);
-        $response->assertJsonStructure([
-            'success',
-            'message',
-            'task_id',
-        ]);
-    }
-
-    /**
-     * 测试进度查询功能 - 测试不存在的任务返回404
-     */
-    #[Test]
-    public function test_get_import_progress_not_found() {
-        $this->actingAs($this->user);
-
-        $taskId = 'nonexistent_task';
-        $response = $this->getJson("/admin/wiki-maintenance/progress/{$taskId}");
-        $response->assertStatus(404);
-        $response->assertJson([
-            'success' => false,
-            'message' => '找不到指定的任務',
-        ]);
     }
 
     protected function tearDown(): void {

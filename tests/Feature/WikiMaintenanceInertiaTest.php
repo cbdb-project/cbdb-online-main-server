@@ -81,7 +81,7 @@ class WikiMaintenanceInertiaTest extends TestCase {
                 ->has('sources', 3)
                 ->where('records.0.c_personid', 1)
                 ->where('records.0.link', 'https://zh.wikipedia.org/wiki/%E6%9D%8E%E7%99%BD')
-                ->has('urls.import')
+                ->has('urls.index')
                 ->has('page_translations.admin'));
     }
 

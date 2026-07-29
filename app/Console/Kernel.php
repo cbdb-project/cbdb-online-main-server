@@ -12,7 +12,6 @@ class Kernel extends ConsoleKernel {
      * @var array
      */
     protected $commands = [
-        Commands\WikiTaskManager::class,
         \App\Console\Commands\SyncOpenccTradSimpSource::class,
         \App\Console\Commands\RebuildNameSearchIndex::class,
         \App\Console\Commands\ExportMysqlToSqlite::class,

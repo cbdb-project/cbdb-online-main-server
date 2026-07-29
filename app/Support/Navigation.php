@@ -212,7 +212,7 @@ class Navigation {
                     'admin.wiki_maintenance',
                     'fab fa-wikipedia-w',
                     self::url('admin.wiki-maintenance', 'admin.wiki-maintenance', 'app.admin.wiki-maintenance'),
-                    ['pages' => ['Wiki 對照資料維護'], 'patterns' => []]
+                    ['pages' => ['外部資料庫引用瀏覽器', 'Wiki 對照資料維護'], 'patterns' => []]
                 ),
                 self::item(
                     'table-maintenance',

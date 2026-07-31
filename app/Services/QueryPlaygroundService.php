@@ -58,6 +58,9 @@ class QueryPlaygroundService {
             'generateFromNlStreamEndpoint' => route('query-playground.generate-from-nl-stream', [], false),
             'answerFromNlEndpoint' => route('query-playground.answer-from-nl', [], false),
             'answerFromNlStreamEndpoint' => route('query-playground.answer-from-nl-stream', [], false),
+            // QA 模式多輪追問輪數上限（見 docs/QUERY_PLAYGROUND_QA_MULTITURN_PLAN.md 第 10 節）：
+            // 前端一律讀取此 prop 判斷何時停用追問輸入框，不寫死數字，避免前後端上限不同步。
+            'qaMaxTurns' => (int) config('query_playground.qa_max_turns', 5),
         ];
     }
 

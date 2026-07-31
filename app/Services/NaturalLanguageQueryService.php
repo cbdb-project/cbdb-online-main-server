@@ -438,6 +438,10 @@ class NaturalLanguageQueryService {
      * @param array|null $tableNames 限制使用的表名（可選）
      * @param callable|null $progressCallback SSE 進度回調
      * @param bool|null $useToolsOverride 是否強制啟用工具
+     * @param array<int, array{question: string, summary: string}> $conversationHistory
+     *   見 docs/QUERY_PLAYGROUND_QA_MULTITURN_PLAN.md：QA 模式多輪追問的先前輪次
+     *   （只含 question/summary，不含本次新問題），由 controller 直接從 request 轉發，
+     *   不經過任何資料庫查詢。
      * @return array
      */
     public function answerQuestion(
@@ -446,7 +450,8 @@ class NaturalLanguageQueryService {
         ?callable $progressCallback = null,
         ?bool $useToolsOverride = null,
         ?callable $heartbeatCallback = null,
-        ?callable $abortCheck = null
+        ?callable $abortCheck = null,
+        array $conversationHistory = []
     ): array {
         if (empty($this->apiKey)) {
             return [
@@ -482,11 +487,14 @@ class NaturalLanguageQueryService {
 
             $messages = [
                 ['role' => 'system', 'content' => $systemPrompt],
+                ...$this->buildConversationHistoryMessages($conversationHistory),
                 ['role' => 'user', 'content' => $question],
             ];
 
-            // 工具調用循環（與 generateSQL 相似邏輯）
-            $maxRounds = max(1, (int) config('nl_query_tools.max_tool_calls', 20));
+            // 工具調用循環（與 generateSQL 相似邏輯）。fallback 40 對齊
+            // config/nl_query_tools.php 的全域預設值，避免此處與 buildQaSystemPrompt()
+            // 各自寫一個不同的 fallback 而互相矛盾（見 docs/QUERY_PLAYGROUND_QA_MULTITURN_PLAN.md 第 7.5 節）。
+            $maxRounds = max(1, (int) config('nl_query_tools.max_tool_calls', 40));
             $round = 0;
             $allToolResults = [];
             $allSqlUsed = [];
@@ -656,11 +664,41 @@ class NaturalLanguageQueryService {
     }
 
     /**
+     * 見 docs/QUERY_PLAYGROUND_QA_MULTITURN_PLAN.md 第 7.1 節：把先前輪次的
+     * question/summary 組成 user/assistant 交錯訊息，插入本輪新問題之前。只用
+     * summary（既有 response contract 的精簡摘要欄位），不塞入完整 tool-call/
+     * tool-result 訊息——本輪若需要新資料會透過工具調用迴圈重新查詢，優於重播
+     * 舊結果。summary 為空字串時該輪只送 user 訊息，避免送出空的 assistant 內容。
+     *
+     * @param array<int, array{question: string, summary: string}> $conversationHistory
+     * @return array<int, array{role: string, content: string}>
+     */
+    protected function buildConversationHistoryMessages(array $conversationHistory): array {
+        $messages = [];
+        foreach ($conversationHistory as $turn) {
+            $question = trim((string) ($turn['question'] ?? ''));
+            if ($question === '') {
+                continue;
+            }
+
+            $messages[] = ['role' => 'user', 'content' => $question];
+
+            $summary = trim((string) ($turn['summary'] ?? ''));
+            if ($summary !== '') {
+                $messages[] = ['role' => 'assistant', 'content' => $summary];
+            }
+        }
+
+        return $messages;
+    }
+
+    /**
      * 構建歷史問答模式的系統提示詞
      */
     protected function buildQaSystemPrompt(string $schemaPrompt, bool $toolsEnabled): string {
         $toolsHint = '';
-        $maxToolRounds = max(1, (int) config('nl_query_tools.max_tool_calls', 20));
+        // fallback 40 對齊 config/nl_query_tools.php 全域預設值，見上方 answerQuestion() 內同一修正的說明。
+        $maxToolRounds = max(1, (int) config('nl_query_tools.max_tool_calls', 40));
 
         if ($toolsEnabled) {
             $toolsHint = <<<TOOLS
@@ -731,6 +769,7 @@ DYNASTIES;
    - **📋 資料庫事實**：直接來自 CBDB 查詢的數據（人物存在性、生卒年、朝代、別名、入仕方式、著述、關係等）
    - **📚 模型補充**：模型自身的歷史知識補充（朝代背景、制度解釋、歷史上下文等），應使用較保守語氣
 6. 若資料不足，應明確說明，不要編造
+7. 使用者可能會針對先前的問答內容進行追問，請利用對話歷史進行指代消解（例如「他」「這個人」「那個機構」可能指向先前輪次提到的實體），若無法確定所指對象，請在回答中禮貌詢問澄清，而非臆測
 
 **回答格式要求：**
 回答必須是嚴格的 JSON，包含以下欄位：

@@ -1,6 +1,12 @@
 # Query Playground QA 模式多輪追問功能 — Work Plan
 
-> 狀態：規劃中（僅文件，尚未實作）
+> **狀態：已實作**（第 9 節五個階段皆完成：Controller/Validation/Rate Limiting、Service
+> 層、前端、測試、前端建置。每階段皆經 review agent 與 codex exec 兩輪獨立審閱至無嚴重
+> 問題。**唯一未完成項目**：`npm run build` 與 `tsc --noEmit` 皆已驗證通過，但本機開發
+> 環境沒有可連線的 MySQL/MariaDB 服務，無法用 `run` skill 實際開瀏覽器手動點擊驗收；
+> 已改以 35 個自動化測試（`tests/Feature/HistoricalQaTest.php`，涵蓋 request/response
+> contract、驗證失敗情境、SSE、`conversation_history` 組裝進 LLM `messages[]` 的實際內容、
+> rate limiting）作為主要驗證依據，合併前建議在有真實資料庫的環境補一次手動驗收。）
 > 本規劃文件僅提供繁體中文版本；不代表功能實作範圍排除英文 i18n——依 `AGENTS.md` 第 6 節規則，新增的 UI 字串（第 4.3 節）仍須比照專案既有慣例同步維護 `resources/lang/zh-TW/*.php` 與 `resources/lang/en/*.php` 兩份翻譯檔，不可只做繁中。
 > 對應功能：`/app/query-playground?mode=qa`（歷史問答 QA 模式）
 > 參考範例：Google 搜尋結果 AI Overview 的「Ask anything」追問輸入框——首次答案生成後，答案下方會持續顯示一個輸入框，使用者可針對同一上下文繼續提問。

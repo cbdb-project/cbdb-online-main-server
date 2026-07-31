@@ -100,6 +100,19 @@ class HistoricalQaTest extends TestCase {
         });
     }
 
+    #[Test]
+    public function qa_max_turns_prop_reflects_config() {
+        Config::set('query_playground.qa_max_turns', 7);
+
+        $this->be($this->adminUser);
+        $response = $this->get(route('app.query-playground.index'));
+
+        $response->assertInertia(function (AssertableInertia $page) {
+            $page->component('QueryPlayground/Index')
+                ->where('qaMaxTurns', 7);
+        });
+    }
+
     // ──── Authorization ────
 
     #[Test]
@@ -157,6 +170,216 @@ class HistoricalQaTest extends TestCase {
         ]);
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['question']);
+    }
+
+    #[Test]
+    public function answer_from_nl_accepts_request_without_conversation_history() {
+        // 向後相容：不帶 conversation_history（或帶空陣列）與現行單輪行為完全一致。
+        $this->be($this->adminUser);
+
+        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService->method('answerQuestion')->willReturn([
+            'success' => true,
+            'answer_markdown' => '李白是唐代詩人。',
+            'summary' => '唐代詩人',
+            'sql_used' => [],
+            'tool_calls' => [],
+            'evidence' => [],
+            'caveat' => '',
+            'model' => 'gemini-test-model',
+        ]);
+        $this->app->instance(NaturalLanguageQueryService::class, $mockService);
+
+        $response = $this->postJson(route('query-playground.answer-from-nl'), [
+            'question' => '李白是什麼時代的人？',
+        ]);
+
+        $response->assertOk();
+        $response->assertJson(['success' => true]);
+        $this->assertArrayNotHasKey('conversation_id', $response->json());
+        $this->assertArrayNotHasKey('turn_index', $response->json());
+    }
+
+    #[Test]
+    public function answer_from_nl_rejects_conversation_history_exceeding_max_turns() {
+        Config::set('query_playground.qa_max_turns', 5);
+        $this->be($this->adminUser);
+
+        // qa_max_turns=5 → conversation_history 上限 4 筆，送 5 筆應被拒。
+        $history = array_map(fn ($i) => ['question' => "問題 {$i}", 'summary' => "摘要 {$i}"], range(1, 5));
+
+        $response = $this->postJson(route('query-playground.answer-from-nl'), [
+            'question' => '追問',
+            'conversation_history' => $history,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['conversation_history']);
+    }
+
+    #[Test]
+    public function answer_from_nl_accepts_conversation_history_at_max_turns_boundary() {
+        Config::set('query_playground.qa_max_turns', 5);
+        $this->be($this->adminUser);
+
+        // 剛好 4 筆歷史（qa_max_turns - 1）應通過驗證，不被 max 規則擋下。
+        $history = array_map(fn ($i) => ['question' => "問題 {$i}", 'summary' => "摘要 {$i}"], range(1, 4));
+
+        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService->method('answerQuestion')->willReturn([
+            'success' => true,
+            'answer_markdown' => 'ok',
+            'summary' => 'ok',
+            'sql_used' => [],
+            'tool_calls' => [],
+            'evidence' => [],
+            'caveat' => '',
+            'model' => 'gemini-test-model',
+        ]);
+        $this->app->instance(NaturalLanguageQueryService::class, $mockService);
+
+        $response = $this->postJson(route('query-playground.answer-from-nl'), [
+            'question' => '追問',
+            'conversation_history' => $history,
+        ]);
+
+        $response->assertOk();
+    }
+
+    #[Test]
+    public function answer_from_nl_rejects_conversation_history_missing_question() {
+        $this->be($this->adminUser);
+
+        $response = $this->postJson(route('query-playground.answer-from-nl'), [
+            'question' => '追問',
+            'conversation_history' => [
+                ['summary' => '只有摘要，沒有 question'],
+            ],
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['conversation_history.0.question']);
+    }
+
+    #[Test]
+    public function answer_from_nl_rejects_conversation_history_exceeding_char_limit() {
+        Config::set('query_playground.qa_history_char_limit', 100);
+        $this->be($this->adminUser);
+
+        // 單筆 summary 80 字，2 筆共 160 字，超過門檻 100。
+        $response = $this->postJson(route('query-playground.answer-from-nl'), [
+            'question' => '追問',
+            'conversation_history' => [
+                ['question' => 'q1', 'summary' => str_repeat('字', 80)],
+                ['question' => 'q2', 'summary' => str_repeat('字', 80)],
+            ],
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['conversation_history']);
+    }
+
+    #[Test]
+    public function answer_from_nl_accepts_conversation_history_exactly_at_char_limit() {
+        Config::set('query_playground.qa_history_char_limit', 100);
+        $this->be($this->adminUser);
+
+        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService->method('answerQuestion')->willReturn([
+            'success' => true,
+            'answer_markdown' => 'ok',
+            'summary' => 'ok',
+            'sql_used' => [],
+            'tool_calls' => [],
+            'evidence' => [],
+            'caveat' => '',
+            'model' => 'gemini-test-model',
+        ]);
+        $this->app->instance(NaturalLanguageQueryService::class, $mockService);
+
+        // question 2 字 + summary 98 字 = 剛好 100，門檻是「超過才擋」，等於門檻應通過。
+        $response = $this->postJson(route('query-playground.answer-from-nl'), [
+            'question' => '追問',
+            'conversation_history' => [
+                ['question' => 'q1', 'summary' => str_repeat('字', 98)],
+            ],
+        ]);
+
+        $response->assertOk();
+    }
+
+    #[Test]
+    public function answer_from_nl_with_qa_max_turns_zero_rejects_any_conversation_history() {
+        // qa_max_turns 若被誤設為 0/負值：max(0, qa_max_turns - 1) 降級為 0，
+        // 效果是「不允許任何歷史紀錄」，但仍允許不帶 conversation_history 的首輪問題。
+        Config::set('query_playground.qa_max_turns', 0);
+        $this->be($this->adminUser);
+
+        $response = $this->postJson(route('query-playground.answer-from-nl'), [
+            'question' => '追問',
+            'conversation_history' => [
+                ['question' => 'q1', 'summary' => 's1'],
+            ],
+        ]);
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['conversation_history']);
+
+        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService->method('answerQuestion')->willReturn([
+            'success' => true,
+            'answer_markdown' => 'ok',
+            'summary' => 'ok',
+            'sql_used' => [],
+            'tool_calls' => [],
+            'evidence' => [],
+            'caveat' => '',
+            'model' => 'gemini-test-model',
+        ]);
+        $this->app->instance(NaturalLanguageQueryService::class, $mockService);
+
+        $this->postJson(route('query-playground.answer-from-nl'), [
+            'question' => '首輪問題',
+        ])->assertOk();
+    }
+
+    #[Test]
+    public function answer_from_nl_forwards_conversation_history_to_service() {
+        $this->be($this->adminUser);
+
+        $history = [
+            ['question' => '李白是誰？', 'summary' => '李白是唐代詩人。'],
+        ];
+
+        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService->expects($this->once())
+            ->method('answerQuestion')
+            ->with(
+                '他還有哪些作品？',
+                null,
+                null,
+                true,
+                null,
+                null,
+                $history
+            )
+            ->willReturn([
+                'success' => true,
+                'answer_markdown' => 'ok',
+                'summary' => 'ok',
+                'sql_used' => [],
+                'tool_calls' => [],
+                'evidence' => [],
+                'caveat' => '',
+                'model' => 'gemini-test-model',
+            ]);
+        $this->app->instance(NaturalLanguageQueryService::class, $mockService);
+
+        $response = $this->postJson(route('query-playground.answer-from-nl'), [
+            'question' => '他還有哪些作品？',
+            'conversation_history' => $history,
+        ]);
+
+        $response->assertOk();
     }
 
     #[Test]
@@ -297,6 +520,65 @@ class HistoricalQaTest extends TestCase {
         $this->assertStringContainsString('text/event-stream', $response->headers->get('Content-Type'));
         $this->assertStringContainsString('no-cache, no-transform', (string) $response->headers->get('Cache-Control'));
         $this->assertSame('no', $response->headers->get('X-Accel-Buffering'));
+    }
+
+    #[Test]
+    public function answer_from_nl_stream_forwards_conversation_history_and_completes() {
+        $this->be($this->adminUser);
+
+        $history = [
+            ['question' => '李白是誰？', 'summary' => '李白是唐代詩人。'],
+        ];
+
+        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService->expects($this->once())
+            ->method('answerQuestion')
+            ->with(
+                $this->anything(),
+                $this->anything(),
+                $this->anything(),
+                $this->anything(),
+                $this->anything(),
+                $this->anything(),
+                $history
+            )
+            ->willReturn([
+                'success' => true,
+                'answer_markdown' => '他還寫過很多詩。',
+                'summary' => '李白的其他作品',
+                'sql_used' => [],
+                'tool_calls' => [],
+                'evidence' => [],
+                'caveat' => '',
+                'model' => 'gemini-test-model',
+            ]);
+
+        $this->app->instance(NaturalLanguageQueryService::class, $mockService);
+
+        $response = $this->call('POST', route('query-playground.answer-from-nl-stream'), [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_ACCEPT' => 'text/event-stream',
+        ], json_encode(['question' => '他還有哪些作品？', 'conversation_history' => $history]));
+
+        $response->assertStatus(200);
+        $response->assertStreamed();
+        $this->assertStringContainsString('event: complete', $response->streamedContent());
+    }
+
+    #[Test]
+    public function answer_from_nl_stream_rejects_conversation_history_exceeding_max_turns() {
+        Config::set('query_playground.qa_max_turns', 5);
+        $this->be($this->adminUser);
+
+        $history = array_map(fn ($i) => ['question' => "問題 {$i}", 'summary' => "摘要 {$i}"], range(1, 5));
+
+        $response = $this->postJson(route('query-playground.answer-from-nl-stream'), [
+            'question' => '追問',
+            'conversation_history' => $history,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['conversation_history']);
     }
 
     #[Test]
@@ -577,5 +859,153 @@ class HistoricalQaTest extends TestCase {
         // 驗證最後一輪沒有被套用 response_format
         $lastRequest = $capturedRequests[count($capturedRequests) - 1];
         $this->assertArrayNotHasKey('response_format', $lastRequest, '最後一輪 QA 請求不應套用 SQL 的 response_format');
+    }
+
+    // ──── conversation_history 組裝進 LLM messages[] ────
+
+    #[Test]
+    public function qa_conversation_history_is_assembled_into_llm_messages_using_summary() {
+        Config::set('nl_query_tools.enabled', false);
+
+        $capturedRequests = [];
+        $service = $this->mockLlmService(function (array $requestData) use (&$capturedRequests) {
+            $capturedRequests[] = $requestData;
+
+            return [
+                'successful' => true,
+                'status' => 200,
+                'body' => '',
+                'json' => [
+                    'choices' => [[
+                        'message' => ['role' => 'assistant', 'content' => json_encode([
+                            'answer_markdown' => '他還寫過很多詩。',
+                            'summary' => '李白的其他作品',
+                            'sql_used' => [],
+                            'evidence' => [],
+                            'caveat' => '',
+                        ])],
+                        'finish_reason' => 'stop',
+                    ]],
+                ],
+            ];
+        });
+
+        $conversationHistory = [
+            ['question' => '李白是誰？', 'summary' => '李白是唐代詩人。'],
+            ['question' => '他生於哪一年？', 'summary' => ''], // 空 summary：只應組出 user 訊息
+        ];
+
+        $result = $service->answerQuestion('他還有哪些作品？', null, null, null, null, null, $conversationHistory);
+
+        $this->assertTrue($result['success']);
+        $this->assertCount(1, $capturedRequests);
+
+        $messages = $capturedRequests[0]['messages'];
+        // [system, user(Q1), assistant(A1), user(Q2)（無 assistant，因 summary 為空）, user(本輪新問題)]
+        $this->assertSame('system', $messages[0]['role']);
+        $this->assertSame('user', $messages[1]['role']);
+        $this->assertSame('李白是誰？', $messages[1]['content']);
+        $this->assertSame('assistant', $messages[2]['role']);
+        $this->assertSame('李白是唐代詩人。', $messages[2]['content']);
+        $this->assertSame('user', $messages[3]['role']);
+        $this->assertSame('他生於哪一年？', $messages[3]['content']);
+        $this->assertSame('user', $messages[4]['role']);
+        $this->assertSame('他還有哪些作品？', $messages[4]['content']);
+        $this->assertCount(5, $messages, 'messages 應恰為 [system, user, assistant, user, user]，空 summary 的一輪不應多出空的 assistant 訊息');
+    }
+
+    #[Test]
+    public function qa_without_conversation_history_still_assembles_two_messages() {
+        // 向後相容：不帶 conversation_history 時，messages 應與現行單輪行為一致（只有 system+user）。
+        Config::set('nl_query_tools.enabled', false);
+
+        $capturedRequests = [];
+        $service = $this->mockLlmService(function (array $requestData) use (&$capturedRequests) {
+            $capturedRequests[] = $requestData;
+
+            return [
+                'successful' => true,
+                'status' => 200,
+                'body' => '',
+                'json' => [
+                    'choices' => [[
+                        'message' => ['role' => 'assistant', 'content' => json_encode([
+                            'answer_markdown' => '李白是唐代詩人。',
+                            'summary' => '唐代詩人',
+                            'sql_used' => [],
+                            'evidence' => [],
+                            'caveat' => '',
+                        ])],
+                        'finish_reason' => 'stop',
+                    ]],
+                ],
+            ];
+        });
+
+        $result = $service->answerQuestion('李白是什麼時代的人？');
+
+        $this->assertTrue($result['success']);
+        $messages = $capturedRequests[0]['messages'];
+        $this->assertCount(2, $messages);
+        $this->assertSame('system', $messages[0]['role']);
+        $this->assertSame('user', $messages[1]['role']);
+        $this->assertSame('李白是什麼時代的人？', $messages[1]['content']);
+    }
+
+    // ──── Rate limiting ────
+
+    #[Test]
+    public function answer_from_nl_returns_429_after_exceeding_rate_limit() {
+        Config::set('query_playground.qa_rate_limit_per_minute', 2);
+        $this->be($this->adminUser);
+
+        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService->method('answerQuestion')->willReturn([
+            'success' => true,
+            'answer_markdown' => 'ok',
+            'summary' => 'ok',
+            'sql_used' => [],
+            'tool_calls' => [],
+            'evidence' => [],
+            'caveat' => '',
+            'model' => 'gemini-test-model',
+        ]);
+        $this->app->instance(NaturalLanguageQueryService::class, $mockService);
+
+        $payload = ['question' => '李白是什麼時代的人？'];
+
+        $this->postJson(route('query-playground.answer-from-nl'), $payload)->assertOk();
+        $this->postJson(route('query-playground.answer-from-nl'), $payload)->assertOk();
+        $third = $this->postJson(route('query-playground.answer-from-nl'), $payload);
+
+        $third->assertStatus(429);
+    }
+
+    #[Test]
+    public function answer_from_nl_rate_limit_is_keyed_per_user() {
+        Config::set('query_playground.qa_rate_limit_per_minute', 1);
+
+        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService->method('answerQuestion')->willReturn([
+            'success' => true,
+            'answer_markdown' => 'ok',
+            'summary' => 'ok',
+            'sql_used' => [],
+            'tool_calls' => [],
+            'evidence' => [],
+            'caveat' => '',
+            'model' => 'gemini-test-model',
+        ]);
+        $this->app->instance(NaturalLanguageQueryService::class, $mockService);
+
+        $payload = ['question' => '李白是什麼時代的人？'];
+
+        $this->be($this->adminUser);
+        $this->postJson(route('query-playground.answer-from-nl'), $payload)->assertOk();
+        $this->postJson(route('query-playground.answer-from-nl'), $payload)->assertStatus(429);
+
+        // 換一個使用者，限流額度應該是獨立的，不受上一位使用者已用額度影響。
+        $this->be($this->regularUser);
+        $this->postJson(route('query-playground.answer-from-nl'), $payload)->assertOk();
     }
 }

@@ -952,6 +952,271 @@ class HistoricalQaTest extends TestCase {
         $this->assertSame('李白是什麼時代的人？', $messages[1]['content']);
     }
 
+    // ──── suggested_follow_ups（第二階段）────
+
+    #[Test]
+    public function qa_returns_llm_provided_suggested_follow_ups() {
+        Config::set('nl_query_tools.enabled', false);
+
+        $service = $this->mockLlmService([
+            'successful' => true,
+            'status' => 200,
+            'body' => '',
+            'json' => [
+                'choices' => [[
+                    'message' => ['role' => 'assistant', 'content' => json_encode([
+                        'answer_markdown' => '李白是唐代詩人。',
+                        'summary' => '唐代詩人',
+                        'sql_used' => [],
+                        'evidence' => [],
+                        'caveat' => '',
+                        'suggested_follow_ups' => ['李白有哪些著名的詩作？', '李白與杜甫是什麼關係？'],
+                    ])],
+                    'finish_reason' => 'stop',
+                ]],
+            ],
+        ]);
+
+        $result = $service->answerQuestion('李白是什麼時代的人？');
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(['李白有哪些著名的詩作？', '李白與杜甫是什麼關係？'], $result['suggested_follow_ups']);
+    }
+
+    #[Test]
+    public function qa_ignores_non_array_suggested_follow_ups() {
+        Config::set('nl_query_tools.enabled', false);
+
+        $service = $this->mockLlmService([
+            'successful' => true,
+            'status' => 200,
+            'body' => '',
+            'json' => [
+                'choices' => [[
+                    'message' => ['role' => 'assistant', 'content' => json_encode([
+                        'answer_markdown' => '李白是唐代詩人。',
+                        'summary' => '唐代詩人',
+                        'sql_used' => [],
+                        'evidence' => [],
+                        'caveat' => '',
+                        'suggested_follow_ups' => '不是陣列',
+                    ])],
+                    'finish_reason' => 'stop',
+                ]],
+            ],
+        ]);
+
+        $result = $service->answerQuestion('李白是什麼時代的人？');
+
+        // 格式錯誤的選填欄位不應讓整個回答解析失敗。
+        $this->assertTrue($result['success']);
+        $this->assertSame('李白是唐代詩人。', $result['answer_markdown']);
+        $this->assertSame([], $result['suggested_follow_ups']);
+    }
+
+    #[Test]
+    public function qa_ignores_suggested_follow_ups_with_non_string_elements() {
+        Config::set('nl_query_tools.enabled', false);
+
+        $service = $this->mockLlmService([
+            'successful' => true,
+            'status' => 200,
+            'body' => '',
+            'json' => [
+                'choices' => [[
+                    'message' => ['role' => 'assistant', 'content' => json_encode([
+                        'answer_markdown' => '李白是唐代詩人。',
+                        'summary' => '唐代詩人',
+                        'sql_used' => [],
+                        'evidence' => [],
+                        'caveat' => '',
+                        'suggested_follow_ups' => ['正常字串', 123, null],
+                    ])],
+                    'finish_reason' => 'stop',
+                ]],
+            ],
+        ]);
+
+        $result = $service->answerQuestion('李白是什麼時代的人？');
+
+        $this->assertTrue($result['success']);
+        $this->assertSame([], $result['suggested_follow_ups']);
+    }
+
+    #[Test]
+    public function qa_ignores_suggested_follow_ups_shaped_as_json_object() {
+        // json_decode(..., true) 會把 JSON object（非陣列，鍵為字串）與 JSON array 都解成
+        // PHP array，僅用 is_array() 無法區分；需額外對同一段 JSON 文字做非關聯解碼
+        // （assoc=false）才能還原原始型別（見 rawSuggestedFollowUpsValue() 說明）。
+        Config::set('nl_query_tools.enabled', false);
+
+        $service = $this->mockLlmService([
+            'successful' => true,
+            'status' => 200,
+            'body' => '',
+            'json' => [
+                'choices' => [[
+                    'message' => ['role' => 'assistant', 'content' => json_encode([
+                        'answer_markdown' => '李白是唐代詩人。',
+                        'summary' => '唐代詩人',
+                        'sql_used' => [],
+                        'evidence' => [],
+                        'caveat' => '',
+                        'suggested_follow_ups' => ['a' => '問題一', 'b' => '問題二'],
+                    ])],
+                    'finish_reason' => 'stop',
+                ]],
+            ],
+        ]);
+
+        $result = $service->answerQuestion('李白是什麼時代的人？');
+
+        $this->assertTrue($result['success']);
+        $this->assertSame([], $result['suggested_follow_ups']);
+    }
+
+    #[Test]
+    public function qa_ignores_suggested_follow_ups_shaped_as_json_object_with_numeric_string_keys() {
+        // 關鍵邊界案例：{"0":"q1","1":"q2"} 這種鍵為連續數字字串的 JSON object，
+        // json_decode(..., true) 解碼後會與 JSON array ["q1","q2"] 得到完全相同的
+        // PHP array（array_is_list() 也回傳 true，無法區分），是前一輪修正的漏網案例。
+        // 必須直接寫死原始 JSON 字串（而非用 PHP array 經 json_encode()），因為 PHP
+        // 陣列的字串鍵 '0'/'1' 本來就會被正規化成整數鍵，json_encode() 出來仍是陣列，
+        // 無法用來建構這個 JSON object 邊界情況。
+        Config::set('nl_query_tools.enabled', false);
+
+        $content = '{"answer_markdown":"李白是唐代詩人。","summary":"唐代詩人","sql_used":[],'
+            . '"evidence":[],"caveat":"","suggested_follow_ups":{"0":"問題一","1":"問題二"}}';
+
+        $service = $this->mockLlmService([
+            'successful' => true,
+            'status' => 200,
+            'body' => '',
+            'json' => [
+                'choices' => [[
+                    'message' => ['role' => 'assistant', 'content' => $content],
+                    'finish_reason' => 'stop',
+                ]],
+            ],
+        ]);
+
+        $result = $service->answerQuestion('李白是什麼時代的人？');
+
+        $this->assertTrue($result['success']);
+        $this->assertSame([], $result['suggested_follow_ups']);
+    }
+
+    #[Test]
+    public function qa_truncates_suggested_follow_ups_exceeding_four_items() {
+        Config::set('nl_query_tools.enabled', false);
+
+        $service = $this->mockLlmService([
+            'successful' => true,
+            'status' => 200,
+            'body' => '',
+            'json' => [
+                'choices' => [[
+                    'message' => ['role' => 'assistant', 'content' => json_encode([
+                        'answer_markdown' => '李白是唐代詩人。',
+                        'summary' => '唐代詩人',
+                        'sql_used' => [],
+                        'evidence' => [],
+                        'caveat' => '',
+                        'suggested_follow_ups' => ['問題一', '問題二', '問題三', '問題四', '問題五'],
+                    ])],
+                    'finish_reason' => 'stop',
+                ]],
+            ],
+        ]);
+
+        $result = $service->answerQuestion('李白是什麼時代的人？');
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(['問題一', '問題二', '問題三', '問題四'], $result['suggested_follow_ups']);
+    }
+
+    #[Test]
+    public function qa_defaults_suggested_follow_ups_to_empty_array_when_absent() {
+        Config::set('nl_query_tools.enabled', false);
+
+        $service = $this->mockLlmService([
+            'successful' => true,
+            'status' => 200,
+            'body' => '',
+            'json' => [
+                'choices' => [[
+                    'message' => ['role' => 'assistant', 'content' => json_encode([
+                        'answer_markdown' => '李白是唐代詩人。',
+                        'summary' => '唐代詩人',
+                        'sql_used' => [],
+                        'evidence' => [],
+                        'caveat' => '',
+                        // 既有回應格式（兩階段之間向後相容）：完全不含此欄位。
+                    ])],
+                    'finish_reason' => 'stop',
+                ]],
+            ],
+        ]);
+
+        $result = $service->answerQuestion('李白是什麼時代的人？');
+
+        $this->assertTrue($result['success']);
+        $this->assertSame([], $result['suggested_follow_ups']);
+    }
+
+    #[Test]
+    public function answer_from_nl_response_includes_suggested_follow_ups() {
+        $this->be($this->adminUser);
+
+        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService->method('answerQuestion')->willReturn([
+            'success' => true,
+            'answer_markdown' => '李白是唐代詩人。',
+            'summary' => '唐代詩人',
+            'sql_used' => [],
+            'tool_calls' => [],
+            'evidence' => [],
+            'caveat' => '',
+            'suggested_follow_ups' => ['李白有哪些著名的詩作？'],
+            'model' => 'gemini-test-model',
+        ]);
+        $this->app->instance(NaturalLanguageQueryService::class, $mockService);
+
+        $response = $this->postJson(route('query-playground.answer-from-nl'), [
+            'question' => '李白是什麼時代的人？',
+        ]);
+
+        $response->assertOk();
+        $response->assertJson(['suggested_follow_ups' => ['李白有哪些著名的詩作？']]);
+    }
+
+    #[Test]
+    public function answer_from_nl_stream_complete_event_includes_suggested_follow_ups() {
+        $this->be($this->adminUser);
+
+        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService->method('answerQuestion')->willReturn([
+            'success' => true,
+            'answer_markdown' => '李白是唐代詩人。',
+            'summary' => '唐代詩人',
+            'sql_used' => [],
+            'tool_calls' => [],
+            'evidence' => [],
+            'caveat' => '',
+            'suggested_follow_ups' => ['李白有哪些著名的詩作？'],
+            'model' => 'gemini-test-model',
+        ]);
+        $this->app->instance(NaturalLanguageQueryService::class, $mockService);
+
+        $response = $this->call('POST', route('query-playground.answer-from-nl-stream'), [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_ACCEPT' => 'text/event-stream',
+        ], json_encode(['question' => '李白是什麼時代的人？']));
+
+        $response->assertStatus(200);
+        $this->assertStringContainsString('李白有哪些著名的詩作', $response->streamedContent());
+    }
+
     // ──── Rate limiting ────
 
     #[Test]

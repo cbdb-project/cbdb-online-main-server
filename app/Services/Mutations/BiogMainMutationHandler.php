@@ -11,6 +11,7 @@ use App\Repositories\ToolsRepository;
 use App\Services\BracketNormalizer;
 use App\Services\CharVariantMapService;
 use App\Services\NameSearchIndexService;
+use App\Services\ProposalRevisionService;
 use App\Support\CompositePrimaryKey;
 use App\Support\PinyinUmlaut;
 use Carbon\Carbon;
@@ -36,15 +37,18 @@ class BiogMainMutationHandler extends AbstractMutationHandler {
     protected BiogMainRepository $biogMainRepository;
     protected NameSearchIndexService $nameSearchIndexService;
     protected OperationRepository $operationRepository;
+    protected ProposalRevisionService $proposalRevisionService;
 
     public function __construct(
         BiogMainRepository $biogMainRepository,
         NameSearchIndexService $nameSearchIndexService,
-        OperationRepository $operationRepository
+        OperationRepository $operationRepository,
+        ProposalRevisionService $proposalRevisionService
     ) {
         $this->biogMainRepository = $biogMainRepository;
         $this->nameSearchIndexService = $nameSearchIndexService;
         $this->operationRepository = $operationRepository;
+        $this->proposalRevisionService = $proposalRevisionService;
     }
 
     public function supports(string $resource, string $mode, string $operation): bool {
@@ -139,7 +143,26 @@ class BiogMainMutationHandler extends AbstractMutationHandler {
         return response()->json($response);
     }
 
+    /**
+     * 見 docs/PROPOSAL_REVISION_HASH_DESIGN.md：BIOG_MAIN proposal update 第一階段
+     * 強制要求 base_revision，於提交當下重算 current_revision 比對，避免使用者基於
+     * 舊版本提交的提案在核准時盲目覆寫掉期間已發生的變更。
+     */
     protected function handleProposalUpdate(int $personId, array $updatedFields, array $merged, BiogMain $original, array $meta): JsonResponse {
+        $baseRevision = is_string($meta['base_revision'] ?? null) ? trim($meta['base_revision']) : '';
+        if ($baseRevision === '') {
+            return $this->errorResponse('缺少 base_revision，請重新整理後再提交提案', 422, [
+                'base_revision' => ['required'],
+            ]);
+        }
+
+        $currentRevision = $this->proposalRevisionService->hash('BIOG_MAIN', $original->toArray());
+        if (!hash_equals($currentRevision, $baseRevision)) {
+            return $this->errorResponse('資料已被更新，請重新載入後再提交提案', 409, [
+                'base_revision' => ['stale'],
+            ]);
+        }
+
         ['payload' => $proposalData, 'replaced' => $variantReplaced] = $this->prepareProposalPayload($merged);
         $validator = Validator::make($proposalData, $this->validationRules($original), $this->validationMessages());
         if ($validator->fails()) {
@@ -157,6 +180,8 @@ class BiogMainMutationHandler extends AbstractMutationHandler {
                 'submitted_by_id' => Auth::id(),
                 'submitted_at' => Carbon::now()->format('Y-m-d H:i:s'),
                 'comment' => $comment,
+                'base_revision' => $currentRevision,
+                'revision_algo' => ProposalRevisionService::ALGO,
             ],
             '__review_status' => 'pending',
             '__key_columns' => ['c_personid'],

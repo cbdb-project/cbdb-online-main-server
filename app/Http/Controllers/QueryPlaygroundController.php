@@ -8,6 +8,7 @@ use App\Services\SqlTableNameExtractor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 
@@ -374,18 +375,14 @@ class QueryPlaygroundController extends Controller {
             return response()->json(['error' => '您的帳號尚未啟用，無法使用此功能。'], 403);
         }
 
-        $request->validate([
-            'question' => 'required|string|max:1000',
-            'tables' => 'nullable|array',
-            'tables.*' => 'string',
-            'use_tools' => 'nullable|boolean',
-        ]);
+        $this->validateQaRequest($request);
 
         $question = $request->input('question');
         $tables = $request->input('tables');
         $useTools = $request->boolean('use_tools', true);
+        $conversationHistory = $this->conversationHistoryFromRequest($request);
 
-        $result = $nlqService->answerQuestion($question, $tables, null, $useTools);
+        $result = $nlqService->answerQuestion($question, $tables, useToolsOverride: $useTools, conversationHistory: $conversationHistory);
 
         if (!$result['success']) {
             return response()->json([
@@ -405,20 +402,16 @@ class QueryPlaygroundController extends Controller {
             return response()->json(['error' => '您的帳號尚未啟用，無法使用此功能。'], 403);
         }
 
-        $request->validate([
-            'question' => 'required|string|max:1000',
-            'tables' => 'nullable|array',
-            'tables.*' => 'string',
-            'use_tools' => 'nullable|boolean',
-        ]);
+        $this->validateQaRequest($request);
 
         $question = $request->input('question');
         $tables = $request->input('tables');
         $useTools = $request->boolean('use_tools', true);
+        $conversationHistory = $this->conversationHistoryFromRequest($request);
 
-        return $this->streamSseResponse(function (callable $sendEvent, callable $sendHeartbeatIfNeeded, callable $isClientDisconnected) use ($question, $tables, $nlqService, $useTools) {
+        return $this->streamSseResponse(function (callable $sendEvent, callable $sendHeartbeatIfNeeded, callable $isClientDisconnected) use ($question, $tables, $nlqService, $useTools, $conversationHistory) {
             try {
-                $result = $nlqService->answerQuestion($question, $tables, $sendEvent, $useTools, $sendHeartbeatIfNeeded, $isClientDisconnected);
+                $result = $nlqService->answerQuestion($question, $tables, $sendEvent, $useTools, $sendHeartbeatIfNeeded, $isClientDisconnected, $conversationHistory);
 
                 if ($result['success']) {
                     $sendEvent('complete', [
@@ -444,6 +437,63 @@ class QueryPlaygroundController extends Controller {
                 ]);
             }
         });
+    }
+
+    /**
+     * QA 模式多輪追問（見 docs/QUERY_PLAYGROUND_QA_MULTITURN_PLAN.md）request 驗證：
+     * 沿用既有 question/tables/use_tools 規則，新增選填的 conversation_history。
+     * conversation_history 陣列筆數上限對應 qa_max_turns - 1（單一對話總輪數硬上限）。
+     */
+    protected function validateQaRequest(Request $request): void {
+        $request->validate([
+            'question' => 'required|string|max:1000',
+            'tables' => 'nullable|array',
+            'tables.*' => 'string',
+            'use_tools' => 'nullable|boolean',
+            'conversation_history' => 'nullable|array|max:' . max(0, (int) config('query_playground.qa_max_turns', 5) - 1),
+            'conversation_history.*.question' => 'required_with:conversation_history|string|max:1000',
+            'conversation_history.*.summary' => 'nullable|string|max:2000',
+        ]);
+
+        $this->assertConversationHistoryWithinCharLimit((array) $request->input('conversation_history', []));
+    }
+
+    /**
+     * 輕量保險：conversation_history 全部 question/summary 加總字元數超過門檻視為異常
+     * request（正常情況下 qa_max_turns - 1 筆不可能超過此值，除非繞過前端限制竄改）。
+     * 於 controller validation 階段擋下、回 422，不讓 request 進入 service 層才失敗。
+     */
+    protected function assertConversationHistoryWithinCharLimit(array $conversationHistory): void {
+        $totalChars = 0;
+        foreach ($conversationHistory as $turn) {
+            $totalChars += mb_strlen((string) ($turn['question'] ?? ''));
+            $totalChars += mb_strlen((string) ($turn['summary'] ?? ''));
+        }
+
+        $limit = (int) config('query_playground.qa_history_char_limit', 6000);
+        if ($totalChars > $limit) {
+            throw ValidationException::withMessages([
+                'conversation_history' => ['對話歷史內容過長，請開新對話。'],
+            ]);
+        }
+    }
+
+    /**
+     * 將 request 的 conversation_history 正規化為 [['question'=>string,'summary'=>string], ...]，
+     * 供 NaturalLanguageQueryService::answerQuestion() 的 $conversationHistory 參數使用。
+     */
+    protected function conversationHistoryFromRequest(Request $request): array {
+        $conversationHistory = $request->input('conversation_history', []);
+        if (!is_array($conversationHistory)) {
+            return [];
+        }
+
+        return array_map(function ($turn) {
+            return [
+                'question' => (string) ($turn['question'] ?? ''),
+                'summary' => (string) ($turn['summary'] ?? ''),
+            ];
+        }, $conversationHistory);
     }
 
     /**

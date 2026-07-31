@@ -507,8 +507,17 @@ Route::middleware('auth')->group(function () {
     Route::post('query-playground/schema', 'QueryPlaygroundController@qbeSchema')->name('query-playground.schema');
     Route::post('query-playground/generate-from-nl', 'QueryPlaygroundController@generateFromNL')->name('query-playground.generate-from-nl');
     Route::post('query-playground/generate-from-nl-stream', 'QueryPlaygroundController@generateFromNLStream')->name('query-playground.generate-from-nl-stream');
-    Route::post('query-playground/answer-from-nl', 'QueryPlaygroundController@answerFromNL')->name('query-playground.answer-from-nl');
-    Route::post('query-playground/answer-from-nl-stream', 'QueryPlaygroundController@answerFromNLStream')->name('query-playground.answer-from-nl-stream');
+    // QA 模式多輪追問每輪都會呼叫一次 LLM API，屬有實際成本的操作；比照 routes/ai.php 既有
+    // throttle 慣例，依登入使用者 ID 限流（見 docs/QUERY_PLAYGROUND_QA_MULTITURN_PLAN.md 第 6.4 節）。
+    // 用具名 limiter（定義於 RouteServiceProvider::boot()）而非直接把數字內插進字串：
+    // 內插字串在路由註冊當下就把上限值定死，之後改 config 不會生效；具名 limiter 的 callback
+    // 於每次請求時才讀取 config，才能真正做到「config 驅動」且可在測試中動態調整。
+    Route::post('query-playground/answer-from-nl', 'QueryPlaygroundController@answerFromNL')
+        ->middleware('throttle:qa-answer')
+        ->name('query-playground.answer-from-nl');
+    Route::post('query-playground/answer-from-nl-stream', 'QueryPlaygroundController@answerFromNLStream')
+        ->middleware('throttle:qa-answer')
+        ->name('query-playground.answer-from-nl-stream');
     Route::get('query-playground/nl-query-logs', 'QueryPlaygroundController@nlQueryLogs')->name('query-playground.nl-query-logs');
     Route::get('app/query-playground/nl-query-logs', 'QueryPlaygroundController@appNlQueryLogs')
         ->middleware('inertia')

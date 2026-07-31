@@ -107,6 +107,9 @@ return [
     'qa_model'                 => '📚 模型補充',
     'qa_hide_details'          => '▼ 隱藏詳細資訊',
     'qa_show_details'          => '▶ 顯示詳細資訊（SQL、證據來源）',
+    'qa_follow_up_placeholder' => '繼續追問…',
+    'qa_new_conversation'      => '開新對話',
+    'qa_turn_limit_reached'    => '已達單一對話上限（:count 輪），請開新對話',
 
     // NL Query Logs page
     'log_page_title'         => '自然語言查詢日誌',

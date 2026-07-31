@@ -26,6 +26,7 @@ interface PageProps {
     generateFromNlStreamEndpoint: string;
     answerFromNlEndpoint: string;
     answerFromNlStreamEndpoint: string;
+    qaMaxTurns: number;
 }
 
 interface QueryResult {
@@ -48,6 +49,7 @@ export default function Index() {
         generateFromNlStreamEndpoint,
         answerFromNlEndpoint,
         answerFromNlStreamEndpoint,
+        qaMaxTurns,
     } = props;
 
     const t = useTranslation('query');
@@ -252,6 +254,7 @@ export default function Index() {
                             nlModel={nlModel}
                             answerFromNlEndpoint={answerFromNlEndpoint}
                             answerFromNlStreamEndpoint={answerFromNlStreamEndpoint}
+                            qaMaxTurns={qaMaxTurns}
                         />
                     )}
                 </div>

@@ -107,6 +107,9 @@ return [
     'qa_model'                 => '📚 Model',
     'qa_hide_details'          => '▼ Hide Details',
     'qa_show_details'          => '▶ Show Details (SQL, Evidence)',
+    'qa_follow_up_placeholder' => 'Ask a follow-up…',
+    'qa_new_conversation'      => 'New Conversation',
+    'qa_turn_limit_reached'    => 'This conversation has reached its limit (:count turns). Please start a new conversation.',
 
     // NL Query Logs page
     'log_page_title'         => 'NL Query Logs',

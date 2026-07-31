@@ -8,50 +8,109 @@ interface Evidence {
     detail: string;
 }
 
+/**
+ * 見 docs/QUERY_PLAYGROUND_QA_MULTITURN_PLAN.md：一輪問答（Q + A）。對話歷史完全
+ * 存在前端 state（不落地、不做 localStorage），重新整理頁面即遺失。
+ */
+interface QaTurn {
+    id: string;
+    question: string;
+    status: 'pending' | 'streaming' | 'done' | 'error';
+    answerMarkdown?: string;
+    summary?: string;
+    sqlUsed?: string[];
+    toolCalls?: ToolCallTrace[];
+    evidence?: Evidence[];
+    caveat?: string;
+    error?: string;
+}
+
 interface Props {
     nlModel: string;
     answerFromNlEndpoint: string;
     answerFromNlStreamEndpoint: string;
+    /** 見第 10 節：由後端 config('query_playground.qa_max_turns') 透過 Inertia props 傳入，前端不寫死數字。 */
+    qaMaxTurns: number;
 }
 
-export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answerFromNlStreamEndpoint }: Props) {
+function makeTurnId(): string {
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answerFromNlStreamEndpoint, qaMaxTurns }: Props) {
     const t = useTranslation('query');
     const [question, setQuestion] = useState('');
     const [consent, setConsent] = useState(false);
     const [useTools, setUseTools] = useState(true);
     const [useStreaming, setUseStreaming] = useState(true);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [answerMarkdown, setAnswerMarkdown] = useState('');
-    const [summary, setSummary] = useState('');
-    const [sqlUsed, setSqlUsed] = useState<string[]>([]);
-    const [toolCalls, setToolCalls] = useState<ToolCallTrace[]>([]);
-    const [evidence, setEvidence] = useState<Evidence[]>([]);
-    const [caveat, setCaveat] = useState('');
-    const [showDetails, setShowDetails] = useState(false);
+    const [turns, setTurns] = useState<QaTurn[]>([]);
     const abortControllerRef = useRef<AbortController | null>(null);
+    const activeTurnIdRef = useRef<string | null>(null);
 
-    const resetResults = () => {
-        setError('');
-        setAnswerMarkdown('');
-        setSummary('');
-        setSqlUsed([]);
-        setToolCalls([]);
-        setEvidence([]);
-        setCaveat('');
+    const isFirstTurn = turns.length === 0;
+    const limitReached = turns.length >= qaMaxTurns;
+    const lastTurn = turns.length > 0 ? turns[turns.length - 1] : null;
+    const isBusy = lastTurn !== null && (lastTurn.status === 'pending' || lastTurn.status === 'streaming');
+
+    const updateTurn = (turnId: string, patch: Partial<QaTurn>) => {
+        setTurns((prev) => prev.map((turn) => (turn.id === turnId ? { ...turn, ...patch } : turn)));
+    };
+
+    const appendToolCall = (turnId: string, trace: ToolCallTrace) => {
+        setTurns((prev) => prev.map((turn) =>
+            turn.id === turnId ? { ...turn, toolCalls: [...(turn.toolCalls || []), trace] } : turn,
+        ));
+    };
+
+    const updateLastToolCall = (turnId: string, matchId: string, patch: Partial<ToolCallTrace>) => {
+        setTurns((prev) => prev.map((turn) => {
+            if (turn.id !== turnId) return turn;
+            const toolCalls = turn.toolCalls || [];
+            const updated = [...toolCalls];
+            let idx = matchId ? updated.findLastIndex((tc) => tc.tool_call_id === matchId) : -1;
+            if (idx < 0) idx = updated.findLastIndex((tc) => tc.status === 'running');
+            if (idx >= 0) updated[idx] = { ...updated[idx], ...patch };
+            return { ...turn, toolCalls: updated };
+        }));
+    };
+
+    /** 見第 4.1 節：只取已完成輪次的 {question, summary}，不送完整 answer_markdown。 */
+    const buildConversationHistory = (): { question: string; summary: string }[] =>
+        turns
+            .filter((turn) => turn.status === 'done')
+            .map((turn) => ({ question: turn.question, summary: turn.summary || '' }));
+
+    // 按鈕本身也用 isBusy 停用（見下方 render）：若在請求進行中仍能清空 turns，
+    // 該請求的 activeTurnIdRef/abortControllerRef 之後在 finally 被清成 null，
+    // 會誤傷使用者緊接著送出的下一輪請求（取消鍵失靈、無法正確 abort）。
+    const handleNewConversation = () => {
+        setTurns([]);
+        setQuestion('');
     };
 
     const handleSubmit = useCallback(async () => {
-        if (!question.trim() || !consent) return;
+        const trimmedQuestion = question.trim();
+        if (!trimmedQuestion || isBusy || limitReached) return;
+        if (isFirstTurn && !consent) return;
 
-        setLoading(true);
-        resetResults();
+        const turnId = makeTurnId();
+        activeTurnIdRef.current = turnId;
+        const conversationHistory = buildConversationHistory();
+
+        setTurns((prev) => [...prev, { id: turnId, question: trimmedQuestion, status: 'pending' }]);
+        setQuestion('');
 
         const csrfToken = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content || '';
+        const requestBody: Record<string, unknown> = { question: trimmedQuestion, use_tools: useTools };
+        if (conversationHistory.length > 0) {
+            requestBody.conversation_history = conversationHistory;
+        }
 
         if (useStreaming) {
             try {
                 abortControllerRef.current = new AbortController();
+                updateTurn(turnId, { status: 'streaming' });
+
                 const response = await fetch(answerFromNlStreamEndpoint, {
                     method: 'POST',
                     headers: {
@@ -59,7 +118,7 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                         'X-CSRF-TOKEN': csrfToken,
                         'Accept': 'text/event-stream',
                     },
-                    body: JSON.stringify({ question, use_tools: useTools }),
+                    body: JSON.stringify(requestBody),
                     signal: abortControllerRef.current.signal,
                 });
 
@@ -80,7 +139,7 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                     if (!currentEvent || !currentData) return;
                     try {
                         const parsed = JSON.parse(currentData);
-                        handleStreamEvent(currentEvent, parsed);
+                        handleStreamEvent(turnId, currentEvent, parsed);
                     } catch (e) {
                         console.warn('Failed to parse SSE event:', e);
                     }
@@ -125,10 +184,10 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                 }
             } catch (err) {
                 if (err instanceof Error && err.name === 'AbortError') return;
-                setError(err instanceof Error ? err.message : t('qa_failed'));
+                updateTurn(turnId, { status: 'error', error: err instanceof Error ? err.message : t('qa_failed') });
             } finally {
-                setLoading(false);
                 abortControllerRef.current = null;
+                activeTurnIdRef.current = null;
             }
         } else {
             // Non-streaming
@@ -140,7 +199,7 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                         'X-CSRF-TOKEN': csrfToken,
                         'Accept': 'application/json',
                     },
-                    body: JSON.stringify({ question, use_tools: useTools }),
+                    body: JSON.stringify(requestBody),
                 });
 
                 const data = await response.json();
@@ -148,14 +207,16 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                     throw new Error(data.error || t('qa_failed'));
                 }
 
-                setAnswerMarkdown(data.answer_markdown || '');
-                setSummary(data.summary || '');
-                setSqlUsed(data.sql_used || []);
-                setEvidence(data.evidence || []);
-                setCaveat(data.caveat || '');
-                // Populate tool calls from non-streaming response
+                const patch: Partial<QaTurn> = {
+                    status: 'done',
+                    answerMarkdown: data.answer_markdown || '',
+                    summary: data.summary || '',
+                    sqlUsed: data.sql_used || [],
+                    evidence: data.evidence || [],
+                    caveat: data.caveat || '',
+                };
                 if (Array.isArray(data.tool_calls)) {
-                    const traces: ToolCallTrace[] = data.tool_calls.map((tc: Record<string, unknown>) => ({
+                    patch.toolCalls = data.tool_calls.map((tc: Record<string, unknown>) => ({
                         tool_call_id: String(tc.tool_call_id ?? ''),
                         name: String(tc.tool_name ?? ''),
                         status: tc.status === 'error' ? 'error' : 'completed',
@@ -163,144 +224,209 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                         result_summary: (tc.result_summary as ToolResultSummary) ?? undefined,
                         error: tc.status === 'error' ? String((tc.result_summary as Record<string, unknown>)?.error ?? '') : undefined,
                     }));
-                    setToolCalls(traces);
                 }
+                updateTurn(turnId, patch);
             } catch (err) {
-                setError(err instanceof Error ? err.message : t('qa_failed'));
+                updateTurn(turnId, { status: 'error', error: err instanceof Error ? err.message : t('qa_failed') });
             } finally {
-                setLoading(false);
+                activeTurnIdRef.current = null;
             }
         }
-    }, [question, consent, useTools, useStreaming, answerFromNlEndpoint, answerFromNlStreamEndpoint, t]);
+    }, [question, consent, useTools, useStreaming, isBusy, limitReached, isFirstTurn, turns, answerFromNlEndpoint, answerFromNlStreamEndpoint, t]);
 
-    const handleStreamEvent = (event: string, data: Record<string, unknown>) => {
+    const handleStreamEvent = (turnId: string, event: string, data: Record<string, unknown>) => {
         switch (event) {
             case 'status':
                 // General status message — no-op for now
                 break;
             case 'tool_execution_start':
-                setToolCalls((prev) => [...prev, {
+                appendToolCall(turnId, {
                     tool_call_id: String(data.tool_call_id ?? ''),
                     name: String(data.tool_name || data.name || 'tool'),
                     status: 'running',
                     arguments: (data.arguments as Record<string, unknown>) ?? undefined,
-                }]);
+                });
                 break;
             case 'tool_execution_complete': {
                 const toolCallId = String(data.tool_call_id ?? '');
                 const status: ToolCallTrace['status'] = data.success === false ? 'error' : 'completed';
                 const resultSummary = (data.result_summary as ToolResultSummary) ?? undefined;
-                setToolCalls((prev) => {
-                    const updated = [...prev];
-                    let idx = toolCallId ? updated.findLastIndex(tc => tc.tool_call_id === toolCallId) : -1;
-                    if (idx < 0) idx = updated.findLastIndex(tc => tc.status === 'running');
-                    if (idx >= 0) {
-                        updated[idx] = {
-                            ...updated[idx],
-                            status,
-                            result_summary: resultSummary,
-                            error: status === 'error' ? (resultSummary?.error ?? String(data.error ?? '')) : undefined,
-                        };
-                    }
-                    return updated;
+                updateLastToolCall(turnId, toolCallId, {
+                    status,
+                    result_summary: resultSummary,
+                    error: status === 'error' ? (resultSummary?.error ?? String(data.error ?? '')) : undefined,
                 });
                 break;
             }
             case 'complete':
-                setAnswerMarkdown(String(data.answer_markdown || ''));
-                setSummary(String(data.summary || ''));
-                setSqlUsed((data.sql_used as string[]) || []);
-                setEvidence((data.evidence as Evidence[]) || []);
-                setCaveat(String(data.caveat || ''));
+                updateTurn(turnId, {
+                    status: 'done',
+                    answerMarkdown: String(data.answer_markdown || ''),
+                    summary: String(data.summary || ''),
+                    sqlUsed: (data.sql_used as string[]) || [],
+                    evidence: (data.evidence as Evidence[]) || [],
+                    caveat: String(data.caveat || ''),
+                });
                 break;
             case 'error':
-                setError(String(data.error || t('qa_error')));
+                updateTurn(turnId, { status: 'error', error: String(data.error || t('qa_error')) });
                 break;
         }
     };
 
     const handleCancel = () => {
         abortControllerRef.current?.abort();
-        setLoading(false);
+        // 取消時該輪從未完成，從 turns 移除而非留下卡住的 pending/streaming 卡片。
+        const turnId = activeTurnIdRef.current;
+        if (turnId) {
+            setTurns((prev) => prev.filter((turn) => turn.id !== turnId));
+        }
+        activeTurnIdRef.current = null;
     };
 
     return (
         <div>
-            {/* Privacy notice */}
-            <div style={{
-                backgroundColor: 'var(--warning-subtle)',
-                border: '1px solid var(--warning-border)',
-                borderRadius: 6,
-                padding: 12,
-                marginBottom: 16,
-                fontSize: '0.85rem',
-                color: 'var(--warning-subtle-foreground)',
-            }}>
-                <strong>{t('qa_privacy_label')}</strong>{' '}{t('qa_privacy_body', { model: nlModel })}
-            </div>
-
-            {/* Question input */}
-            <div style={{ marginBottom: 12 }}>
-                <label style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--muted-foreground)', display: 'block', marginBottom: 4 }}>
-                    {t('qa_placeholder')}
-                </label>
-                <textarea
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    placeholder={t('qa_example')}
-                    rows={3}
-                    maxLength={1000}
-                    disabled={loading}
-                    style={{
-                        width: '100%',
-                        padding: 12,
-                        border: '1px solid var(--input)',
-                        borderRadius: 6,
-                        fontSize: '0.9rem',
-                        resize: 'vertical',
-                        boxSizing: 'border-box',
-                    }}
-                />
-                <div style={{ textAlign: 'right', fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: 2 }}>
-                    {question.length}/1000
+            {/* Privacy notice：只在第一輪（尚未開始對話）顯示，追問沿用同一份提交端行為，不重複記錄新的同意動作。 */}
+            {isFirstTurn && (
+                <div style={{
+                    backgroundColor: 'var(--warning-subtle)',
+                    border: '1px solid var(--warning-border)',
+                    borderRadius: 6,
+                    padding: 12,
+                    marginBottom: 16,
+                    fontSize: '0.85rem',
+                    color: 'var(--warning-subtle-foreground)',
+                }}>
+                    <strong>{t('qa_privacy_label')}</strong>{' '}{t('qa_privacy_body', { model: nlModel })}
                 </div>
-            </div>
+            )}
 
-            {/* Options */}
-            <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-                    {t('qa_agree_privacy')}
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={useTools} onChange={(e) => setUseTools(e.target.checked)} />
-                    {t('qa_use_tools')}
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={useStreaming} onChange={(e) => setUseStreaming(e.target.checked)} />
-                    {t('qa_stream')}
-                </label>
-            </div>
-
-            {/* Submit button */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-                <button
-                    onClick={handleSubmit}
-                    disabled={loading || !question.trim() || !consent}
-                    style={{
-                        padding: '8px 18px',
-                        fontSize: '0.85rem',
+            {/* 訊息串：依序顯示每一輪 Q/A */}
+            {turns.map((turn) => (
+                <div key={turn.id} style={{ marginBottom: 20 }}>
+                    <div style={{
                         fontWeight: 600,
-                        border: 'none',
-                        borderRadius: 5,
-                        backgroundColor: loading || !question.trim() || !consent ? 'var(--muted-foreground)' : 'var(--success)',
-                        color: 'var(--success-foreground)',
-                        cursor: loading || !question.trim() || !consent ? 'default' : 'pointer',
-                    }}
-                >
-                    {loading ? t('qa_answering') : t('qa_ask')}
-                </button>
-                {loading && (
+                        fontSize: '0.9rem',
+                        color: 'var(--foreground)',
+                        marginBottom: 8,
+                    }}>
+                        {turn.question}
+                    </div>
+
+                    {turn.error && (
+                        <div style={{
+                            backgroundColor: 'var(--danger-subtle)',
+                            border: '1px solid var(--danger-border)',
+                            borderRadius: 6,
+                            padding: 12,
+                            marginBottom: 12,
+                            fontSize: '0.85rem',
+                            color: 'var(--danger-subtle-foreground)',
+                        }}>
+                            ⚠ {turn.error}
+                        </div>
+                    )}
+
+                    {(turn.toolCalls?.length ?? 0) > 0 && <ToolTracePanel toolCalls={turn.toolCalls || []} />}
+
+                    {(turn.status === 'pending' || turn.status === 'streaming') && !turn.answerMarkdown && (turn.toolCalls?.length ?? 0) === 0 && (
+                        <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted-foreground)' }}>
+                            <div style={{ fontSize: '1.5rem', marginBottom: 8 }}>⏳</div>
+                            {t('qa_querying')}
+                        </div>
+                    )}
+
+                    {turn.answerMarkdown && (
+                        <TurnAnswer t={t} turn={turn} />
+                    )}
+                </div>
+            ))}
+
+            {/* 輪數上限提示 */}
+            {limitReached && (
+                <div style={{
+                    backgroundColor: 'var(--muted)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 6,
+                    padding: 12,
+                    marginBottom: 16,
+                    fontSize: '0.85rem',
+                    color: 'var(--muted-foreground)',
+                }}>
+                    {t('qa_turn_limit_reached', { count: String(qaMaxTurns) })}
+                </div>
+            )}
+
+            {/* Question input：第一輪顯示完整表單（含同意勾選/選項），追問後精簡為「Ask anything」樣式。 */}
+            {!limitReached && (
+                <div style={{ marginBottom: 12 }}>
+                    {isFirstTurn && (
+                        <label style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--muted-foreground)', display: 'block', marginBottom: 4 }}>
+                            {t('qa_placeholder')}
+                        </label>
+                    )}
+                    <textarea
+                        value={question}
+                        onChange={(e) => setQuestion(e.target.value)}
+                        placeholder={isFirstTurn ? t('qa_example') : t('qa_follow_up_placeholder')}
+                        rows={isFirstTurn ? 3 : 2}
+                        maxLength={1000}
+                        disabled={isBusy}
+                        style={{
+                            width: '100%',
+                            padding: 12,
+                            border: '1px solid var(--input)',
+                            borderRadius: 6,
+                            fontSize: '0.9rem',
+                            resize: 'vertical',
+                            boxSizing: 'border-box',
+                        }}
+                    />
+                    <div style={{ textAlign: 'right', fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: 2 }}>
+                        {question.length}/1000
+                    </div>
+                </div>
+            )}
+
+            {/* Options：只在第一輪顯示，追問沿用第一輪選擇的 use_tools/use_streaming。 */}
+            {isFirstTurn && !limitReached && (
+                <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+                        {t('qa_agree_privacy')}
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={useTools} onChange={(e) => setUseTools(e.target.checked)} />
+                        {t('qa_use_tools')}
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={useStreaming} onChange={(e) => setUseStreaming(e.target.checked)} />
+                        {t('qa_stream')}
+                    </label>
+                </div>
+            )}
+
+            {/* Submit / cancel / new conversation buttons */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                {!limitReached && (
+                    <button
+                        onClick={handleSubmit}
+                        disabled={isBusy || !question.trim() || (isFirstTurn && !consent)}
+                        style={{
+                            padding: '8px 18px',
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            border: 'none',
+                            borderRadius: 5,
+                            backgroundColor: isBusy || !question.trim() || (isFirstTurn && !consent) ? 'var(--muted-foreground)' : 'var(--success)',
+                            color: 'var(--success-foreground)',
+                            cursor: isBusy || !question.trim() || (isFirstTurn && !consent) ? 'default' : 'pointer',
+                        }}
+                    >
+                        {isBusy ? t('qa_answering') : t('qa_ask')}
+                    </button>
+                )}
+                {isBusy && (
                     <button
                         onClick={handleCancel}
                         style={{
@@ -316,59 +442,58 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                         {t('qa_cancel')}
                     </button>
                 )}
+                {turns.length > 0 && (
+                    <button
+                        onClick={handleNewConversation}
+                        disabled={isBusy}
+                        style={{
+                            padding: '8px 14px',
+                            fontSize: '0.85rem',
+                            border: '1px solid var(--muted-foreground)',
+                            borderRadius: 5,
+                            backgroundColor: 'transparent',
+                            color: 'var(--muted-foreground)',
+                            cursor: isBusy ? 'default' : 'pointer',
+                            opacity: isBusy ? 0.5 : 1,
+                        }}
+                    >
+                        {t('qa_new_conversation')}
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+}
+
+/** 單輪答案卡片：答案本文、caveat、可折疊的 SQL/證據來源詳細資訊。 */
+function TurnAnswer({ t, turn }: { t: (key: string, replace?: Record<string, string>) => string; turn: QaTurn }) {
+    const [showDetails, setShowDetails] = useState(false);
+    const sqlUsed = turn.sqlUsed || [];
+    const evidence = turn.evidence || [];
+
+    return (
+        <div>
+            <div style={{
+                backgroundColor: 'var(--surface-sunken)',
+                border: '1px solid var(--border)',
+                borderRadius: 6,
+                padding: 20,
+                marginBottom: 16,
+            }}>
+                <h4 style={{ margin: '0 0 12px', fontSize: '1rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                    {t('qa_answer')}
+                </h4>
+                <div
+                    style={{
+                        fontSize: '0.9rem',
+                        lineHeight: 1.7,
+                        color: 'var(--foreground)',
+                    }}
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(turn.answerMarkdown || '') }}
+                />
             </div>
 
-            {/* Error */}
-            {error && (
-                <div style={{
-                    backgroundColor: 'var(--danger-subtle)',
-                    border: '1px solid var(--danger-border)',
-                    borderRadius: 6,
-                    padding: 12,
-                    marginBottom: 12,
-                    fontSize: '0.85rem',
-                    color: 'var(--danger-subtle-foreground)',
-                }}>
-                    ⚠ {error}
-                </div>
-            )}
-
-            {/* Tool trace */}
-            <ToolTracePanel toolCalls={toolCalls} />
-
-            {/* Loading indicator */}
-            {loading && !answerMarkdown && toolCalls.length === 0 && (
-                <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted-foreground)' }}>
-                    <div style={{ fontSize: '1.5rem', marginBottom: 8 }}>⏳</div>
-                    {t('qa_querying')}
-                </div>
-            )}
-
-            {/* Answer display */}
-            {answerMarkdown && (
-                <div style={{
-                    backgroundColor: 'var(--surface-sunken)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 6,
-                    padding: 20,
-                    marginBottom: 16,
-                }}>
-                    <h4 style={{ margin: '0 0 12px', fontSize: '1rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                        {t('qa_answer')}
-                    </h4>
-                    <div
-                        style={{
-                            fontSize: '0.9rem',
-                            lineHeight: 1.7,
-                            color: 'var(--foreground)',
-                        }}
-                        dangerouslySetInnerHTML={{ __html: renderMarkdown(answerMarkdown) }}
-                    />
-                </div>
-            )}
-
-            {/* Caveat */}
-            {caveat && answerMarkdown && (
+            {turn.caveat && (
                 <div style={{
                     backgroundColor: 'var(--muted)',
                     border: '1px solid var(--border)',
@@ -378,12 +503,11 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                     fontSize: '0.8rem',
                     color: 'var(--muted-foreground)',
                 }}>
-                    ⚠ {caveat}
+                    ⚠ {turn.caveat}
                 </div>
             )}
 
-            {/* Details panel (collapsible) */}
-            {answerMarkdown && (sqlUsed.length > 0 || evidence.length > 0) && (
+            {(sqlUsed.length > 0 || evidence.length > 0) && (
                 <div style={{ marginBottom: 12 }}>
                     <button
                         onClick={() => setShowDetails(!showDetails)}
@@ -408,7 +532,6 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                             padding: 16,
                             backgroundColor: 'var(--card)',
                         }}>
-                            {/* SQL used */}
                             {sqlUsed.length > 0 && (
                                 <div style={{ marginBottom: 12 }}>
                                     <label style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--muted-foreground)', display: 'block', marginBottom: 6 }}>
@@ -432,7 +555,6 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                                 </div>
                             )}
 
-                            {/* Evidence */}
                             {evidence.length > 0 && (
                                 <div>
                                     <label style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--muted-foreground)', display: 'block', marginBottom: 6 }}>

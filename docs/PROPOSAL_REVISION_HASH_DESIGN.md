@@ -1,6 +1,11 @@
 # Proposal Revision Hash 設計
 
-> **狀態：設計草案，尚未實作**（程式碼中查無 revision hash 相關實作）。
+> **狀態：第一階段已實作**（`BIOG_MAIN`、`/api/v2/mutate`、`mode=proposal`、
+> `operation=update`，提交端與審核端衝突檢查皆已完成，見下方「第一階段落地
+> 範圍」與程式碼：[ProposalRevisionService](../app/Services/ProposalRevisionService.php)、
+> [BiogMainMutationHandler](../app/Services/Mutations/BiogMainMutationHandler.php)、
+> [OperationsProposalController](../app/Http/Controllers/OperationsProposalController.php)）。
+> 其他章節描述的擴展（其他資源接入、create proposal、Web 表單）仍是未實作的未來方向。
 >
 > **前提已部分改變（2026-07）**：核准端對多數人物子資源已改為「重放 v2 handler」
 > （見 [PERSON_PROPOSAL_PATHS.md](./PERSON_PROPOSAL_PATHS.md)），核准時是把
@@ -9,7 +14,8 @@
 >
 > **仍然存在的風險**：同一欄位被並行修改時，核准仍會以提案值覆寫較新的值——
 > 這正是本設計要解決的部分，仍有價值。尚未收斂到重放路徑的資源
-> （委派檔 5 資源、`BIOG_MAIN`）則兩種風險都還在。
+> （委派檔 5 資源、`BIOG_MAIN`）則兩種風險都還在；`BIOG_MAIN` 的這部分風險
+> 已由本設計第一階段解決，其餘 5 個委派檔資源仍未處理。
 
 ## 目標
 

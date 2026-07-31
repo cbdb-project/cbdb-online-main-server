@@ -2,11 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Models\BiogMain;
 use App\Models\Operation;
 use App\Models\User;
 use App\Services\CharVariantMapService;
-use App\Services\ProposalRevisionService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -528,131 +526,6 @@ class BiogMainProposalTest extends TestCase {
         $operation->refresh();
         $payload = json_decode($operation->resource_data, true);
         $this->assertSame('approved', $payload['__review_status']);
-    }
-
-    #[Test]
-    public function testApproveBiogMainProposalSucceedsWhenBaseRevisionMatchesCurrentRow() {
-        // 見 docs/PROPOSAL_REVISION_HASH_DESIGN.md：__proposal_meta.base_revision 與核准
-        // 當下重算出的 current_revision 一致時，核准應照常套用，不應誤擋正常情況。
-        $admin = $this->makeAdmin();
-        $this->actingAs($admin);
-
-        $personId = 6;
-        DB::table('BIOG_MAIN')->insert([
-            'c_personid' => $personId,
-            'c_name_chn' => '陳六',
-            'c_surname_chn' => '陳',
-            'c_mingzi_chn' => '六',
-            'c_notes' => 'Old notes',
-        ]);
-
-        $baseRevision = (new ProposalRevisionService())->hash('BIOG_MAIN', BiogMain::find($personId)->toArray());
-
-        $operation = Operation::create([
-            'user_id' => 100,
-            'c_personid' => $personId,
-            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
-            'resource' => 'BIOG_MAIN',
-            'resource_id' => (string) $personId,
-            'resource_data' => json_encode([
-                'c_personid' => $personId,
-                'c_surname_chn' => '陳',
-                'c_mingzi_chn' => '六',
-                'c_notes' => 'New notes',
-                '__key_columns' => ['c_personid'],
-                '__review_status' => 'pending',
-                '__proposal_meta' => [
-                    'base_revision' => $baseRevision,
-                    'revision_algo' => ProposalRevisionService::ALGO,
-                ],
-            ]),
-            'resource_original' => json_encode([
-                'c_personid' => $personId,
-                'c_surname_chn' => '陳',
-                'c_mingzi_chn' => '六',
-                'c_notes' => 'Old notes',
-            ]),
-        ]);
-
-        $this->post(route('operations.proposals.approve', $operation), [
-            'review_comment' => 'ok',
-        ])->assertRedirect();
-
-        $this->assertDatabaseHas('BIOG_MAIN', [
-            'c_personid' => $personId,
-            'c_notes' => 'New notes',
-        ]);
-        $operation->refresh();
-        $payload = json_decode($operation->resource_data, true);
-        $this->assertSame('approved', $payload['__review_status']);
-    }
-
-    #[Test]
-    public function testApproveBiogMainProposalRejectsWhenRowChangedAfterProposalSubmitted() {
-        // 見 docs/PROPOSAL_REVISION_HASH_DESIGN.md 核准流程：提案提交後、核准前資料已被
-        // 他人修改 → current_revision 與 base_revision 不同，拒絕核准（整筆交易回滾），
-        // 而不是盲目覆寫掉期間已發生的變更。
-        $admin = $this->makeAdmin();
-        $this->actingAs($admin);
-
-        $personId = 7;
-        DB::table('BIOG_MAIN')->insert([
-            'c_personid' => $personId,
-            'c_name_chn' => '孫七',
-            'c_surname_chn' => '孫',
-            'c_mingzi_chn' => '七',
-            'c_notes' => 'Old notes',
-        ]);
-
-        // 提案提交時的 base_revision：對應「孫七／Old notes」這個版本。
-        $baseRevision = (new ProposalRevisionService())->hash('BIOG_MAIN', BiogMain::find($personId)->toArray());
-
-        $operation = Operation::create([
-            'user_id' => 100,
-            'c_personid' => $personId,
-            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
-            'resource' => 'BIOG_MAIN',
-            'resource_id' => (string) $personId,
-            'resource_data' => json_encode([
-                'c_personid' => $personId,
-                'c_surname_chn' => '孫',
-                'c_mingzi_chn' => '七',
-                'c_notes' => 'Proposed notes',
-                '__key_columns' => ['c_personid'],
-                '__review_status' => 'pending',
-                '__proposal_meta' => [
-                    'base_revision' => $baseRevision,
-                    'revision_algo' => ProposalRevisionService::ALGO,
-                ],
-            ]),
-            'resource_original' => json_encode([
-                'c_personid' => $personId,
-                'c_surname_chn' => '孫',
-                'c_mingzi_chn' => '七',
-                'c_notes' => 'Old notes',
-            ]),
-        ]);
-
-        // 提案送出後、核准前，資料已被其他人修改。
-        DB::table('BIOG_MAIN')->where('c_personid', $personId)->update(['c_notes' => 'Concurrently edited notes']);
-
-        $response = $this->post(route('operations.proposals.approve', $operation), [
-            'review_comment' => 'try approve stale',
-        ]);
-
-        $response->assertRedirect();
-        $flash = session('flash_notification', collect())->toArray();
-        $this->assertStringContainsString('資料自提案提交後已被更新', $flash[0]['message'] ?? '');
-
-        // 整筆交易回滾：資料維持「他人修改後」的狀態、不是提案內容；提案維持 pending；無 audit_log。
-        $this->assertDatabaseHas('BIOG_MAIN', [
-            'c_personid' => $personId,
-            'c_notes' => 'Concurrently edited notes',
-        ]);
-        $operation->refresh();
-        $payload = json_decode($operation->resource_data, true);
-        $this->assertSame('pending', $payload['__review_status']);
-        $this->assertDatabaseCount('audit_log', 0);
     }
 
     #[Test]

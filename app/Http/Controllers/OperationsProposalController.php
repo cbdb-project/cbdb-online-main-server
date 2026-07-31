@@ -7,7 +7,6 @@ use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
 use App\Services\NameSearchIndexService;
-use App\Services\ProposalRevisionService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -21,7 +20,6 @@ class OperationsProposalController extends Controller {
     protected $operationRepository;
     protected $nameSearchIndexService;
     protected $biogMainRepository;
-    protected ProposalRevisionService $proposalRevisionService;
     protected array $tableColumnCache = [];
 
     /**
@@ -84,13 +82,11 @@ class OperationsProposalController extends Controller {
     public function __construct(
         OperationRepository $operationRepository,
         NameSearchIndexService $nameSearchIndexService,
-        BiogMainRepository $biogMainRepository,
-        ProposalRevisionService $proposalRevisionService
+        BiogMainRepository $biogMainRepository
     ) {
         $this->operationRepository = $operationRepository;
         $this->nameSearchIndexService = $nameSearchIndexService;
         $this->biogMainRepository = $biogMainRepository;
-        $this->proposalRevisionService = $proposalRevisionService;
     }
 
     public function approve(Request $request, Operation $operation) {
@@ -101,13 +97,6 @@ class OperationsProposalController extends Controller {
         $table = $operation->resource;
         $keyColumns = $payload['__key_columns'] ?? [];
         $opType = (int) $operation->op_type;
-        // 見 docs/PROPOSAL_REVISION_HASH_DESIGN.md：提案若在提交時存了 base_revision
-        // （目前僅 BIOG_MAIN update 提案，見 BiogMainMutationHandler），核准時需重新比對
-        // 目前資料列，避免提案提交後、核准前資料已被他人變更卻遭盲目覆寫。未存
-        // base_revision 的提案（其他資源、或核准前存量提案）維持原行為，不受影響。
-        $baseRevision = is_string($payload['__proposal_meta']['base_revision'] ?? null)
-            ? $payload['__proposal_meta']['base_revision']
-            : null;
 
         // 實體聚合提案（§4.5）：resource 為聚合 API 名、跨多表，不走下方「單表列」機制。
         // 以 mode=direct 重放對應 EntityAggregate handler（validate→guardWrite→service），
@@ -128,15 +117,14 @@ class OperationsProposalController extends Controller {
         $comment = trim((string) $request->input('review_comment', ''));
 
         try {
-            DB::transaction(function () use ($opType, $table, $data, $keyColumns, $original, $operation, $comment, $auxiliaryPayload, $baseRevision) {
+            DB::transaction(function () use ($opType, $table, $data, $keyColumns, $original, $operation, $comment, $auxiliaryPayload) {
                 [$appliedRow, $usedDirectWorkflow] = $this->applyProposal(
                     $operation,
                     $table,
                     $data,
                     $keyColumns,
                     $original,
-                    $auxiliaryPayload,
-                    $baseRevision
+                    $auxiliaryPayload
                 );
 
                 if (!$usedDirectWorkflow) {
@@ -407,8 +395,7 @@ class OperationsProposalController extends Controller {
         array $data,
         array $keyColumns,
         array $original,
-        array $auxiliaryPayload,
-        ?string $baseRevision = null
+        array $auxiliaryPayload
     ): array {
         // 段一：已遷移的人物子資源 CREATE／UPDATE／DELETE 一律由 v2 direct handler 重放，使核准與直接編輯
         // 逐位一致（派生／護欄／audit／索引同步）。usedDirectWorkflow=true —— handler 自寫 operation + audit，
@@ -437,7 +424,7 @@ class OperationsProposalController extends Controller {
             return [$this->applyCreateProposal($table, $data, $keyColumns), false];
         }
 
-        return [$this->applyUpdateProposal($table, $data, $keyColumns, $original, $baseRevision), false];
+        return [$this->applyUpdateProposal($table, $data, $keyColumns, $original), false];
     }
 
     /**
@@ -761,25 +748,7 @@ class OperationsProposalController extends Controller {
         }
     }
 
-    /**
-     * 見 docs/PROPOSAL_REVISION_HASH_DESIGN.md：核准套用前重新計算 $currentRow 的
-     * revision，比對提案提交時記下的 base_revision。提案提交後、核准前若資料已被
-     * 他人異動，current_revision 會不同，拒絕核准（而非盲目覆寫掉較新的資料）。
-     * $baseRevision 為 null 代表此提案未走 base_revision 機制（其他資源，或本機制
-     * 上線前的存量提案），維持原行為，不做檢查。
-     */
-    protected function assertRevisionNotStale(string $table, array $currentRow, ?string $baseRevision): void {
-        if ($baseRevision === null) {
-            return;
-        }
-
-        $currentRevision = $this->proposalRevisionService->hash($table, $currentRow);
-        if (!hash_equals($currentRevision, $baseRevision)) {
-            throw new \RuntimeException('資料自提案提交後已被更新，請要求提案者重新整理並重提。');
-        }
-    }
-
-    protected function applyUpdateProposal(string $table, array $data, array $keyColumns, array $original, ?string $baseRevision = null): array {
+    protected function applyUpdateProposal(string $table, array $data, array $keyColumns, array $original): array {
         if (empty($original)) {
             throw new \RuntimeException('缺少原始資料，無法更新。');
         }
@@ -795,7 +764,6 @@ class OperationsProposalController extends Controller {
                 throw new \RuntimeException('資料不存在或已被刪除，無法更新。');
             }
 
-            $this->assertRevisionNotStale($table, $model->toArray(), $baseRevision);
             $this->assertNoClearColumns($table, $data, $model->toArray());
 
             foreach ($keyColumns as $column) {
@@ -824,7 +792,6 @@ class OperationsProposalController extends Controller {
             throw new \RuntimeException('資料不存在或已被刪除，無法更新。');
         }
 
-        $this->assertRevisionNotStale($table, (array) $current, $baseRevision);
         $this->assertNoClearColumns($table, $data, (array) $current);
 
         $updatePayload = $this->buildUpdatePayload($data, $keyColumns, $original);

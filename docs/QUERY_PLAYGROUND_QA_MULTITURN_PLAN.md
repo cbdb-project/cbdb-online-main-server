@@ -1,12 +1,18 @@
 # Query Playground QA 模式多輪追問功能 — Work Plan
 
-> **狀態：已實作**（第 9 節五個階段皆完成：Controller/Validation/Rate Limiting、Service
-> 層、前端、測試、前端建置。每階段皆經 review agent 與 codex exec 兩輪獨立審閱至無嚴重
-> 問題。**唯一未完成項目**：`npm run build` 與 `tsc --noEmit` 皆已驗證通過，但本機開發
-> 環境沒有可連線的 MySQL/MariaDB 服務，無法用 `run` skill 實際開瀏覽器手動點擊驗收；
-> 已改以 35 個自動化測試（`tests/Feature/HistoricalQaTest.php`，涵蓋 request/response
-> contract、驗證失敗情境、SSE、`conversation_history` 組裝進 LLM `messages[]` 的實際內容、
-> rate limiting）作為主要驗證依據，合併前建議在有真實資料庫的環境補一次手動驗收。）
+> **狀態：第一、二階段皆已實作**（第 9 節五個階段＋第 9.1 節第二階段皆完成：
+> Controller/Validation/Rate Limiting、Service 層、前端、測試、前端建置、
+> `suggested_follow_ups` 建議追問 chips。每個小環節皆經 review agent 與 codex exec
+> 審閱至無嚴重問題——第二階段的 `suggested_follow_ups` 型別防禦經過兩輪 codex 才抓到
+> 根本問題（`json_decode(..., true)` 對 JSON array 與「鍵為連續數字字串的 JSON object」
+> 會解出完全相同形狀的 PHP array，無法用任何陣列形狀啟發式判斷區分，唯一可靠做法是
+> 額外做一次非關聯解碼，見第 7.2 節），過程細節見文末審閱紀錄。**唯一未完成項目**：
+> `npm run build` 與 `tsc --noEmit` 皆已驗證通過，但本機開發環境沒有可連線的
+> MySQL/MariaDB 服務，無法用 `run` skill 實際開瀏覽器手動點擊驗收；已改以
+> `tests/Feature/HistoricalQaTest.php`（涵蓋 request/response contract、驗證失敗情境、
+> SSE、`conversation_history` 組裝進 LLM `messages[]` 的實際內容、`suggested_follow_ups`
+> 型別防禦與邊界案例、rate limiting）作為主要驗證依據，建議找機會在有真實資料庫的
+> 環境補一次手動驗收。）
 > 本規劃文件僅提供繁體中文版本；不代表功能實作範圍排除英文 i18n——依 `AGENTS.md` 第 6 節規則，新增的 UI 字串（第 4.3 節）仍須比照專案既有慣例同步維護 `resources/lang/zh-TW/*.php` 與 `resources/lang/en/*.php` 兩份翻譯檔，不可只做繁中。
 > 對應功能：`/app/query-playground?mode=qa`（歷史問答 QA 模式）
 > 參考範例：Google 搜尋結果 AI Overview 的「Ask anything」追問輸入框——首次答案生成後，答案下方會持續顯示一個輸入框，使用者可針對同一上下文繼續提問。
@@ -23,7 +29,7 @@
 - 不做對話分享/匯出功能。
 - 不改動 SQL 模式（`mode=sql`）、QBE 模式、NL→SQL 模式，僅針對 QA 模式。
 - 不重新設計 SQL allowlist / CTE 驗證邏輯（沿用現有 `ReadOnlyTableQueryService`/`SqlTableNameExtractor`，每輪、每個 tool call 仍必須完整跑過驗證，不可因為「歷史紀錄」而跳過或快取驗證結果）。
-- **建議追問清單（`suggested_follow_ups`，比照 Google「如果你想，我可以說明：」）本次不做，且暫不排入第二階段時程**（見第 10 節）——先把「能追問」這個核心能力做出來，範圍更可控；未來若有需求再另行評估、重新開範圍。
+- ~~建議追問清單（`suggested_follow_ups`，比照 Google「如果你想，我可以說明：」）本次不做，且暫不排入第二階段時程~~ **第二階段已定案要做**，見第 4.1、7.2、10 節。
 - 不新增任何資料表、不做對話持久化的授權/併發/保留政策設計（因為沒有伺服器端對話物件需要保護）。
 
 ## 2. 現況摘要（詳細調查見下方附錄 A）
@@ -51,7 +57,7 @@
 | Google AI Overview | 本功能對應設計 |
 |---|---|
 | 答案下方常駐 "Ask anything" 輸入框 | QA 面板答案卡片下方常駐追問輸入框（取代現有「送出後消失」的表單） |
-| "If you'd like, I can explain: ..." 建議清單 | 本次不做，暫不排入時程（見第 10 節） |
+| "If you'd like, I can explain: ..." 建議清單 | LLM 於回答 JSON 中額外輸出 `suggested_follow_ups: string[]`（0–4 個），前端渲染為可點擊 chip，點擊後帶入輸入框（不自動送出，見第 4.1 節） |
 | 追問會延續同一個上下文 | 前端把先前輪次的 `{question, summary}` 隨每次追問請求送回後端，後端當場組裝 `messages[]`，不查資料庫 |
 | 對話僅存在當次瀏覽（重新搜尋才重置） | 完全比照：對話只存在前端 state，重新整理頁面即遺失 |
 
@@ -70,6 +76,7 @@
     toolCalls?: ToolCallTrace[];
     evidence?: Evidence[];
     caveat?: string;
+    suggestedFollowUps?: string[];
     error?: string;
   }
   const [turns, setTurns] = useState<QaTurn[]>([]);
@@ -85,6 +92,7 @@
   - 第一輪送出後，追問輸入框精簡為「Ask anything」樣式（textarea + 送出鈕），不重複顯示同意勾選；`use_tools`/`use_streaming` 兩個選項是否每輪重新顯示交由實作時的 UI 判斷（後端不對 `use_tools` 做任何跨輪次的一致性檢查或記憶，純屬前端呈現選擇，沒有 precedence 問題需要解決）。
   - 追問輸入框需在「上一輪回答完成後」才可互動（避免同一對話並發兩個進行中的請求造成訊息串錯亂——這是前端 UX 層面的保護，不需要後端額外的併發鎖，因為後端本身無狀態、不寫入共享資料）。
   - 累積滿 `qaMaxTurns` 輪（`turns.length >= qaMaxTurns`）後停用輸入框並顯示提示文字，只留「開新對話」可用。
+- **建議追問 chips（第二階段，已定案）**：`suggestedFollowUps` 非空時，在該輪答案卡片下方渲染 0–4 個可點擊 chip（文字取自陣列各元素）。點擊行為：把該文字帶入追問輸入框（`setQuestion(text)`），**不自動送出**——比照 Google 行為（點擊建議是先展開/帶入而非直接送出新查詢），讓使用者可先檢視/修改再送出，較保守安全。只有「最後一輪」（`turns` 陣列最後一筆）的建議 chips 需要顯示（較早輪次的建議已過時，不需要一直保留在畫面上）；若已達 `qaMaxTurns` 上限，chips 仍可顯示但點擊後因輸入框已停用而無法送出，屬預期行為，不需額外處理。
 - 「開新對話」按鈕：清空 `turns`，回到初始畫面。
 - 中斷/取消（`handleCancel`）需綁定到「目前進行中的 turn」，行為不變，只是作用目標改變。
 
@@ -95,6 +103,7 @@
 - `qa_follow_up_placeholder`（追問輸入框提示文字）
 - `qa_new_conversation`（開新對話按鈕）
 - `qa_turn_limit_reached`（達到輪數上限提示文字，例如「已達單一對話上限（{count} 輪），請開新對話」——文案需支援帶入 `qaMaxTurns` 變數，不寫死「5」，因為上限值來自後端 config，日後調整 config 不應該需要改動翻譯字串）
+- `qa_suggested_follow_ups_label`（建議追問標題，第二階段新增）
 - 沿用現有 `qa_*` 系列鍵值（`qa_ask`/`qa_answering`/`qa_cancel`/`qa_error` 等）不需重複新增。
 
 ## 5. 無持久化設計（取代先前的資料表設計）
@@ -115,9 +124,9 @@
 - Request: `{question, tables?, use_tools?}`
 - Response: `{success, answer_markdown, summary, sql_used, tool_calls, evidence, caveat, model}` 或 `{success:false, error}`
 
-**擴充方式（向後相容，且不改動任何既有欄位）**：
+**擴充方式（向後相容，不改動任何既有欄位的型別/語意）**：
 - Request 新增**選填**欄位 `conversation_history`（陣列，每筆 `{question: string, summary: string}`）。不帶此欄位（或帶空陣列）與現行單輪行為完全一致，既有測試不需修改。
-- Response **不新增任何欄位**——不需要 `conversation_id`、不需要 `turn_index`，因為沒有伺服器端對話物件可供之後的請求引用；前端自己知道目前是第幾輪、自己組裝下一次要送出的 `conversation_history`。
+- Response 新增 `suggested_follow_ups`（string[]，可為空陣列，見第 7.2 節）——純新增欄位，既有測試用 `assertJsonStructure` 斷言既有欄位存在（不斷言「僅有這些欄位」），故不需修改即可通過；不需要 `conversation_id`、不需要 `turn_index`，因為沒有伺服器端對話物件可供之後的請求引用；前端自己知道目前是第幾輪、自己組裝下一次要送出的 `conversation_history`。
 
 ### 6.2 Endpoint 設計
 沿用既有兩個 endpoint（`answer-from-nl`/`answer-from-nl-stream`），不新增路由。Controller 內新增邏輯：
@@ -178,8 +187,11 @@ public function answerQuestion(
 
 ### 7.2 System prompt 調整（`buildQaSystemPrompt()`）
 - 新增段落告知模型：「使用者可能會針對先前的問答內容進行追問，請利用對話歷史進行指代消解（例如『他』『這個人』『那個機構』可能指向先前輪次提到的實體），若無法確定所指對象，請在回答中禮貌詢問澄清，而非臆測。」
-- **輸出 contract 本次不擴充**——`parseQaResponse()` 期待的既有 JSON 結構（`answer_markdown`/`summary`/`sql_used`/`evidence`/`caveat`）維持不變，不新增 `suggested_follow_ups`（暫不排入時程，見第 10 節）。
-- **既有語言缺口（本次多輪功能不修，僅記錄）**：`buildQaSystemPrompt()` 是整段寫死繁體中文，未依 `App::getLocale()` 切換回答語言，屬既有問題，本規劃不處理。
+- **輸出 contract 擴充（第二階段，已定案）**：`parseQaResponse()` 期待的既有 JSON 結構（`answer_markdown`/`summary`/`sql_used`/`evidence`/`caveat`）新增 `suggested_follow_ups`（string 陣列，0–4 個，根據本輪回答內容產生的延伸提問建議）。System prompt 需明確要求模型輸出此欄位，且是「選填、可為空陣列」（避免模型硬湊建議湊數）。
+- `parseQaResponse()` 對應更新以解析並驗證 `suggested_follow_ups`：**型別防禦**——回傳值若非陣列，或陣列元素非字串，一律忽略該欄位、以空陣列 `[]` 帶過，不可因為這個選填欄位格式錯誤就讓整個回答解析失敗（`success:false`）。此防禦邏輯獨立於既有必填欄位（`answer_markdown`/`summary` 等）的解析，不影響既有失敗路徑。超過 4 個元素時**截斷保留前 4 個**（而非整欄位丟棄——截斷仍能交付部分有效建議，比完全捨棄更務實）。
+  **實作時發現並修正兩輪的陷阱**（codex review 抓到）：`json_decode(..., true)` 對同一段 JSON 文字做關聯解碼後，JSON array（`["a","b"]`）與 JSON object（即使鍵是連續數字字串，例如 `{"0":"a","1":"b"}`）會解出**完全相同形狀**的 PHP array——這個「原始 JSON 到底是 array 還是 object」的資訊在關聯解碼當下就已經遺失，事後不管用 `is_array()` 還是 PHP 8.1+ 的 `array_is_list()`（第一輪修正嘗試，只能排除鍵為非數字字串的一般關聯陣列，排不掉鍵剛好是連續數字字串的 object）都無法回頭還原、必然有漏網案例。唯一可靠做法：對同一段 JSON 文字**額外做一次非關聯解碼**（`assoc=false`），此模式下 `json_decode()` 對 JSON array 一律回傳 PHP `array`、對 JSON object 一律回傳 `stdClass`，與鍵名稱/內容完全無關，才能真正還原原始型別。
+- Response（JSON 與 SSE `event: complete` 皆同）新增 `suggested_follow_ups` 欄位（string[]，可為空陣列），不影響任何既有欄位，向後相容。
+- **既有語言缺口（本次多輪功能不修，僅記錄）**：`buildQaSystemPrompt()` 是整段寫死繁體中文，未依 `App::getLocale()` 切換回答語言，屬既有問題，本規劃不處理；`suggested_follow_ups` 與 `answer_markdown` 出自同一顆 LLM、同一份 system prompt，語言表現與現況一致，不會讓既有語言缺口變得更嚴重，也不會讓它變好。
 
 ### 7.3 Context 大小（因硬上限與視窗一致，不需要額外截斷規則）
 - 因為第 6.4 節已將單一對話硬上限訂為 5 輪（`conversation_history` 最多 4 筆），這個上限本身就等於「送給 LLM 的 context 視窗」，**不存在「硬上限 > 視窗」的落差**，因此不需要先前草案第 7.3 節那套「只留最近 5 輪、超過視窗的舊輪次如何處理」的額外截斷邏輯——`conversation_history` 陣列裡有幾筆就全部注入，validation 已經保證這個陣列不會超過 4 筆。
@@ -205,10 +217,11 @@ public function answerQuestion(
   6. 沿用既有「QA 最終輪不送 `response_format`」回歸測試，確認多輪情境下依然成立。
   7. **Rate limiting**：對 `answer-from-nl` 在測試中快速發送超過 `qa_rate_limit_per_minute` 設定值的請求次數，驗證超過後回傳 `429`（可用 `config(['query_playground.qa_rate_limit_per_minute' => 2])` 之類的方式在測試中把上限調低以方便觸發）。
   8. **輪數上限的前後端一致性**：`qa_max_turns`（定案預設 5，見第 10 節）由 Inertia props 傳給前端（見第 4.1、9 節），測試需涵蓋：(a) `appIndex()` 的 Inertia props 斷言中包含 `qaMaxTurns`（或同等命名）且數值等於 `config('query_playground.qa_max_turns')`；(b) 後端 validation 上限（`qa_max_turns - 1`）與 config 值一致。前端不得寫死 `5`，一律讀取 props。
+  9. **`suggested_follow_ups`（第二階段，已定案）**：(a) LLM 回傳合法陣列時，response 的 `suggested_follow_ups` 與之相符（JSON 與 SSE 版本皆驗證）；(b) LLM 回傳非陣列（例如字串）時，`parseQaResponse()` 不應讓整個請求失敗，`suggested_follow_ups` 應退化為空陣列、其餘欄位正常回傳；(c) 陣列元素含非字串（例如數字、`null`）時同樣防禦性忽略整個欄位、回空陣列，不應讓非字串元素原樣流入 response；(d) LLM 未回傳此欄位（既有回應格式，兩階段之間的向後相容）時，`suggested_follow_ups` 預設為空陣列，不應報錯；(e) LLM 回傳 JSON **物件**時同樣視為非陣列、退化為空陣列——須涵蓋兩種鍵形狀：鍵為一般字串（例如 `{"a":"問題一"}`）**以及**鍵為連續數字字串（例如 `{"0":"問題一","1":"問題二"}`，`json_decode(..., true)` 後與 JSON array 解出完全相同形狀的 PHP array，是最容易漏測的邊界案例，需要獨立測試案例覆蓋，不能只測前者）；(f) LLM 回傳超過 4 個元素時，截斷保留前 4 個，不是整欄位丟棄。
 - 不需要 migration 測試（沒有新增資料表）。
 
 ### 8.2 前端（若之後有前端測試框架/手動驗收）
-- 手動驗收腳本（因為現有前端似乎沒有 e2e 測試框架，需另外確認）：第一輪提問 → 出現追問輸入框 → 追問後訊息串正確累加 → 連續追問至第 5 輪後輸入框停用並顯示提示 → 開新對話後狀態清空 → 取消/中斷追問時不影響已完成的前幾輪顯示 → 快速連續送出多輪追問觸發 429 時前端能顯示合理錯誤訊息（而非白屏或 unhandled rejection）。
+- 手動驗收腳本（因為現有前端似乎沒有 e2e 測試框架，需另外確認）：第一輪提問 → 出現追問輸入框 → 追問後訊息串正確累加 → 連續追問至第 5 輪後輸入框停用並顯示提示 → 開新對話後狀態清空 → 取消/中斷追問時不影響已完成的前幾輪顯示 → 快速連續送出多輪追問觸發 429 時前端能顯示合理錯誤訊息（而非白屏或 unhandled rejection）→ **第二階段**：回答下方出現建議追問 chips（若 LLM 有回傳）→ 點擊 chip 帶入輸入框但不自動送出 → 送出新一輪後，前一輪的 chips 不再顯示、只有最新一輪顯示。
 
 ## 9. 分階段實作與 Review 檢查點（依 AGENTS.md／使用者要求的流程）
 
@@ -222,11 +235,17 @@ public function answerQuestion(
 
 每個環節之間維持文件開頭要求的 review 節奏。
 
+### 9.1 第二階段：`suggested_follow_ups`（已定案動工）
+
+1. **後端**：`buildQaSystemPrompt()` 新增欄位要求、`parseQaResponse()` 解析與型別防禦、JSON/SSE response 新增 `suggested_follow_ups` 欄位、第 8.1 節案例 9 的測試。
+2. **前端**：`QaTurn` 新增 `suggestedFollowUps` 欄位、渲染可點擊 chips（只顯示最後一輪）、點擊帶入輸入框（不自動送出）、新增 `qa_suggested_follow_ups_label` 翻譯字串（zh-TW/en 同步）。
+3. 同樣依開頭要求的 review 節奏：每個小環節先 review agent 再 codex exec，至無嚴重問題才推進下一步。
+
 ## 10. 已拍板事項
 
 1. **硬性輪數上限**：`qa_max_turns` 預設值定案為 **5**（含首輪）。
 2. **Rate limit 數值**：`qa_rate_limit_per_minute` 預設值定案為 **10**（每分鐘 10 次）。
-3. **建議追問（`suggested_follow_ups`）**：暫不排入第二階段，僅維持第 1 節「非目標」的紀錄，待未來有需求時再另行評估、重新開範圍；本規劃文件不再為其保留待辦時程。
+3. ~~**建議追問（`suggested_follow_ups`）**：暫不排入第二階段~~ **已改為定案動工**（見第 9.1 節），設計沿用先前草稿已規劃好的內容：LLM 回傳 0–4 個建議、前端渲染為可點擊 chip、點擊帶入輸入框但不自動送出。
 4. **前端輪數上限與後端 config 的同步方式**：定案為**後端透過 Inertia props 把 `qa_max_turns` 傳給前端**，前端一律讀取 props 提供的數值，不寫死 `5`（見第 4.1、9 節）。
 
 ---

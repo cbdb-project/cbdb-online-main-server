@@ -22,6 +22,7 @@ interface QaTurn {
     toolCalls?: ToolCallTrace[];
     evidence?: Evidence[];
     caveat?: string;
+    suggestedFollowUps?: string[];
     error?: string;
 }
 
@@ -214,6 +215,7 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                     sqlUsed: data.sql_used || [],
                     evidence: data.evidence || [],
                     caveat: data.caveat || '',
+                    suggestedFollowUps: Array.isArray(data.suggested_follow_ups) ? data.suggested_follow_ups : [],
                 };
                 if (Array.isArray(data.tool_calls)) {
                     patch.toolCalls = data.tool_calls.map((tc: Record<string, unknown>) => ({
@@ -266,6 +268,7 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                     sqlUsed: (data.sql_used as string[]) || [],
                     evidence: (data.evidence as Evidence[]) || [],
                     caveat: String(data.caveat || ''),
+                    suggestedFollowUps: Array.isArray(data.suggested_follow_ups) ? (data.suggested_follow_ups as string[]) : [],
                 });
                 break;
             case 'error':
@@ -302,7 +305,7 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
             )}
 
             {/* 訊息串：依序顯示每一輪 Q/A */}
-            {turns.map((turn) => (
+            {turns.map((turn, index) => (
                 <div key={turn.id} style={{ marginBottom: 20 }}>
                     <div style={{
                         fontWeight: 600,
@@ -337,7 +340,12 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
                     )}
 
                     {turn.answerMarkdown && (
-                        <TurnAnswer t={t} turn={turn} />
+                        <TurnAnswer
+                            t={t}
+                            turn={turn}
+                            showSuggestions={index === turns.length - 1}
+                            onPickSuggestion={setQuestion}
+                        />
                     )}
                 </div>
             ))}
@@ -465,11 +473,24 @@ export default function HistoricalQaPanel({ nlModel, answerFromNlEndpoint, answe
     );
 }
 
-/** 單輪答案卡片：答案本文、caveat、可折疊的 SQL/證據來源詳細資訊。 */
-function TurnAnswer({ t, turn }: { t: (key: string, replace?: Record<string, string>) => string; turn: QaTurn }) {
+/** 單輪答案卡片：答案本文、caveat、建議追問 chips、可折疊的 SQL/證據來源詳細資訊。 */
+function TurnAnswer({
+    t,
+    turn,
+    showSuggestions,
+    onPickSuggestion,
+}: {
+    t: (key: string, replace?: Record<string, string>) => string;
+    turn: QaTurn;
+    /** 見第 4.1 節：建議 chips 只顯示於最後一輪，較早輪次的建議已過時。 */
+    showSuggestions: boolean;
+    /** 點擊 chip 帶入輸入框文字，不自動送出。 */
+    onPickSuggestion: (text: string) => void;
+}) {
     const [showDetails, setShowDetails] = useState(false);
     const sqlUsed = turn.sqlUsed || [];
     const evidence = turn.evidence || [];
+    const suggestedFollowUps = showSuggestions ? (turn.suggestedFollowUps || []) : [];
 
     return (
         <div>
@@ -504,6 +525,33 @@ function TurnAnswer({ t, turn }: { t: (key: string, replace?: Record<string, str
                     color: 'var(--muted-foreground)',
                 }}>
                     ⚠ {turn.caveat}
+                </div>
+            )}
+
+            {suggestedFollowUps.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--muted-foreground)', display: 'block', marginBottom: 6 }}>
+                        {t('qa_suggested_follow_ups_label')}
+                    </label>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {suggestedFollowUps.map((suggestion, i) => (
+                            <button
+                                key={i}
+                                onClick={() => onPickSuggestion(suggestion)}
+                                style={{
+                                    padding: '6px 12px',
+                                    fontSize: '0.8rem',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 999,
+                                    backgroundColor: 'var(--surface-sunken)',
+                                    color: 'var(--foreground)',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                {suggestion}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             )}
 

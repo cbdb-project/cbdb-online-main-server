@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Log;
 class NaturalLanguageQueryService {
     use LlmFallbackTrait;
 
+    /** system prompt 要求 LLM 輸出 0–4 個建議追問；超過時截斷保留前 4 個，而非整欄位丟棄。 */
+    protected const MAX_SUGGESTED_FOLLOW_UPS = 4;
+
     protected DatabaseSchemaService $schemaService;
     protected NlQueryToolsService $toolsService;
     protected string $apiKey;
@@ -639,6 +642,7 @@ class NaturalLanguageQueryService {
                     'tool_calls' => !empty($allToolResults) ? $allToolResults : [],
                     'evidence' => $parsed['evidence'] ?? [],
                     'caveat' => $parsed['caveat'] ?? '部分歷史背景為模型補充，非資料庫直接欄位。',
+                    'suggested_follow_ups' => $parsed['suggested_follow_ups'] ?? [],
                     'model' => $this->model,
                 ];
             }
@@ -778,6 +782,7 @@ DYNASTIES;
 - sql_used: 陣列，包含此次回答中使用過的 SQL 語句（若無則為空陣列）
 - evidence: 陣列，每項包含 type（"database" 或 "model_background"）、label、detail
 - caveat: 關於資料來源的注意事項說明
+- suggested_follow_ups: 選填，陣列（0 到 4 個字串），根據本輪回答內容產生的延伸追問建議；若想不到有意義的建議，回傳空陣列即可，不要為了湊數而硬湊
 
 **回答撰寫指引：**
 - 資料庫查到的事實以明確語氣陳述
@@ -801,7 +806,8 @@ DYNASTIES;
     {"type": "database", "label": "BIOG_MAIN", "detail": "人物基本資料"},
     {"type": "model_background", "label": "歷史背景補充", "detail": "唐代詩歌文化背景"}
   ],
-  "caveat": "部分歷史背景為模型補充，非資料庫直接欄位。"
+  "caveat": "部分歷史背景為模型補充，非資料庫直接欄位。",
+  "suggested_follow_ups": ["李白有哪些著名的詩作？", "李白與杜甫是什麼關係？"]
 }
 
 **重要：回覆必須是純 JSON，不要使用 Markdown 代碼區塊或額外文字包裹。**
@@ -836,6 +842,7 @@ PROMPT;
             'sql_used' => [],
             'evidence' => [],
             'caveat' => '部分歷史背景為模型補充，非資料庫直接欄位。',
+            'suggested_follow_ups' => [],
         ];
 
         if (empty(trim($content))) {
@@ -870,6 +877,7 @@ PROMPT;
                     'sql_used' => $sqlText ? [$sqlText] : [],
                     'evidence' => [],
                     'caveat' => $defaults['caveat'],
+                    'suggested_follow_ups' => [],
                 ];
             }
 
@@ -879,6 +887,7 @@ PROMPT;
                 'sql_used' => $parsed['sql_used'] ?? [],
                 'evidence' => $parsed['evidence'] ?? [],
                 'caveat' => $parsed['caveat'] ?? $defaults['caveat'],
+                'suggested_follow_ups' => $this->extractSuggestedFollowUps($this->rawSuggestedFollowUpsValue($jsonContent)),
             ];
         }
 
@@ -887,6 +896,45 @@ PROMPT;
             'answer_markdown' => $content,
             'summary' => mb_substr($content, 0, 100),
         ]);
+    }
+
+    /**
+     * 見 docs/QUERY_PLAYGROUND_QA_MULTITURN_PLAN.md 第 7.2 節：`json_decode(..., true)`
+     * 對同一段 JSON 文字做關聯陣列解碼後，JSON array（例如 `["a","b"]`）與 JSON object
+     * （即使鍵是連續數字字串，例如 `{"0":"a","1":"b"}`）會解出完全相同形狀的 PHP array，
+     * 「原始 JSON 到底是 array 還是 object」這個資訊在關聯解碼當下就已經遺失，事後用
+     * `array_is_list()` 等純陣列形狀檢查一律無法還原、必然有漏網案例。
+     *
+     * 唯一可靠做法：對同一段 JSON 文字額外做一次**非**關聯解碼（`assoc=false`）。此模式下
+     * `json_decode()` 對 JSON array 一律回傳 PHP `array`、對 JSON object 一律回傳
+     * `stdClass`，與鍵名稱/內容完全無關，才能真正還原原始型別。
+     */
+    protected function rawSuggestedFollowUpsValue(string $jsonContent): mixed {
+        $nonAssoc = json_decode($jsonContent, false, 512, JSON_INVALID_UTF8_IGNORE);
+
+        return is_object($nonAssoc) ? ($nonAssoc->suggested_follow_ups ?? null) : null;
+    }
+
+    /**
+     * suggested_follow_ups 為選填欄位，LLM 輸出格式錯誤（非陣列、或陣列含非字串元素）
+     * 時整個欄位忽略、回傳空陣列，不可因為這個選填欄位格式錯誤讓整個回答解析失敗。
+     * `$value` 須來自 {@see rawSuggestedFollowUpsValue()} 的非關聯解碼結果，這裡的
+     * `is_array()` 才會是可靠的「原始 JSON 確實是 array」判斷。
+     *
+     * @return array<int, string>
+     */
+    protected function extractSuggestedFollowUps(mixed $value): array {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        foreach ($value as $item) {
+            if (!is_string($item)) {
+                return [];
+            }
+        }
+
+        return array_slice(array_values($value), 0, self::MAX_SUGGESTED_FOLLOW_UPS);
     }
 
     /**

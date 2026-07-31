@@ -422,6 +422,7 @@ class QueryPlaygroundController extends Controller {
                         'tool_calls' => $result['tool_calls'] ?? [],
                         'evidence' => $result['evidence'] ?? [],
                         'caveat' => $result['caveat'] ?? '',
+                        'suggested_follow_ups' => $result['suggested_follow_ups'] ?? [],
                         'model' => $result['model'] ?? null,
                     ]);
                 } else {

@@ -23,31 +23,7 @@ class OperationsProposalController extends Controller {
     protected array $tableColumnCache = [];
 
     /**
-     * 表名到模型類的映射
-     * 用於將審批應用到資料表時使用 Eloquent 模型，以觸發觀察者
-     *
-     * @var array
-     */
-    protected $tableModelMap = [
-        'BIOG_MAIN' => \App\Models\BiogMain::class,
-        // 未來可以添加更多表的映射
-        // 注意：ALTNAME_DATA 使用復合主鍵，不使用 Eloquent，改為手動調用索引服務
-    ];
-
-    /**
-     * 核准套用時的「不可清空」欄位守衛（per-table）：payload 將該欄寫成空、而資料列當下有值時，
-     * 擋下核准。兜住「提交端驗證修復前的存量 pending 提案」與 legacy 提交路徑（所有提案核准必經此處）。
-     * 以「當下 DB 現值」而非提案存檔時的 original 比對：提案送出後若他人已補值，清空它的舊提案照樣被擋。
-     */
-    protected const NO_CLEAR_COLUMNS_ON_APPLY = [
-        'BIOG_MAIN' => [
-            'c_mingzi_chn' => '名（中）',
-            'c_mingzi' => '拼音名',
-        ],
-    ];
-
-    /**
-     * 段一／段二：以 v2 mutation handler 重放核准的人物子資源提案（表名 → API resource）。
+     * 段一／段二／段三：以 v2 mutation handler 重放核准的人物提案（表名 → API resource）。
      *
      * 這些表的提案原本落到通用行覆寫（applyCreate/Update/DeleteProposal）或 legacy repository
      * 委派（applyOffice/PossessionCreate/PossessionUpdate/EventProposal），繞過聚合的
@@ -61,12 +37,25 @@ class OperationsProposalController extends Controller {
      * （對齊 PostingMutationHandler／PossessionMutationHandler／EventMutationHandler／
      * *CreateHandler 既有的 direct 地址副表同步邏輯）。
      *
+     * 段三（BIOG_MAIN，人物主檔）三種操作各按 direct 語義重放，不照抄子資源形狀：
+     *  - update → BiogMainMutationHandler：核准時把提案 delta 套用到「當下」資料列並重跑
+     *    BasicInformationRequest 驗證（含「名（中）／拼音名原值非空即不可清空」護欄，取代先前
+     *    控制器層的 NO_CLEAR_COLUMNS_ON_APPLY——語義等價且 direct／proposal 同一份）。
+     *  - delete → BiogMainDeleteHandler：人物「刪除」是軟刪除（c_name_chn='<待删除>' 的 UPDATE）。
+     *    先前通用 applyDeleteProposal() 會對 BIOG_MAIN 做**物理 DELETE**——與 direct 語義相反，
+     *    且在入邊 FK 尚為 CASCADE 期間會靜默連鎖刪除 25 張子表資料（見
+     *    docs/CASCADE_TO_RESTRICT_MIGRATION_NOTES.md §11.1）。現行無任何提交端會產生
+     *    BIOG_MAIN 的 TYPE_PROPOSAL_DELETE，此路由是防禦性封洞。
+     *  - create → BiogMainCreateHandler：帶 c_personid 驗證（非 0、不得已存在、不得過大）與
+     *    欄位白名單，取代先前的盲 Eloquent create（僅 legacy 提交路由理論可達）。
+     *
      * 不含：委派檔 KIN_DATA／ASSOC_DATA（兩人互為鏡像的親屬／社會關係，核准時的鏡像衝突語義
      * 仍在 legacy 那側、需先裁定域邏輯才能收斂，見 docs/PERSON_PROPOSAL_PATHS.md §5.1）；
      * code 表提案走 CodesController 自己的核准路徑、不經此。
      * auth 無礙：canReviewProposals() 與 canWriteDirectly() 為同一謂詞，能到核准端點者必過 authorizeDirect()。
      */
     protected const HANDLER_ROUTED_RESOURCES = [
+        'BIOG_MAIN' => 'basicinformation',
         'ALTNAME_DATA' => 'altnames',
         'BIOG_ADDR_DATA' => 'addresses',
         'ENTRY_DATA' => 'entries',
@@ -505,6 +494,16 @@ class OperationsProposalController extends Controller {
         $body = json_decode($response->getContent(), true);
         if ($status < 200 || $status >= 300) {
             $message = is_array($body) ? (string) ($body['message'] ?? '提案套用失敗') : '提案套用失敗';
+            // handler 的欄位級錯誤（如 BIOG_MAIN 的「名不能為空」）對審核者有指向性，攤平附在訊息後。
+            $fieldErrors = is_array($body['errors'] ?? null)
+                ? implode('；', array_map(
+                    static fn ($messages) => implode('；', array_map('strval', (array) $messages)),
+                    $body['errors']
+                ))
+                : '';
+            if ($fieldErrors !== '') {
+                $message .= '：'.$fieldErrors;
+            }
 
             // 交回外層交易回滾；訊息不外洩底層細節（approve() 已有 ValidationException/QueryException 友善提示）。
             throw new \RuntimeException("提案套用失敗（{$resource}/{$handlerOperation}）：{$message}");
@@ -707,15 +706,6 @@ class OperationsProposalController extends Controller {
             throw new \RuntimeException('資料已存在，無法再次新增。');
         }
 
-        // 檢查是否有對應的模型類，如果有則使用 Eloquent 模型以觸發觀察者
-        if (isset($this->tableModelMap[$table])) {
-            $modelClass = $this->tableModelMap[$table];
-            $model = $modelClass::create($data);
-
-            return $this->convertRowToArray($model);
-        }
-
-        // 如果沒有對應的模型，則使用原有的 DB::table() 方法
         DB::table($table)->insert($data);
 
         $row = DB::table($table)->where($this->buildKeyConditions($keyColumns, $data))->first();
@@ -731,23 +721,6 @@ class OperationsProposalController extends Controller {
         return $this->convertRowToArray($row);
     }
 
-    /**
-     * 「不可清空」守衛：提案 payload 把 NO_CLEAR_COLUMNS_ON_APPLY 所列欄位寫成空白、
-     * 而該列當下（$currentRow）有值時，拒絕核准。原本即為空的欄位不受影響（可維持空）。
-     */
-    protected function assertNoClearColumns(string $table, array $data, array $currentRow): void {
-        foreach (self::NO_CLEAR_COLUMNS_ON_APPLY[$table] ?? [] as $column => $label) {
-            if (!array_key_exists($column, $data)) {
-                continue;
-            }
-            $proposed = trim((string) ($data[$column] ?? ''));
-            $current = trim((string) ($currentRow[$column] ?? ''));
-            if ($proposed === '' && $current !== '') {
-                throw new \RuntimeException("此提案會清空既有的「{$label}」，無法核准。");
-            }
-        }
-    }
-
     protected function applyUpdateProposal(string $table, array $data, array $keyColumns, array $original): array {
         if (empty($original)) {
             throw new \RuntimeException('缺少原始資料，無法更新。');
@@ -756,43 +729,10 @@ class OperationsProposalController extends Controller {
         $data = $this->enforceAuditFieldsForUpdate($table, $data, $original);
         $conditions = $this->buildKeyConditions($keyColumns, $original);
 
-        // 檢查是否有對應的模型類，如果有則使用 Eloquent 模型以觸發觀察者
-        if (isset($this->tableModelMap[$table])) {
-            $modelClass = $this->tableModelMap[$table];
-            $model = $modelClass::where($conditions)->first();
-            if (!$model) {
-                throw new \RuntimeException('資料不存在或已被刪除，無法更新。');
-            }
-
-            $this->assertNoClearColumns($table, $data, $model->toArray());
-
-            foreach ($keyColumns as $column) {
-                if (!array_key_exists($column, $original)) {
-                    continue;
-                }
-                if (array_key_exists($column, $data) && !$this->keyValuesMatch($data[$column], $original[$column])) {
-                    throw new \RuntimeException('提案不可修改主鍵欄位。');
-                }
-            }
-
-            $updatePayload = array_diff_key($data, array_flip($keyColumns));
-            if (!empty($updatePayload)) {
-                // 使用 update() 方法，這會觸發 Observer 並強制更新
-                $model->update($updatePayload);
-                // 重新讀取以確保獲取最新數據
-                $model->refresh();
-            }
-
-            return $this->convertRowToArray($model);
-        }
-
-        // 如果沒有對應的模型，則使用原有的 DB::table() 方法
         $current = DB::table($table)->where($conditions)->first();
         if (!$current) {
             throw new \RuntimeException('資料不存在或已被刪除，無法更新。');
         }
-
-        $this->assertNoClearColumns($table, $data, (array) $current);
 
         $updatePayload = $this->buildUpdatePayload($data, $keyColumns, $original);
 

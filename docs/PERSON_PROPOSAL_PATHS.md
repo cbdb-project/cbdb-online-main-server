@@ -53,7 +53,7 @@ direct 與 proposal 因此天然對等，不需要兩邊各自維護。
 | events | `EVENTS_DATA` | v2 handler | ✅ **A** | ✅ **A** | ✅ **A** |
 | kinship | `KIN_DATA` | v2 handler | ⚠ B | ⚠ B | ❌ **C** ＋ 鏡像同步 |
 | associations | `ASSOC_DATA` | v2 handler | ⚠ B | ⚠ B | ❌ **C** ＋ 鏡像同步 |
-| **biogmain** | `BIOG_MAIN` | v2 handler | ❌ **C** | ❌ **C**（Eloquent＋不可清空守衛） | ❌ **C** |
+| **biogmain** | `BIOG_MAIN` | v2 handler | ✅ **A** | ✅ **A** | ✅ **A**（軟刪除） |
 
 **注意分派順序**：`applyProposal()` 先判 A，再判 DELETE→C，才輪到 B（kinship／associations）的
 兩個分支。委派檔（B）的 DELETE 因此其實不走 B、而是掉進 C，只是 `approve()` 另外替 ASSOC／KIN
@@ -134,6 +134,20 @@ eventStoreById/eventUpdateById` **未刪除**：Blade 版 `BasicInformationOffic
 `BasicInformationPossessionController`／`BasicInformationEventsController` 仍在用（AGENTS.md
 所述 flag-gated 回退頁面），這幾個 repository 方法繼續服務直接編輯，只是核准不再另外呼叫它們。
 
+### 4.6 段三：`BIOG_MAIN`（人物主檔）收斂到路徑 A——三種操作各按 direct 語義路由
+
+依 §6 建議先查清三種操作的實際語義後收斂（不照抄 update 的形狀硬套）：
+
+| 操作 | 重放對象 | 語義決定 |
+|---|---|---|
+| UPDATE | `BiogMainMutationHandler`（direct） | 唯一有活提交端的操作（v2 `mode=proposal` 與 legacy Blade `action=proposal` 兩條）。核准＝把提案 delta（`diff(original, data)`，BLOCKED_FIELDS 由 handler 濾除）套用到**當下**資料列並重跑 `BasicInformationRequest` 驗證。「名（中）／拼音名不可清空」護欄由 handler 的 `validationRules($original)` 提供（原值非空才掛 required，§5.2 確認之等價護欄），控制器層的 `NO_CLEAR_COLUMNS_ON_APPLY`／`assertNoClearColumns`／`tableModelMap` Eloquent 分支隨之移除（收斂後不可達） |
+| DELETE | `BiogMainDeleteHandler`（direct） | **現行沒有任何提交端會產生 `BIOG_MAIN` 的 TYPE_PROPOSAL_DELETE**（眾包刪除走 op_type=4＋crowdsourcing_status=2，另一條審核流）；此路由是防禦性封洞——收斂前通用 `applyDeleteProposal()` 會對 BIOG_MAIN 做**物理 DELETE**，與 direct 的軟刪除（`c_name_chn='<待删除>'` 的 UPDATE）語義相反，且在入邊 FK 尚為 CASCADE 期間會靜默連鎖刪除 25 張子表資料（見 CASCADE_TO_RESTRICT_MIGRATION_NOTES.md §11.1） |
+| CREATE | `BiogMainCreateHandler`（direct） | 僅 legacy 提交路由理論可達（UI 不產生；人物新增另有流程）。重放帶 `c_personid` 驗證（非 0、不得已存在、不得過大）與欄位白名單，取代先前的盲 Eloquent create |
+
+回歸測試：`tests/Feature/BiogMainProposalTest.php`（含軟刪除取代物理 DELETE、create 撞既有
+personid fail-closed、清空名（中）被 handler 驗證擋下）。核准失敗訊息現會攤平 handler 的
+欄位級錯誤（如「參數校驗失敗：名不能為空」），對審核者保留指向性。
+
 ---
 
 ## 5. 還沒做什麼
@@ -154,17 +168,10 @@ eventStoreById/eventUpdateById` **未刪除**：Blade 版 `BasicInformationOffic
 頁面獨立提案／編輯同一組關係，核准時要怎麼判定衝突、要不要覆寫對面、由誰的版本為準，
 是尚未理清的領域決策，遷到路徑 A 前需要先裁定清楚，不只是接線。**本輪刻意不動**。
 
-### 5.2 `BIOG_MAIN`（路徑 C）——人物主記錄的核准仍是盲寫
+### 5.2 `BIOG_MAIN`——✅ 已收斂（見 §4.6）
 
-`BIOG_MAIN` 的 update 提案核准走通用 Eloquent 更新（`tableModelMap` → `BiogMain::update()`），
-直接編輯卻走 `BiogMainMutationHandler`。要收斂需先確認 handler 側具備等價於
-`NO_CLEAR_COLUMNS_ON_APPLY`（`c_mingzi_chn`／`c_mingzi` 不可被清空）的護欄，否則會失去這道保護。
-
-**現況更新**：查證 `BiogMainMutationHandler::validationRules()`（自 2026-07-15 起）已存在等價
-護欄（原值非空才掛 required，註解明寫「direct 與 proposal 一致」），§5.2 原本要求的前置確認
-**已滿足**——收斂到路徑 A 目前僅剩「路由＋驗證」，是下一個可做的項目（BIOG_MAIN 無鏡像、
-無地址副表，形狀比 §4.5 更簡單；但 CREATE／DELETE 語義需另外確認：人物「刪除」是軟刪除
-而非物理 DELETE，「新增」是否有對應的 create 提案流程需先查證再收斂，不能照抄 update 的做法）。
+原記載的前置確認（handler 側「不可清空」護欄）與 CREATE／DELETE 語義查證均已完成並落地，
+三種操作全部路由到對應 direct handler 重放。
 
 ### 5.3 提交端的第二條路徑（legacy）
 
@@ -178,15 +185,15 @@ Blade 時代的提案提交入口，涵蓋全部 13 個資源，**直接 `record
 
 ## 6. 建議順序
 
-1. **`BIOG_MAIN` update 收斂到 A**：guard 已確認存在（§5.2），先查清 CREATE／DELETE 的實際語義
-   （軟刪除、是否有 create 提案）再決定三種操作各自怎麼路由，不要照抄 update 的形狀硬套。
+1. ~~**`BIOG_MAIN` 收斂到 A**~~ ✅ 已完成（§4.6，三種操作各按 direct 語義路由）。
 2. **kinship／associations 收斂到 A**（需先裁定鏡像語義）：建議單獨開分支、單獨 review，
    因為它改的是核准時的鏡像衝突行為——這是唯一還需要「重新裁定域邏輯」而非單純接線的項目。
 3. **下架 legacy 提交路徑**：確認 Blade 頁全數不再使用後移除路由，消滅繞過提交端驗證的入口。
 
-完成 1–2 後，`OperationsProposalController` 的路徑 B／C 可整段移除
-（含 `applyKinship/AssocProposal`、`applyCreate/Update/DeleteProposal`、`tableModelMap` 等
-重複實作），控制器塌成「decode → resolve → handle → updateStatus」。
+完成 2 後，`OperationsProposalController` 的路徑 B／C 可整段移除
+（含 `applyKinship/AssocProposal`、`applyCreate/Update/DeleteProposal` 等重複實作；
+`tableModelMap` 與 `NO_CLEAR_COLUMNS_ON_APPLY` 已隨 §4.6 移除），
+控制器塌成「decode → resolve → handle → updateStatus」。
 
 ---
 

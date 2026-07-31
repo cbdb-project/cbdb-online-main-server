@@ -419,7 +419,8 @@ class BiogMainProposalTest extends TestCase {
 
     #[Test]
     public function testApproveRejectsProposalThatWouldClearExistingMingzi() {
-        // 核准端「不可清空」守衛：payload 把名（中）寫成空、而該列當下有值 → 拒絕核准、資料不變、提案維持 pending。
+        // 「不可清空」語義（核准＝重放 BiogMainMutationHandler direct）：payload 把名（中）寫成空、
+        // 而該列當下有值 → handler 驗證擋下（名不能為空）、資料不變、提案維持 pending。
         // 模擬「提交端驗證修復前的存量 pending 提案」與 legacy 路徑提交的提案。
         $admin = $this->makeAdmin();
         $this->actingAs($admin);
@@ -463,7 +464,7 @@ class BiogMainProposalTest extends TestCase {
 
         $response->assertRedirect();
         $flash = session('flash_notification', collect())->toArray();
-        $this->assertStringContainsString('清空既有的「名（中）」', $flash[0]['message'] ?? '');
+        $this->assertStringContainsString('名不能為空', $flash[0]['message'] ?? '');
 
         // 資料未變、提案未被標記 approved（交易整筆回滾）。
         $this->assertDatabaseHas('BIOG_MAIN', [
@@ -526,6 +527,168 @@ class BiogMainProposalTest extends TestCase {
         $operation->refresh();
         $payload = json_decode($operation->resource_data, true);
         $this->assertSame('approved', $payload['__review_status']);
+    }
+
+    #[Test]
+    public function testApproveBiogMainDeleteProposalSoftDeletesInsteadOfPhysicalDelete() {
+        // BIOG_MAIN 刪除提案核准＝重放 BiogMainDeleteHandler（軟刪除：c_name_chn='<待删除>' 的 UPDATE）。
+        // 收斂前通用 applyDeleteProposal() 會對 BIOG_MAIN 做物理 DELETE——與 direct 語義相反，
+        // 且在入邊 FK 尚為 CASCADE 期間會靜默連鎖刪除子表資料。
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        $personId = 6;
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => $personId,
+            'c_name_chn' => '孫六',
+            'c_notes' => 'Some notes',
+        ]);
+
+        $operation = Operation::create([
+            'user_id' => 100,
+            'c_personid' => $personId,
+            'op_type' => Operation::TYPE_PROPOSAL_DELETE,
+            'resource' => 'BIOG_MAIN',
+            'resource_id' => (string) $personId,
+            'resource_data' => json_encode([
+                'c_personid' => $personId,
+                'c_name_chn' => '孫六',
+                '__key_columns' => ['c_personid'],
+                '__review_status' => 'pending',
+            ]),
+            'resource_original' => json_encode([
+                'c_personid' => $personId,
+                'c_name_chn' => '孫六',
+                'c_notes' => 'Some notes',
+            ]),
+        ]);
+
+        $this->post(route('operations.proposals.approve', $operation), [
+            'review_comment' => 'ok to delete',
+        ])->assertRedirect();
+
+        // 原列仍在（軟刪除），僅改名為刪除標記；notes 等其他欄位不動。
+        $this->assertDatabaseHas('BIOG_MAIN', [
+            'c_personid' => $personId,
+            'c_name_chn' => '<待删除>',
+            'c_notes' => 'Some notes',
+        ]);
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status']);
+
+        // handler 自寫 op_type=4（TYPE_DELETE）final operation 與 audit（operation='UPDATE'，軟刪除語義）。
+        $this->assertDatabaseHas('operations', [
+            'c_personid' => $personId,
+            'op_type' => Operation::TYPE_DELETE,
+            'resource' => 'BIOG_MAIN',
+        ]);
+        $this->assertDatabaseHas('audit_log', [
+            'table_name' => 'BIOG_MAIN',
+            'operation' => 'UPDATE',
+        ]);
+    }
+
+    #[Test]
+    public function testApproveBiogMainCreateProposalRejectedWhenPersonIdExists() {
+        // BIOG_MAIN create 提案核准＝重放 BiogMainCreateHandler：c_personid 已存在 → fail-closed，
+        // 不再走收斂前的盲 Eloquent create。
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 7,
+            'c_name_chn' => '既有人物',
+        ]);
+
+        $operation = Operation::create([
+            'user_id' => 100,
+            'c_personid' => 7,
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource' => 'BIOG_MAIN',
+            'resource_id' => '7',
+            'resource_data' => json_encode([
+                'c_personid' => 7,
+                'c_surname_chn' => '錢',
+                'c_mingzi_chn' => '七',
+                'c_mingzi' => 'Qi',
+                '__key_columns' => ['c_personid'],
+                '__review_status' => 'pending',
+            ]),
+        ]);
+
+        $this->post(route('operations.proposals.approve', $operation), [
+            'review_comment' => 'try approve',
+        ])->assertRedirect();
+
+        $flash = session('flash_notification', collect())->toArray();
+        $this->assertStringContainsString('審核失敗', $flash[0]['message'] ?? '');
+
+        // 既有列未被覆寫；提案維持 pending。
+        $this->assertDatabaseHas('BIOG_MAIN', [
+            'c_personid' => 7,
+            'c_name_chn' => '既有人物',
+        ]);
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('pending', $payload['__review_status']);
+    }
+
+    #[Test]
+    public function testApproveBiogMainCreateProposalCreatesViaHandler() {
+        // create 提案核准成功路徑：經 BiogMainCreateHandler 白名單＋c_personid 驗證後由
+        // repository store 落庫（事務＋operation＋audit）。
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin);
+
+        DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 1,
+            'c_name_chn' => '既有人物',
+        ]);
+
+        $operation = Operation::create([
+            'user_id' => 100,
+            'c_personid' => 8,
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource' => 'BIOG_MAIN',
+            'resource_id' => '8',
+            'resource_data' => json_encode([
+                'c_personid' => 8,
+                'c_surname_chn' => '錢',
+                'c_mingzi_chn' => '八',
+                'c_surname' => 'Qian',
+                'c_mingzi' => 'Ba',
+                'c_notes' => 'Created via proposal',
+                '__key_columns' => ['c_personid'],
+                '__review_status' => 'pending',
+            ]),
+        ]);
+
+        $this->post(route('operations.proposals.approve', $operation), [
+            'review_comment' => 'ok to create',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('BIOG_MAIN', [
+            'c_personid' => 8,
+            'c_name_chn' => '錢八',
+            'c_notes' => 'Created via proposal',
+        ]);
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status']);
+
+        // handler 自寫 op_type=1（TYPE_CREATE）final operation 與 INSERT audit。
+        $this->assertDatabaseHas('operations', [
+            'c_personid' => 8,
+            'op_type' => Operation::TYPE_CREATE,
+            'resource' => 'BIOG_MAIN',
+        ]);
+        $this->assertDatabaseHas('audit_log', [
+            'table_name' => 'BIOG_MAIN',
+            'operation' => 'INSERT',
+        ]);
     }
 
     #[Test]

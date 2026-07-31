@@ -4,6 +4,12 @@
 
 ## 2026-07
 
+### 提案核准段三：BIOG_MAIN 收斂到 v2 handler 重放（人物主檔告別盲寫路徑 C）
+- `BIOG_MAIN` 加入 `OperationsProposalController::HANDLER_ROUTED_RESOURCES`，三種操作各按 direct 語義重放：update → `BiogMainMutationHandler`（delta 套用當下資料列＋`BasicInformationRequest` 驗證，「名（中）／拼音名不可清空」護欄改由 handler 統一提供）；delete → `BiogMainDeleteHandler`（軟刪除）；create → `BiogMainCreateHandler`（c_personid 驗證＋欄位白名單）。
+- **封掉物理 DELETE 洞**：收斂前若出現 BIOG_MAIN 的刪除提案，通用 `applyDeleteProposal()` 會直接 `DELETE FROM BIOG_MAIN`——與 direct 的軟刪除語義相反，且在入邊 FK 尚為 CASCADE 的觀察期會靜默連鎖刪除 25 張子表資料。現行雖無提交端會產生此類提案，屬防禦性封洞。
+- 隨收斂移除不可達死碼：`tableModelMap`、`NO_CLEAR_COLUMNS_ON_APPLY`／`assertNoClearColumns`、applyCreate/UpdateProposal 的 Eloquent 分支。核准失敗訊息攤平 handler 欄位級錯誤（如「名不能為空」）保留審核指向性。
+- 詳見 `docs/PERSON_PROPOSAL_PATHS.md` §4.6；回歸測試 `tests/Feature/BiogMainProposalTest.php`（13 tests）。
+
 ### 外部資料庫引用瀏覽器改版：/external-db-link、開放活躍帳號、Blade 版下架
 - 原 admin/wiki-maintenance 頁面全面翻新：改用共用 DataTable（TanStack）元件，新增搜尋（人名／頁碼標題模糊、純數字比對人物 ID）、白名單欄位伺服器端排序，列表補朝代／指數年／指數地址欄；換頁／排序／搜尋／來源全同步進 URL query，連結可分享復現。
 - 權限自「活躍管理員」降為「活躍帳號」（唯讀瀏覽頁；排序／搜尋門檻與 codes 對齊），側欄項目自「管理工具」移入「專家工具」。

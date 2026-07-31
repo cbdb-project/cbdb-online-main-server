@@ -2,11 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Models\BiogMain;
 use App\Models\Operation;
 use App\Models\User;
 use App\Services\CharVariantMapService;
-use App\Services\ProposalRevisionService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -277,18 +275,6 @@ class ApiV2MutateTest extends TestCase {
         ], $overrides));
     }
 
-    /**
-     * BIOG_MAIN proposal update 第一階段強制要求 meta.base_revision（見
-     * docs/PROPOSAL_REVISION_HASH_DESIGN.md），測試以此讀取目前 DB 資料列現算出的
-     * revision，比照 handler 內 `BiogMain::find($personId)->toArray()` 的算法。
-     */
-    protected function currentBiogMainRevision(int $personId = 138841): string {
-        $row = BiogMain::find($personId);
-        $this->assertNotNull($row, "測試前置：找不到 c_personid={$personId} 的 BIOG_MAIN 列");
-
-        return (new ProposalRevisionService())->hash('BIOG_MAIN', $row->toArray());
-    }
-
     #[Test]
     public function testBiogMainNullableFieldsSentinelFullyIdempotent() {
         // basic_info 的 nullable 欄（c_female / c_index_year 等，real schema nullable（0/值有意義））語義與子資源碼欄不同：
@@ -522,7 +508,7 @@ class ApiV2MutateTest extends TestCase {
                 'c_surname' => 'Lv',
                 'c_surname_rm' => 'Lv',
             ],
-            'meta' => ['comment' => '提案修正姓氏拼音', 'base_revision' => $this->currentBiogMainRevision()],
+            'meta' => ['comment' => '提案修正姓氏拼音'],
         ])->assertOk();
 
         $operation = DB::table('operations')
@@ -614,7 +600,7 @@ class ApiV2MutateTest extends TestCase {
             'changes' => [
                 'c_mingzi_chn' => '淸',
             ],
-            'meta' => ['comment' => '提案修正名字異體字', 'base_revision' => $this->currentBiogMainRevision()],
+            'meta' => ['comment' => '提案修正名字異體字'],
         ]);
 
         $response->assertOk();
@@ -650,7 +636,7 @@ class ApiV2MutateTest extends TestCase {
             'changes' => [
                 'c_mingzi_chn' => '峯',
             ],
-            'meta' => ['comment' => '提案修正名字', 'base_revision' => $this->currentBiogMainRevision()],
+            'meta' => ['comment' => '提案修正名字'],
         ]);
 
         $response->assertOk();
@@ -688,7 +674,6 @@ class ApiV2MutateTest extends TestCase {
             ],
             'meta' => [
                 'comment' => '提案修正姓氏',
-                'base_revision' => $this->currentBiogMainRevision(),
             ],
         ]);
 
@@ -737,71 +722,10 @@ class ApiV2MutateTest extends TestCase {
         $this->assertSame('update', $payload['__proposal_meta']['action']);
         $this->assertSame('biogmain', $payload['__proposal_meta']['resource_type']);
         $this->assertSame('提案修正姓氏', $payload['__proposal_meta']['comment']);
-        $this->assertSame($this->currentBiogMainRevision(), $payload['__proposal_meta']['base_revision']);
-        $this->assertSame(ProposalRevisionService::ALGO, $payload['__proposal_meta']['revision_algo']);
         $this->assertSame('張', $original['c_surname_chn']);
         $this->assertSame('張忠', $original['c_name_chn']);
 
         $this->assertDatabaseCount('audit_log', 0);
-    }
-
-    #[Test]
-    public function testProposalBiogMainUpdateRejectsMissingBaseRevision() {
-        $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'biog-main-proposal-no-revision@example.com');
-        $this->actingAs($user);
-        $this->seedBiogMain();
-
-        $response = $this->postJson('/api/v2/mutate', [
-            'resource' => 'basicinformation',
-            'person_id' => 138841,
-            'mode' => 'proposal',
-            'operation' => 'update',
-            'target' => ['pk' => ['c_personid' => 138841]],
-            'changes' => ['c_surname_chn' => '章'],
-            'meta' => ['comment' => '缺少 base_revision'],
-        ]);
-
-        $response->assertStatus(422)
-            ->assertJson([
-                'ok' => false,
-                'errors' => ['base_revision' => ['required']],
-            ]);
-
-        $this->assertDatabaseCount('operations', 0);
-    }
-
-    #[Test]
-    public function testProposalBiogMainUpdateRejectsStaleBaseRevision() {
-        $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'biog-main-proposal-stale@example.com');
-        $this->actingAs($user);
-        $this->seedBiogMain();
-
-        // 模擬真實流程：使用者先取得當下 base_revision，
-        // 之後、送出提案前，資料列已被其他人修改。
-        $staleBaseRevision = $this->currentBiogMainRevision();
-        DB::table('BIOG_MAIN')->where('c_personid', 138841)->update(['c_surname_chn' => '李']);
-
-        $response = $this->postJson('/api/v2/mutate', [
-            'resource' => 'basicinformation',
-            'person_id' => 138841,
-            'mode' => 'proposal',
-            'operation' => 'update',
-            'target' => ['pk' => ['c_personid' => 138841]],
-            'changes' => ['c_mingzi_chn' => '安'],
-            'meta' => [
-                'comment' => '基於舊版本提交',
-                'base_revision' => $staleBaseRevision,
-            ],
-        ]);
-
-        $response->assertStatus(409)
-            ->assertJson([
-                'ok' => false,
-                'errors' => ['base_revision' => ['stale']],
-            ]);
-
-        $this->assertDatabaseCount('operations', 0);
-        $this->assertDatabaseHas('BIOG_MAIN', ['c_personid' => 138841, 'c_surname_chn' => '李', 'c_mingzi_chn' => '忠']);
     }
 
     #[Test]
@@ -810,23 +734,13 @@ class ApiV2MutateTest extends TestCase {
         $this->actingAs($this->makeUser(email: 'biog-no-clear@example.com'));
         $this->seedBiogMain();
 
-        // 三種清空嘗試皆遭拒（direct 與 proposal 皆不寫入），row 全程未變，
-        // base_revision 可在迴圈外算一次沿用；proposal 分支需帶正確值，
-        // 否則 422 會來自「缺少 base_revision」而非本測試要驗證的「不可清空」規則。
-        $baseRevision = $this->currentBiogMainRevision();
-
         foreach (['direct', 'proposal'] as $mode) {
             foreach ([['c_mingzi_chn' => ''], ['c_mingzi_chn' => null], ['c_mingzi' => '']] as $changes) {
-                $response = $this->postJson('/api/v2/mutate', [
+                $this->postJson('/api/v2/mutate', [
                     'resource' => 'basicinformation', 'person_id' => 138841, 'mode' => $mode, 'operation' => 'update',
                     'target' => ['pk' => ['c_personid' => 138841]],
                     'changes' => $changes,
-                    ...($mode === 'proposal' ? ['meta' => ['base_revision' => $baseRevision]] : []),
-                ]);
-                $response->assertStatus(422);
-                // 確認 422 來自「不可清空」規則本身，不是 base_revision 檢查搶先擋下
-                // （否則本測試會對 proposal 分支變成假陽性、沒有真的驗證到清空規則）。
-                $this->assertArrayNotHasKey('base_revision', $response->json('errors') ?? []);
+                ])->assertStatus(422);
             }
         }
 
@@ -848,7 +762,7 @@ class ApiV2MutateTest extends TestCase {
                 'resource' => 'basicinformation', 'person_id' => 138841, 'mode' => $mode, 'operation' => 'update',
                 'target' => ['pk' => ['c_personid' => 138841]],
                 'changes' => ['c_index_year' => $mode === 'direct' ? 1101 : 1102],
-                ...($mode === 'proposal' ? ['meta' => ['comment' => '僅改指數年', 'base_revision' => $this->currentBiogMainRevision()]] : []),
+                ...($mode === 'proposal' ? ['meta' => ['comment' => '僅改指數年']] : []),
             ])->assertOk();
 
             $row = DB::table('BIOG_MAIN')->where('c_personid', 138841)->first();

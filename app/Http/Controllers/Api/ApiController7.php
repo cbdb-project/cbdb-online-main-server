@@ -13,12 +13,13 @@ use App\Models\AddrCode;
 use App\Models\AssocCode;
 use App\Models\BiogMain;
 use App\Models\Dynasty;
+use App\Support\ExecutionTimeLimit;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 ini_set('memory_limit', '512M');
-ini_set('max_execution_time', 300);
+ExecutionTimeLimit::extendTo(300);  // 測試環境為 no-op，避免套住整個 PHPUnit process
 
 class ApiController7 extends Controller {
     use AuthenticatesUsers;

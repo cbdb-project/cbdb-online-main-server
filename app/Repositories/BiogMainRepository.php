@@ -35,13 +35,14 @@ use App\Services\ExplicitCascadeLogger;
 use App\Services\PinyinDictionary;
 use App\Services\VariantCharNormalizer;
 use App\Support\CompositePrimaryKey;
+use App\Support\ExecutionTimeLimit;
 use App\Support\PinyinUmlaut;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
 //修改結束
 
 //20230628建安修改
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -49,7 +50,7 @@ use Illuminate\Support\Facades\Log;
 //修改結束
 
 ini_set('memory_limit', '512M');
-ini_set('max_execution_time', 300);
+ExecutionTimeLimit::extendTo(300);  // 測試環境為 no-op，避免套住整個 PHPUnit process
 
 /**
  * Class BiogMainRepository

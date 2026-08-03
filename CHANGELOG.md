@@ -15,6 +15,8 @@
 - `guzzlehttp/guzzle` 7.10.0 → 7.15.2、`guzzlehttp/psr7` 2.11.0 → 2.13.0（連帶 promises 2.5.1、symfony/deprecation-contracts v3.7.1），清掉 9 個 medium 告警，`composer audit` 歸零；`composer.json` 未動（落在既有 `^7.2` 約束內）。影響面最大的是兩個 proxy 相關（CVE-2026-55568 HTTPS proxy 靜默降級、Proxy-Authorization 洩漏給 origin）——三處 LLM 外呼都帶 `Authorization: Bearer`。
 - 新增 `.github/dependabot.yml`：composer／npm weekly（minor＋patch 分組成單一 PR、major 逐套件）、github-actions 與 docker monthly（後者用 `directories` 指向 `/docker`、`/.devcontainer`，`directory: /` 找不到 Dockerfile）。**刻意不設 `target-branch`**：Dependabot 建立安全更新 PR 時會忽略設了該欄的設定項，導致分組與 prefix 對安全更新失效。
 - 釐清一點：安全更新 PR 由 repo 的 Dependabot security updates 開關控制，**與這份設定檔無關**（#1191、#1205 在本檔加入前就已自動開出）。
+- 移除 Laravel Mix／webpack 時代遺留的 `cross-env`／`sass-loader`／`resolve-url-loader`（建置早已改用 Vite，三者在 repo 內零引用；`package-lock.json` 隨之少 1086 行、79 個 webpack 工具鏈條目）。這是 Dependabot 首輪 PR 的實際產出之一——它對這些死依賴開了 major bump PR（#1211、#1213），正確處置是移除而非升級，否則每輪都會重複產生噪音。
+- 首輪 8 個 Dependabot PR 的處置：合併 npm minor／patch 群組（#1210，18 個更新，含 Vite 8.2／React 19.2.8／Vue 3.5.40）與三個 GitHub Actions major（#1208 cache、#1209 setup-node、#1215 checkout——其 CI 即以新版 action 跑出綠燈，屬自我驗證）；關閉 #1212（`@inertiajs/react` 2→3 需 `inertiajs/inertia-laravel` 同步升 v3，是協調升級、另立項目）與 #1214（`datatables.net` 1.13→3.0，頂層無任何直接 import、runtime 實際使用 `datatables.net-bs4` 巢狀的 2.3.5，升級只會讓十餘個 1.x 插件包各自複製一份副本；該樹待 Phase 7 AdminLTE 下架時一併處理）。
 
 ## 2026-07
 

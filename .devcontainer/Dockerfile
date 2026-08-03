@@ -1,6 +1,6 @@
 # Dev Container for cbdb-online-main-server
 # PHP 8.4 (Debian Bookworm) – development only, not a production image
-FROM mcr.microsoft.com/devcontainers/php:1-8.4-bookworm
+FROM mcr.microsoft.com/devcontainers/php:8.5-bookworm
 
 RUN rm -f /etc/apt/sources.list.d/yarn.list || true
 

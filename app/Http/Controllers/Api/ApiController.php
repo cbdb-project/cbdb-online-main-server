@@ -18,11 +18,12 @@ use App\Models\OfficeCode;
 use App\Models\OfficeCodeTypeRel;
 use App\Models\OfficeTypeTree;
 use App\Support\ExecutionTimeLimit;
+use App\Support\MemoryLimit;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
 
-ini_set('memory_limit', '512M');
-ExecutionTimeLimit::extendTo(300);  // 測試環境為 no-op，避免套住整個 PHPUnit process
+MemoryLimit::extendTo('512M');
+ExecutionTimeLimit::extendTo(300);  // 只放寬不縮限：CLI／測試環境（上限為 0＝無限制）一律 no-op，見 ExecutionTimeLimit
 
 class ApiController extends Controller {
     use AuthenticatesUsers;

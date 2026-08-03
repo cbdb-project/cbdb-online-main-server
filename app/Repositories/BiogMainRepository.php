@@ -36,12 +36,13 @@ use App\Services\PinyinDictionary;
 use App\Services\VariantCharNormalizer;
 use App\Support\CompositePrimaryKey;
 use App\Support\ExecutionTimeLimit;
+use App\Support\MemoryLimit;
 use App\Support\PinyinUmlaut;
 use Carbon\Carbon;
-use Illuminate\Http\Request;
 //修改結束
 
 //20230628建安修改
+use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -49,8 +50,8 @@ use Illuminate\Support\Facades\Log;
 
 //修改結束
 
-ini_set('memory_limit', '512M');
-ExecutionTimeLimit::extendTo(300);  // 測試環境為 no-op，避免套住整個 PHPUnit process
+MemoryLimit::extendTo('512M');
+ExecutionTimeLimit::extendTo(300);  // 只放寬不縮限：CLI／測試環境（上限為 0＝無限制）一律 no-op，見 ExecutionTimeLimit
 
 /**
  * Class BiogMainRepository

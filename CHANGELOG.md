@@ -2,6 +2,20 @@
 
 本檔案改為維護近階段的重要變更與產品方向，不再保留完整歷史流水帳。較舊的大型升級請參考 `docs/` 下專門文檔。
 
+## 2026-08
+
+### 執行時間／記憶體上限改為「只放寬不縮限」，修掉整套 phpunit 跑不完的元凶
+- `set_time_limit()`／`ini_set('max_execution_time')`／`ini_set('memory_limit')` 的作用域是**整個 PHP process**，而 PHPUnit 共用單一 process。原本散在 `AiPostingAutofillController`、`QueryPlaygroundController`（SSE）、`Api/ApiController*`、`BiogMainRepository`、`CbdbTableMaintenanceController` 的呼叫——執行時間 13 處（10 處在 class 宣告前的**檔案頂層**、autoload 到就生效）、記憶體 11 處（10 處在頂層）——會把上限套到其後整段測試流程，使全套測試必定被 `Maximum execution time exceeded` 攔腰砍斷，錯誤還指向無關檔案。全套實測需 368 秒，先撞 120 秒（autofill）再撞 300 秒（頂層 `ini_set`）兩層卡點。
+- 新增 `App\Support\ExecutionTimeLimit` 與 `App\Support\MemoryLimit`，語義統一為**只放寬、絕不縮限**（現值為 0／-1＝無限制，或已更寬時一律 no-op）。**生產實測（2026-08-03）**：web（php-fpm 8.4）`max_execution_time = 30`／`memory_limit = 1G`，CLI `0`／`-1`。因此舊寫法在生產其實在**降級**——每次 `/api/select/*` 請求被從 1G 壓到 512M，artisan 則從無限制被壓到 300 秒／512M。收斂後 web 放寬行為完全不變，CLI 與測試環境不再被誤傷。
+- `Api/ApiController3` 的 600 秒改為 300：生產 fpm pool 的 `request_terminate_timeout = 300s` 會先殺掉 worker，PHP 端寫 600 永遠跑不到，屬虛假餘量。
+- `docker/php.ini` 補上「未被任何環境載入、數值與生產不符」的警示標頭（Dockerfile 未 COPY、compose 未 mount）。
+- 回歸測試：`tests/Unit/ExecutionTimeLimitTest.php`、`tests/Unit/MemoryLimitTest.php`（皆以子行程驗證正式環境分支，涵蓋放寬／不縮限／無法解析三類）。全套 `phpunit` 首次能一次跑完。
+
+### 依賴安全維護：清空 Dependabot 告警並補上版本更新設定
+- `guzzlehttp/guzzle` 7.10.0 → 7.15.2、`guzzlehttp/psr7` 2.11.0 → 2.13.0（連帶 promises 2.5.1、symfony/deprecation-contracts v3.7.1），清掉 9 個 medium 告警，`composer audit` 歸零；`composer.json` 未動（落在既有 `^7.2` 約束內）。影響面最大的是兩個 proxy 相關（CVE-2026-55568 HTTPS proxy 靜默降級、Proxy-Authorization 洩漏給 origin）——三處 LLM 外呼都帶 `Authorization: Bearer`。
+- 新增 `.github/dependabot.yml`：composer／npm weekly（minor＋patch 分組成單一 PR、major 逐套件）、github-actions 與 docker monthly（後者用 `directories` 指向 `/docker`、`/.devcontainer`，`directory: /` 找不到 Dockerfile）。**刻意不設 `target-branch`**：Dependabot 建立安全更新 PR 時會忽略設了該欄的設定項，導致分組與 prefix 對安全更新失效。
+- 釐清一點：安全更新 PR 由 repo 的 Dependabot security updates 開關控制，**與這份設定檔無關**（#1191、#1205 在本檔加入前就已自動開出）。
+
 ## 2026-07
 
 ### 提案核准段三：BIOG_MAIN 收斂到 v2 handler 重放（人物主檔告別盲寫路徑 C）

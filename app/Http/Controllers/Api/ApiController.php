@@ -17,11 +17,12 @@ use App\Models\EntryCodeTypeRel;
 use App\Models\OfficeCode;
 use App\Models\OfficeCodeTypeRel;
 use App\Models\OfficeTypeTree;
+use App\Support\ExecutionTimeLimit;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
 
 ini_set('memory_limit', '512M');
-ini_set('max_execution_time', 300);
+ExecutionTimeLimit::extendTo(300);  // 測試環境為 no-op，避免套住整個 PHPUnit process
 
 class ApiController extends Controller {
     use AuthenticatesUsers;

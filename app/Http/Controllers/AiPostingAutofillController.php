@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\PostingAutofillService;
+use App\Support\ExecutionTimeLimit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -41,7 +42,8 @@ class AiPostingAutofillController extends Controller {
         $personId = $request->input('person_id');
 
         // AI API 回應可能需要較長時間，延長 PHP 執行時間限制
-        set_time_limit(120);
+        // （測試環境不設限：set_time_limit 會套住整個 PHPUnit process，見 ExecutionTimeLimit）
+        ExecutionTimeLimit::extendTo(120);
 
         $startTime = microtime(true);
         $result = $this->autofillService->extractAndMatch($sourceText, $personId);

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\NaturalLanguageQueryService;
 use App\Services\QueryPlaygroundService;
 use App\Services\SqlTableNameExtractor;
+use App\Support\ExecutionTimeLimit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -187,7 +188,7 @@ class QueryPlaygroundController extends Controller {
      */
     protected function streamSseResponse(callable $producer) {
         return response()->stream(function () use ($producer) {
-            set_time_limit(300);  // SSE 串流需要較長時間（多輪工具呼叫 + LLM 回應）
+            ExecutionTimeLimit::extendTo(300);  // SSE 串流需要較長時間（多輪工具呼叫 + LLM 回應）
             ignore_user_abort(true);
 
             $lastSentAt = microtime(true);

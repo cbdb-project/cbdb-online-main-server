@@ -130,6 +130,8 @@ return [
     'log_error_message'      => 'Error Message',
     'log_llm_prompt'         => 'LLM Prompt',
     'log_llm_response'       => 'LLM Response',
+    'log_llm_response_table'    => 'Table View',
+    'log_llm_response_raw'      => 'Show Raw',
     'log_chars'              => 'characters',
     'log_key_info'           => 'Key Information',
     'log_model'              => 'Model',

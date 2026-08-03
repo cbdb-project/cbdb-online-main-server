@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { usePage } from '@inertiajs/react';
 import DashboardLayout from '../../../Layouts/DashboardLayout';
 import { Pagination } from '../../../components/ui/Pagination';
@@ -48,6 +48,232 @@ interface NlQueryLogsPageProps extends SharedProps {
 }
 
 const nf = new Intl.NumberFormat();
+
+/** 將字串中的實際換行與字面 `<br />`／`<br/>` 都轉成真正的換行顯示，其餘文字原樣輸出（不解讀為 HTML）。 */
+function MultilineText({ value }: { value: string }) {
+    const lines = value.split(/\r\n|\r|\n|<br\s*\/?>/gi);
+    return (
+        <>
+            {lines.map((line, i) => (
+                <React.Fragment key={i}>
+                    {i > 0 && <br />}
+                    {line}
+                </React.Fragment>
+            ))}
+        </>
+    );
+}
+
+/**
+ * 遞迴渲染深度上限，同時涵蓋兩種情況：物件/陣列本身的巢狀層數，以及字串欄位
+ * （如 OpenAI tool_calls[].function.arguments）被再次解析為 JSON 容器的次數。
+ * 避免異常巢狀輸入（無論是結構本身或字串套字串）拖垮渲染或造成堆疊溢位。
+ */
+const MAX_JSON_RENDER_DEPTH = 12;
+
+function tryParseJsonContainer(text: string): unknown {
+    const trimmed = text.trim();
+    if (trimmed[0] !== '{' && trimmed[0] !== '[') {
+        return undefined;
+    }
+    try {
+        const value: unknown = JSON.parse(trimmed);
+        return typeof value === 'object' && value !== null ? value : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
+    if (value === null || value === undefined) {
+        return <span className="text-muted-foreground">null</span>;
+    }
+    if (typeof value === 'string') {
+        if (value === '') {
+            return <span className="text-muted-foreground">""</span>;
+        }
+        const nested = depth < MAX_JSON_RENDER_DEPTH ? tryParseJsonContainer(value) : undefined;
+        return nested !== undefined ? <JsonValue value={nested} depth={depth + 1} /> : <MultilineText value={value} />;
+    }
+    if (typeof value !== 'object') {
+        return <>{String(value)}</>;
+    }
+    if (depth >= MAX_JSON_RENDER_DEPTH) {
+        return <MultilineText value={JSON.stringify(value)} />;
+    }
+    if (Array.isArray(value)) {
+        return value.length === 0 ? (
+            <span className="text-muted-foreground">[]</span>
+        ) : (
+            <JsonTable rows={value.map((item, i) => [`#${i}`, item] as [string, unknown])} depth={depth + 1} />
+        );
+    }
+    const entries = Object.entries(value as Record<string, unknown>);
+    return entries.length === 0 ? <span className="text-muted-foreground">{'{}'}</span> : <JsonTable rows={entries} depth={depth + 1} />;
+}
+
+function JsonTable({ rows, depth }: { rows: [string, unknown][]; depth: number }) {
+    return (
+        <table className="w-full table-fixed rounded border border-border/60 text-xs">
+            <tbody>
+                {rows.map(([key, value]) => (
+                    <tr key={key} className="border-b border-border/60 align-top last:border-b-0">
+                        <th className="w-28 whitespace-nowrap break-words px-2 py-1 text-left font-medium text-muted-foreground">{key}</th>
+                        <td className="break-words px-2 py-1">
+                            <JsonValue value={value} depth={depth} />
+                        </td>
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    );
+}
+
+/**
+ * `llm_response` 依來源可能是：{rounds:[...], total_rounds}（一般查詢，含每輪工具呼叫過程）、
+ * 單一 OpenAI 回應物件（QA 模式，無 rounds 包裝）、或 {fallback_non_tool_mode, fallback_response}
+ * （工具模式失敗降級）。三者皆只需取「最後一輪」的 choices[0].message.content 作為最終生成結果，
+ * 其餘輪次紀錄／tool_calls_requested／tool_results／usage 等屬過程資訊，表格化時略過。
+ */
+function unwrapToResponseObject(data: unknown): unknown {
+    if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+        return data;
+    }
+    let current: Record<string, unknown> = data as Record<string, unknown>;
+    if (typeof current.fallback_response === 'object' && current.fallback_response !== null) {
+        current = current.fallback_response as Record<string, unknown>;
+    }
+    if (Array.isArray(current.rounds) && current.rounds.length > 0) {
+        const lastRound = current.rounds[current.rounds.length - 1];
+        if (typeof lastRound === 'object' && lastRound !== null) {
+            const roundResponse = (lastRound as Record<string, unknown>).llm_response;
+            current = (typeof roundResponse === 'object' && roundResponse !== null ? roundResponse : lastRound) as Record<string, unknown>;
+        }
+    }
+    return current;
+}
+
+/** 取出第一個以 `{` 開頭、括號配對完整的 JSON 物件子字串（忽略字串內的括號）。 */
+function extractFirstJsonObjectSubstring(text: string): string | undefined {
+    const start = text.indexOf('{');
+    if (start === -1) {
+        return undefined;
+    }
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let i = start; i < text.length; i++) {
+        const ch = text[i];
+        if (escaped) {
+            escaped = false;
+            continue;
+        }
+        if (ch === '\\') {
+            escaped = true;
+            continue;
+        }
+        if (ch === '"') {
+            inString = !inString;
+            continue;
+        }
+        if (inString) {
+            continue;
+        }
+        if (ch === '{') {
+            depth++;
+        } else if (ch === '}') {
+            depth--;
+            if (depth === 0) {
+                return text.slice(start, i + 1);
+            }
+        }
+    }
+    return undefined;
+}
+
+/**
+ * 只在整段內容「頭尾都是 fence」時才剝除（例如 QA 的 answer_markdown 內容本身可能含
+ * ```sql fence，若改用中段搜尋最近的 fence pair 會被這種內嵌 fence 誤截斷）。
+ */
+function stripOuterCodeFence(content: string): string {
+    const trimmed = content.trim();
+    const openMatch = trimmed.match(/^```(?:json)?\s*/i);
+    if (!openMatch || !trimmed.endsWith('```')) {
+        return trimmed;
+    }
+    return trimmed.slice(openMatch[0].length, -3).trim();
+}
+
+/** LLM 有時把 JSON 包在 ```json fence 或前後夾雜說明文字，盡量還原出可解析的 JSON 物件。 */
+function parseMessageContent(content: string): unknown {
+    const candidate = stripOuterCodeFence(content);
+    try {
+        return JSON.parse(candidate);
+    } catch {
+        // fall through
+    }
+    const objectSubstring = extractFirstJsonObjectSubstring(candidate);
+    if (objectSubstring) {
+        try {
+            return JSON.parse(objectSubstring);
+        } catch {
+            // fall through
+        }
+    }
+    return undefined;
+}
+
+function extractFinalResult(fullParsed: unknown): unknown {
+    const responseObj = unwrapToResponseObject(fullParsed);
+    if (typeof responseObj !== 'object' || responseObj === null) {
+        return responseObj;
+    }
+    const choices = (responseObj as Record<string, unknown>).choices;
+    const firstChoice = Array.isArray(choices) ? (choices[0] as Record<string, unknown> | undefined) : undefined;
+    const message = firstChoice?.message as Record<string, unknown> | undefined;
+    const content = message?.content;
+    if (typeof content !== 'string') {
+        return responseObj;
+    }
+    if (content.trim() === '') {
+        return content;
+    }
+    const parsedContent = parseMessageContent(content);
+    return parsedContent !== undefined ? parsedContent : content;
+}
+
+function LlmResponseBlock({ raw, tableLabel, rawLabel }: { raw: string; tableLabel: string; rawLabel: string }) {
+    const [showRaw, setShowRaw] = useState(false);
+
+    const fullParsed = useMemo(() => {
+        try {
+            const value: unknown = JSON.parse(raw);
+            return typeof value === 'object' && value !== null ? value : undefined;
+        } catch {
+            return undefined;
+        }
+    }, [raw]);
+
+    const finalResult = useMemo(() => (fullParsed !== undefined ? extractFinalResult(fullParsed) : undefined), [fullParsed]);
+
+    if (fullParsed === undefined) {
+        return <pre className="max-h-[32rem] overflow-auto bg-muted/40 p-2 text-xs">{raw}</pre>;
+    }
+
+    return (
+        <div>
+            <div className="mb-1 flex justify-end">
+                <Button type="button" variant="outline" size="sm" onClick={() => setShowRaw((v) => !v)}>
+                    <i className={cn('fas', showRaw ? 'fa-table' : 'fa-code')} aria-hidden />
+                    {showRaw ? tableLabel : rawLabel}
+                </Button>
+            </div>
+            <div className="max-h-[32rem] overflow-auto rounded border border-border bg-muted/40 p-2">
+                {showRaw ? <pre className="text-xs">{JSON.stringify(fullParsed, null, 2)}</pre> : <JsonValue value={finalResult} />}
+            </div>
+        </div>
+    );
+}
 
 export default function NlQueryLogsIndex() {
     const props = usePage<NlQueryLogsPageProps>().props;
@@ -236,7 +462,11 @@ export default function NlQueryLogsIndex() {
                                 )}
                                 {log.llm_response && (
                                     <LogCollapsible label={t('log_llm_response')}>
-                                        <pre className="max-h-[32rem] overflow-auto bg-muted/40 p-2 text-xs">{log.llm_response}</pre>
+                                        <LlmResponseBlock
+                                            raw={log.llm_response}
+                                            tableLabel={t('log_llm_response_table')}
+                                            rawLabel={t('log_llm_response_raw')}
+                                        />
                                     </LogCollapsible>
                                 )}
                             </div>

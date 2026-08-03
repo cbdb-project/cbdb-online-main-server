@@ -130,6 +130,8 @@ return [
     'log_error_message'      => '錯誤信息',
     'log_llm_prompt'         => 'LLM 提示詞',
     'log_llm_response'       => 'LLM 響應',
+    'log_llm_response_table'    => '表格顯示',
+    'log_llm_response_raw'      => '顯示原始文字',
     'log_chars'              => '字符',
     'log_key_info'           => '關鍵信息',
     'log_model'              => '模型',

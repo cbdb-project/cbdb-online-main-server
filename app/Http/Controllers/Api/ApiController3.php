@@ -17,12 +17,16 @@ use App\Models\Dynasty;
 use App\Models\EntryCode;
 use App\Models\KinshipCode;
 use App\Support\ExecutionTimeLimit;
+use App\Support\MemoryLimit;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-ini_set('memory_limit', '1024M');
-ExecutionTimeLimit::extendTo(600);  // 測試環境為 no-op，避免套住整個 PHPUnit process
+MemoryLimit::extendTo('1024M');
+// 原值 600 秒是虛假的餘量：生產 php-fpm 的 request_terminate_timeout = 300s 會先殺掉 worker，
+// PHP 端寫 600 也永遠跑不到（實測 2026-08-03）。改為 300 與真正的天花板對齊；若確實需要更久，
+// 必須同時調整 fpm pool 的 request_terminate_timeout，光改這裡無效。
+ExecutionTimeLimit::extendTo(300);
 
 class ApiController3 extends Controller {
     use AuthenticatesUsers;

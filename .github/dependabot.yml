@@ -1,10 +1,14 @@
 version: 2
 
-# Dependabot 版本更新設定。
+# Dependabot 版本更新（version updates）設定。
 #
-# 背景：此倉庫先前只啟用了 security alerts（Dependabot 會掃 composer.lock 並回報漏洞），
-# 但沒有這份設定檔，因此 Dependabot 不會自動開修補 PR——告警只會累積、需人工處理。
-# 一併補上 npm 與 github-actions：package-lock.json 先前完全沒有被掃描，屬零覆蓋。
+# 這份檔案管的是**定期版本更新**。**安全更新（security updates）不歸它管**——那由 repo 的
+# Dependabot security updates 開關控制，沒有這份檔案照樣會開 PR（實例：#1191 fast-uri、
+# #1205 postcss 都在本檔加入之前就由 Dependabot 自動開出並合併）。兩者是各自獨立的機制。
+#
+# 不要加 target-branch：Dependabot 在建立**安全更新** PR 時會忽略設了 target-branch 的設定項，
+# 於是安全更新 PR 拿不到下面的 groups 分組、commit-message prefix 與 PR 上限。省略時預設就是
+# repo 的 default branch（本倉庫為 develop），所以寫了只有壞處。
 #
 # 分組（groups）策略：同一 ecosystem 的 patch／minor 合併成單一 PR，避免每週被大量
 # 單套件 PR 淹沒；major 升級刻意不分組，維持一個套件一個 PR 以便逐一評估破壞性變更。
@@ -17,7 +21,6 @@ updates:
       time: '09:00'
       timezone: Asia/Taipei
     open-pull-requests-limit: 5
-    target-branch: develop
     commit-message:
       prefix: 'chore(deps)'
       prefix-development: 'chore(deps-dev)'
@@ -35,7 +38,6 @@ updates:
       time: '09:00'
       timezone: Asia/Taipei
     open-pull-requests-limit: 5
-    target-branch: develop
     commit-message:
       prefix: 'chore(deps)'
       prefix-development: 'chore(deps-dev)'
@@ -51,6 +53,17 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 3
-    target-branch: develop
     commit-message:
       prefix: 'chore(ci)'
+
+  # 釘住的 base image 也需要納管；注意必須用 directories 明確指出 Dockerfile 所在目錄，
+  # 用 directory: / 找不到它們（Dependabot 只在指定目錄裡找 Dockerfile）。
+  - package-ecosystem: docker
+    directories:
+      - /docker
+      - /.devcontainer
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: 'chore(docker)'

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\NameFtsProgressService;
+use App\Support\MemoryLimit;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
@@ -118,7 +119,7 @@ class CbdbTableMaintenanceController extends Controller {
 
         // 移除執行時間限制
         set_time_limit(0);
-        ini_set('memory_limit', '1024M');
+        MemoryLimit::extendTo('1024M');
 
         // 構建 Artisan::call() 參數（關聯數組格式）
         $params = [];

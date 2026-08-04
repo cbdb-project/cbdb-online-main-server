@@ -1,6 +1,6 @@
 # CASCADE → RESTRICT：翻轉 migration 的機制與分批 rollout（MariaDB 10.3）
 
-> 狀態：批次 1–4 已落地並實測；末批（BIOG_MAIN／POSTING_DATA／POSSESSION_DATA 共 28 條）migration 已實作、待 MariaDB 10.3 端到端實測。翻完全庫 ON DELETE CASCADE 歸零。
+> 狀態：**批次 1–4 與末批全部落地並實測完成**——全庫 ON DELETE CASCADE 歸零（僅餘 1 條既有且正確的 SET NULL）。
 > 上位文件：[docs/ON_DELETE_CASCADE_RISK.md](./ON_DELETE_CASCADE_RISK.md)（§6「RESTRICT 先行、按被引用表分批」）
 > 目的：把 §6.1 的翻轉方案落成可執行、可分批、可回滾的 migration，並記錄 §6.1 範例 SQL 在
 > **prod 版本 MariaDB 10.3** 上跑不起來的實測修正（該文件是在 10.11 驗的）。
@@ -97,7 +97,7 @@ GROUP BY REFERENCED_TABLE_NAME, DELETE_RULE;
 | **2** | TEXT_CODES(21)、ADDR_CODES(11)＝**32 條**（TEXT_CODES 另 1 條 `SET NULL` 本已正確、未觸碰） | `2026_07_21_000000_restrict_fks_referencing_text_addr_codes` | ✅ 已實作＋MariaDB 10.3 端到端驗（見 §9.1）；同 commit 為唯一活硬刪路徑 `AdminBatchLoadBookTitlesController::undo()` 補 1451 友好報錯垫片 |
 | **3** | 其餘全部小詞表／類型表／樹表 35 張＝**52 條**（KINSHIP_CODES(6)、ASSOC_CODES(4)、OFFICE_CODES(3)、TEXT_BIBLCAT_CODES／STATUS_CODES／ENTRY_CODES／COUNTRY_CODES／APPOINTMENT_CODES／OFFICE_TYPE_TREE／ADMIN_CAT_CODES(各 2)、其餘各 1，含自引用 pair FK 與 *_TYPE_REL 入邊） | `2026_07_23_000000_restrict_fks_referencing_small_code_tables` | ✅ 已實作＋MariaDB 10.3 端到端驗（見 §9.2）；同 commit 為唯一活硬刪路徑（office 實體刪除，經通用 `EntityAggregateDeleteHandler`）補 1451 友好報錯垫片 |
 | **4** | SOCIAL_INSTITUTION_CODES(5)＋SOCIAL_INSTITUTION_NAME_CODES(5)＝**10 條**（含 CODES→NAME_CODES pair FK；資料表仍為 dual-key 雙單欄 FK 形態、未改複合鍵） | `2026_07_23_000001_restrict_fks_referencing_social_institution_tables` | ✅ 已實作＋MariaDB 10.3 端到端驗（見 §9.3）。前置皆已就位：codes UI 三表封寫（step 4）、實體刪除為顯式級聯（`SocialInstituteImportService::delete()`）＋引用護欄、`EntityAggregateDeleteHandler` 通用 1451 垫片 |
-| **末批** | BIOG_MAIN(25，含 operations→BIOG_MAIN)＋POSTING_DATA(2)＋POSSESSION_DATA(1)＝**28 條** | `2026_08_03_000000_restrict_fks_referencing_biog_main_batch` | ✅ 已實作（應用層前置見 §11，觀察期結束後翻轉）；**待補 MariaDB 10.3 端到端實測**（§9 同規格），翻完全庫 CASCADE 應歸零 |
+| **末批** | BIOG_MAIN(25，含 operations→BIOG_MAIN)＋POSTING_DATA(2)＋POSSESSION_DATA(1)＝**28 條** | `2026_08_03_000000_restrict_fks_referencing_biog_main_batch` | ✅ 已實作＋MariaDB 10.3 端到端驗（見 §9.4）；翻完全庫 `CASCADE 0`，去級聯 Phase 1 收尾 |
 
 **節奏（§6.1「app-layer-first」）**：翻一批 → 觀察 1–2 週盯 1451（1451 會把漏網的 cascade
 依賴刪除路徑逼出，fail-closed 零損失）→ 修應用層 → 下一批。`ON UPDATE CASCADE`（187 條）本階段一律保留。
@@ -197,6 +197,34 @@ migration，再套用批次 1：
 > （被人物資料引用回 409）＋`EntityAggregateDeleteHandler` 通用 1451 垫片（批次 3 落地）
 > 兜住漏網情形。app 內無其他 SOCIAL_INSTITUTION_* 硬刪呼叫點。
 
+### 9.4 末批端到端實測（fresh MariaDB 10.3.39，2026-08-03）
+
+同 §9 流程（乾淨 10.3.39 容器、app 容器全量 `php artisan migrate`）：
+
+| 檢查 | 結果 |
+|---|---|
+| 全部 migration 在 10.3 執行 | ✅ 全 DONE，無錯 |
+| 末批翻轉 | ✅ `flipped 28`，59ms |
+| 三表入邊 `DELETE_RULE` | ✅ BIOG_MAIN 25／POSTING_DATA 2／POSSESSION_DATA 1 全 `NO ACTION` |
+| 全庫 | ✅ **`CASCADE 0`**／`NO ACTION 188`／`RESTRICT 1`／`SET NULL 1`（共 190 條）——去級聯完成 |
+| 唯一非 RESTRICT 邊 | ✅ `fk_merged_person_source`（MERGED_PERSON_DATA→TEXT_CODES，`SET NULL`），既有且正確，全程未觸碰 |
+| `ON UPDATE CASCADE` | ✅ 190 條全數保留（本階段不動，§8） |
+| 行為 (a)：刪被引用的 `BIOG_MAIN` 列 | ✅ 1451 擋下（`POSSESSION_ADDR_ibfk_2`）；biog/posted/posting 一列不少 |
+| 行為 (b)：刪仍被引用的 `POSTING_DATA` 父列 | ✅ 1451 擋下（`POSTED_TO_OFFICE_DATA_ibfk_15`）；**共用同一 `c_posting_id` 的 2 條兄弟列全數保留** |
+| 行為 (b2)：刪仍被引用的 `POSSESSION_DATA` 父列 | ✅ 1451 擋下（`POSSESSION_ADDR_ibfk_3`）；子列保留 |
+| 行為 (c)：零引用刪除（先子後父） | ✅ ADDR→POSSESSION_DATA→POSTED_TO_OFFICE_DATA→POSTING_DATA→BIOG_MAIN 依序刪除全部成功 |
+| 可逆 | ✅ `migrate:rollback --step=1` 翻回 CASCADE（28 條，回到批次 4 終態 `CASCADE 28`／`NO ACTION 160`），re-migrate 恢復 `CASCADE 0` |
+
+> **對照組（翻轉前 CASCADE 的實際危害，於 rollback 後同一庫實測）**：同樣的
+> `DELETE FROM POSTING_DATA WHERE c_posting_id=...`，在 CASCADE 下**無報錯地成功**，
+> 並把共用該 `c_posting_id` 的 **2 條 `POSTED_TO_OFFICE_DATA` 兄弟列一併靜默刪除**
+> （刪除前 2 → 刪除後 0）。prod 實測有 31 個被多列共用的 `c_posting_id`（§11.2），
+> 翻成 RESTRICT 後此路徑轉為 fail-closed。
+>
+> 註（§3 的補充）：10.3 對 `RESTRICT` 多數回報 `NO ACTION`，但由
+> `2026_07_24_000000_restore_events_addr_event_code_fk` 建立的 `EVENTS_ADDR_ibfk_3`
+> 回報字面 `RESTRICT`。兩者在 InnoDB 語義相同，驗證查詢仍應 `IN ('RESTRICT','NO ACTION')`。
+
 ## 10. 對 `ON_DELETE_CASCADE_RISK.md` 的修正建議
 
 1. §6.1「同一 `ALTER` 內 DROP＋ADD」→ 改為「**兩條獨立 ALTER**（先 DROP 再 ADD）」，註明 10.3 的 1826 限制。
@@ -279,8 +307,5 @@ migration，再套用批次 1：
 SQLite no-op、`down()` 可逆）。無新增應用層垫片：本批三張被引用表的刪除路徑在 §11.2–11.4 已改為
 應用層顯式級聯，`BIOG_MAIN` 則無活的硬刪路徑。
 
-**尚待執行**（部署前）：於乾淨 MariaDB 10.3 容器跑 §9 同規格端到端實測——預期
-`flipped 28`、全庫 `CASCADE 0`／`NO ACTION 188`／`SET NULL 1`；行為抽測至少涵蓋
-（a）刪被引用的 `BIOG_MAIN` 列 → 1451 擋下；（b）刪仍被 `POSTED_TO_OFFICE_DATA` 引用的
-`POSTING_DATA` 父列 → 1451 擋下（現行 CASCADE 下會連坐刪掉共用同一 `c_posting_id` 的兄弟列，
-prod 實測有 31 個這種 id）；（c）零引用刪除仍成功；（d）`migrate:rollback --step=1` 翻回 CASCADE。
+端到端實測已完成（乾淨 MariaDB 10.3.39 容器，§9.4）：`flipped 28`、全庫 `CASCADE 0`、
+三項 1451 行為抽測與零引用刪除、rollback／re-migrate 皆如預期。

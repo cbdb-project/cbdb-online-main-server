@@ -3,15 +3,21 @@
 > English version: [ON_DELETE_CASCADE_RISK.en.md](./ON_DELETE_CASCADE_RISK.en.md)
 >
 > 撰寫日期：2026-07-07 ｜ 修訂：2026-07-16（依團隊決議新增 §6 實施方案設計）；2026-07-28（依 Phase 1
-> 分批翻轉的 MariaDB 10.3 實測結果回補 §6.1 執行細節，見下方修正說明）｜ 依據：
+> 分批翻轉的 MariaDB 10.3 實測結果回補 §6.1 執行細節，見下方修正說明）；2026-08-03（**Phase 1 全部
+> 完成**，回補現況與數字修正）｜ 依據：
 > `database/migrations/2025_01_01_000000_import_cbdb_schema.php`（生產 MariaDB schema 的入庫來源）
 >
 > **本文目的**：說明本專案 schema 目前處於「物理刪除 × 級聯刪除」這個對資料資產最危險的組合中，
 > 解釋其原理性風險（這在資料庫應用領域本應是共識）；並給出破局矩陣——**去級聯（RESTRICT）與
 > 軟刪除（deprecate）各自解決什麼、為何兩者互補而非二選一**——以及可執行的改造路線圖。
 >
-> **現況（2026-07-28）**：本文 §6.1 Phase 1 已分批執行至批次 4（詞表入邊全數翻畢，僅剩
-> `BIOG_MAIN`／`POSTING_DATA`／`POSSESSION_DATA` 共 28 條入邊，應用層前置已完成、進入觀察期），
+> **現況（2026-08-03）：§6.1 Phase 1 已全部完成。** 五個批次（66＋32＋52＋10＋28＝188 條）依序
+> 翻轉完畢，**全庫 `ON DELETE CASCADE` 歸零**——實測 `CASCADE 0`／`NO ACTION 188`／`RESTRICT 1`／
+> `SET NULL 1`（共 190 條；唯一的 `SET NULL` 是本來就正確的 `fk_merged_person_source`）。本文
+> §2 的災難場景在現行 schema 上**已不可能發生**：刪被引用的父列一律被 DB 以 1451 擋下（fail-closed）。
+> 矩陣位置因此由 ①（物理刪除 × CASCADE）落到 ②（物理刪除 × RESTRICT）；④ 仍待 Phase 2／3。
+> 另：prod 版本已查明為 **MariaDB 10.11.14**（先前記述的 10.3 有誤），全部批次是在較嚴格的 10.3
+> 上驗的，10.3 通過即 10.11 通過，已落地的 migration 不受影響。
 > 每批機制細節、10.3 實測結果與逐批 rollout log 見
 > [docs/CASCADE_TO_RESTRICT_MIGRATION_NOTES.md](./CASCADE_TO_RESTRICT_MIGRATION_NOTES.md)——
 > 該文件是本文 §6.1 的執行紀錄與現行權威來源，兩文所述執行細節如有出入，以該文件為準。
@@ -22,13 +28,13 @@
 
 ## TL;DR
 
-1. 本專案 schema 有 **186 個 `ON DELETE CASCADE` 外鍵**（另有 187 個 `ON UPDATE CASCADE`），遍布所有核心表，其中絕大多數掛在「傳記資料 → 詞表（code 表）」的**引用關係**上；而應用層對詞表執行的是**物理刪除**（且多數路徑無引用檢查）。
+1. 本專案 schema **原有 186 個 `ON DELETE CASCADE` 外鍵**（baseline；連同後續 migration 新增者共 188 條，另有 190 個 `ON UPDATE CASCADE`）——**截至 2026-08-03 已全數翻為 `RESTRICT`**（見上方現況；以下描述的是翻轉前的狀態與其原理，仍是理解 Phase 2／3 必要性的基礎），遍布所有核心表，其中絕大多數掛在「傳記資料 → 詞表（code 表）」的**引用關係**上；而應用層對詞表執行的是**物理刪除**（且多數路徑無引用檢查）。
 2. 這個組合的後果：**刪除一筆詞表記錄（一個年號、一個朝代、一筆書名），資料庫會靜默連帶刪除所有引用它的傳記資料**——包括 `BIOG_MAIN` 的人物本身，並繼續向下刪光這些人物的全部記錄。應用層的審計（audit_log）、操作紀錄（operations）、提案審核、回退機制**全部無感知**。
 3. 破局矩陣（本文核心論點）：
 
    | | `ON DELETE CASCADE` | `RESTRICT` |
    |---|---|---|
-   | **物理刪除** | **現狀：災難**（一條 DELETE 靜默毀庫） | 可接受（配合引用檢查與遷移工具） |
+   | **物理刪除** | ~~現狀~~**（翻轉前）：災難**（一條 DELETE 靜默毀庫） | **現況（2026-08-03 起）**：可接受（配合引用檢查與遷移工具） |
    | **軟刪除 / deprecate** | 帶電的陷阱（僅靠約定護體，違約即災難） | **目標形態** |
 
    必須至少打破一個因子；兩個都打破才是完整方案。**去級聯是保險絲（出錯時的後果封頂），軟刪除是產品語義（正常路徑不再發生刪除）——層次不同，互補而非替代。**
@@ -228,7 +234,7 @@ RESTRICT 的失敗模式是「煩人但無害」（fail-closed），CASCADE 的�
 3. **合併＋重定向工具**：把 A 詞條的全部引用批次改指到 B 詞條，受審計、可回退，A 退役留重定向——這也是日後「人物合併」的同構地基。
 4. **顯式級聯刪除服務**：覆蓋 Step 1 標記為「組合」的少數關係（參考 `OfficePostingRepository` 現行寫法，補齊快照與同 operation_id 分組）。
 
-**Step 3：翻轉約束（止血 migration，維護窗口執行）**
+**Step 3：翻轉約束（止血 migration，維護窗口執行）** ✅ **已完成（2026-07-20 ～ 2026-08-03，分五批）**
 按 Step 1 決策表批量執行：
 
 ```sql
@@ -244,14 +250,14 @@ ALTER TABLE ALTNAME_DATA
 - 優先順序按入邊數：`NIAN_HAO`(24)、`YEAR_RANGE_CODES`(23)、`TEXT_CODES`(22)、`ADDR_CODES`(11)、`GANZHI_CODES`/`DYNASTIES`(9)，再及其餘。
 - 同步更新 `import_cbdb_schema.php`（或新增 migration），保持新裝環境一致。
 
-**Step 4：驗證與回歸（與 Step 3 同窗口）**
+**Step 4：驗證與回歸（與 Step 3 同窗口）** ✅ **已隨各批完成**（每批在乾淨 MariaDB 10.3 容器上全量 migrate ＋行為抽測 ＋rollback 驗證，逐批結果見 `CASCADE_TO_RESTRICT_MIGRATION_NOTES.md` §9–§9.4）
 - staging 上實測：刪一筆被引用的年號 → 期望應用層擋下（或 DB 報 1451 錯誤），傳記資料一列不少；退役一筆年號 → 選擇器消失、既有記錄顯示照常；
 - 核對 `information_schema`：目標批次內 `DELETE_RULE='CASCADE'` 歸零；
 - 生產執行後同樣核對＋抽測。
 
 **Step 5：收尾與長期項**
 - **孤兒掃描**排程：週期核對引用完整性作為縱深防禦（覆蓋約束缺口與歷史遺留）。
-- **`ON UPDATE CASCADE`（187 個）單獨立項**：改鍵傳播不銷毀資料、危險性低一級，但同樣繞過審計。長期應把「詞表改鍵」收為應用層受審計操作後改為 RESTRICT；在那之前先在文件與 UI 標明現狀。
+- **`ON UPDATE CASCADE`（實測 190 個）單獨立項**：改鍵傳播不銷毀資料、危險性低一級，但同樣繞過審計。長期應把「詞表改鍵」收為應用層受審計操作後改為 RESTRICT；在那之前先在文件與 UI 標明現狀。
 - **測試環境缺口單獨立項**：SQLite 無外鍵意味著 CI 永遠測不到本文所有行為，MariaDB 約束相關變更需要專門的整合驗證手段（如 CI 起 MariaDB 容器跑約束測試）。
 
 ### 5.2 工作量與依賴總覽
@@ -317,7 +323,7 @@ ALTER TABLE ALTNAME_DATA
 
 | 階段 | 內容 | 交付的價值 |
 |---|---|---|
-| **Phase 1：墊片＋翻約束** | 刪除路徑捕捉 1451 → 友好報錯「仍被 N 處引用」；刪除一律先寫 operations／audit_log ＋必填 reason；廢除 `deleteBatch` 刪 operations 紀錄；隨後分批翻轉（下述） | 災難場景解除；零引用刪除可復原；決議 1／2／3 全數滿足 |
+| **Phase 1：墊片＋翻約束** ✅ **已完成（2026-08-03）** | 刪除路徑捕捉 1451 → 友好報錯「仍被 N 處引用」；刪除一律先寫 operations／audit_log ＋必填 reason；廢除 `deleteBatch` 刪 operations 紀錄；隨後分批翻轉（下述） | 災難場景解除（全庫 CASCADE 歸零）；零引用刪除可復原；決議 1／2 已滿足，決議 3（必填 reason）隨 Phase 2 的刪除流程重建一併補齊 |
 | **Phase 2：合併＋重定向工具** | 受審計批次 re-point ＋清零後物理刪除 | 錯誤／重複詞條（大宗需求）有正規出口；亦是人物合併的同構地基 |
 | **Phase 3：lifecycle registry（按需）** | §6.2–§6.3 | 僅當「退役但保留引用」需求被實務驗證時啟動 |
 
@@ -327,7 +333,8 @@ ALTER TABLE ALTNAME_DATA
 2. **執行**（維護窗口）：MariaDB 不支援原地修改外鍵行為，**兩條獨立 `ALTER`**（先 DROP 再 ADD，
    **修正**：同名約束若寫在同一條 `ALTER` 內 DROP＋ADD，MariaDB 10.3 實測回
    `ERROR 1826 (HY000): Duplicate FOREIGN KEY constraint name`，拆成兩條才成功；prod 版本
-   究竟 10.3 或 10.11 待確認，但兩條獨立 `ALTER` 在兩版皆安全，一律採用，細節與實測見
+   已於 2026-08-03 查明為 **10.11.14**（全部批次仍是在較嚴格的 10.3 上驗的），兩條獨立
+   `ALTER` 在兩版皆安全，一律採用，細節與實測見
    `CASCADE_TO_RESTRICT_MIGRATION_NOTES.md` §2）；`foreign_key_checks=0` 時 ADD FK 不掃描既有資料
    （一致性由原約束保證），`ALTER` 近乎即時，僅短暫 metadata lock，先在 staging 對最大表量測：
 
@@ -348,7 +355,7 @@ ALTER TABLE ALTNAME_DATA
 4. **觀察期**（1–2 週再下一批）：監控 1451（`Cannot delete or update a parent row`）——出現＝漏網硬刪路徑，fail-closed 零損失，修應用層即可；
 5. **回滾預案**：反向 `ALTER` 改回 CASCADE，單條語句、無資料風險。
 
-其他要點：RESTRICT 與 NO ACTION 在 InnoDB 等價，統一顯式寫 `RESTRICT`；每批同步提交 migration（新裝環境一致）；SQLite 測試環境無外鍵，驗證必須在 MariaDB 上做（CI 起 MariaDB 容器為長期項，§5 Step 5）；**`operations` 表自身也有一條 CASCADE 指向 `BIOG_MAIN`（人物被級聯刪時操作紀錄一併消失，審計軌跡不設防），納入 `BIOG_MAIN` 批次一併翻轉**；`ON UPDATE CASCADE`（187 條）本階段保留（§5 Step 5 單獨立項）。
+其他要點：RESTRICT 與 NO ACTION 在 InnoDB 等價，統一顯式寫 `RESTRICT`；每批同步提交 migration（新裝環境一致）；SQLite 測試環境無外鍵，驗證必須在 MariaDB 上做（CI 起 MariaDB 容器為長期項，§5 Step 5）；**`operations` 表自身也有一條 CASCADE 指向 `BIOG_MAIN`（人物被級聯刪時操作紀錄一併消失，審計軌跡不設防），納入 `BIOG_MAIN` 批次一併翻轉**；`ON UPDATE CASCADE`（實測 190 條）本階段保留（§5 Step 5 單獨立項）。
 
 ### 6.2 第三階段設計研究：軟刪除狀態怎麼存
 

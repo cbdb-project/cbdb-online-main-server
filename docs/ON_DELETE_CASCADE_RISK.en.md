@@ -2,11 +2,11 @@
 
 > 中文版（權威版本）: [ON_DELETE_CASCADE_RISK.md](./ON_DELETE_CASCADE_RISK.md) — this is a translation; in case of discrepancy the Chinese version prevails.
 >
-> Written: 2026-07-07 ｜ Revised: 2026-07-16 (added §6, the implementation design following the team's decisions); 2026-07-28 (backfilled §6.1 execution details from the MariaDB 10.3 results of the Phase 1 batch rollout, see the correction note below) ｜ Based on: `database/migrations/2025_01_01_000000_import_cbdb_schema.php` (the source from which the production MariaDB schema was imported)
+> Written: 2026-07-07 ｜ Revised: 2026-07-16 (added §6, the implementation design following the team's decisions); 2026-07-28 (backfilled §6.1 execution details from the MariaDB 10.3 results of the Phase 1 batch rollout, see the correction note below); 2026-08-03 (**Phase 1 complete** — status and figures corrected) ｜ Based on: `database/migrations/2025_01_01_000000_import_cbdb_schema.php` (the source from which the production MariaDB schema was imported)
 >
 > **Purpose of this document**: to show that this project's schema currently sits in the combination most dangerous to a data asset — "physical delete × cascading delete" — and to explain the principled risk (which should be common knowledge in database practice); to present the escape matrix — **what de-cascading (RESTRICT) and soft deletion (deprecate) each solve, and why the two are complementary rather than either/or** — and to lay out an executable migration roadmap.
 >
-> **Status (2026-07-28)**: §6.1 Phase 1 has been rolled out through batch 4 (all code-table inbound FKs flipped; only `BIOG_MAIN`/`POSTING_DATA`/`POSSESSION_DATA`, 28 FKs, remain — application-layer prep is done and the flip is in its observation window). Per-batch mechanics, MariaDB 10.3 test results, and the batch-by-batch rollout log live in
+> **Status (2026-08-03): §6.1 Phase 1 is complete.** All five batches (66 + 32 + 52 + 10 + 28 = 188 FKs) have been flipped, and **there is no `ON DELETE CASCADE` left in the database** — measured: `CASCADE 0` / `NO ACTION 188` / `RESTRICT 1` / `SET NULL 1` (190 total; the single `SET NULL`, `fk_merged_person_source`, was correct to begin with). The disaster scenario in §2 is **no longer possible** on the current schema: deleting a referenced parent row is blocked by the database with error 1451 (fail-closed). The matrix position therefore moves from ① (physical delete × CASCADE) to ② (physical delete × RESTRICT); ④ still awaits Phase 2/3. Also: production has been confirmed to run **MariaDB 10.11.14** (the earlier "10.3" was wrong); every batch was verified on the *stricter* 10.3, so what passes on 10.3 passes on 10.11 and the shipped migrations are unaffected. Per-batch mechanics, MariaDB 10.3 test results, and the batch-by-batch rollout log live in
 > [docs/CASCADE_TO_RESTRICT_MIGRATION_NOTES.md](./CASCADE_TO_RESTRICT_MIGRATION_NOTES.md), which is
 > the authoritative execution record for this document's §6.1 — where the two disagree, that file wins.
 >
@@ -16,13 +16,13 @@
 
 ## TL;DR
 
-1. This project's schema contains **186 `ON DELETE CASCADE` foreign keys** (plus 187 `ON UPDATE CASCADE`), spread across all core tables. The vast majority sit on **reference relationships** from "biographical data → code tables"; meanwhile the application layer performs **physical deletes** on code tables (and most paths do no reference checking).
+1. This project's schema **used to contain 186 `ON DELETE CASCADE` foreign keys** (188 counting those added by later migrations; plus 190 `ON UPDATE CASCADE`) — **all of them flipped to `RESTRICT` as of 2026-08-03** (see Status above; what follows describes the pre-flip state and its underlying principle, which remains the basis for why Phase 2/3 are needed), spread across all core tables. The vast majority sit on **reference relationships** from "biographical data → code tables"; meanwhile the application layer performs **physical deletes** on code tables (and most paths do no reference checking).
 2. The consequence of this combination: **deleting one code-table record (a reign period, a dynasty, a book title) silently cascades away all biographical data that references it** — including the persons themselves in `BIOG_MAIN`, and then everything belonging to those persons. The application layer's auditing (audit_log), operation records (operations), proposal review, and restore mechanisms are **all completely blind** to it.
 3. The escape matrix (the core argument of this document):
 
    | | `ON DELETE CASCADE` | `RESTRICT` |
    |---|---|---|
-   | **Physical delete** | **Status quo: disaster** (one DELETE silently guts the database) | Acceptable (with reference checks and migration tooling) |
+   | **Physical delete** | ~~Status quo~~ **(pre-flip): disaster** (one DELETE silently guts the database) | **Current state (since 2026-08-03)**: acceptable (with reference checks and migration tooling) |
    | **Soft delete / deprecate** | A live trap (protected only by convention; one violation is a disaster) | **Target state** |
 
    At least one factor must be broken; breaking both is the complete solution. **De-cascading is the fuse (it caps the consequences when something goes wrong); soft deletion is the product semantics (deletion no longer happens on the normal path) — they operate at different layers and complement rather than replace each other.**
@@ -222,7 +222,7 @@ Deliverable: a decision table (one row per constraint: current → target rule �
 3. **Merge + redirect tool**: re-point all references from entry A to entry B in bulk — audited, restorable, A retired with a redirect left behind. This is also the isomorphic foundation for future "person merge."
 4. **Explicit cascade-deletion service**: covering the few relationships Step 1 labels "composition" (following the current `OfficePostingRepository` pattern, adding snapshots and same-operation_id grouping).
 
-**Step 3: Flip the constraints (bleeding-stop migration, run in a maintenance window)**
+**Step 3: Flip the constraints (bleeding-stop migration, run in a maintenance window)** ✅ **Done (2026-07-20 – 2026-08-03, in five batches)**
 Execute in batches per Step 1's decision table:
 
 ```sql
@@ -238,14 +238,14 @@ ALTER TABLE ALTNAME_DATA
 - Prioritize by incoming-edge count: `NIAN_HAO` (24), `YEAR_RANGE_CODES` (23), `TEXT_CODES` (22), `ADDR_CODES` (11), `GANZHI_CODES`/`DYNASTIES` (9), then the rest.
 - Update `import_cbdb_schema.php` (or add a migration) in the same change, keeping fresh installs consistent.
 
-**Step 4: Verification and regression (same window as Step 3)**
+**Step 4: Verification and regression (same window as Step 3)** ✅ **Done with each batch** (full `migrate` on a clean MariaDB 10.3 container + behavioral spot checks + rollback verification; per-batch results in `CASCADE_TO_RESTRICT_MIGRATION_NOTES.md` §9–§9.4)
 - Live test on staging: delete a referenced reign period → expect the application layer to block it (or the DB to raise error 1451), with not one row of biographical data lost; retire a reign period → it disappears from selectors while existing records display as usual;
 - Check `information_schema`: `DELETE_RULE='CASCADE'` drops to zero within the target batch;
 - After the production run, perform the same check plus spot tests.
 
 **Step 5: Wrap-up and long-term items**
 - **Orphan-scan schedule**: periodic referential-integrity checks as defense in depth (covering constraint gaps and historical leftovers).
-- **`ON UPDATE CASCADE` (187 of them) as a separate project**: key-change propagation does not destroy data and is one grade less dangerous, but it bypasses auditing all the same. Long term, "code-table key changes" should be absorbed into an audited application-layer operation and then flipped to RESTRICT; until then, document and surface the current behavior in docs and UI.
+- **`ON UPDATE CASCADE` (190 measured) as a separate project**: key-change propagation does not destroy data and is one grade less dangerous, but it bypasses auditing all the same. Long term, "code-table key changes" should be absorbed into an audited application-layer operation and then flipped to RESTRICT; until then, document and surface the current behavior in docs and UI.
 - **The test-environment gap as a separate project**: SQLite having no foreign keys means CI can never test any behavior in this document; MariaDB constraint-related changes need dedicated integration verification (e.g. CI spinning up a MariaDB container to run constraint tests).
 
 ### 5.2 Effort and Dependency Overview
@@ -311,7 +311,7 @@ This also revises §5.1's ordering argument ("application layer first, constrain
 
 | Phase | Content | Value delivered |
 |---|---|---|
-| **Phase 1: shim + flip** | Delete paths catch 1451 → friendly error "still referenced in N places"; every delete writes operations/audit_log + a required reason first; abolish `deleteBatch`'s deletion of operations records; then flip in batches (below) | The disaster scenario is gone; zero-reference deletes are restorable; decisions 1/2/3 fully satisfied |
+| **Phase 1: shim + flip** ✅ **Complete (2026-08-03)** | Delete paths catch 1451 → friendly error "still referenced in N places"; every delete writes operations/audit_log + a required reason first; abolish `deleteBatch`'s deletion of operations records; then flip in batches (below) | The disaster scenario is gone (no CASCADE left in the database); zero-reference deletes are restorable; decisions 1/2 satisfied, decision 3 (required reason) lands with the delete-flow rebuild in Phase 2 |
 | **Phase 2: merge + redirect tool** | Audited bulk re-pointing + physical delete once references reach zero | A proper outlet for erroneous/duplicate entries (the dominant need); also the isomorphic foundation for person merge |
 | **Phase 3: lifecycle registry (on demand)** | §6.2–§6.3 | Started only when the "retired but still referenced" need is validated in practice |
 
@@ -322,7 +322,8 @@ This also revises §5.1's ordering argument ("application layer first, constrain
    **two separate `ALTER` statements** (DROP first, then ADD; **correction**: doing DROP + ADD of a
    same-named constraint within one `ALTER` fails on MariaDB 10.3 with
    `ERROR 1826 (HY000): Duplicate FOREIGN KEY constraint name`, splitting into two statements works;
-   whether prod is 10.3 or 10.11 is still unconfirmed, but two separate `ALTER`s are safe on both, so
+   production was confirmed on 2026-08-03 to be **10.11.14** (every batch was nevertheless verified on the
+   stricter 10.3); two separate `ALTER`s are safe on both, so
    that's what we always use — see `CASCADE_TO_RESTRICT_MIGRATION_NOTES.md` §2 for the test); with
    `foreign_key_checks = 0`, ADD FK does not scan existing data (consistency is already guaranteed by
    the original constraint), so each `ALTER` is near-instant with only a brief metadata lock; measure
@@ -346,7 +347,7 @@ This also revises §5.1's ordering argument ("application layer first, constrain
 4. **Observation period** (1–2 weeks before the next batch): monitor for 1451 (`Cannot delete or update a parent row`) — an occurrence means a hard-delete path slipped through: fail-closed, zero loss, fix the application layer;
 5. **Rollback plan**: the reverse `ALTER` back to CASCADE — one statement, no data risk.
 
-Other points: RESTRICT and NO ACTION are equivalent in InnoDB — write `RESTRICT` explicitly and uniformly; each batch ships with its migration (fresh installs stay consistent); the SQLite test environment has no foreign keys, so verification must run on MariaDB (a MariaDB container in CI is the long-term item, §5 Step 5); **the `operations` table itself has a CASCADE pointing at `BIOG_MAIN`** (a person's operation records vanish with a cascade-deleted person — the audit trail itself is unprotected), flipped together with the `BIOG_MAIN` batch; **`ON UPDATE CASCADE` (187 of them) is retained at this stage** (separate project, §5 Step 5).
+Other points: RESTRICT and NO ACTION are equivalent in InnoDB — write `RESTRICT` explicitly and uniformly; each batch ships with its migration (fresh installs stay consistent); the SQLite test environment has no foreign keys, so verification must run on MariaDB (a MariaDB container in CI is the long-term item, §5 Step 5); **the `operations` table itself has a CASCADE pointing at `BIOG_MAIN`** (a person's operation records vanish with a cascade-deleted person — the audit trail itself is unprotected), flipped together with the `BIOG_MAIN` batch; **`ON UPDATE CASCADE` (190 measured) is retained at this stage** (separate project, §5 Step 5).
 
 ### 6.2 Phase 3 Design Study: How to Store the Soft-Delete State
 
@@ -363,7 +364,7 @@ Requirements (from the decisions and §4): **R1** a state flag for pick endpoint
 **E's three costs, assessed**:
 
 1. **Filtering cost**: the affected surface is small — only the **pick surface** needs filtering (selectors/autocomplete/new-reference write validation, a single-digit number of endpoints); display JOINs, biographical-data queries, and research SQL via Query Playground do **not** filter by design (a deprecated-but-referenced entry must stay visible). The deprecated key set is a 10⁰–10³-scale, low-churn governance artifact; with `LifecycleService` caching it, the filter degenerates to `WHERE pk NOT IN (short list)` — same order as B/C's `WHERE c_deprecated = 0`, no actual JOIN needed.
-2. **No true foreign key**: a registry row pointing at a vanished row is harmless (orphan scan cleans it up); a target-row **key change** (the 187 `ON UPDATE CASCADE`s) silently detaches the flag (fail-open) — any key-change tool must update the registry in the same transaction, and the orphan scan checks registry keys for existence.
+2. **No true foreign key**: a registry row pointing at a vanished row is harmless (orphan scan cleans it up); a target-row **key change** (the 190 `ON UPDATE CASCADE`s) silently detaches the flag (fail-open) — any key-change tool must update the registry in the same transaction, and the orphan scan checks registry keys for existence.
 3. **Discoverability**: hand-written raw SQL sees no retirement state in the code table. A **second-order** problem: the dangerous operation (DELETE) is backstopped by RESTRICT at the DB layer; the worst outcome of missing the state is a mildly skewed analysis or a new reference to a retired entry (repairable with the merge tool) — no data loss. And per decisions 2/5, the released databases carry no retirement state under **any** option, so the gap exists only for internal users. Mitigations: internal views (no base-table change, not exported) + everything through `LifecycleService` (an endpoint bypassing the service is the same engineering-discipline issue as a forgotten `WHERE` under B/C — code review and regression tests).
 
 **Why not reuse the existing `audit_log` / `operations`**: those are **event logs** ("what happened"); the registry is **current state** ("what is the status now"). Deriving the current key set from a log means aggregating to the latest event per key — exactly the expensive scan; the registry is that derivation materialized. Deprecating changes no column of the target row, so audit_log (whose contract is old/new row images) has no natural entry to record, and there is no column for reason/redirect; operations is a person-centric workflow queue (`c_personid` NOT NULL, and that FK is itself a CASCADE). Every registry row carries an `operation_id` linking back to the logs — history stays with the existing machinery; this is not duplication. The partial exception is the tombstone (`deleted`): a physical delete already leaves a DELETE event with old_data in audit_log, missing only the reason — which is exactly why Phase 1 needs no registry; the registry's necessity comes from the current state of deprecated/merged.

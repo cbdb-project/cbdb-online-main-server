@@ -17,6 +17,16 @@
 - 優先使用 Laravel Schema Builder。
 - 若必須寫原始 SQL，請移除 SQLite 不支援的語法，例如 `COMMENT`、`ENGINE`、`USING BTREE`。
 
+### 1.1 外鍵一律 RESTRICT（去級聯已完成）
+- 全庫 `ON DELETE CASCADE` 已於 2026-08 全數翻為 `RESTRICT`（唯一例外是本來就正確的
+  `fk_merged_person_source`＝`SET NULL`）。**新 migration 建立外鍵一律用 `ON DELETE RESTRICT`
+  ／`restrictOnDelete()`，禁止 `CASCADE`／`cascadeOnDelete()`**；`ON UPDATE CASCADE` 維持現狀。
+- 連帶刪除改由應用層顯式執行（先子後父、父列僅在無剩餘引用時才刪、逐列寫 operations／audit，
+  見 `App\Services\ExplicitCascadeLogger`）。刪除路徑撞到 errno 1451 要轉友好報錯，不可吞掉。
+- 背景與執行紀錄：[docs/ON_DELETE_CASCADE_RISK.md](./docs/ON_DELETE_CASCADE_RISK.md)、
+  [docs/CASCADE_TO_RESTRICT_MIGRATION_NOTES.md](./docs/CASCADE_TO_RESTRICT_MIGRATION_NOTES.md)；
+  刪除功能重建設計見 [docs/DELETE_IMPACT_PREVIEW_PLAN.md](./docs/DELETE_IMPACT_PREVIEW_PLAN.md)。
+
 ### 2. 複合主鍵
 - Laravel Eloquent 不支援複合主鍵。
 - 複合主鍵表請使用 Query Builder，不要建立仰賴 Eloquent 主鍵行為的模型。

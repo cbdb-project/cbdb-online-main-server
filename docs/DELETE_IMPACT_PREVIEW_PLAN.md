@@ -58,9 +58,13 @@ Phase 1 把 DB 級聯拆掉後，系統落在矩陣 ②（物理刪除 × RESTRI
 - SQLite（測試環境）：`PRAGMA foreign_key_list(<table>)`——baseline 的 `sanitizeForSqlite()` **保留**了
   `CONSTRAINT ... FOREIGN KEY` 定義，所以測試庫查得到 FK 拓撲，影響圖邏輯**在 CI 可完整單元測試**。
 
-> ⚠ **陷阱（必須寫進實作註解）**：SQLite 測試庫的 FK 定義仍寫著 `ON DELETE CASCADE`（翻轉 migration
-> 是 MySQL-only no-op），MariaDB 上則是 `RESTRICT`。因此影響圖**只能用 FK 的存在與欄位**，
-> **不得依賴 `DELETE_RULE`** 判斷是否展開，否則兩個環境行為會分歧。
+> **已消除的陷阱**：原本 SQLite 測試庫的 FK 定義寫的是 `ON DELETE CASCADE`（翻轉 migration 是
+> MySQL-only no-op），與 MariaDB 的 `RESTRICT` 相反。2026-08-03 已把所有手寫 schema 一併改為
+> `RESTRICT`（見 `CASCADE_TO_RESTRICT_MIGRATION_NOTES.md` §12），兩邊現在一致。
+>
+> ⚠ 儘管如此，影響圖仍應**只用 FK 的存在與欄位、不依賴 `DELETE_RULE`**：語義上「誰引用了我」
+> 與「DB 打算怎麼處理」是兩件事，本服務要的是前者；而且 MariaDB 會把 `RESTRICT` 顯示成
+> `RESTRICT` 或 `NO ACTION`（視建立方式而定），以規則字串分支必然出錯。
 
 ### 4.2 展開規則
 

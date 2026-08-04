@@ -11,7 +11,7 @@ return new class () extends Migration {
      *
      * 修正內容:
      * 1. ✅ 完整的 FK 刪除 (涵蓋 parent 和 child 欄位)
-     * 2. ✅ 保留 CASCADE 行為 (ON DELETE/UPDATE)
+     * 2. ✅ 保留 ON UPDATE CASCADE；ON DELETE 重建為 RESTRICT（去級聯 Phase 1 後的終態）
      * 3. ✅ SQLite 兼容性 (使用 is_sqlite() 判斷)
      * 4. ✅ FK 恢復使用明確清單，確保重跑時也能正確恢復
      * 5. ✅ 涵蓋 ADMIN_CAT_CODE_TYPE_REL.c_admin_cat_code
@@ -219,7 +219,7 @@ return new class () extends Migration {
                     ADD CONSTRAINT `{$fk['name']}`
                     FOREIGN KEY (`{$fk['column']}`)
                     REFERENCES `{$fk['ref_table']}` (`{$fk['ref_column']}`)
-                    ON DELETE CASCADE
+                    ON DELETE RESTRICT
                     ON UPDATE CASCADE
                 ");
             }

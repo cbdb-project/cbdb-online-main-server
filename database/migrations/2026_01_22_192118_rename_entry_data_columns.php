@@ -50,13 +50,13 @@ return new class () extends Migration {
                 $table->foreign('c_entry_nh_id', 'ENTRY_DATA_ibfk_9')
                     ->references('c_nianhao_id')
                     ->on('NIAN_HAO')
-                    ->onDelete('cascade')
+                    ->onDelete('restrict')
                     ->onUpdate('cascade');
 
                 $table->foreign('c_parental_status_code', 'ENTRY_DATA_ibfk_10')
                     ->references('c_parental_status_code')
                     ->on('PARENTAL_STATUS_CODES')
-                    ->onDelete('cascade')
+                    ->onDelete('restrict')
                     ->onUpdate('cascade');
             });
         }
@@ -100,13 +100,13 @@ return new class () extends Migration {
                 $table->foreign('c_nianhao_id', 'ENTRY_DATA_ibfk_9')
                     ->references('c_nianhao_id')
                     ->on('NIAN_HAO')
-                    ->onDelete('cascade')
+                    ->onDelete('restrict')
                     ->onUpdate('cascade');
 
                 $table->foreign('c_parental_status', 'ENTRY_DATA_ibfk_10')
                     ->references('c_parental_status_code')
                     ->on('PARENTAL_STATUS_CODES')
-                    ->onDelete('cascade')
+                    ->onDelete('restrict')
                     ->onUpdate('cascade');
             });
         }

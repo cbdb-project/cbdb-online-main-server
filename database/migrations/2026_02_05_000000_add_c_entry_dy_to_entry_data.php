@@ -30,7 +30,7 @@ return new class () extends Migration {
                 $table->foreign('c_entry_dy', 'ENTRY_DATA_ibfk_13')
                     ->references('c_dy')
                     ->on('DYNASTIES')
-                    ->onDelete('cascade')
+                    ->onDelete('restrict')
                     ->onUpdate('cascade');
             });
         }

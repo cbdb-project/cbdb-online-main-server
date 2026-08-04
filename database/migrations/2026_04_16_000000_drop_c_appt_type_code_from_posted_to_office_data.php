@@ -35,7 +35,7 @@ return new class () extends Migration {
                 $table->foreign('c_appt_code', 'POSTED_TO_OFFICE_DATA_ibfk_1')
                     ->references('c_appt_code')
                     ->on('APPOINTMENT_CODES')
-                    ->cascadeOnDelete()
+                    ->restrictOnDelete()
                     ->cascadeOnUpdate();
             });
         }
@@ -106,7 +106,7 @@ return new class () extends Migration {
                 $table->foreign('c_appt_type_code', 'POSTED_TO_OFFICE_DATA_ibfk_1')
                     ->references('c_appt_code')
                     ->on('APPOINTMENT_CODES')
-                    ->cascadeOnDelete()
+                    ->restrictOnDelete()
                     ->cascadeOnUpdate();
             });
         }

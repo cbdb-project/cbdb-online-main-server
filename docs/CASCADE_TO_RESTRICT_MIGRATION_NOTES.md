@@ -49,8 +49,10 @@
   故 migration **必須 MySQL-only**：`if (!is_mysql()) return;`，SQLite 為 no-op。
 - 不用可攜 Schema Builder（SQLite 會炸），直接 `DB::statement()` raw ALTER。
 - 行為驗證**只能在 MariaDB 上做**（CI 起 MariaDB 容器為長期項，§6.1）。
-- **baseline `import_cbdb_schema.php` 不必改**：fresh install 先跑 baseline（CASCADE）、再跑翻轉
-  migration，終態一致；編輯 186 條 FK 的 baseline 風險大於收益。
+- **baseline `import_cbdb_schema.php` 已於 2026-08-03 一併改寫**（見 §12）。原本的判斷是
+  「fresh install 先跑 baseline（CASCADE）、再跑翻轉 migration，終態一致，不值得動 186 條 FK」；
+  Phase 1 收尾後判斷改變——**SQLite 測試庫永遠停在 CASCADE**（翻轉 migration 是 MySQL-only no-op），
+  與 MariaDB 終態不一致，會誤導任何讀 schema 的工具與人。
 
 ## 6. 批次 migration 的實作範式：資料驅動但範圍鎖定被引用表
 
@@ -319,3 +321,47 @@ SQLite no-op、`down()` 可逆）。無新增應用層垫片：本批三張被�
 
 端到端實測已完成（乾淨 MariaDB 10.3.39 容器，§9.4）：`flipped 28`、全庫 `CASCADE 0`、
 三項 1451 行為抽測與零引用刪除、rollback／re-migrate 皆如預期。
+
+## 12. 手寫 schema 一併改為 RESTRICT（2026-08-03）
+
+### 12.1 為什麼要改，改了哪些
+
+翻轉 migration 是 **MySQL-only**（SQLite 無法 ALTER 改 FK），所以 SQLite 測試庫的 FK 定義
+**永遠停在 baseline 寫死的 `ON DELETE CASCADE`**，與 MariaDB 的終態相反。這對「讀 schema 決定
+行為」的程式是實打實的陷阱（見 [DELETE_IMPACT_PREVIEW_PLAN.md](./DELETE_IMPACT_PREVIEW_PLAN.md) §4.1）。
+
+因此把**所有手寫 schema** 的 `ON DELETE` 一律改為 `RESTRICT`（`ON UPDATE CASCADE` 不動）：
+
+| 檔案 | 處數 |
+|---|---|
+| `2025_01_01_000000_import_cbdb_schema.php`（baseline dump） | 186 |
+| `2025_11_20_000000_create_admin_cat_tables` / `..._094916_add_admin_cat_code_to_addr_codes_table` / `..._100000_alter_admin_cat_tables_collation` | 5 |
+| `2026_01_22_192118_rename_entry_data_columns` | 4 |
+| `2026_01_26_000000_add_composite_pk_to_events_data` / `2026_01_26_000001_update_events_addr_composite_fk` | 4 |
+| `2026_02_05_000000_add_c_entry_dy_to_entry_data` | 1 |
+| `2026_02_12_000001_convert_fields_to_smallint`（重建 FK 處，另修過時註解） | 1 |
+| `2026_04_16_000000_drop_c_appt_type_code_from_posted_to_office_data`（`cascadeOnDelete()` 拼法） | 2 |
+
+> 注意 `cascadeOnDelete()` 這種 Laravel 拼法——只 grep `onDelete('cascade')` 會漏掉。
+
+**既有的 prod／dev 資料庫不受影響**：這些 migration 早已執行過，改的是「新裝環境長什麼樣」。
+
+### 12.2 SQLite 釋出檔不受影響（已查證）
+
+對外釋出的 SQLite（`ExportMysqlToSqlite`）**不是手寫 schema**：它對線上 MySQL 跑 `SHOW CREATE TABLE`
+再轉換，且轉換時**整段丟棄 `CONSTRAINT` / `FOREIGN KEY` 定義**（`convertCreateTableToSqlite()`），
+釋出檔本來就沒有任何外鍵。因此去級聯對釋出物是完全透明的，無須改動。
+
+### 12.3 驗證（fresh MariaDB 10.11.18，2026-08-03）
+
+| 檢查 | 結果 |
+|---|---|
+| 全量 `php artisan migrate` | ✅ 全 DONE，無錯 |
+| 翻轉 migration 的輸出 | ✅ 五批全部 `flipped 0`——baseline 直接就是終態，沒有可翻的 CASCADE |
+| 全庫 | ✅ `RESTRICT 188`／`NO ACTION 1`／`SET NULL 1`（共 190，語義與翻轉路徑完全一致；RESTRICT ≡ NO ACTION，顯示差異見 §3） |
+| `ON UPDATE CASCADE` | ✅ 190 條全數保留 |
+| 行為抽測（§9.4 同一份腳本） | ✅ 三項 1451 全數擋下、兄弟列保留、零引用刪除成功 |
+| SQLite 全套測試 | ✅ `./vendor/bin/phpunit` 2410 tests / 10653 assertions 全過 |
+
+> 兩條路徑（baseline CASCADE → 翻轉，與 baseline 直接 RESTRICT）殊途同歸，終態語義相同；
+> 差別僅在 `information_schema` 把 `RESTRICT` 顯示為 `RESTRICT` 還是 `NO ACTION`（§3）。

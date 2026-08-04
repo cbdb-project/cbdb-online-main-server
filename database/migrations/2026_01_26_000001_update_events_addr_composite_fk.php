@@ -70,7 +70,7 @@ return new class () extends Migration {
                 ALTER TABLE `EVENTS_ADDR`
                 ADD CONSTRAINT `EVENTS_ADDR_ibfk_3`
                 FOREIGN KEY (`c_event_code`) REFERENCES `EVENT_CODES` (`c_event_code`)
-                ON DELETE CASCADE ON UPDATE CASCADE
+                ON DELETE RESTRICT ON UPDATE CASCADE
             ');
         } else {
             // SQLite：需要重建表
@@ -123,7 +123,7 @@ return new class () extends Migration {
                 ALTER TABLE `EVENTS_ADDR`
                 ADD CONSTRAINT `EVENTS_ADDR_ibfk_3`
                 FOREIGN KEY (`c_event_record_id`) REFERENCES `EVENT_CODES` (`c_event_code`)
-                ON DELETE CASCADE ON UPDATE CASCADE
+                ON DELETE RESTRICT ON UPDATE CASCADE
             ');
         } else {
             $this->rebuildTableForSqliteDown();

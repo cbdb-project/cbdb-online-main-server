@@ -364,7 +364,7 @@ return new class () extends Migration {
                 ADD CONSTRAINT EVENTS_DATA_ibfk_3
                 FOREIGN KEY (c_event_code)
                 REFERENCES EVENT_CODES(c_event_code)
-                ON DELETE CASCADE
+                ON DELETE RESTRICT
                 ON UPDATE CASCADE
             ',
             'EVENTS_DATA_ibfk_6' => '
@@ -372,7 +372,7 @@ return new class () extends Migration {
                 ADD CONSTRAINT EVENTS_DATA_ibfk_6
                 FOREIGN KEY (c_personid)
                 REFERENCES BIOG_MAIN(c_personid)
-                ON DELETE CASCADE
+                ON DELETE RESTRICT
                 ON UPDATE CASCADE
             ',
         ];

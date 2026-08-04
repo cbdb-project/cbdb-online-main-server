@@ -33,13 +33,13 @@ class AlterAdminCatTablesCollation extends Migration {
                 ->references('c_admin_cat_code')
                 ->on('ADMIN_CAT_CODES')
                 ->onUpdate('cascade')
-                ->onDelete('cascade');
+                ->onDelete('restrict');
 
             $table->foreign('c_admin_cat_type_code', 'fk_admin_cat_type_code')
                 ->references('c_admin_cat_type_code')
                 ->on('ADMIN_CAT_TYPES')
                 ->onUpdate('cascade')
-                ->onDelete('cascade');
+                ->onDelete('restrict');
         });
     }
 

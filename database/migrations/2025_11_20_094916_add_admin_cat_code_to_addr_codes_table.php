@@ -30,7 +30,7 @@ class AddAdminCatCodeToAddrCodesTable extends Migration {
                     ->references('c_admin_cat_code')
                     ->on('ADMIN_CAT_CODES')
                     ->onUpdate('cascade')
-                    ->onDelete('cascade');
+                    ->onDelete('restrict');
             });
         }
     }

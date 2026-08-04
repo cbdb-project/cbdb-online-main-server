@@ -1,9 +1,10 @@
-# CASCADE → RESTRICT：翻轉 migration 的機制與分批 rollout（MariaDB 10.3）
+# CASCADE → RESTRICT：翻轉 migration 的機制與分批 rollout（驗證平台 MariaDB 10.3；prod 為 10.11.14）
 
 > 狀態：**批次 1–4 與末批全部落地並實測完成**——全庫 ON DELETE CASCADE 歸零（僅餘 1 條既有且正確的 SET NULL）。
 > 上位文件：[docs/ON_DELETE_CASCADE_RISK.md](./ON_DELETE_CASCADE_RISK.md)（§6「RESTRICT 先行、按被引用表分批」）
 > 目的：把 §6.1 的翻轉方案落成可執行、可分批、可回滾的 migration，並記錄 §6.1 範例 SQL 在
-> **prod 版本 MariaDB 10.3** 上跑不起來的實測修正（該文件是在 10.11 驗的）。
+> **MariaDB 10.3** 上跑不起來的實測修正（該文件的範例是在 10.11 驗的）。全部批次都在 10.3
+> 上驗證——這是兩個候選版本中較嚴格的一個；prod 實際為 10.11.14（§2），10.3 通過即 10.11 通過。
 
 ---
 
@@ -23,12 +24,13 @@
 | 同一 `ALTER` 內 `DROP FOREIGN KEY x, ADD CONSTRAINT x ...`（同名） | ❌ `ERROR 1826 (HY000): Duplicate FOREIGN KEY constraint name` |
 | 拆成兩條 `ALTER`：先 `DROP`、再 `ADD`（同名） | ✅ 成功；`DELETE_RULE` 變更；刪被引用父列 `ERROR 1451` 擋下 |
 
-- §6.1 的範例在 **MariaDB 10.11** 驗（見該文件附錄 C），但 **prod 是 10.3**（AGENTS.md）。
-  10.3 不允許在單一 `ALTER` 內 DROP 又 ADD 同名 FK。
-- ⚠ **待確認**：prod 究竟 10.3 還是 10.11（AGENTS.md 說 10.3、cascade 文件說在 10.11 驗）。
-  無論如何，**兩條 ALTER 在兩版皆安全，一律採用**。
+- §6.1 的範例在 **MariaDB 10.11** 驗（見該文件附錄 C）。本文件早期依 `AGENTS.md` 假設 prod 為
+  10.3，故全部批次都在 10.3 容器上驗——10.3 不允許在單一 `ALTER` 內 DROP 又 ADD 同名 FK。
+- ✅ **已查明（2026-08-03）**：prod 實際為 **MariaDB `10.11.14`**（經 prod MCP `SELECT VERSION()`）。
+  這對已落地的 migration **沒有影響**：驗證是在**更嚴格**的 10.3 上做的（1826 限制為 10.3 獨有），
+  兩條獨立 ALTER 在 10.11 同樣合法，10.3 通過即 10.11 通過。**兩條 ALTER 在兩版皆安全，一律採用**。
 
-## 3. 10.3 的坑：RESTRICT 在 information_schema 顯示為 NO ACTION
+## 3. 10.3 的坑：RESTRICT 在 information_schema 多半顯示為 NO ACTION
 
 寫 `ON DELETE RESTRICT`，`information_schema.REFERENTIAL_CONSTRAINTS.DELETE_RULE` 在 10.3
 回報 **`NO ACTION`**（InnoDB 中 RESTRICT ≡ NO ACTION）。因此驗證須 `DELETE_RULE IN ('RESTRICT','NO ACTION')`，
@@ -100,7 +102,7 @@ GROUP BY REFERENCED_TABLE_NAME, DELETE_RULE;
 | **末批** | BIOG_MAIN(25，含 operations→BIOG_MAIN)＋POSTING_DATA(2)＋POSSESSION_DATA(1)＝**28 條** | `2026_08_03_000000_restrict_fks_referencing_biog_main_batch` | ✅ 已實作＋MariaDB 10.3 端到端驗（見 §9.4）；翻完全庫 `CASCADE 0`，去級聯 Phase 1 收尾 |
 
 **節奏（§6.1「app-layer-first」）**：翻一批 → 觀察 1–2 週盯 1451（1451 會把漏網的 cascade
-依賴刪除路徑逼出，fail-closed 零損失）→ 修應用層 → 下一批。`ON UPDATE CASCADE`（187 條）本階段一律保留。
+依賴刪除路徑逼出，fail-closed 零損失）→ 修應用層 → 下一批。`ON UPDATE CASCADE`（實測 190 條）本階段一律保留。
 
 ## 9. 批次 1 端到端實測（fresh MariaDB 10.3，2026-07-20）
 
@@ -225,11 +227,19 @@ migration，再套用批次 1：
 > `2026_07_24_000000_restore_events_addr_event_code_fk` 建立的 `EVENTS_ADDR_ibfk_3`
 > 回報字面 `RESTRICT`。兩者在 InnoDB 語義相同，驗證查詢仍應 `IN ('RESTRICT','NO ACTION')`。
 
-## 10. 對 `ON_DELETE_CASCADE_RISK.md` 的修正建議
+## 10. 對 `ON_DELETE_CASCADE_RISK.md` 的修正（已回補）
 
-1. §6.1「同一 `ALTER` 內 DROP＋ADD」→ 改為「**兩條獨立 ALTER**（先 DROP 再 ADD）」，註明 10.3 的 1826 限制。
-2. 附錄 B 驗證：`DELETE_RULE='RESTRICT'` → `DELETE_RULE IN ('RESTRICT','NO ACTION')`。
-3. 標註 prod 版本待確認（10.3 vs 10.11）；兩條 ALTER 為跨版本安全選擇。
+前兩項已於 `b05670c2`（分支 `docs-on-delete-cascade-risk`／PR #1143）回補進該文件 §6.1：
+
+1. ~~§6.1「同一 `ALTER` 內 DROP＋ADD」~~ → 已改為「**兩條獨立 ALTER**（先 DROP 再 ADD）」，並註明 10.3 的 1826 限制。
+2. ~~附錄 B 驗證 `DELETE_RULE='RESTRICT'`~~ → 已改為 `DELETE_RULE IN ('RESTRICT','NO ACTION')`。
+3. **prod 版本已查明：MariaDB `10.11.14`**（2026-08-03 經 prod MCP `SELECT VERSION()` 實測），
+   不是先前假設的 10.3。影響評估：
+   - **不需重跑或改寫任何已落地的 migration**——全部批次都是在**更嚴格**的 10.3 上驗過的
+     （10.3 才有 1826 的同名同語句限制；兩條獨立 ALTER 在 10.11 同樣合法），10.3 通過即 10.11 通過；
+   - `AGENTS.md`「MariaDB 10.3」的記述已同步更正；
+   - §3 的 `NO ACTION` 顯示差異屬 InnoDB 語義等價問題，驗證條件 `IN ('RESTRICT','NO ACTION')` 兩版皆適用；
+   - 唯一遺留待辦：本文件與該風險文件既有的「10.3／10.11 待確認」措辭應一併清掉（風險文件在 PR #1143 上修訂）。
 
 ## 11. 末批前置：應用層顯式級聯（已完成，觀察期已結束）
 

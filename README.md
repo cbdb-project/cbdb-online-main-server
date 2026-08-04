@@ -55,7 +55,7 @@
 ### 生產環境
 - **PHP**: 8.2+ (最低 8.2.0，建議 8.4)
 - **Laravel**: 12.x (已從 11.x 升級，參見 [UPGRADE.md](./docs/UPGRADE.md))
-- **數據庫**: MariaDB 10.3.39 (Debian)
+- **數據庫**: MariaDB 10.11.14 (Ubuntu 24.04；2026-08-03 於 prod 實測)
 - **Web Server**: Caddy
 - **Node.js**: 22.x（建議搭配 npm 10）
 

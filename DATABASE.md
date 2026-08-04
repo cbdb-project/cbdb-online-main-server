@@ -18,7 +18,7 @@
 ## 數據庫環境
 
 ### 生產環境
-- **數據庫系統**：MariaDB 10.3.39 (Debian)
+- **數據庫系統**：MariaDB 10.11.14 (Ubuntu 24.04；2026-08-03 於 prod 實測)
 - **版本資訊**：`mysql Ver 15.1 Distrib 10.3.39-MariaDB, for debian-linux-gnu (x86_64) using readline 5.2`
 - **字符集**：utf8mb4
 - **排序規則**：utf8mb4_general_ci
@@ -351,7 +351,7 @@ protected function setUp(): void {
 ### 問題 1：全文搜索需求
 
 **問題**：需要對中文姓名進行全文搜索
-**限制**：MariaDB 10.3 不支持 ngram parser
+**限制**：MariaDB（10.3／10.11 皆然）不支持 ngram parser
 **解決方案**：
 1. ✅ **短期**：使用 B-Tree 索引 + 前綴匹配（已測試，性能優秀）
 2. **長期**：考慮 Elasticsearch 或 Meilisearch 等搜索服務

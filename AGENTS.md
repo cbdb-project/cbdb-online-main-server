@@ -3,7 +3,7 @@
 本文件提供 AI 代理在此專案工作的最小必要背景。目標是快速上手、降低踩坑，不再保留已失效的歷史操作細節。
 
 ## 專案現況
-- 技術棧：Laravel 12、PHP 8.2+、MariaDB 10.3、SQLite（測試）、Vite、Vue 3、Inertia/React。
+- 技術棧：Laravel 12、PHP 8.2+、MariaDB 10.11（prod 實測 10.11.14；相容性下限仍按 10.3 撰寫）、SQLite（測試）、Vite、Vue 3、Inertia/React。
 - 全站主要互動頁面已遷移至 **React/Inertia 並翻 flag 上線**（`config/migration_flags.php` 頁面 flag 多為 `new`）：人物列表/檢視/詳情中樞、13 個 React 編輯器（basic-info + 12 個複合主鍵子資源）、Codes CRUD、operations/manage/crowdsourcing、admin 工具、認證頁、Query Playground（`/app/query-playground`）等。
 - **舊版 Blade 視圖與 AdminLTE 3 + Bootstrap 4 仍實體保留**：flag-gated 頁面（basicinformation.*、view、codes、operations、manage、crowdsourcing、admin.*、auth.*、welcome 等）把對應 flag 改回 `old` 即可即時回退、不需改碼。少數頁面例外：**Query Playground 無主頁 flag，`/query-playground` 硬導向 `/app/query-playground`（React）、不走 flag 回退；外部資料庫引用瀏覽器亦同，`/external-db-link` 硬導向 `/app/external-db-link`、Blade 版已刪除**。AdminLTE 實體下架（Phase 7）尚未執行。**新功能一律只做在 React/Inertia 路徑（`resources/js/inertia/**`），不要再改舊 Blade。**
 - 前端資源由 Vite 載入；React/Inertia 元件在 `resources/js/inertia/`。

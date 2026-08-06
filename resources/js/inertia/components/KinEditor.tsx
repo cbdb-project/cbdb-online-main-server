@@ -32,12 +32,22 @@ import {
  */
 type Fields = Record<string, string>;
 
+/** 修改提案模式（resubmit）：復用同一編輯器與 /api/v2 管線重發提案（見 MutationController::resubmit）。 */
+interface ResubmitInfo {
+    resubmit_proposal_id?: number;
+    initial_comment?: string;
+    resubmit_endpoint?: string;
+}
+
 interface Props {
     personId: number;
     personLabel: string;
     mode: 'create' | 'edit';
     initialFields: Fields;
     initialLabels?: Fields;
+    /** update 提案的預填內容：蓋在 fields 上、不進 baseline snapshot（對原列正確計算 diff）。 */
+    overlayFields?: Fields;
+    resubmit?: ResubmitInfo;
     canEdit: boolean;
     canPropose: boolean;
     createEndpoint: string;
@@ -56,15 +66,17 @@ const NON_PK = ['c_source', 'c_pages', 'c_notes', 'c_autogen_notes'];
 
 export default function KinEditor({
     personId, personLabel, mode, initialFields, initialLabels = {},
+    overlayFields = {}, resubmit,
     canEdit, canPropose, createEndpoint, mutateEndpoint, deleteEndpoint, indexUrl, t,
 }: Props) {
+    const isResubmit = !!(resubmit?.resubmit_proposal_id && resubmit?.resubmit_endpoint);
     const tr = (k: string, fb: string) => { const v = t ? t(k) : k; return v && v !== k ? v : fb; };
     const base: Fields = {
         c_personid: String(personId),
         c_kin_id: '', c_kin_code: '', c_source: '0',
         ...initialFields,
     };
-    const [fields, setFields] = useState<Fields>(base);
+    const [fields, setFields] = useState<Fields>({ ...base, ...overlayFields });
     const [labels, setLabels] = useState<Fields>(initialLabels);
     const [savedSnapshot, setSavedSnapshot] = useState(JSON.stringify(base));
     const originalPk = useRef<Record<string, number | string>>(Object.fromEntries(PK.map((k) => {
@@ -77,7 +89,7 @@ export default function KinEditor({
     const [message, setMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [sourceHighlight, setSourceHighlight] = useState(false);
-    const [comment, setComment] = useState('');
+    const [comment, setComment] = useState(resubmit?.initial_comment ?? '');
     const [conflict, setConflict] = useState<MirrorConflict | null>(null); // #66 對面鏡像衝突
     const [suspected, setSuspected] = useState<MirrorSuspected | null>(null); // #70 對面疑似漂移鏡像
     const [deleteMulti, setDeleteMulti] = useState<MirrorDeleteMultiple | null>(null); // #81 §6 刪除命中對面多筆反向列
@@ -155,6 +167,7 @@ export default function KinEditor({
     };
 
     const save = async (sm: 'direct' | 'proposal', force = false) => {
+        if (isResubmit) sm = 'proposal'; // 修改提案模式只有「重發提案」一種語義
         // #80（§5-B）：direct 存檔且偵測到對面多筆對應時，第一次點擊只提示不送出（武裝確認），第二次才一併同步。
         // force（#66/#70 衝突強制覆寫/收斂）已是使用者的明確決定，不再二次攔截。
         if (sm === 'direct' && !force && oppositeEdge?.status === 'multiple' && !multiAckRef.current) {
@@ -213,6 +226,7 @@ export default function KinEditor({
                 return;
             }
         }
+        if (isResubmit && resubmit?.resubmit_endpoint) endpoint = resubmit.resubmit_endpoint;
         try {
             // #66：meta 可帶 comment（proposal）與 force（衝突警告中選「強制覆寫」時）。
             const meta: Record<string, unknown> = {};
@@ -403,11 +417,11 @@ export default function KinEditor({
             ) : null}
 
             <div style={gSubmitRow}>
-                {canEdit ? <button type="button" style={gPrimaryBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
-                {(canEdit || canPropose) ? <button type="button" style={gInfoBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => (canEdit ? setConfirmProposalMode(true) : void save('proposal'))}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('submit_proposal', '提交建議')}</button> : null}
+                {canEdit && !isResubmit ? <button type="button" style={gPrimaryBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
+                {(canEdit || canPropose) ? <button type="button" style={gInfoBtn} disabled={saving || (mode === 'edit' && !dirty && !isResubmit)} onClick={() => (canEdit && !isResubmit ? setConfirmProposalMode(true) : void save('proposal'))}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : (isResubmit ? tr('resubmit_proposal', '更新提案') : tr('submit_proposal', '提交建議'))}</button> : null}
                 <ActionStatus saving={saving} deleting={deleting} message={message} error={error} t={t} />
                 <div style={gBtnGroupRight}>
-                    {mode === 'edit' && canEdit && deleteEndpoint ? <button type="button" style={gDangerBtn} disabled={deleting} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
+                    {mode === 'edit' && canEdit && deleteEndpoint && !isResubmit ? <button type="button" style={gDangerBtn} disabled={deleting} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
                     <a href={indexUrl} style={gCancelBtn}>{tr('cancel', '取消')}</a>
                 </div>
             </div>

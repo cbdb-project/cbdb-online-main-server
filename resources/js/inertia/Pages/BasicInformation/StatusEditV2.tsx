@@ -15,6 +15,8 @@ interface PageProps extends SharedProps {
     edit_mode: 'create' | 'edit';
     initial_fields: Fields;
     initial_labels: Fields;
+    proposal_overlay: Fields;
+    resubmit: { resubmit_proposal_id?: number; initial_comment?: string; resubmit_endpoint?: string };
     can_edit: boolean;
     can_propose: boolean;
     ai_enabled: boolean;
@@ -53,6 +55,8 @@ export default function StatusEditV2() {
                 mode={p.edit_mode}
                 initialFields={p.initial_fields}
                 initialLabels={p.initial_labels}
+                overlayFields={p.proposal_overlay}
+                resubmit={p.resubmit}
                 canEdit={p.can_edit}
                 canPropose={p.can_propose}
                 aiEnabled={p.ai_enabled}

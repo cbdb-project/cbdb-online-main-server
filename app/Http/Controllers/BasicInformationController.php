@@ -385,6 +385,7 @@ class BasicInformationController extends Controller {
 
         $hasPk = $request->filled('c_addr_id') && $request->filled('c_addr_type') && $request->filled('c_sequence');
         $mode = $hasPk ? 'edit' : 'create';
+        [$proposalOverlay, $resubmitProps] = $this->proposalResubmitProps($request, 'BIOG_ADDR_DATA');
 
         $initialFields = ['c_personid' => (string) $personId];
         $initialLabels = [];
@@ -435,6 +436,11 @@ class BasicInformationController extends Controller {
 
         $user = Auth::user();
 
+        if ($mode === 'create') {
+            $initialFields = array_merge($initialFields, $proposalOverlay);
+            $proposalOverlay = [];
+        }
+
         return Inertia::render('BasicInformation/AddressEditV2', [
             'person_id' => $personId,
             'person_label' => $personLabel,
@@ -444,6 +450,8 @@ class BasicInformationController extends Controller {
             'edit_mode' => $mode,
             'initial_fields' => (object) $initialFields,
             'initial_labels' => (object) $initialLabels,
+            'proposal_overlay' => (object) $proposalOverlay,
+            'resubmit' => (object) $resubmitProps,
             'other_belongs' => $otherBelongs,
             'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
             'can_propose' => $user ? $user->canPropose() : false,
@@ -466,6 +474,7 @@ class BasicInformationController extends Controller {
 
         $hasPk = $request->filled('c_textid') && $request->filled('c_role_id');
         $mode = $hasPk ? 'edit' : 'create';
+        [$proposalOverlay, $resubmitProps] = $this->proposalResubmitProps($request, 'BIOG_TEXT_DATA');
 
         $initialFields = ['c_personid' => (string) $personId];
         $initialLabels = [];
@@ -501,12 +510,19 @@ class BasicInformationController extends Controller {
 
         $user = Auth::user();
 
+        if ($mode === 'create') {
+            $initialFields = array_merge($initialFields, $proposalOverlay);
+            $proposalOverlay = [];
+        }
+
         return Inertia::render('BasicInformation/TextEditV2', [
             'person_id' => $personId,
             'person_label' => $personLabel,
             'edit_mode' => $mode,
             'initial_fields' => (object) $initialFields,
             'initial_labels' => (object) $initialLabels,
+            'proposal_overlay' => (object) $proposalOverlay,
+            'resubmit' => (object) $resubmitProps,
             'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
             'can_propose' => $user ? $user->canPropose() : false,
             'create_endpoint' => route('api.v2.create.web', [], false),
@@ -522,12 +538,64 @@ class BasicInformationController extends Controller {
      * Inertia + React 版：別名（altname）編輯器（對齊 legacy biogmains/altname/_form）。
      * 主鍵 (c_personid, c_alt_name_chn[字串], c_alt_name_type_code)；獨立測試路由、未上線。
      */
+    /**
+     * 修改提案模式（?proposal={operation_id}）：載入待審提案、回傳
+     * [overlay 欄位, resubmit props]。修改提案復用「發提案」的同一個編輯器與
+     * /api/v2 提交管線（見 MutationController::resubmit），不再走 codes 通用
+     * 全欄表單——該表單按 Schema 全欄渲染回寫，會把稽核欄等系統欄灌進 payload。
+     *
+     * create 提案（op_type 8）：呼叫端把 overlay 併入 initial_fields（create 表單直接預填）；
+     * update 提案（op_type 9）：overlay 另傳（編輯器蓋在 fields 上、不進 baseline snapshot，
+     * 才能對原列正確計算 diff）。overlay 僅含使用者欄位：剔除 __ 控制鍵與四個稽核欄。
+     */
+    protected function proposalResubmitProps(Request $request, string $table): array {
+        $proposalId = $request->query('proposal');
+        if ($proposalId === null || $proposalId === '') {
+            return [[], []];
+        }
+
+        $operation = \App\Models\Operation::find((int) $proposalId);
+        if (!$operation || $operation->resource !== $table
+            || !in_array((int) $operation->op_type, [\App\Models\Operation::TYPE_PROPOSAL_CREATE, \App\Models\Operation::TYPE_PROPOSAL_UPDATE], true)) {
+            abort(404, '找不到對應的提案');
+        }
+
+        $user = Auth::user();
+        if (!$user || ((int) $operation->user_id !== (int) $user->id && !$user->canReviewProposals())) {
+            abort(403, '只有提案人或審核人可以修改提案');
+        }
+
+        $payload = json_decode((string) $operation->resource_data, true);
+        $payload = is_array($payload) ? $payload : [];
+        if (!in_array((string) ($payload['__review_status'] ?? 'pending'), ['pending', 'rejected'], true)) {
+            abort(409, '提案已審結或撤回，無法修改');
+        }
+
+        $overlay = [];
+        foreach ($payload as $key => $value) {
+            if (!is_string($key) || str_starts_with($key, '__')
+                || in_array($key, ['c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date'], true)) {
+                continue;
+            }
+            if (is_scalar($value) || $value === null) {
+                $overlay[$key] = $value === null ? '' : (string) $value;
+            }
+        }
+
+        return [$overlay, [
+            'resubmit_proposal_id' => (int) $operation->id,
+            'initial_comment' => (string) ($payload['__proposal_meta']['comment'] ?? ''),
+            'resubmit_endpoint' => route('api.v2.proposals.resubmit.web', ['operation' => $operation->id], false),
+        ]];
+    }
+
     public function appAltnameEditV2(Request $request, $id) {
         $personId = $this->normalizePersonId($id);
         [, $personLabel] = $this->buildPersonViewProps($personId);
 
         $hasPk = $request->filled('c_alt_name_chn') && $request->filled('c_alt_name_type_code');
         $mode = $hasPk ? 'edit' : 'create';
+        [$proposalOverlay, $resubmitProps] = $this->proposalResubmitProps($request, 'ALTNAME_DATA');
 
         $initialFields = ['c_personid' => (string) $personId];
         $initialLabels = [];
@@ -562,12 +630,19 @@ class BasicInformationController extends Controller {
 
         $user = Auth::user();
 
+        if ($mode === 'create') {
+            $initialFields = array_merge($initialFields, $proposalOverlay);
+            $proposalOverlay = [];
+        }
+
         return Inertia::render('BasicInformation/AltnameEditV2', [
             'person_id' => $personId,
             'person_label' => $personLabel,
             'edit_mode' => $mode,
             'initial_fields' => (object) $initialFields,
             'initial_labels' => (object) $initialLabels,
+            'proposal_overlay' => (object) $proposalOverlay,
+            'resubmit' => (object) $resubmitProps,
             'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
             'can_propose' => $user ? $user->canPropose() : false,
             'create_endpoint' => route('api.v2.create.web', [], false),
@@ -592,6 +667,7 @@ class BasicInformationController extends Controller {
 
         $hasPk = $request->filled('c_inst_code') && $request->filled('c_inst_name_code') && $request->filled('c_bi_role_code');
         $mode = $hasPk ? 'edit' : 'create';
+        [$proposalOverlay, $resubmitProps] = $this->proposalResubmitProps($request, 'BIOG_INST_DATA');
 
         $initialFields = ['c_personid' => (string) $personId];
         $initialLabels = [];
@@ -629,6 +705,11 @@ class BasicInformationController extends Controller {
 
         $user = Auth::user();
 
+        if ($mode === 'create') {
+            $initialFields = array_merge($initialFields, $proposalOverlay);
+            $proposalOverlay = [];
+        }
+
         return Inertia::render('BasicInformation/SocialInstEditV2', [
             'person_id' => $personId,
             'person_label' => $personLabel,
@@ -636,6 +717,8 @@ class BasicInformationController extends Controller {
             'edit_mode' => $mode,
             'initial_fields' => (object) $initialFields,
             'initial_labels' => (object) $initialLabels,
+            'proposal_overlay' => (object) $proposalOverlay,
+            'resubmit' => (object) $resubmitProps,
             'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
             'can_propose' => $user ? $user->canPropose() : false,
             'create_endpoint' => route('api.v2.create.web', [], false),
@@ -662,6 +745,7 @@ class BasicInformationController extends Controller {
 
         $hasPk = $request->filled('c_possession_record_id');
         $mode = $hasPk ? 'edit' : 'create';
+        [$proposalOverlay, $resubmitProps] = $this->proposalResubmitProps($request, 'POSSESSION_DATA');
 
         $initialFields = ['c_personid' => (string) $personId];
         $initialLabels = [];
@@ -696,6 +780,11 @@ class BasicInformationController extends Controller {
 
         $user = Auth::user();
 
+        if ($mode === 'create') {
+            $initialFields = array_merge($initialFields, $proposalOverlay);
+            $proposalOverlay = [];
+        }
+
         return Inertia::render('BasicInformation/PossessionEditV2', [
             'person_id' => $personId,
             'person_label' => $personLabel,
@@ -706,6 +795,8 @@ class BasicInformationController extends Controller {
             'initial_fields' => (object) $initialFields,
             'initial_labels' => (object) $initialLabels,
             'initial_addr' => $initialAddr,
+            'proposal_overlay' => (object) $proposalOverlay,
+            'resubmit' => (object) $resubmitProps,
             'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
             'can_propose' => $user ? $user->canPropose() : false,
             'create_endpoint' => route('api.v2.create.web', [], false),
@@ -733,6 +824,7 @@ class BasicInformationController extends Controller {
 
         $hasPk = $request->filled('c_sequence') && $request->filled('c_event_code');
         $mode = $hasPk ? 'edit' : 'create';
+        [$proposalOverlay, $resubmitProps] = $this->proposalResubmitProps($request, 'EVENTS_DATA');
 
         $initialFields = ['c_personid' => (string) $personId];
         $initialLabels = [];
@@ -772,6 +864,11 @@ class BasicInformationController extends Controller {
 
         $user = Auth::user();
 
+        if ($mode === 'create') {
+            $initialFields = array_merge($initialFields, $proposalOverlay);
+            $proposalOverlay = [];
+        }
+
         return Inertia::render('BasicInformation/EventEditV2', [
             'person_id' => $personId,
             'person_label' => $personLabel,
@@ -782,6 +879,8 @@ class BasicInformationController extends Controller {
             'initial_fields' => (object) $initialFields,
             'initial_labels' => (object) $initialLabels,
             'initial_addr' => $initialAddr,
+            'proposal_overlay' => (object) $proposalOverlay,
+            'resubmit' => (object) $resubmitProps,
             'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
             'can_propose' => $user ? $user->canPropose() : false,
             'create_endpoint' => route('api.v2.create.web', [], false),
@@ -810,6 +909,7 @@ class BasicInformationController extends Controller {
         $pkKeys = ['c_entry_code', 'c_sequence', 'c_kin_code', 'c_assoc_code', 'c_kin_id', 'c_year', 'c_assoc_id', 'c_inst_code', 'c_inst_name_code'];
         $hasPk = collect($pkKeys)->every(fn ($k) => $request->has($k) && $request->input($k) !== '');
         $mode = $hasPk ? 'edit' : 'create';
+        [$proposalOverlay, $resubmitProps] = $this->proposalResubmitProps($request, 'ENTRY_DATA');
 
         $initialFields = ['c_personid' => (string) $personId];
         $initialLabels = [];
@@ -882,6 +982,11 @@ class BasicInformationController extends Controller {
 
         $user = Auth::user();
 
+        if ($mode === 'create') {
+            $initialFields = array_merge($initialFields, $proposalOverlay);
+            $proposalOverlay = [];
+        }
+
         return Inertia::render('BasicInformation/EntriesEditV2', [
             'person_id' => $personId,
             'person_label' => $personLabel,
@@ -891,6 +996,8 @@ class BasicInformationController extends Controller {
             'edit_mode' => $mode,
             'initial_fields' => (object) $initialFields,
             'initial_labels' => (object) $initialLabels,
+            'proposal_overlay' => (object) $proposalOverlay,
+            'resubmit' => (object) $resubmitProps,
             'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
             'can_propose' => $user ? $user->canPropose() : false,
             'create_endpoint' => route('api.v2.create.web', [], false),
@@ -921,6 +1028,7 @@ class BasicInformationController extends Controller {
         $pkKeys = ['c_sequence', 'c_status_code'];
         $hasPk = collect($pkKeys)->every(fn ($k) => $request->has($k) && $request->input($k) !== '');
         $mode = $hasPk ? 'edit' : 'create';
+        [$proposalOverlay, $resubmitProps] = $this->proposalResubmitProps($request, 'STATUS_DATA');
 
         $initialFields = ['c_personid' => (string) $personId];
         $initialLabels = [];
@@ -980,6 +1088,11 @@ class BasicInformationController extends Controller {
         $user = Auth::user();
         $aiEnabled = (bool) config('services.gemini.api_key') && $user && $user->isActive();
 
+        if ($mode === 'create') {
+            $initialFields = array_merge($initialFields, $proposalOverlay);
+            $proposalOverlay = [];
+        }
+
         return Inertia::render('BasicInformation/StatusEditV2', [
             'person_id' => $personId,
             'person_label' => $personLabel,
@@ -987,6 +1100,8 @@ class BasicInformationController extends Controller {
             'edit_mode' => $mode,
             'initial_fields' => (object) $initialFields,
             'initial_labels' => (object) $initialLabels,
+            'proposal_overlay' => (object) $proposalOverlay,
+            'resubmit' => (object) $resubmitProps,
             'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
             'can_propose' => $user ? $user->canPropose() : false,
             'ai_enabled' => $aiEnabled,
@@ -1019,6 +1134,7 @@ class BasicInformationController extends Controller {
         // c_textid 存在且非空才視為編輯（0 為合法 textid，故不可用 (int) 是否為 0 判斷）。
         $hasPk = $request->has('c_textid') && $request->input('c_textid') !== '';
         $mode = $hasPk ? 'edit' : 'create';
+        [$proposalOverlay, $resubmitProps] = $this->proposalResubmitProps($request, 'BIOG_SOURCE_DATA');
 
         $initialFields = ['c_personid' => (string) $personId];
         $initialLabels = [];
@@ -1056,12 +1172,19 @@ class BasicInformationController extends Controller {
 
         $user = Auth::user();
 
+        if ($mode === 'create') {
+            $initialFields = array_merge($initialFields, $proposalOverlay);
+            $proposalOverlay = [];
+        }
+
         return Inertia::render('BasicInformation/SourceEditV2', [
             'person_id' => $personId,
             'person_label' => $personLabel,
             'edit_mode' => $mode,
             'initial_fields' => (object) $initialFields,
             'initial_labels' => (object) $initialLabels,
+            'proposal_overlay' => (object) $proposalOverlay,
+            'resubmit' => (object) $resubmitProps,
             'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
             'can_propose' => $user ? $user->canPropose() : false,
             'create_endpoint' => route('api.v2.create.web', [], false),
@@ -1092,6 +1215,7 @@ class BasicInformationController extends Controller {
         $hasPk = $request->has('c_office_id') && $request->has('c_posting_id')
             && $request->input('c_posting_id') !== '';
         $mode = $hasPk ? 'edit' : 'create';
+        [$proposalOverlay, $resubmitProps] = $this->proposalResubmitProps($request, 'POSTED_TO_OFFICE_DATA');
 
         $initialFields = ['c_personid' => (string) $personId];
         $initialLabels = [];
@@ -1155,6 +1279,11 @@ class BasicInformationController extends Controller {
 
         $user = Auth::user();
 
+        if ($mode === 'create') {
+            $initialFields = array_merge($initialFields, $proposalOverlay);
+            $proposalOverlay = [];
+        }
+
         return Inertia::render('BasicInformation/OfficeEditV2', [
             'person_id' => $personId,
             'person_label' => $personLabel,
@@ -1165,6 +1294,8 @@ class BasicInformationController extends Controller {
             'initial_fields' => (object) $initialFields,
             'initial_labels' => (object) $initialLabels,
             'initial_addr' => $initialAddr,
+            'proposal_overlay' => (object) $proposalOverlay,
+            'resubmit' => (object) $resubmitProps,
             'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
             'can_propose' => $user ? $user->canPropose() : false,
             'create_endpoint' => route('api.v2.create.web', [], false),
@@ -1212,6 +1343,7 @@ class BasicInformationController extends Controller {
         $pkCols = ['c_assoc_code', 'c_assoc_id', 'c_kin_code', 'c_kin_id', 'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year'];
         $hasPk = collect($pkCols)->every(fn ($c) => $request->has($c));
         $mode = $hasPk ? 'edit' : 'create';
+        [$proposalOverlay, $resubmitProps] = $this->proposalResubmitProps($request, 'ASSOC_DATA');
 
         $initialFields = ['c_personid' => (string) $personId];
         $initialLabels = [];
@@ -1300,6 +1432,11 @@ class BasicInformationController extends Controller {
 
         $user = Auth::user();
 
+        if ($mode === 'create') {
+            $initialFields = array_merge($initialFields, $proposalOverlay);
+            $proposalOverlay = [];
+        }
+
         return Inertia::render('BasicInformation/AssocEditV2', [
             'person_id' => $personId,
             'person_label' => $personLabel,
@@ -1309,6 +1446,8 @@ class BasicInformationController extends Controller {
             'edit_mode' => $mode,
             'initial_fields' => (object) $initialFields,
             'initial_labels' => (object) $initialLabels,
+            'proposal_overlay' => (object) $proposalOverlay,
+            'resubmit' => (object) $resubmitProps,
             'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
             'can_propose' => $user ? $user->canPropose() : false,
             'create_endpoint' => route('api.v2.create.web', [], false),
@@ -1337,6 +1476,7 @@ class BasicInformationController extends Controller {
         // 編輯模式：以 2 段非 c_personid 主鍵（c_kin_id、c_kin_code）皆存在判斷。
         $hasPk = $request->has('c_kin_id') && $request->has('c_kin_code');
         $mode = $hasPk ? 'edit' : 'create';
+        [$proposalOverlay, $resubmitProps] = $this->proposalResubmitProps($request, 'KIN_DATA');
 
         $initialFields = ['c_personid' => (string) $personId];
         $initialLabels = [];
@@ -1389,12 +1529,19 @@ class BasicInformationController extends Controller {
 
         $user = Auth::user();
 
+        if ($mode === 'create') {
+            $initialFields = array_merge($initialFields, $proposalOverlay);
+            $proposalOverlay = [];
+        }
+
         return Inertia::render('BasicInformation/KinshipEditV2', [
             'person_id' => $personId,
             'person_label' => $personLabel,
             'edit_mode' => $mode,
             'initial_fields' => (object) $initialFields,
             'initial_labels' => (object) $initialLabels,
+            'proposal_overlay' => (object) $proposalOverlay,
+            'resubmit' => (object) $resubmitProps,
             'can_edit' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
             'can_propose' => $user ? $user->canPropose() : false,
             'create_endpoint' => route('api.v2.create.web', [], false),

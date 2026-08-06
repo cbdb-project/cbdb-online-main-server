@@ -32,6 +32,13 @@ import {
 type Fields = Record<string, string>;
 export interface AddrItem { id: string; label: string }
 
+/** 修改提案模式（resubmit）：復用同一編輯器與 /api/v2 管線重發提案（見 MutationController::resubmit）。 */
+interface ResubmitInfo {
+    resubmit_proposal_id?: number;
+    initial_comment?: string;
+    resubmit_endpoint?: string;
+}
+
 interface Props {
     personId: number;
     personLabel: string;
@@ -42,6 +49,9 @@ interface Props {
     initialFields: Fields;
     initialLabels?: Fields;
     initialAddr?: AddrItem[];
+    /** update 提案的預填內容：蓋在 fields 上、不進 baseline snapshot（對原列正確計算 diff）。僅含主表欄位，不含地址副表。 */
+    overlayFields?: Fields;
+    resubmit?: ResubmitInfo;
     canEdit: boolean;
     canPropose: boolean;
     createEndpoint: string;
@@ -68,8 +78,10 @@ const NON_PK = [
 
 export default function OfficeEditor({
     personId, personLabel, dynastyCode = null, dynastyStart, dynastyEnd, mode, initialFields, initialLabels = {}, initialAddr = [],
+    overlayFields = {}, resubmit,
     canEdit, canPropose, createEndpoint, mutateEndpoint, deleteEndpoint, indexUrl, aiEnabled = false, aiModel, aiExtractEndpoint, t,
 }: Props) {
+    const isResubmit = !!(resubmit?.resubmit_proposal_id && resubmit?.resubmit_endpoint);
     const tr = (k: string, fb: string) => { const v = t ? t(k) : k; return v && v !== k ? v : fb; };
     const isCreate = mode === 'create';
     // 新增預設對齊 legacy：c_office_id 預設 option 0、c_source 預設 0、旗標 0；編輯由 initialFields 覆蓋。
@@ -84,7 +96,7 @@ export default function OfficeEditor({
         ...(isCreate && dynastyCode != null ? { c_dy: String(dynastyCode) } : {}),
         ...initialFields,
     };
-    const [fields, setFields] = useState<Fields>(base);
+    const [fields, setFields] = useState<Fields>({ ...base, ...overlayFields });
     const [labels, setLabels] = useState<Fields>(initialLabels);
     const [addr, setAddr] = useState<AddrItem[]>(initialAddr);
     const [addrKey, setAddrKey] = useState(0); // 用於重置地址新增框
@@ -102,7 +114,7 @@ export default function OfficeEditor({
     useEffect(() => () => { if (msgTimer.current) window.clearTimeout(msgTimer.current); }, []);
     const [error, setError] = useState<string | null>(null);
     const [sourceHighlight, setSourceHighlight] = useState(false);
-    const [comment, setComment] = useState('');
+    const [comment, setComment] = useState(resubmit?.initial_comment ?? '');
 
     const dirty = useMemo(() => JSON.stringify({ f: fields, a: addr }) !== savedSnapshot, [fields, addr, savedSnapshot]);
     const set = (k: string, v: string) => setFields((p) => ({ ...p, [k]: v }));
@@ -218,6 +230,7 @@ export default function OfficeEditor({
 
     // sm: direct/proposal；asNew: 編輯模式的「另存新檔」（走 create 配發新 c_posting_id）。
     const save = async (sm: 'direct' | 'proposal', asNew = false) => {
+        if (isResubmit) sm = 'proposal'; // 修改提案模式只有「重發提案」一種語義
         setSaving(true); setError(null); setMessage(null);
         const creating = isCreate || asNew;
         // 官名 c_office_id 必填（拒絕 0/未詳）：僅新建/另存新檔時擋；編輯既有列不卡
@@ -260,6 +273,7 @@ export default function OfficeEditor({
         if (comment) meta.comment = comment;
         if (creating && aiFillLogId.current) meta.ai_fill_log_id = aiFillLogId.current;
 
+        if (isResubmit && resubmit?.resubmit_endpoint) endpoint = resubmit.resubmit_endpoint;
         try {
             const res = await fetch(endpoint, {
                 method: 'POST',
@@ -424,12 +438,12 @@ export default function OfficeEditor({
             )}
 
             <div style={gSubmitRow}>
-                {canEdit ? <button type="button" style={gPrimaryBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
-                {mode === 'edit' && canEdit ? <button type="button" style={gSuccessBtn} disabled={saving} onClick={() => void save('direct', true)}>{tr('save_as', '另存新檔')}</button> : null}
-                {(canEdit || canPropose) ? <button type="button" style={gInfoBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => (canEdit ? setConfirmProposalMode(true) : void save('proposal'))}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('submit_proposal', '提交建議')}</button> : null}
+                {canEdit && !isResubmit ? <button type="button" style={gPrimaryBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
+                {mode === 'edit' && canEdit && !isResubmit ? <button type="button" style={gSuccessBtn} disabled={saving} onClick={() => void save('direct', true)}>{tr('save_as', '另存新檔')}</button> : null}
+                {(canEdit || canPropose) ? <button type="button" style={gInfoBtn} disabled={saving || (mode === 'edit' && !dirty && !isResubmit)} onClick={() => (canEdit && !isResubmit ? setConfirmProposalMode(true) : void save('proposal'))}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : (isResubmit ? tr('resubmit_proposal', '更新提案') : tr('submit_proposal', '提交建議'))}</button> : null}
                 <ActionStatus saving={saving} deleting={deleting} message={message} error={error} t={t} />
                 <div style={gBtnGroupRight}>
-                    {mode === 'edit' && canEdit && deleteEndpoint ? <button type="button" style={gDangerBtn} disabled={deleting} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
+                    {mode === 'edit' && canEdit && deleteEndpoint && !isResubmit ? <button type="button" style={gDangerBtn} disabled={deleting} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
                     <a href={indexUrl} style={gCancelBtn}>{tr('cancel', '取消')}</a>
                 </div>
             </div>

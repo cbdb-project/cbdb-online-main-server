@@ -63,6 +63,135 @@ class MutationController extends Controller {
         return $handler->handle($resource, $mode, $operation, (int) $personId, $targetPk, $changes, is_array($meta) ? $meta : []);
     }
 
+    /**
+     * 修改提案＝撤回舊提案＋以完全相同的提交流程重發（單一交易）。
+     *
+     * 根因（2026-08-05）：「修改提案」原復用 codes 通用編輯頁——按 Schema 全欄渲染、儲存時整包
+     * 回寫 resource_data，繞過 v2 handler 白名單，會把稽核欄等系統欄以 null 鍵灌進 payload
+     * （op 351725 事故）。治本：修改提案回到各資源自己的編輯器與 /api/v2 同一條驗證管線，
+     * 「編輯後的 payload」與「新提交的 payload」由構造保證一致。
+     *
+     * 流程：驗證擁有權與狀態 → 交易內先把舊提案標 cancelled（讓「同主鍵已有待審核提案」護欄
+     * 天然放行）→ 以 mode=proposal 重放 registry handler（與 store() 相同 dispatch）→ handler
+     * 失敗整筆回滾（舊提案回到 pending，並把 handler 的欄位級錯誤原樣回給編輯器）→ 成功則
+     * 舊 meta 記 superseded_by、新 meta 記 resubmit_of。
+     */
+    public function resubmit(Request $request, \App\Models\Operation $operation): JsonResponse {
+        if (!Auth::check()) {
+            return $this->errorResponse('Unauthenticated.', 401);
+        }
+
+        $user = Auth::user();
+        $isOwner = (int) $operation->user_id === (int) Auth::id();
+        if (!$isOwner && !$user->canReviewProposals()) {
+            return $this->errorResponse('只有提案人或審核人可以修改提案', 403);
+        }
+
+        $opType = (int) $operation->op_type;
+        if (!in_array($opType, [\App\Models\Operation::TYPE_PROPOSAL_CREATE, \App\Models\Operation::TYPE_PROPOSAL_UPDATE], true)) {
+            return $this->errorResponse('此操作不是可修改的提案', 422, ['operation' => ['not_editable_proposal']]);
+        }
+
+        $oldPayload = json_decode((string) $operation->resource_data, true);
+        $oldPayload = is_array($oldPayload) ? $oldPayload : [];
+        $status = (string) ($oldPayload['__review_status'] ?? 'pending');
+        if (!in_array($status, ['pending', 'rejected'], true)) {
+            return $this->errorResponse('提案已審結或撤回，無法修改', 422, ['operation' => ['not_editable_status']]);
+        }
+
+        $payload = $request->json()->all();
+        if (!is_array($payload) || empty($payload)) {
+            $payload = $request->all();
+        }
+
+        $resource = strtolower((string) ($payload['resource'] ?? ''));
+        $handlerOperation = strtolower((string) ($payload['operation'] ?? 'update'));
+        $personId = $payload['person_id'] ?? null;
+        $targetPk = $payload['target']['pk'] ?? null;
+        $changes = $payload['changes'] ?? null;
+        $meta = is_array($payload['meta'] ?? null) ? $payload['meta'] : [];
+
+        if (!is_array($targetPk)) {
+            return $this->errorResponse('缺少 target.pk', 422, ['target.pk' => ['required']]);
+        }
+        if (!is_array($changes)) {
+            return $this->errorResponse('缺少 changes', 422, ['changes' => ['required']]);
+        }
+        if ($personId === null || $personId === '') {
+            return $this->errorResponse('缺少 person_id', 422, ['person_id' => ['required']]);
+        }
+
+        // mode 一律強制 proposal：resubmit 的語義就是重發提案，不接受 direct。
+        $handler = $this->handlerRegistry->resolve($resource, 'proposal', $handlerOperation);
+        if (!$handler) {
+            return $this->errorResponse('目前尚未支援此變更模式', 501, [
+                'resource' => $resource,
+                'mode' => 'proposal',
+                'operation' => $handlerOperation,
+            ]);
+        }
+
+        /** @var JsonResponse|null $handlerResponse */
+        $handlerResponse = null;
+
+        try {
+            DB::transaction(function () use ($operation, $oldPayload, $handler, $resource, $handlerOperation, $personId, $targetPk, $changes, $meta, &$handlerResponse) {
+                // 1) 先撤回舊提案，讓 handler 的「同主鍵已有待審核提案則拒」護欄放行。
+                $now = \Carbon\Carbon::now()->format('Y-m-d H:i:s');
+                $cancelledPayload = $oldPayload;
+                $cancelledPayload['__review_status'] = 'cancelled';
+                $meta0 = is_array($cancelledPayload['__proposal_meta'] ?? null) ? $cancelledPayload['__proposal_meta'] : [];
+                $meta0['cancelled_at'] = $now;
+                $meta0['cancelled_by'] = Auth::user()->name ?? Auth::id();
+                $meta0['cancelled_by_id'] = Auth::id();
+                $meta0['cancel_reason'] = '已重新提交（修改提案）';
+                $cancelledPayload['__proposal_meta'] = $meta0;
+                $operation->resource_data = json_encode($cancelledPayload, JSON_UNESCAPED_UNICODE);
+                $operation->save();
+
+                // 2) 與 store() 完全相同的 dispatch（mode=proposal）。
+                $handlerResponse = $handler->handle($resource, 'proposal', $handlerOperation, (int) $personId, $targetPk, $changes, $meta);
+                $statusCode = $handlerResponse->getStatusCode();
+                $body = json_decode($handlerResponse->getContent(), true);
+                if ($statusCode < 200 || $statusCode >= 300 || !($body['ok'] ?? false)) {
+                    // 回滾：舊提案回到原狀態，handler 的欄位級錯誤由外層原樣回傳。
+                    throw new \RuntimeException('__resubmit_handler_failed');
+                }
+
+                // 3) 互相回鏈：舊 meta 記 superseded_by、新 meta 記 resubmit_of。
+                $newOperationId = $body['result']['operation_id'] ?? null;
+                if ($newOperationId !== null) {
+                    $newOperation = \App\Models\Operation::find($newOperationId);
+                    if ($newOperation === null || $newOperation->resource !== $operation->resource) {
+                        // 資源表不一致＝前端送錯資源，寧可整筆回滾也不留下錯位的取代鏈。
+                        throw new \RuntimeException('resubmit 資源與原提案不一致');
+                    }
+                    $meta0['superseded_by'] = $newOperation->id;
+                    $cancelledPayload['__proposal_meta'] = $meta0;
+                    $operation->resource_data = json_encode($cancelledPayload, JSON_UNESCAPED_UNICODE);
+                    $operation->save();
+
+                    $newPayload = json_decode((string) $newOperation->resource_data, true);
+                    if (is_array($newPayload)) {
+                        $newMeta = is_array($newPayload['__proposal_meta'] ?? null) ? $newPayload['__proposal_meta'] : [];
+                        $newMeta['resubmit_of'] = $operation->id;
+                        $newPayload['__proposal_meta'] = $newMeta;
+                        $newOperation->resource_data = json_encode($newPayload, JSON_UNESCAPED_UNICODE);
+                        $newOperation->save();
+                    }
+                }
+            });
+        } catch (\RuntimeException $e) {
+            if ($e->getMessage() === '__resubmit_handler_failed' && $handlerResponse !== null) {
+                return $handlerResponse;
+            }
+
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+
+        return $handlerResponse;
+    }
+
     public function get(Request $request): JsonResponse {
         $payload = $request->json()->all();
         if (!is_array($payload) || empty($payload)) {

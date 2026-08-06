@@ -19,6 +19,8 @@ interface PageProps extends SharedProps {
     initial_fields: Fields;
     initial_labels: Fields;
     initial_addr: AddrItem[];
+    proposal_overlay: Fields;
+    resubmit: { resubmit_proposal_id?: number; initial_comment?: string; resubmit_endpoint?: string };
     can_edit: boolean;
     can_propose: boolean;
     create_endpoint: string;
@@ -53,6 +55,8 @@ export default function PossessionEditV2() {
                 initialFields={p.initial_fields}
                 initialLabels={p.initial_labels}
                 initialAddr={p.initial_addr}
+                overlayFields={p.proposal_overlay}
+                resubmit={p.resubmit}
                 canEdit={p.can_edit}
                 canPropose={p.can_propose}
                 createEndpoint={p.create_endpoint}

@@ -22,12 +22,22 @@ import {
  */
 type Fields = Record<string, string>;
 
+/** 修改提案模式（resubmit）：復用同一編輯器與 /api/v2 管線重發提案（見 MutationController::resubmit）。 */
+export interface ResubmitInfo {
+    resubmit_proposal_id?: number;
+    initial_comment?: string;
+    resubmit_endpoint?: string;
+}
+
 interface Props {
     personId: number;
     personLabel: string;
     mode: 'create' | 'edit';
     initialFields: Fields;
     initialLabels?: Fields;
+    /** update 提案的預填內容：蓋在 fields 上、不進 baseline snapshot（對原列正確計算 diff）。 */
+    overlayFields?: Fields;
+    resubmit?: ResubmitInfo;
     canEdit: boolean;
     canPropose: boolean;
     createEndpoint: string;
@@ -52,12 +62,14 @@ function pkVal(key: string, raw: string, personId: number): string | number {
 
 export default function AltnameEditor({
     personId, personLabel, mode, initialFields, initialLabels = {},
+    overlayFields = {}, resubmit,
     canEdit, canPropose, createEndpoint, mutateEndpoint, deleteEndpoint, indexUrl, t,
 }: Props) {
+    const isResubmit = !!(resubmit?.resubmit_proposal_id && resubmit?.resubmit_endpoint);
     const tr = (k: string, fb: string) => { const v = t ? t(k) : k; return v && v !== k ? v : fb; };
     // 對齊 legacy：c_sequence 不預設值（建立時必填、由使用者決定序號），避免捏造序號造成排序錯誤。
     const base: Fields = { c_personid: String(personId), c_alt_name_chn: '', c_alt_name_type_code: '0', c_source: '0', ...initialFields };
-    const [fields, setFields] = useState<Fields>(base);
+    const [fields, setFields] = useState<Fields>({ ...base, ...overlayFields });
     const [labels, setLabels] = useState<Fields>(initialLabels);
     const [savedSnapshot, setSavedSnapshot] = useState(JSON.stringify(base));
     const msgTimer = useRef<number | null>(null);
@@ -73,7 +85,7 @@ export default function AltnameEditor({
     const dirty = useMemo(() => JSON.stringify(fields) !== savedSnapshot, [fields, savedSnapshot]);
     const [error, setError] = useState<string | null>(null);
     const [sourceHighlight, setSourceHighlight] = useState(false);
-    const [comment, setComment] = useState('');
+    const [comment, setComment] = useState(resubmit?.initial_comment ?? '');
 
     const set = (k: string, v: string) => setFields((p) => ({ ...p, [k]: v }));
     const setLabel = (k: string, v: string) => setLabels((p) => ({ ...p, [k]: v }));
@@ -92,6 +104,7 @@ export default function AltnameEditor({
     const [umlautPrompt, setUmlautPrompt] = useState<{ sm: 'direct' | 'proposal'; conversions: UmlautConversion[]; converted: string } | null>(null);
 
     const save = async (sm: 'direct' | 'proposal') => {
+        if (isResubmit) sm = 'proposal'; // 修改提案模式只有「重發提案」一種語義
         // 別名（拼音）c_alt_name 必填：建立與編輯皆不可為空（使用者指定，較 legacy 嚴格）。
         if ((fields.c_alt_name ?? '') === '') { setError(tr('altname_pinyin_required', '請輸入別名（拼音）')); return; }
         // Tier 2 閘：唯有依「我們的規則」（l/n+v 且後非 a/i/o/u）命中時，才彈窗；否則照舊直接提交。
@@ -135,6 +148,7 @@ export default function AltnameEditor({
             for (const k of EDITABLE_PK) { const v = effFields[k] ?? ''; if ((initial[k] ?? '') !== v) changes[k] = v; }
             if (Object.keys(changes).length === 0) { setSaving(false); setError(tr('no_change', '沒有變更')); return; }
         }
+        if (isResubmit && resubmit?.resubmit_endpoint) endpoint = resubmit.resubmit_endpoint;
         try {
             const res = await fetch(endpoint, {
                 method: 'POST',
@@ -281,11 +295,11 @@ export default function AltnameEditor({
             )}
 
             <div style={gSubmitRow}>
-                {canEdit ? <button type="button" style={gPrimaryBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
-                {(canEdit || canPropose) ? <button type="button" style={gInfoBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => (canEdit ? setConfirmProposalMode(true) : void save('proposal'))}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('submit_proposal', '提交建議')}</button> : null}
+                {canEdit && !isResubmit ? <button type="button" style={gPrimaryBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
+                {(canEdit || canPropose) ? <button type="button" style={gInfoBtn} disabled={saving || (mode === 'edit' && !dirty && !isResubmit)} onClick={() => (canEdit && !isResubmit ? setConfirmProposalMode(true) : void save('proposal'))}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : (isResubmit ? tr('resubmit_proposal', '更新提案') : tr('submit_proposal', '提交建議'))}</button> : null}
                 <ActionStatus saving={saving} deleting={deleting} message={message} error={error} t={t} />
                 <div style={gBtnGroupRight}>
-                    {mode === 'edit' && canEdit && deleteEndpoint ? <button type="button" style={gDangerBtn} disabled={deleting} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
+                    {mode === 'edit' && canEdit && deleteEndpoint && !isResubmit ? <button type="button" style={gDangerBtn} disabled={deleting} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
                     <a href={indexUrl} style={gCancelBtn}>{tr('cancel', '取消')}</a>
                 </div>
             </div>

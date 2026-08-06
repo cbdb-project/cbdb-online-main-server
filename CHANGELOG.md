@@ -4,6 +4,12 @@
 
 ## 2026-08
 
+### 修改提案改為「同一編輯器＋同一管線重發」（resubmit），廢除通用全欄表單改提案
+- 根因追認（op 351725）：「修改提案」原復用 codes 通用編輯頁——按 `Schema::getColumnListing` **全欄**渲染（含四個稽核欄的空輸入框）、儲存時整包回寫 `resource_data` 且無白名單——提案被編輯一次，payload 就被灌入稽核欄 null 鍵，核准重放即撞 handler 白名單 422。「發提案」與「改提案」走不同介面與流程，正是髒 payload 的製造機。
+- 新流程：**修改提案＝單一交易內撤回舊提案＋以完全相同的提交流程重發**。新端點 `POST api/v2/proposals/{operation}/resubmit`（`MutationController::resubmit`）：驗擁有權／狀態 → 交易內先把舊提案標 `cancelled`（讓「同主鍵已有待審提案」護欄天然放行）→ 與 `store()` 相同 dispatch 重放 registry handler（mode 強制 proposal）→ 失敗整筆回滾（舊提案回到 pending、handler 欄位級錯誤原樣回給編輯器）→ 成功則舊 meta 記 `superseded_by`、新 meta 記 `resubmit_of`。「編輯後的 payload」與「新提交的 payload」由構造保證一致。
+- 前端：operations 列表「修改提案」對人物 12 個子資源改導向**各資源自己的 edit-v2 編輯器**（`?proposal={id}`；update 提案附原列 PK 進 edit 模式）。編輯器 resubmit 模式：提案內容 overlay 蓋在欄位上（不進 baseline、對原列正確算 diff）、預填修改說明、隱藏 direct／刪除按鈕、送出改打 resubmit 端點。codes 表、`BIOG_MAIN` 與 delete 提案維持 codes 通用編輯頁；任官／財產／事件的地址副表意圖（`__proposal_aux`）暫不預填（已知限制）。
+- 回歸測試：`ProposalResubmitTest`（同主鍵重發護欄放行／handler 拒絕整筆回滾／眾包用戶 403／已審結 422／預填剔除控制鍵與稽核欄）。
+
 ### 稽核欄語義定案＋legacy Blade 表單下架閘門（修核准 422 與「比較」灰按鈕）
 - **語義定案（2026-08-05）**：`c_modified_by/date` 一律記「最後一次實際寫入」——核准提案、還原記錄都是寫入，落庫時蓋當下，不從提案 payload 或歷史快照沿用舊值；`c_created_*` 只在 create 蓋、之後永遠沿用。核准署名採雙人名「審核人 (Proposed by: 提案人)」，經新增的 `App\Support\AuditActor`（請求級 override）統一注入 `ToolsRepository::timestamp()` 與各處直接蓋章點（update handler、kinship/assoc 鏡像列、Codes、BiogMain 匯入等）。
 - **修核准 422**：提案 payload 是「快照」語義、可能夾帶四個稽核欄（legacy 提案入口無欄位白名單；update 提案 data＝original∪changes 天然含），核准重放 v2 handler 時會被白名單擋成 `disallowed_fields` 整筆失敗（2026-08-05 別名 create 提案實案）。`applyViaMutationHandler` 重放前統一剔除稽核欄（create／update 兩分支），由 handler 重新蓋章；通用路徑 `enforceAuditFieldsForCreate/Update` 同步改為無條件蓋章。restore 兩路徑（update／delete）也改蓋還原人＋還原時刻。

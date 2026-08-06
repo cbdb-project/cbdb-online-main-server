@@ -68,15 +68,23 @@ handler 的 `changes` 是**使用者意圖**——白名單刻意不含稽核欄
   - 任何路徑失敗都整筆交易回滾、提案維持待審（fail-closed）；handler 的欄位級錯誤會攤平附在
     flash 訊息後，保留對審核者的指向性。
 - **退回**（`reject`）：標記 `rejected` 與備註，不動資料表。
-- **修改／撤回**（提案者）：`pending`／`rejected` 可修改（狀態重設 `pending`）；撤回標記
-  `cancelled`、記錄撤回者／時間／原因。
+- **修改提案**（2026-08-05 改版）：**修改提案＝撤回舊提案＋以完全相同的提交流程重發**（單一交易，
+  `POST api/v2/proposals/{operation}/resubmit`，`MutationController::resubmit`）。人物子資源提案
+  的「修改提案」按鈕導向**各資源自己的 edit-v2 編輯器**（`?proposal={id}` 預填提案內容與說明），
+  送出經 registry 重放同一個 handler——白名單、幂等正規化、主鍵檢查與新提交完全一致，
+  「編輯後的 payload」不可能再與「新提交的 payload」分歧。成功後舊提案標 `cancelled`＋
+  `superseded_by`、新提案記 `resubmit_of`；handler 拒絕則整筆回滾、舊提案維持待審。
+  改版動機：舊流程復用 codes 通用編輯頁，按 Schema **全欄**渲染並整包回寫 `resource_data`，
+  會把稽核欄等系統欄以 null 鍵灌進 payload（op 351725 事故——核准重放撞白名單 422 的實際成因）。
+- **撤回**（提案者）：標記 `cancelled`、記錄撤回者／時間／原因。
 - 提案列表：`/operations?proposals_only=1`，可按狀態篩選；行內按鈕依身分顯示。
 
 ## 5. 已知限制
 
-- `/operations` 的「修改提案／撤回提案」統一復用 codes 模組的通用提案編輯流程（`codes.proposals.*`），
-  表單排列與原 Basic Information 子頁不完全一致；任官兩表（`POSTED_TO_OFFICE_DATA`／
-  `POSTED_TO_ADDR_DATA`）例外、需回原頁面處理。依賴複雜聯動欄位的資源建議回原頁面重新發起提案。
+- 「修改提案」的 codes 通用編輯頁（`codes.proposals.*`）仍服務：codes 代碼表提案、`BIOG_MAIN`
+  提案與 delete 提案（無對應編輯器）。**人物 12 個子資源已改走各自的 edit-v2 編輯器**（見 §4）。
+- 修改提案的預填只涵蓋主表使用者欄位：任官／財產／事件的**地址副表意圖**（存於
+  `__proposal_aux`）暫不預填，需於編輯器中重新指定；重發後 handler 會照常寫入 aux。
 - kinship／associations 的核准仍走 legacy 委派（路徑 B），其鏡像語義收斂與「比較」支援
   （`__applied_operation_id` 回報）待 PERSON_PROPOSAL_PATHS.md §6 順序處理。
 - 存量舊格式提案**不做兼容與回填**（2026-08-05 維護者決策）：核准端的稽核欄剔除能讓髒 payload

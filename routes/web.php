@@ -39,6 +39,8 @@ Route::middleware(['auth.optional'])->post('api/v2/mutate', 'Api\\MutationContro
 Route::middleware(['auth.optional'])->post('api/v2/batch_mutate', 'Api\\MutationController@batchStore')->name('api.v2.batch-mutate.web');
 Route::middleware(['auth.optional'])->post('api/v2/create', 'Api\\MutationController@create')->name('api.v2.create.web');
 Route::middleware(['auth.optional'])->post('api/v2/delete', 'Api\\MutationController@delete')->name('api.v2.delete.web');
+// 修改提案＝撤回舊提案＋同一條提交管線重發（見 MutationController::resubmit 註解）
+Route::middleware(['auth.optional'])->post('api/v2/proposals/{operation}/resubmit', 'Api\\MutationController@resubmit')->name('api.v2.proposals.resubmit.web');
 Route::middleware(['auth.optional'])->match(['get', 'post'], 'api/v2/get', 'Api\\MutationController@get')->name('api.v2.get.web');
 // #79：社會關係／親屬「對面互逆鏡像」現況偵測（缺邊/多條），供編輯器行內提示用。
 Route::middleware(['auth.optional'])->post('api/v2/relationship/opposite-edges', 'Api\\MutationController@oppositeEdges')->name('api.v2.relationship.opposite-edges.web');

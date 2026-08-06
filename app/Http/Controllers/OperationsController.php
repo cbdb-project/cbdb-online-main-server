@@ -958,10 +958,60 @@ class OperationsController extends Controller {
                 'restore' => route('operations.restore', $item->id, false),
                 'approve' => route('operations.proposals.approve', $item->id, false),
                 'reject' => route('operations.proposals.reject', $item->id, false),
-                'edit_proposal' => route('codes.proposals.edit', ['table_name' => $resourceName, 'operation' => $item->id], false),
+                'edit_proposal' => $this->buildProposalEditUrl($item, $resourceName, $resourceDataParsed),
                 'cancel_proposal' => route('codes.proposals.cancel', ['table_name' => $resourceName, 'operation' => $item->id], false),
             ],
         ];
+    }
+
+    /** 人物資源表 → edit-v2 路由名（「修改提案」改連各資源自己的編輯器，見 MutationController::resubmit）。 */
+    private const PERSON_PROPOSAL_EDITV2_ROUTES = [
+        'ALTNAME_DATA' => 'app.basicinformation.altnames.editv2',
+        'BIOG_ADDR_DATA' => 'app.basicinformation.addresses.editv2',
+        'ENTRY_DATA' => 'app.basicinformation.entries.editv2',
+        'STATUS_DATA' => 'app.basicinformation.statuses.editv2',
+        'BIOG_TEXT_DATA' => 'app.basicinformation.texts.editv2',
+        'BIOG_SOURCE_DATA' => 'app.basicinformation.sources.editv2',
+        'BIOG_INST_DATA' => 'app.basicinformation.socialinst.editv2',
+        'POSTED_TO_OFFICE_DATA' => 'app.basicinformation.offices.editv2',
+        'POSSESSION_DATA' => 'app.basicinformation.possession.editv2',
+        'EVENTS_DATA' => 'app.basicinformation.events.editv2',
+        'KIN_DATA' => 'app.basicinformation.kinship.editv2',
+        'ASSOC_DATA' => 'app.basicinformation.assoc.editv2',
+    ];
+
+    /**
+     * 「修改提案」連結：人物子資源提案（op_type 8/9）導向各資源自己的 edit-v2 編輯器
+     * （?proposal={id} 預填、經 /api/v2 resubmit 重發——與發提案同一介面同一管線）；
+     * update 提案（9）附原列 PK 查詢參數使編輯器進入 edit 模式。codes 表、BIOG_MAIN 與
+     * delete 提案維持 codes 通用編輯頁。
+     */
+    protected function buildProposalEditUrl($item, string $resourceName, $resourceDataParsed): string {
+        $table = (string) ($item->resource ?? '');
+        $opType = (int) ($item->op_type ?? 0);
+        $routeName = self::PERSON_PROPOSAL_EDITV2_ROUTES[$table] ?? null;
+
+        if ($routeName !== null && in_array($opType, [Operation::TYPE_PROPOSAL_CREATE, Operation::TYPE_PROPOSAL_UPDATE], true)) {
+            $payload = is_array($resourceDataParsed) ? $resourceDataParsed : [];
+            $original = json_decode((string) ($item->resource_original ?? ''), true);
+            $original = is_array($original) ? $original : [];
+            $personId = (int) ($payload['c_personid'] ?? $original['c_personid'] ?? ($item->c_personid ?: 0));
+
+            $params = ['id' => $personId, 'proposal' => $item->id];
+            if ($opType === Operation::TYPE_PROPOSAL_UPDATE) {
+                // 以原列 PK 進入編輯器 edit 模式；overlay（提案內容）由 edit-v2 控制器另傳。
+                $keyColumns = is_array($payload['__key_columns'] ?? null) ? $payload['__key_columns'] : [];
+                foreach ($keyColumns as $column) {
+                    if ($column !== 'c_personid' && array_key_exists($column, $original)) {
+                        $params[$column] = $original[$column];
+                    }
+                }
+            }
+
+            return route($routeName, $params, false);
+        }
+
+        return route('codes.proposals.edit', ['table_name' => $resourceName, 'operation' => $item->id], false);
     }
 
     /**

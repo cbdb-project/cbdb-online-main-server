@@ -30,12 +30,22 @@ import {
  */
 type Fields = Record<string, string>;
 
+/** 修改提案模式（resubmit）：復用同一編輯器與 /api/v2 管線重發提案（見 MutationController::resubmit）。 */
+interface ResubmitInfo {
+    resubmit_proposal_id?: number;
+    initial_comment?: string;
+    resubmit_endpoint?: string;
+}
+
 interface Props {
     personId: number;
     personLabel: string;
     mode: 'create' | 'edit';
     initialFields: Fields;
     initialLabels?: Fields;
+    /** update 提案的預填內容：蓋在 fields 上、不進 baseline snapshot（對原列正確計算 diff）。 */
+    overlayFields?: Fields;
+    resubmit?: ResubmitInfo;
     canEdit: boolean;
     canPropose: boolean;
     createEndpoint: string;
@@ -53,8 +63,10 @@ const MUTABLE = ['c_notes', 'c_main_source', 'c_self_bio'];
 
 export default function SourceEditor({
     personId, personLabel, mode, initialFields, initialLabels = {},
+    overlayFields = {}, resubmit,
     canEdit, canPropose, createEndpoint, mutateEndpoint, deleteEndpoint, indexUrl, isWikiSource = false, t,
 }: Props) {
+    const isResubmit = !!(resubmit?.resubmit_proposal_id && resubmit?.resubmit_endpoint);
     const tr = (k: string, fb: string) => { const v = t ? t(k) : k; return v && v !== k ? v : fb; };
     // 新增預設：c_textid '' = 尚未選擇（與合法代碼 0=未詳 區分；legacy required 僅要求「有選」，
     // 但伺服器允許 0=未詳，故不可把 0 當作「未選」拒絕）；c_pages legacy 預設 '0'（亦為合法字串頁碼）；旗標預設 '0'。
@@ -65,7 +77,7 @@ export default function SourceEditor({
         c_main_source: '0', c_self_bio: '0',
         ...initialFields,
     };
-    const [fields, setFields] = useState<Fields>(base);
+    const [fields, setFields] = useState<Fields>({ ...base, ...overlayFields });
     const [labels, setLabels] = useState<Fields>(initialLabels);
     const [savedSnapshot, setSavedSnapshot] = useState(JSON.stringify(base));
     const msgTimer = useRef<number | null>(null);
@@ -82,7 +94,7 @@ export default function SourceEditor({
     const flashSaved = (m: string) => { setMessage(m); if (msgTimer.current) window.clearTimeout(msgTimer.current); msgTimer.current = window.setTimeout(() => setMessage(null), 3000); };
     useEffect(() => () => { if (msgTimer.current) window.clearTimeout(msgTimer.current); }, []);
     const [error, setError] = useState<string | null>(null);
-    const [comment, setComment] = useState('');
+    const [comment, setComment] = useState(resubmit?.initial_comment ?? '');
 
     const dirty = useMemo(() => JSON.stringify(fields) !== savedSnapshot, [fields, savedSnapshot]);
     const set = (k: string, v: string) => setFields((p) => ({ ...p, [k]: v }));
@@ -91,6 +103,7 @@ export default function SourceEditor({
     const checked = (k: string) => (fields[k] ?? '0') === '1';
 
     const save = async (sm: 'direct' | 'proposal') => {
+        if (isResubmit) sm = 'proposal'; // 修改提案模式只有「重發提案」一種語義
         // 出處（c_textid）為新增必填（legacy required = 必須「有選」）。'' = 尚未選擇 → 擋；
         // 但 0=未詳 為合法代碼（legacy 伺服器允許），使用者明確選 0 不阻擋。
         if (mode === 'create') {
@@ -137,6 +150,7 @@ export default function SourceEditor({
             }
             if (Object.keys(changes).length === 0) { setSaving(false); setError(tr('no_change', '沒有變更')); return; }
         }
+        if (isResubmit && resubmit?.resubmit_endpoint) endpoint = resubmit.resubmit_endpoint;
         try {
             const res = await fetch(endpoint, {
                 method: 'POST',
@@ -266,11 +280,11 @@ export default function SourceEditor({
             )}
 
             <div style={gSubmitRow}>
-                {canEdit ? <button type="button" style={gPrimaryBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
-                {(canEdit || canPropose) ? <button type="button" style={gInfoBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => (canEdit ? setConfirmProposalMode(true) : void save('proposal'))}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('submit_proposal', '提交建議')}</button> : null}
+                {canEdit && !isResubmit ? <button type="button" style={gPrimaryBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
+                {(canEdit || canPropose) ? <button type="button" style={gInfoBtn} disabled={saving || (mode === 'edit' && !dirty && !isResubmit)} onClick={() => (canEdit && !isResubmit ? setConfirmProposalMode(true) : void save('proposal'))}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : (isResubmit ? tr('resubmit_proposal', '更新提案') : tr('submit_proposal', '提交建議'))}</button> : null}
                 <ActionStatus saving={saving} deleting={deleting} message={message} error={error} t={t} />
                 <div style={gBtnGroupRight}>
-                    {mode === 'edit' && canEdit && deleteEndpoint ? <button type="button" style={gDangerBtn} disabled={deleting} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
+                    {mode === 'edit' && canEdit && deleteEndpoint && !isResubmit ? <button type="button" style={gDangerBtn} disabled={deleting} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
                     <a href={indexUrl} style={gCancelBtn}>{tr('cancel', '取消')}</a>
                 </div>
             </div>

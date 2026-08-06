@@ -14,6 +14,7 @@ use Tests\TestCase;
 class BasicInformationAltnamesControllerTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
+        $this->useLegacyPersonForms(); // 本類測 legacy Blade CRUD 行為，撥回 flag=old 越過下架閘門
 
         // 使用 in-memory SQLite 數據庫
         config()->set('database.default', 'sqlite');

@@ -38,6 +38,7 @@ class FormUrlEncodingTest extends TestCase {
 
     protected function setUp(): void {
         parent::setUp();
+        $this->useLegacyPersonForms(); // 本類測 legacy Blade CRUD 行為，撥回 flag=old 越過下架閘門
 
         // 保存原始配置
         $this->originalDbDefault = config('database.default');

@@ -1069,11 +1069,10 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
 
         $reverted = DB::table('TEXT_CODES')->where('c_textid', $created->c_textid)->first();
         $this->assertSame('ce shi gao', $reverted->c_title);
-        // c_modified_by/c_modified_date were NULL on the freshly-imported row;
-        // restore must put them back to NULL, not leave the edit's modifier on
-        // a row whose pinyin was reverted.
-        $this->assertNull($reverted->c_modified_by);
-        $this->assertNull($reverted->c_modified_date);
+        // 2026-08-05 語義定案：restore 也是一次實際寫入，c_modified_* 蓋還原人＋還原時刻，
+        // 不回填快照舊值（此列匯入時為 NULL，但還原本身就是最後一次修改）。
+        $this->assertSame('Batch Admin', $reverted->c_modified_by);
+        $this->assertNotNull($reverted->c_modified_date);
 
         // The restore action also writes its own audit row (op_type=3) via
         // recordRestoreOperation. Production schema sets operations.c_personid

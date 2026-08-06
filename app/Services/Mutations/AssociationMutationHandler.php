@@ -9,7 +9,6 @@ use App\Services\AuditLogService;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandler {
@@ -127,7 +126,7 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
 
         $dataMirror = $newArray;
         unset($dataMirror['__operation_id'], $dataMirror['__note'], $dataMirror['c_created_by'], $dataMirror['c_created_date']);
-        $dataMirror['c_modified_by'] = Auth::user()->name ?? '';
+        $dataMirror['c_modified_by'] = \App\Support\AuditActor::currentName();
         $dataMirror['c_modified_date'] = Carbon::now();
         $dataMirror['c_kin_code'] = CompositePrimaryKey::emptyToSentinel($pairs['kin'] ?? null);
         $dataMirror['c_assoc_kin_code'] = CompositePrimaryKey::emptyToSentinel($pairs['assocKin'] ?? null);
@@ -206,7 +205,7 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
         $pairs = $this->pendingPairs ?? [];
         $dataMirror = (array) $original;
         unset($dataMirror['c_created_by'], $dataMirror['c_created_date']);
-        $dataMirror['c_modified_by'] = Auth::user()->name ?? '';
+        $dataMirror['c_modified_by'] = \App\Support\AuditActor::currentName();
         $dataMirror['c_modified_date'] = Carbon::now();
         $dataMirror['c_kin_code'] = CompositePrimaryKey::emptyToSentinel($pairs['kin'] ?? null);
         $dataMirror['c_assoc_kin_code'] = CompositePrimaryKey::emptyToSentinel($pairs['assocKin'] ?? null);

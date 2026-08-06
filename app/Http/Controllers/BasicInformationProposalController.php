@@ -459,7 +459,13 @@ class BasicInformationProposalController extends Controller {
      * 提取表單數據
      */
     protected function extractFormData(Request $request) {
-        return Arr::except($request->all(), ['_token', '_method', 'action', '__proposal_comment']);
+        // 稽核欄為系統代管（寫入時由 ToolsRepository::timestamp()／核准端蓋章），客戶端夾帶一律剔除：
+        // 此入口無欄位白名單，任何表單欄只要是表真實欄位就會原樣存進提案 payload，稽核欄混入會使
+        // 核准重放被 v2 handler 白名單擋下（2026-08-05 別名提案 422 根因）。
+        return Arr::except($request->all(), [
+            '_token', '_method', 'action', '__proposal_comment',
+            'c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date',
+        ]);
     }
 
     protected function splitFormDataByTable(string $table, array $payload): array {

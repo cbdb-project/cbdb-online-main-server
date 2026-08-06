@@ -210,7 +210,7 @@ class BiogSourceRepository {
 
     public function updateDirect(int $personId, array $targetPk, array $data, array $existing): array {
         $targetPk = $this->normalizePk($targetPk);
-        $data['c_modified_by'] = Auth::user()->name ?? Auth::id();
+        $data['c_modified_by'] = \App\Support\AuditActor::currentName();
         $data['c_modified_date'] = Carbon::now();
 
         $operation = null;

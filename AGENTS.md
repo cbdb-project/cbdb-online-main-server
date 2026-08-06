@@ -5,7 +5,7 @@
 ## 專案現況
 - 技術棧：Laravel 12、PHP 8.2+、MariaDB 10.11（prod 實測 10.11.14；相容性下限仍按 10.3 撰寫）、SQLite（測試）、Vite、Vue 3、Inertia/React。
 - 全站主要互動頁面已遷移至 **React/Inertia 並翻 flag 上線**（`config/migration_flags.php` 頁面 flag 多為 `new`）：人物列表/檢視/詳情中樞、13 個 React 編輯器（basic-info + 12 個複合主鍵子資源）、Codes CRUD、operations/manage/crowdsourcing、admin 工具、認證頁、Query Playground（`/app/query-playground`）等。
-- **舊版 Blade 視圖與 AdminLTE 3 + Bootstrap 4 仍實體保留**：flag-gated 頁面（basicinformation.*、view、codes、operations、manage、crowdsourcing、admin.*、auth.*、welcome 等）把對應 flag 改回 `old` 即可即時回退、不需改碼。少數頁面例外：**Query Playground 無主頁 flag，`/query-playground` 硬導向 `/app/query-playground`（React）、不走 flag 回退；外部資料庫引用瀏覽器亦同，`/external-db-link` 硬導向 `/app/external-db-link`、Blade 版已刪除**。AdminLTE 實體下架（Phase 7）尚未執行。**新功能一律只做在 React/Inertia 路徑（`resources/js/inertia/**`），不要再改舊 Blade。**
+- **舊版 Blade 視圖與 AdminLTE 3 + Bootstrap 4 仍實體保留**：flag-gated 頁面（basicinformation.*、view、codes、operations、manage、crowdsourcing、admin.*、auth.*、welcome 等）把對應 flag 改回 `old` 即可即時回退、不需改碼。**人物編輯相關 legacy 路由在 flag=new 時已被 `LegacyBladeFormGate` 實質下架**：表單 GET 302 導向 `/app` 對應頁、寫入端點（含無欄位白名單的 `proposalStore`）回 410；flag 改回 `old` 才放行。少數頁面例外：**Query Playground 無主頁 flag，`/query-playground` 硬導向 `/app/query-playground`（React）、不走 flag 回退；外部資料庫引用瀏覽器亦同，`/external-db-link` 硬導向 `/app/external-db-link`、Blade 版已刪除**。AdminLTE 實體下架（Phase 7）尚未執行。**新功能一律只做在 React/Inertia 路徑（`resources/js/inertia/**`），不要再改舊 Blade。**
 - 前端資源由 Vite 載入；React/Inertia 元件在 `resources/js/inertia/`。
 - 使用者介面支援繁體中文／英文切換（預設 zh-TW），文件與 commit message 一律使用繁體中文。
 
@@ -26,6 +26,14 @@
 - 背景與執行紀錄：[docs/ON_DELETE_CASCADE_RISK.md](./docs/ON_DELETE_CASCADE_RISK.md)、
   [docs/CASCADE_TO_RESTRICT_MIGRATION_NOTES.md](./docs/CASCADE_TO_RESTRICT_MIGRATION_NOTES.md)；
   刪除功能重建設計見 [docs/DELETE_IMPACT_PREVIEW_PLAN.md](./docs/DELETE_IMPACT_PREVIEW_PLAN.md)。
+
+### 1.2 稽核欄（c_created_*／c_modified_*）由系統蓋章
+- 語義（2026-08-05 定案）：`c_modified_*`＝「最後一次實際寫入」——核准提案、還原記錄都是寫入，
+  一律蓋當下，不從提案 payload／歷史快照沿用舊值；`c_created_*` 只在 create 蓋、之後永遠沿用。
+- 署名一律經 [app/Support/AuditActor.php](./app/Support/AuditActor.php) 取得（核准期間為雙人名
+  「審核人 (Proposed by: 提案人)」），**不要直接寫 `Auth::user()->name`**。
+- 提案 payload／operation 快照裡的稽核欄是「審計事實」可保留；但任何寫入路徑（handler 重放、
+  通用核准、restore）落庫前必須剔除或覆蓋，不可原樣回寫。
 
 ### 2. 複合主鍵
 - Laravel Eloquent 不支援複合主鍵。

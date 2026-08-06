@@ -60,7 +60,7 @@ Route::resource('basicinformation', 'BasicInformationController', ['name' => [
     'edit' => 'basicinformation.edit',
     'update' => 'basicinformation.update',
     'index' => 'basicinformation.index',
-]]);
+]])->middleware('legacy.form:person');
 // Inertia + React 版（人物列表，public，與舊 index 同）
 Route::get('app/basicinformation', 'BasicInformationController@appIndex')
     ->middleware('inertia')
@@ -165,119 +165,119 @@ Route::get('basicinformation/{id}/offices/{cpk}/saveas', 'BasicInformationOffice
 
 // ALTNAME_DATA
 Route::get('basicinformation/{id}/altnames/edit', 'BasicInformationAltnamesController@editQuery')
-    ->name('basicinformation.altnames.edit.query');
+    ->name('basicinformation.altnames.edit.query')->middleware('legacy.form:altnames');
 Route::match(['put', 'patch'], 'basicinformation/{id}/altnames/update', 'BasicInformationAltnamesController@updateQuery')
-    ->name('basicinformation.altnames.update.query');
+    ->name('basicinformation.altnames.update.query')->middleware('legacy.form:altnames');
 Route::delete('basicinformation/{id}/altnames/delete', 'BasicInformationAltnamesController@destroyQuery')
-    ->name('basicinformation.altnames.destroy.query');
+    ->name('basicinformation.altnames.destroy.query')->middleware('legacy.form:altnames');
 
 // BIOG_ADDR_DATA
 Route::get('basicinformation/{id}/addresses/edit', 'BasicInformationAddressesController@editQuery')
-    ->name('basicinformation.addresses.edit.query');
+    ->name('basicinformation.addresses.edit.query')->middleware('legacy.form:addresses');
 Route::match(['put', 'patch'], 'basicinformation/{id}/addresses/update', 'BasicInformationAddressesController@updateQuery')
-    ->name('basicinformation.addresses.update.query');
+    ->name('basicinformation.addresses.update.query')->middleware('legacy.form:addresses');
 Route::delete('basicinformation/{id}/addresses/delete', 'BasicInformationAddressesController@destroyQuery')
-    ->name('basicinformation.addresses.destroy.query');
+    ->name('basicinformation.addresses.destroy.query')->middleware('legacy.form:addresses');
 
 // TEXT_DATA
 Route::get('basicinformation/{id}/texts/edit', 'BasicInformationTextsController@editQuery')
-    ->name('basicinformation.texts.edit.query');
+    ->name('basicinformation.texts.edit.query')->middleware('legacy.form:texts');
 Route::match(['put', 'patch'], 'basicinformation/{id}/texts/update', 'BasicInformationTextsController@updateQuery')
-    ->name('basicinformation.texts.update.query');
+    ->name('basicinformation.texts.update.query')->middleware('legacy.form:texts');
 Route::delete('basicinformation/{id}/texts/delete', 'BasicInformationTextsController@destroyQuery')
-    ->name('basicinformation.texts.destroy.query');
+    ->name('basicinformation.texts.destroy.query')->middleware('legacy.form:texts');
 
 // BIOG_SOURCE_DATA
 Route::get('basicinformation/{id}/sources/edit', 'BasicInformationSourcesController@editQuery')
-    ->name('basicinformation.sources.edit.query');
+    ->name('basicinformation.sources.edit.query')->middleware('legacy.form:sources');
 Route::match(['put', 'patch'], 'basicinformation/{id}/sources/update', 'BasicInformationSourcesController@updateQuery')
-    ->name('basicinformation.sources.update.query');
+    ->name('basicinformation.sources.update.query')->middleware('legacy.form:sources');
 Route::delete('basicinformation/{id}/sources/delete', 'BasicInformationSourcesController@destroyQuery')
-    ->name('basicinformation.sources.destroy.query');
+    ->name('basicinformation.sources.destroy.query')->middleware('legacy.form:sources');
 
 // ASSOC_DATA
 Route::get('basicinformation/{id}/assoc/edit', 'BasicInformationAssocController@editQuery')
-    ->name('basicinformation.assoc.edit.query');
+    ->name('basicinformation.assoc.edit.query')->middleware('legacy.form:assoc');
 Route::match(['put', 'patch'], 'basicinformation/{id}/assoc/update', 'BasicInformationAssocController@updateQuery')
-    ->name('basicinformation.assoc.update.query');
+    ->name('basicinformation.assoc.update.query')->middleware('legacy.form:assoc');
 Route::delete('basicinformation/{id}/assoc/delete', 'BasicInformationAssocController@destroyQuery')
-    ->name('basicinformation.assoc.destroy.query');
+    ->name('basicinformation.assoc.destroy.query')->middleware('legacy.form:assoc');
 
 // KIN_DATA
 Route::get('basicinformation/{id}/kinship/edit', 'BasicInformationKinshipController@editQuery')
-    ->name('basicinformation.kinship.edit.query');
+    ->name('basicinformation.kinship.edit.query')->middleware('legacy.form:kinship');
 Route::match(['put', 'patch'], 'basicinformation/{id}/kinship/update', 'BasicInformationKinshipController@updateQuery')
-    ->name('basicinformation.kinship.update.query');
+    ->name('basicinformation.kinship.update.query')->middleware('legacy.form:kinship');
 Route::delete('basicinformation/{id}/kinship/delete', 'BasicInformationKinshipController@destroyQuery')
-    ->name('basicinformation.kinship.destroy.query');
+    ->name('basicinformation.kinship.destroy.query')->middleware('legacy.form:kinship');
 
 // STATUS_DATA
 Route::get('basicinformation/{id}/statuses/edit', 'BasicInformationStatusesController@editQuery')
-    ->name('basicinformation.statuses.edit.query');
+    ->name('basicinformation.statuses.edit.query')->middleware('legacy.form:statuses');
 Route::match(['put', 'patch'], 'basicinformation/{id}/statuses/update', 'BasicInformationStatusesController@updateQuery')
-    ->name('basicinformation.statuses.update.query');
+    ->name('basicinformation.statuses.update.query')->middleware('legacy.form:statuses');
 Route::delete('basicinformation/{id}/statuses/delete', 'BasicInformationStatusesController@destroyQuery')
-    ->name('basicinformation.statuses.destroy.query');
+    ->name('basicinformation.statuses.destroy.query')->middleware('legacy.form:statuses');
 
 // ENTRY_DATA
 Route::get('basicinformation/{id}/entries/edit', 'BasicInformationEntriesController@editQuery')
-    ->name('basicinformation.entries.edit.query');
+    ->name('basicinformation.entries.edit.query')->middleware('legacy.form:entries');
 Route::match(['put', 'patch'], 'basicinformation/{id}/entries/update', 'BasicInformationEntriesController@updateQuery')
-    ->name('basicinformation.entries.update.query');
+    ->name('basicinformation.entries.update.query')->middleware('legacy.form:entries');
 Route::delete('basicinformation/{id}/entries/delete', 'BasicInformationEntriesController@destroyQuery')
-    ->name('basicinformation.entries.destroy.query');
+    ->name('basicinformation.entries.destroy.query')->middleware('legacy.form:entries');
 
 // EVENTS_DATA
 Route::get('basicinformation/{id}/events/edit', 'BasicInformationEventsController@editQuery')
-    ->name('basicinformation.events.edit.query');
+    ->name('basicinformation.events.edit.query')->middleware('legacy.form:events');
 Route::match(['put', 'patch'], 'basicinformation/{id}/events/update', 'BasicInformationEventsController@updateQuery')
-    ->name('basicinformation.events.update.query');
+    ->name('basicinformation.events.update.query')->middleware('legacy.form:events');
 Route::delete('basicinformation/{id}/events/delete', 'BasicInformationEventsController@destroyQuery')
-    ->name('basicinformation.events.destroy.query');
+    ->name('basicinformation.events.destroy.query')->middleware('legacy.form:events');
 
 // BIOG_INST_DATA
 Route::get('basicinformation/{id}/socialinst/edit', 'BasicInformationSocialInstController@editQuery')
-    ->name('basicinformation.socialinst.edit.query');
+    ->name('basicinformation.socialinst.edit.query')->middleware('legacy.form:socialinst');
 Route::match(['put', 'patch'], 'basicinformation/{id}/socialinst/update', 'BasicInformationSocialInstController@updateQuery')
-    ->name('basicinformation.socialinst.update.query');
+    ->name('basicinformation.socialinst.update.query')->middleware('legacy.form:socialinst');
 Route::delete('basicinformation/{id}/socialinst/delete', 'BasicInformationSocialInstController@destroyQuery')
-    ->name('basicinformation.socialinst.destroy.query');
+    ->name('basicinformation.socialinst.destroy.query')->middleware('legacy.form:socialinst');
 
 // POSSESSION_DATA
 Route::get('basicinformation/{id}/possession/edit', 'BasicInformationPossessionController@editQuery')
-    ->name('basicinformation.possession.edit.query');
+    ->name('basicinformation.possession.edit.query')->middleware('legacy.form:possession');
 Route::match(['put', 'patch'], 'basicinformation/{id}/possession/update', 'BasicInformationPossessionController@updateQuery')
-    ->name('basicinformation.possession.update.query');
+    ->name('basicinformation.possession.update.query')->middleware('legacy.form:possession');
 Route::delete('basicinformation/{id}/possession/delete', 'BasicInformationPossessionController@destroyQuery')
-    ->name('basicinformation.possession.destroy.query');
+    ->name('basicinformation.possession.destroy.query')->middleware('legacy.form:possession');
 
 // POSTED_TO_OFFICE_DATA（官名）
 Route::get('basicinformation/{id}/offices/edit', 'BasicInformationOfficesController@editQuery')
-    ->name('basicinformation.offices.edit.query');
+    ->name('basicinformation.offices.edit.query')->middleware('legacy.form:offices');
 Route::match(['put', 'patch'], 'basicinformation/{id}/offices/update', 'BasicInformationOfficesController@updateQuery')
-    ->name('basicinformation.offices.update.query');
+    ->name('basicinformation.offices.update.query')->middleware('legacy.form:offices');
 Route::delete('basicinformation/{id}/offices/delete', 'BasicInformationOfficesController@destroyQuery')
-    ->name('basicinformation.offices.destroy.query');
+    ->name('basicinformation.offices.destroy.query')->middleware('legacy.form:offices');
 
 // 資源路由（放在查詢參數路由之後，作為後備）
-Route::resource('basicinformation.addresses', 'BasicInformationAddressesController')->except(['show', 'destroy']);
-Route::resource('basicinformation.altnames', 'BasicInformationAltnamesController')->except(['show', 'destroy']);
-Route::resource('basicinformation.texts', 'BasicInformationTextsController')->except(['show', 'destroy']);
-Route::resource('basicinformation.offices', 'BasicInformationOfficesController')->except(['show', 'destroy']);
-Route::resource('basicinformation.assoc', 'BasicInformationAssocController')->except(['show', 'destroy']);
-Route::resource('basicinformation.entries', 'BasicInformationEntriesController')->except(['show', 'destroy']);
-Route::resource('basicinformation.events', 'BasicInformationEventsController')->except(['show', 'destroy']);
-Route::resource('basicinformation.kinship', 'BasicInformationKinshipController')->except(['show', 'destroy']);
-Route::resource('basicinformation.statuses', 'BasicInformationStatusesController')->except(['show', 'destroy']);
-Route::resource('basicinformation.possession', 'BasicInformationPossessionController')->except(['show', 'destroy']);
-Route::resource('basicinformation.socialinst', 'BasicInformationSocialInstController')->except(['show', 'destroy']);
-Route::resource('basicinformation.sources', 'BasicInformationSourcesController')->except(['show', 'destroy']);
+Route::resource('basicinformation.addresses', 'BasicInformationAddressesController')->except(['show', 'destroy'])->middleware('legacy.form:addresses');
+Route::resource('basicinformation.altnames', 'BasicInformationAltnamesController')->except(['show', 'destroy'])->middleware('legacy.form:altnames');
+Route::resource('basicinformation.texts', 'BasicInformationTextsController')->except(['show', 'destroy'])->middleware('legacy.form:texts');
+Route::resource('basicinformation.offices', 'BasicInformationOfficesController')->except(['show', 'destroy'])->middleware('legacy.form:offices');
+Route::resource('basicinformation.assoc', 'BasicInformationAssocController')->except(['show', 'destroy'])->middleware('legacy.form:assoc');
+Route::resource('basicinformation.entries', 'BasicInformationEntriesController')->except(['show', 'destroy'])->middleware('legacy.form:entries');
+Route::resource('basicinformation.events', 'BasicInformationEventsController')->except(['show', 'destroy'])->middleware('legacy.form:events');
+Route::resource('basicinformation.kinship', 'BasicInformationKinshipController')->except(['show', 'destroy'])->middleware('legacy.form:kinship');
+Route::resource('basicinformation.statuses', 'BasicInformationStatusesController')->except(['show', 'destroy'])->middleware('legacy.form:statuses');
+Route::resource('basicinformation.possession', 'BasicInformationPossessionController')->except(['show', 'destroy'])->middleware('legacy.form:possession');
+Route::resource('basicinformation.socialinst', 'BasicInformationSocialInstController')->except(['show', 'destroy'])->middleware('legacy.form:socialinst');
+Route::resource('basicinformation.sources', 'BasicInformationSourcesController')->except(['show', 'destroy'])->middleware('legacy.form:sources');
 
 // BiogMain 提案路由
 Route::post('basicinformation/{personid}/{resource}/proposal', 'BasicInformationProposalController@proposalStore')
-    ->name('basicinformation.proposal.store');
+    ->name('basicinformation.proposal.store')->middleware('legacy.form:proposal');
 Route::post('basicinformation/{personid}/{resource}/{id}/proposal', 'BasicInformationProposalController@proposalUpdate')
-    ->name('basicinformation.proposal.update');
+    ->name('basicinformation.proposal.update')->middleware('legacy.form:proposal');
 
 Route::get('codes', 'CodesController@index')->name('codes.index');
 // Inertia + React 版（代碼表總覽）

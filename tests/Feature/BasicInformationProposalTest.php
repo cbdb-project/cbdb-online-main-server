@@ -18,6 +18,7 @@ use Tests\TestCase;
 class BasicInformationProposalTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
+        $this->useLegacyPersonForms(); // 本類測 legacy Blade CRUD 行為，撥回 flag=old 越過下架閘門
 
         // Mock BiogMainRepository
         $this->app->instance(BiogMainRepository::class, \Mockery::mock(BiogMainRepository::class, function ($mock) {

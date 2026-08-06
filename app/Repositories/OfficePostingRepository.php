@@ -119,7 +119,7 @@ class OfficePostingRepository {
             //有修改地名資訊時$shouldUpdateAddress = true
             //dd($shouldUpdateAddress);
 
-            $c_created_by = Auth::user()->name;
+            $c_created_by = \App\Support\AuditActor::currentName();
             $c_created_date = Carbon::now();
 
             DB::table('POSTING_DATA')->where([
@@ -431,7 +431,7 @@ class OfficePostingRepository {
             $data['c_personid'] = $id;
 
             //將操作新增的使用者與當下時間紀錄為c_created_by與c_created_date。
-            $c_created_by = Auth::user()->name;
+            $c_created_by = \App\Support\AuditActor::currentName();
             $c_created_date = Carbon::now();
             $data['c_created_by'] = $c_created_by;
             $data['c_created_date'] = $c_created_date;
@@ -545,7 +545,7 @@ class OfficePostingRepository {
             $data['c_posting_id'] = ((int) $lastPostingId) + 1;
             $data['c_personid'] = $id;
 
-            $c_created_by = Auth::user()->name;
+            $c_created_by = \App\Support\AuditActor::currentName();
             $c_created_date = Carbon::now();
             $data['c_modified_by'] = $data['c_modified_date'] = '';
             $data['c_created_by'] = $c_created_by;

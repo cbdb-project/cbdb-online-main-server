@@ -205,7 +205,7 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
         // 對齊缺口（11/12 子資源原本不刷新；source 走 BiogSourceRepository 另已處理）。
         // 須在 transaction 閉包捕獲 $updateData 前注入；有效變更判斷已在 handle() 以未注入前的 changes 完成，
         // 故此注入不影響「無變更」攔截。
-        $updateData['c_modified_by'] = Auth::user()->name ?? '';
+        $updateData['c_modified_by'] = \App\Support\AuditActor::currentName();
         $updateData['c_modified_date'] = Carbon::now();
         unset($updateData['c_created_by'], $updateData['c_created_date']);
 

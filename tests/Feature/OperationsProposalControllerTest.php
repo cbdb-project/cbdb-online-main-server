@@ -532,7 +532,8 @@ class OperationsProposalControllerTest extends TestCase {
         ])->first();
 
         $this->assertNotNull($row);
-        $this->assertSame('admin', $row->c_created_by);
+        // 核准署名採雙人名「審核人 (Proposed by: 提案人)」（2026-08-05 語義定案）。
+        $this->assertSame('admin (Proposed by: tester)', $row->c_created_by);
         $this->assertNotNull($row->c_created_date);
     }
 

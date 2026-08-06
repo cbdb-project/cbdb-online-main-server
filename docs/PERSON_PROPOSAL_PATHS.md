@@ -1,22 +1,28 @@
 # 人物提案（proposal）路徑現況
 
 > 本文只描述**人物相關記錄**（`BIOG_MAIN` 與 12 個人物子資源）的提案提交／核准路徑現況：
-> 哪些已收斂到「核准＝重放 direct handler」，哪些仍是獨立實作，各自的具體風險是什麼。
+> 哪些已收斂到「核准＝重放 direct handler」，哪些仍是獨立實作，各自的具體風險是什麼，
+> 以及既有建模的根本缺陷與長期方向（§7）。
+> 提案通則（資料模型、審核流程、稽核欄語義）見 [APPROVAL_FLOWS.md](./APPROVAL_FLOWS.md)。
 > 實體聚合（office／social-institution 等非人物實體）的提案見
 > [ENTITY_AGGREGATE_ARCHITECTURE.md](./ENTITY_AGGREGATE_ARCHITECTURE.md) §4.5。
 
+最後更新：2026-08-05
+
 ---
 
-## 1. 問題的本質：核准 ≠ 直接編輯
+## 1. 問題的本質：核准 ≠ 直接編輯；快照 ≠ 意圖
 
 `operations` 的資源模型是 `{resource, resource_id, resource_data}`——天生表達的是**一張下層表的一列**。
-提案送出時被拍平成行快照，核准時再把那一列蓋回去。於是「核准」與「直接編輯」是**兩份獨立的寫實作**：
-直接編輯走 v2 mutation handler（派生、白名單、引用完整性、幂等正規化、operations＋audit_log），
-核准卻可能繞過其中一部分或全部。
+提案送出時被拍平成**行快照**，核准時再把那一列蓋回去。這造成兩層問題：
 
-修法（§4.5）：**提案＝一次延遲執行的 direct mutation**。核准時不是「蓋一列」，而是把提案還原成
-`{resource, 'direct', operation, personId, targetPk, changes}`，交回**同一個 handler** 重放。
-direct 與 proposal 因此天然對等，不需要兩邊各自維護。
+1. **核准與直接編輯是兩份寫實作**：直接編輯走 v2 mutation handler（派生、白名單、引用完整性、
+   幂等正規化、operations＋audit_log），核准卻可能繞過其中一部分或全部。
+   修法：**提案＝一次延遲執行的 direct mutation**——核准時把提案還原成
+   `{resource, 'direct', operation, personId, targetPk, changes}`，交回**同一個 handler** 重放（路徑 A）。
+2. **快照與意圖語義不同**：快照可含系統代管欄（稽核欄）與多表副產物；handler 的 changes 只認
+   使用者意圖（白名單）。重放層必須做「快照 → 意圖」的翻譯（§4.7 的稽核欄剔除即為此），
+   而這個翻譯的存在本身就說明**行快照不是提案的正確原語**——根本方向見 §7。
 
 ---
 
@@ -26,12 +32,13 @@ direct 與 proposal 因此天然對等，不需要兩邊各自維護。
 
 | # | 路徑 | 實作 | 寫入方式 | 派生／護欄／正規化 | operations＋audit | 對等性 |
 |---|---|---|---|---|---|---|
-| **A** | **handler 重放**（本次收斂到的目標） | `applyViaMutationHandler()` → `MutationHandlerRegistry` | 呼叫 v2 handler 的 direct 路徑 | ✅ 全部（與直接編輯同一份程式） | ✅ handler 自寫 | ✅ **逐位一致** |
-| **B** | **legacy 委派** | `applyKinship/AssocProposal()` | 重建假 `Request` → `BiogMainRepository::*StoreById/*UpdateById` | ⚠ legacy 那一份（與 v2 handler 是**兩份實作**） | ✅ 委派端自寫 | ⚠ 靠測試與共用 mirror helper 手動維持 |
-| **C** | **通用行覆寫** | `applyCreate/Update/DeleteProposal()` | `DB::table()->insert/update/delete` 蓋行快照 | ❌ 全部繞過 | ⚠ 由 `approve()` 事後補記 | ❌ **盲寫，會落殘缺資料** |
+| **A** | **handler 重放**（收斂目標） | `applyViaMutationHandler()` → `MutationHandlerRegistry` | 呼叫 v2 handler 的 direct 路徑 | ✅ 全部（與直接編輯同一份程式） | ✅ handler 自寫，落庫 id 記回 `__applied_operation_id` | ✅ **逐位一致** |
+| **B** | **legacy 委派** | `applyKinship/AssocProposal()` | 重建假 `Request` → `BiogMainRepository::*StoreById/*UpdateById` | ⚠ legacy 那一份（與 v2 handler 是**兩份實作**） | ✅ 委派端自寫；**未回報 id**（「比較」不可用） | ⚠ 靠測試與共用 mirror helper 手動維持 |
+| **C** | **通用行覆寫** | `applyCreate/Update/DeleteProposal()` | `DB::table()->insert/update/delete` 蓋行快照 | ❌ 全部繞過（稽核欄除外，見 §4.7） | ⚠ 由 `approve()` 事後補記 | ❌ **盲寫，會落殘缺資料** |
 
 > 路徑 C 是原始狀態：核准把 `resource_data` 當成「這一列該長的樣子」直接蓋上去。
 > 引用不存在的碼、缺配套欄、未經幂等正規化的值——一律照單全收。
+> 人物資源已全部脫離 C（kinship／assoc 的 DELETE 除外）；C 仍服務 codes 等非人物表。
 
 ---
 
@@ -63,150 +70,161 @@ direct 與 proposal 因此天然對等，不需要兩邊各自維護。
 
 ## 4. 已經做了什麼
 
-### 4.1 段一：7 張人物子資源表全部收斂到路徑 A
+### 4.1 段一：7 張人物子資源表收斂到路徑 A
 
-`OperationsProposalController::HANDLER_ROUTED_RESOURCES` 建立「表名 → API resource」對照，
-核准時重建意圖並重放 direct handler。三個 commit：
+`HANDLER_ROUTED_RESOURCES` 建立「表名 → API resource」對照，核准時重建意圖並重放 direct handler。
+三個 commit：UPDATE／DELETE 先行（`d2350296`）→ office 實體級提案（`eb29d292`）→ CREATE 補完（`d604293b`）。
 
-1. **UPDATE／DELETE**（`d2350296`）——先收斂風險低的兩種操作。
-2. **office 實體級提案**（`eb29d292`）——非人物範圍，見實體架構文件。
-3. **CREATE 補完**（`d604293b`）。
+### 4.2 CREATE 一度被排除的真正原因
 
-### 4.2 CREATE 為何一度被排除，以及真正的原因
-
-段一原本把 CREATE 排除，理由記為「direct-create handler 帶『同主鍵已有待審核提案則拒』
-去重護欄，核准時會被自己擋下」。**該理由過寬**，查證後只對 sources 成立：
-
-| handler | 護欄位置 | direct 路徑是否經過 | 影響 |
-|---|---|---|---|
-| `AbstractPersonSubresourceCreateHandler`（altnames／addresses／entries／statuses／texts／social_institutions） | `handleProposal()` **內部** | ❌ 不經過 | 本來就不受影響 |
-| `SourceMutationHandler`（sources） | `if ($operation === 'create')` 區塊、**在 mode 分派之前** | ✅ 會跑 | **這才是當初擋住重放的那一個** |
-
-修法：`BiogSourceRepository::hasPendingCreateProposal()` 加 `$excludeOperationId`，
-由 `meta.__approving_operation_id` 排除「正在核准的自己」。
+「direct-create 帶去重護欄、核准會被自己擋下」的理由**只對 sources 成立**
+（`SourceMutationHandler` 的護欄在 mode 分派之前、direct 也會跑；
+`AbstractPersonSubresourceCreateHandler` 系的護欄在 `handleProposal()` 內、direct 不經過）。
+修法：`meta.__approving_operation_id` 讓護欄排除「正在核准的自己」。
 
 ### 4.3 收斂後實際修好的行為
 
-- **引用完整性生效**：核准 `c_textid` 不存在的 sources create 提案 → fail-closed
-  （路徑 C 會盲插一列殘缺資料）。回歸測試：`testApproveCreateProposalEnforcesHandlerValidation`。
-- **幂等正規化生效**：create 補寫 legacy 哨兵 0 欄（如 `c_entry_addr_id`／`c_source`），
-  與 legacy 表單一致。
-- **audit／operations 由 handler 統一寫**，`approve()` 不再事後補記（`usedDirectWorkflow=true`）。
-- **改鍵碰撞偵測生效**：`BIOG_SOURCE_DATA` update 改鍵撞既有列 → 409 擋下。
+- 引用完整性（核准 `c_textid` 不存在的 sources create → fail-closed，路徑 C 會盲插）。
+- 幂等正規化（legacy 哨兵 0 欄補寫，與 legacy 表單一致）。
+- audit／operations 由 handler 統一寫（`usedDirectWorkflow=true`，`approve()` 不再補記）。
+- 改鍵碰撞偵測（`BIOG_SOURCE_DATA` update 改鍵撞既有列 → 409）。
 
 ### 4.4 兩處刻意保留／變更的使用者可見契約
 
 | 情況 | 決定 | 理由 |
 |---|---|---|
-| update／delete 缺 `resource_original` | **保留**舊訊息「缺少原始資料，無法更新／刪除。」，在路由前先擋 | 比 handler 的「主鍵格式不正確」更有指向性；此檢查只是定位目標，不重複 handler 邏輯 |
-| create 目標主鍵已存在 | **改用** handler 訊息「目標主鍵已存在」 | handler 於 `preprocessCreateData` 正規化後才比對主鍵（如 -999→0）；在控制器補一份預檢查會與正規化分歧，是真的正確性風險。行為契約（擋下／維持待審／無副作用）不變 |
+| update／delete 缺 `resource_original` | **保留**舊訊息「缺少原始資料，無法更新／刪除。」，在路由前先擋 | 比 handler 的「主鍵格式不正確」更有指向性 |
+| create 目標主鍵已存在 | **改用** handler 訊息「目標主鍵已存在」 | handler 於正規化（-999→0 等）後才比對主鍵，控制器預檢查會與正規化分歧 |
 
-### 4.5 段二：postings／possessions／events（單人屬性、無鏡像）收斂到路徑 A
+### 4.5 段二：postings／possessions／events 收斂到路徑 A
 
-這 3 張表的委派實作（`applyOfficeProposal`／`applyPossessionCreateProposal`／
-`applyPossessionUpdateProposal`／`applyEventProposal`）與 kinship／associations 不同，
-**不涉及「兩人互為鏡像」**——地址副表（`POSTED_TO_ADDR_DATA`／`POSSESSION_ADDR`）是單一人物
-記錄自己的子表，不是另一個人身上的鏡像列，故遷到路徑 A 不需要重新裁定鏡像語義。
+這 3 張表不涉及「兩人互為鏡像」——地址副表是單一人物自己的子表。唯一落差是地址意圖
+（`c_addr`／`c_addr_id`／`c_addr_cleared`）不屬於主表白名單、只存在 `__proposal_aux`：
+`applyViaMutationHandler()` 將其併回 changes（handler 的 direct 路徑本就從 changes 讀這些鍵）。
+DELETE 一併收斂（`*DeleteHandler` 委派與去級聯末批同一批修正過的「先子後父」邏輯）。
+legacy 委派死碼已移除；`BiogMainRepository::office/possession/event*ById` 保留服務 Blade 直接編輯。
 
-**唯一需要解決的落差**：地址副表意圖（`c_addr`／`c_addr_id`／`c_addr_cleared`）從不屬於主表
-欄位白名單，提案送出時只存進 `__proposal_aux`（`data`/`original` 的行快照抓不到）。解法：
-`applyViaMutationHandler()` 新增 `$auxiliaryPayload` 參數，create／update 皆將其併入 `changes`——
-`PostingMutationHandler`／`PossessionMutationHandler`／`EventMutationHandler`／對應
-`*CreateHandler` 的 `handle()` 本就會從 `changes` 抽出這些鍵（direct 路徑既有邏輯），故此舉
-只是把「地址意圖從哪裡讀」對齊到 handler 既有的讀取點，不是新邏輯。其餘 7 張已收斂的表
-無此類副表，`$auxiliaryPayload` 恆為 `[]`，合併為 no-op。
-
-DELETE 一併收斂（非本文先前建議的「最後做」）：這 3 張表的 `*DeleteHandler` 於 direct 模式
-委派既有的 `BiogMainRepository::officeDeleteById()`／`possessionDeleteById()`——與去級聯
-Phase 1 末批前置（見 `docs/CASCADE_TO_RESTRICT_MIGRATION_NOTES.md` §11）同一批修正過的
-「先子後父」「父列僅在無剩餘引用時才刪」邏輯，本就是目前生產環境 direct API／Blade 表單共用
-的路徑，比路徑 C 另外维護的 `deleteOfficeAuxiliaryTables`／`deletePossessionAuxiliaryTables`
-更貼近實際使用的程式碼，故一併移除、不再分階段。
-
-移除的死碼：`applyOfficeProposal`／`applyPossessionCreateProposal`／
-`applyPossessionUpdateProposal`／`applyEventProposal`、`buildLegacyOfficeId`／
-`buildLegacyEventId`、`applyDeleteProposal()` 內的 office／possession 特例、
-`deleteOfficeAuxiliaryTables`／`deletePossessionAuxiliaryTables`（`applyProposal()` 的
-`HANDLER_ROUTED_RESOURCES` 判斷在這些分支之前，加入後這些分支恆不可達）。
-
-`BiogMainRepository::officeStoreById/officeUpdateById/possessionStoreById/possessionUpdateById/
-eventStoreById/eventUpdateById` **未刪除**：Blade 版 `BasicInformationOfficesController`／
-`BasicInformationPossessionController`／`BasicInformationEventsController` 仍在用（AGENTS.md
-所述 flag-gated 回退頁面），這幾個 repository 方法繼續服務直接編輯，只是核准不再另外呼叫它們。
-
-### 4.6 段三：`BIOG_MAIN`（人物主檔）收斂到路徑 A——三種操作各按 direct 語義路由
-
-依 §6 建議先查清三種操作的實際語義後收斂（不照抄 update 的形狀硬套）：
+### 4.6 段三：`BIOG_MAIN` 收斂到路徑 A
 
 | 操作 | 重放對象 | 語義決定 |
 |---|---|---|
-| UPDATE | `BiogMainMutationHandler`（direct） | 唯一有活提交端的操作（v2 `mode=proposal` 與 legacy Blade `action=proposal` 兩條）。核准＝把提案 delta（`diff(original, data)`，BLOCKED_FIELDS 由 handler 濾除）套用到**當下**資料列並重跑 `BasicInformationRequest` 驗證。「名（中）／拼音名不可清空」護欄由 handler 的 `validationRules($original)` 提供（原值非空才掛 required，§5.2 確認之等價護欄），控制器層的 `NO_CLEAR_COLUMNS_ON_APPLY`／`assertNoClearColumns`／`tableModelMap` Eloquent 分支隨之移除（收斂後不可達） |
-| DELETE | `BiogMainDeleteHandler`（direct） | **現行沒有任何提交端會產生 `BIOG_MAIN` 的 TYPE_PROPOSAL_DELETE**（眾包刪除走 op_type=4＋crowdsourcing_status=2，另一條審核流）；此路由是防禦性封洞——收斂前通用 `applyDeleteProposal()` 會對 BIOG_MAIN 做**物理 DELETE**，與 direct 的軟刪除（`c_name_chn='<待删除>'` 的 UPDATE）語義相反，且在入邊 FK 尚為 CASCADE 期間會靜默連鎖刪除 25 張子表資料（見 CASCADE_TO_RESTRICT_MIGRATION_NOTES.md §11.1） |
-| CREATE | `BiogMainCreateHandler`（direct） | 僅 legacy 提交路由理論可達（UI 不產生；人物新增另有流程）。重放帶 `c_personid` 驗證（非 0、不得已存在、不得過大）與欄位白名單，取代先前的盲 Eloquent create |
+| UPDATE | `BiogMainMutationHandler` | 核准＝把 delta 套用**當下**資料列＋重跑 `BasicInformationRequest` 驗證；「名（中）／拼音名不可清空」由 handler `validationRules($original)` 提供 |
+| DELETE | `BiogMainDeleteHandler` | 防禦性封洞：通用 C 會物理 DELETE（與 direct 軟刪除相反、CASCADE 觀察期會連鎖刪 25 張子表） |
+| CREATE | `BiogMainCreateHandler` | 帶 `c_personid` 驗證與白名單，取代盲 Eloquent create |
 
-回歸測試：`tests/Feature/BiogMainProposalTest.php`（含軟刪除取代物理 DELETE、create 撞既有
-personid fail-closed、清空名（中）被 handler 驗證擋下）。核准失敗訊息現會攤平 handler 的
-欄位級錯誤（如「參數校驗失敗：名不能為空」），對審核者保留指向性。
+回歸測試：`tests/Feature/BiogMainProposalTest.php`。
+
+### 4.7 稽核欄語義定案＋legacy 提交入口下架（2026-08-05，commit `6a3c78ee`）
+
+事故：一筆經 legacy 無白名單入口存入的 create 提案 payload 夾帶四個稽核欄，核准重放撞
+handler 白名單 → 422「包含不允許的欄位」整筆失敗。修正分四塊：
+
+1. **快照 → 意圖翻譯補全**：`applyViaMutationHandler()` 重放前統一剔除 `AUDIT_COLUMNS`
+   （create 與 update 兩分支——update 提案 data＝original∪changes **天然含**稽核欄，先前僅靠
+   「diff 兩快照相等而抵銷」僥倖未炸，序列化一漂移就會復發）。
+2. **稽核欄語義**（詳見 APPROVAL_FLOWS.md §3）：任何寫入蓋當下、署名雙人名
+   「審核人 (Proposed by: 提案人)」，統一經 `App\Support\AuditActor`；通用路徑
+   `enforceAuditFieldsForCreate/Update` 改無條件蓋章；restore 蓋還原人＋還原時刻。
+3. **入口下架**：`LegacyBladeFormGate` middleware——flag=new 時 legacy 表單 GET 302 導向
+   `/app` 對應頁、寫入端點（含 `proposalStore`）回 410；flag=old 完整放行（回退承諾保持）。
+   `extractFormData()` 另加剔除稽核欄保險帶。
+4. **「比較」認領**：核准時把 handler 落庫的 direct operation id 寫回提案 payload
+   （`__applied_operation_id`），operations 列表據此把 audit_log 認領回提案列。
+   依決策**不回填存量**；路徑 B（kinship／assoc）未回報 id、其新核准提案「比較」仍不可用。
+
+回歸測試：`ProposalAuditFieldSemanticsTest`、`LegacyBladeFormGateTest`。
 
 ---
 
 ## 5. 還沒做什麼
 
-### 5.1 委派檔 2 個資源（路徑 B）——kinship／associations，暫緩
+### 5.1 路徑 B——kinship／associations，暫緩
 
-`kinship`／`associations` 的核准仍走 legacy repository，而**直接編輯走 v2 handler**
-（例如 `AssociationMutationHandler` 自己 `DB::table('ASSOC_DATA')` 寫，只共用
-`syncAssocMirrorOnUpdate` 這個 mirror helper）。兩者是**獨立的寫實作**，
-靠測試與共用 helper 手動維持對齊——程式註解可見這個持續校準的痕跡
-（如 `#82：核准 CREATE 啟用鏡像衝突/疑似偵測（對齊 v2 direct create）`）。
+核准仍走 legacy repository，而直接編輯走 v2 handler，兩者是獨立寫實作、靠測試與共用 mirror
+helper 手動對齊。**為何暫緩**：`KIN_DATA`／`ASSOC_DATA` 每筆描述**兩個人之間**的關係、各存
+互為鏡像的兩列；核准路徑的鏡像語義（Mirror{Conflict,Suspected,Integrity}Exception、缺鏡像
+backfill、刪除 `$force=true` 廣集孤兒）都實作在 legacy 側、十餘個測試釘著。兩人分別提案同一組
+關係時的衝突裁定是**領域決策**而非接線問題。另注意：**§7 的意圖原語遷移會直接改寫這一塊的
+建模**（「關係」本就該是一個意圖、鏡像列是派生輸出）——若決定做 §7，此項應併入而非先單獨收斂。
 
-**為何暫緩**：`KIN_DATA`／`ASSOC_DATA` 每筆記錄描述的是**兩個人之間**的關係，資料庫裡各自
-存一份互為鏡像的列（正向／反向）。核准路徑的鏡像語義（`MirrorConflictException`／
-`MirrorSuspectedException`／`MirrorIntegrityException`、缺鏡像 backfill、刪除時的
-`$force=true` 廣集孤兒語義）都實作在 legacy 那側，有十餘個測試釘著。這與 §4.5 的地址副表
-不同——地址副表是單一人物自己的子表，鏡像卻是**另一個人身上的另一列**，兩人若分別從各自
-頁面獨立提案／編輯同一組關係，核准時要怎麼判定衝突、要不要覆寫對面、由誰的版本為準，
-是尚未理清的領域決策，遷到路徑 A 前需要先裁定清楚，不只是接線。**本輪刻意不動**。
+### 5.2 legacy 提交路徑——✅ 已封（見 §4.7）
 
-### 5.2 `BIOG_MAIN`——✅ 已收斂（見 §4.6）
-
-原記載的前置確認（handler 側「不可清空」護欄）與 CREATE／DELETE 語義查證均已完成並落地，
-三種操作全部路由到對應 direct handler 重放。
-
-### 5.3 提交端的第二條路徑（legacy）
-
-`BasicInformationProposalController`（`POST basicinformation/{personid}/{resource}/proposal`）是
-Blade 時代的提案提交入口，涵蓋全部 13 個資源，**直接 `recordProposalOperation()` 存行快照、
-繞過 v2 handler 的驗證**。React 編輯器已全部改走 `/api/v2`，但這些路由**仍然掛著、未下架**。
-只要它還在，就可能繞過提交端驗證產生「存量壞提案」——目前靠核准端的 handler 重放（路徑 A）兜住，
-但路徑 B 的 kinship／associations 沒有這層保護。
+`POST basicinformation/{personid}/{resource}/proposal` 在 flag=new 時 410。殘餘風險僅剩
+flag=old 回退窗口（此時 `extractFormData` 的稽核欄剔除仍有效，但其它欄位仍無白名單）。
+路由與控制器**實體仍在**，隨 Phase 7 AdminLTE 下架一併移除。
 
 ---
 
 ## 6. 建議順序
 
-1. ~~**`BIOG_MAIN` 收斂到 A**~~ ✅ 已完成（§4.6，三種操作各按 direct 語義路由）。
-2. **kinship／associations 收斂到 A**（需先裁定鏡像語義）：建議單獨開分支、單獨 review，
-   因為它改的是核准時的鏡像衝突行為——這是唯一還需要「重新裁定域邏輯」而非單純接線的項目。
-3. **下架 legacy 提交路徑**：確認 Blade 頁全數不再使用後移除路由，消滅繞過提交端驗證的入口。
-
-完成 2 後，`OperationsProposalController` 的路徑 B／C 可整段移除
-（含 `applyKinship/AssocProposal`、`applyCreate/Update/DeleteProposal` 等重複實作；
-`tableModelMap` 與 `NO_CLEAR_COLUMNS_ON_APPLY` 已隨 §4.6 移除），
-控制器塌成「decode → resolve → handle → updateStatus」。
+1. ~~`BIOG_MAIN` 收斂到 A~~ ✅（§4.6）
+2. ~~封死 legacy 提交入口~~ ✅（§4.7；實體移除待 Phase 7）
+3. **先裁定 §7 是否立項**——它決定 kinship／assoc 的收斂形狀與「比較」重構
+   （[OPERATIONS_COMPARE_CONSOLIDATION_PLAN.md](./OPERATIONS_COMPARE_CONSOLIDATION_PLAN.md)）
+   騎在哪個模型上做。若立項：kinship／assoc 直接以新原語重做（跳過「先收斂到 A 再遷」的重工）；
+   若不立項：kinship／assoc 收斂到 A（需先裁定鏡像衝突語義，單獨分支、單獨 review）。
+4. 完成後 `OperationsProposalController` 的路徑 B／C 可整段移除，控制器塌成
+   「decode → resolve → handle → updateStatus」。
 
 ---
 
-## 7. 相關程式碼
+## 7. 方向：提案原語應為「意圖」，而非「原表上的 CRUD 行快照」（2026-08-05 提出）
+
+### 7.1 診斷
+
+把提案建模成「在原有表上做 pending CRUD」是**原始設計錯的那一步**。當一次人物子資源修改
+實際涉及多表資料更新時，行快照裝不下完整意圖，系統於是長出一批補償機制——每一個都是同一個
+建模錯誤的症狀：
+
+| 症狀 | 說明 |
+|---|---|
+| `__proposal_aux` 側通道 | 任官地址等副表意圖不屬於主表白名單，只能塞在 payload 旁邊、核准時顯式併回 |
+| kinship／assoc 鏡像機制 | 「A 與 B 是某關係」是一個語義事實，被拆成兩列存放後，需要整套衝突／疑似／fail-closed／強制收斂機制事後縫合 |
+| 稽核欄 422 事故（§4.7） | 快照天然拖著系統代管欄；「重放前剔稽核欄」本質是在從快照**反推**意圖 |
+| 「比較」兩列問題 | 核准要把 pending CRUD「轉正」成另一列 direct operation，同一件事出現兩行、audit 掛錯邊，需 `__applied_operation_id` 縫合 |
+| `POSTED_TO_ADDR_DATA` 借格式 | 一個任官意圖橫跨兩表，單表原語裝不下，明細只能塞 `resource_data['rows']`（AGENTS 高風險備忘） |
+
+### 7.2 目標模型
+
+**operations 存命令（意圖），audit_log 存事件（事實）。**
+
+- 提案＝一條 pending **命令**：資源級動詞＋使用者欄位＋目標身分
+  （例：`{command: 'kinship.create', person: A, target: B, kin_code, source…}`），不含任何
+  系統代管欄，也不預先拆成多列。
+- 核准＝**執行命令**：交給與 direct 完全同一個 handler；鏡像列、副表列、派生欄都是執行時的
+  輸出，由 handler 產生並逐表寫 audit_log。
+- 比較的兩種語義自然落位：pending 比較＝把命令對**當前**資料渲染一遍（與執行共用同一條
+  路徑，順帶得到漂移偵測）；歷史比較＝讀 audit_log 事件。
+- restore 不受影響：繼續走 operations 快照（audit_log 的 old/new 即逐表快照）。
+
+### 7.3 已有的萌芽與遷移順序
+
+§4.5 實體聚合提案（office 試點）**就是這個原語**：`resource`＝聚合 API 名、payload 存
+`__entity_operation`＋`changes`（意圖非快照）、核准＝同一 handler 以 direct 語義重放。
+段一～段三的 handler 重放也是往此收斂——只是意圖還得從快照反推。
+
+遷移順序（受益排序）：
+
+1. **kinship／associations 最痛也最受益**：鏡像機制的一半可隨「關係＝單一意圖」直接消失；
+   且它們尚未收斂到 A，以新原語重做可跳過一次重工（§6-3）。
+2. **postings（＋possessions／events）次之**：`__proposal_aux` 側通道可廢。
+3. 其餘單表資源收益低，可最後或不遷（單表 CRUD 下「意圖」與「行快照剔系統欄」幾乎同構）。
+
+順風條件：「不兼容舊提案、不回填」已是既定決策（§4.7），新命令 schema 不必背歷史包袱；
+§4.5 管線已驗證可行。約束：operations 列表的按表／按主鍵篩選需為命令補派生索引欄；
+命令 schema 需版本欄以備演進。
+
+---
+
+## 8. 相關程式碼
 
 - [app/Http/Controllers/OperationsProposalController.php](../app/Http/Controllers/OperationsProposalController.php)
-  ——`HANDLER_ROUTED_RESOURCES`、`applyProposal()`、`applyViaMutationHandler()`
+  ——`HANDLER_ROUTED_RESOURCES`、`applyProposal()`、`applyViaMutationHandler()`、`AUDIT_COLUMNS`
+- [app/Support/AuditActor.php](../app/Support/AuditActor.php)（稽核署名，§4.7）
+- [app/Http/Middleware/LegacyBladeFormGate.php](../app/Http/Middleware/LegacyBladeFormGate.php)（legacy 表單下架閘門）
 - [app/Services/Mutations/MutationHandlerRegistry.php](../app/Services/Mutations/MutationHandlerRegistry.php)
 - [app/Services/Mutations/AbstractPersonSubresourceCreateHandler.php](../app/Services/Mutations/AbstractPersonSubresourceCreateHandler.php)
   ／[…MutationHandler.php](../app/Services/Mutations/AbstractPersonSubresourceMutationHandler.php)
-- [app/Services/Mutations/PostingMutationHandler.php](../app/Services/Mutations/PostingMutationHandler.php)
-  ／[PossessionMutationHandler.php](../app/Services/Mutations/PossessionMutationHandler.php)
-  ／[EventMutationHandler.php](../app/Services/Mutations/EventMutationHandler.php)（地址副表 direct 同步邏輯）
-- [app/Services/Mutations/BiogMainMutationHandler.php](../app/Services/Mutations/BiogMainMutationHandler.php)（§5.2 不可清空護欄）
-- [app/Http/Controllers/BasicInformationProposalController.php](../app/Http/Controllers/BasicInformationProposalController.php)（legacy 提交端）
-- 測試：`tests/Feature/OperationsProposalControllerTest.php`、`tests/Feature/BasicInformationProposalTest.php`
+- [app/Http/Controllers/BasicInformationProposalController.php](../app/Http/Controllers/BasicInformationProposalController.php)（legacy 提交端，已封）
+- 測試：`OperationsProposalControllerTest`、`BasicInformationProposalTest`、
+  `ProposalAuditFieldSemanticsTest`、`LegacyBladeFormGateTest`、`BiogMainProposalTest`

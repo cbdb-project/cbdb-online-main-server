@@ -1,136 +1,92 @@
-# Proposal / Approval Flows
+# Proposal / Approval Flows（提案與審核通則）
 
-本文件說明目前在 `/codes/*` 與 `/basicinformation/*` 模組導入的提案與審核流程，供後續擴充時參考。
+本文件說明 `/codes/*` 與人物記錄（`basicinformation`）模組的提案與審核流程**通則**。
 
-- 文檔版本：1.2
-- 最後更新：2026-07-24
+- 文檔版本：2.0
+- 最後更新：2026-08-05
 
-> **核准端已分三條路徑，本文只描述通則。** 人物相關資源的核准現已依資源分派到
-> 「重放 v2 handler」／「legacy 委派」／「通用行覆寫」三條路徑之一，行為與風險各不相同。
-> 逐資源 × 操作的現況矩陣見 **[PERSON_PROPOSAL_PATHS.md](./PERSON_PROPOSAL_PATHS.md)**。
-> 實體聚合（office 等）的提案見 [ENTITY_AGGREGATE_ARCHITECTURE.md](./ENTITY_AGGREGATE_ARCHITECTURE.md) §4.5。
+> 人物相關資源逐資源 × 操作的核准路徑矩陣、收斂歷史與後續方向，見
+> **[PERSON_PROPOSAL_PATHS.md](./PERSON_PROPOSAL_PATHS.md)**。
+> 實體聚合（office 等非人物實體）的提案見 [ENTITY_AGGREGATE_ARCHITECTURE.md](./ENTITY_AGGREGATE_ARCHITECTURE.md) §4.5。
+> operations 列表「比較」功能的收斂方案見 [OPERATIONS_COMPARE_CONSOLIDATION_PLAN.md](./OPERATIONS_COMPARE_CONSOLIDATION_PLAN.md)。
 
-## 背景
+## 1. 資料模型
 
-- 不想立即寫入資料庫，但需要記錄使用者的建議或修改草稿。
-- 透過既有 `operations` 表保存提案內容與審核狀態，避免修改 schema。
-- 管理員在 `/operations` 介面上即可看到提案紀錄，並後續實作核准／退回行為。
+提案不動 schema，借 `operations` 表承載：
 
-## 目前支援範圍
+- `op_type`：`8`（TYPE_PROPOSAL_CREATE）／`9`（TYPE_PROPOSAL_UPDATE）／`10`（TYPE_PROPOSAL_DELETE）。
+- `resource`＝下層表名、`resource_id`＝主鍵（query-string 格式，`CompositePrimaryKey::buildStoredResourceId()`）。
+- `resource_data`＝提案內容＋控制鍵（`__` 前綴、核准套用前由 `sanitizePayload()` 剝除）：
 
-- `/codes/{table}` 新增、編輯頁面。
-- `/basicinformation/{id}` 基本資料編輯頁（BIOG_MAIN）。
-- `/basicinformation/{id}` 子資源：
-  - `altnames` (ALTNAME_DATA)
-  - `addresses` (BIOG_ADDR_DATA)
-  - `texts` (BIOG_TEXT_DATA)
-  - `statuses` (STATUS_DATA)
-  - `possessions` (POSSESSION_DATA)
-  - `offices` (POSTED_TO_OFFICE_DATA)
-  - `assoc` (ASSOC_DATA)
-  - `entries` (ENTRY_DATA)
-  - `events` (EVENTS_DATA)
-  - `kinship` (KIN_DATA)
-  - `socialinst` (BIOG_INST_DATA)
-  - `sources` (BIOG_SOURCE_DATA)
-- 刪除提案目前不開放。
-- 只有活躍帳號 (`is_active == 1`) 才能送出提案或直接儲存；只讀代碼表不提供提案按鈕。
+  | 控制鍵 | 寫入時機 | 用途 |
+  |---|---|---|
+  | `__proposal_meta` | 提交 | action／table／display_name／submitted_by(_id)／submitted_at／comment；撤回與修改時追記 |
+  | `__review_status` | 提交＋審核 | `pending` → `approved`／`rejected`／`cancelled` |
+  | `__key_columns` | 提交 | 主鍵欄清單，核准端據此重建 targetPk |
+  | `__proposal_aux` | 提交（限 postings／possessions／events／kinship／assoc） | 主表白名單外的副表／鏡像意圖（如 `c_addr`），核准時併回 changes |
+  | `__reviewed_by(_id)`／`__reviewed_at`／`__review_comment` | 審核 | 審核者與備註 |
+  | `__applied_operation_id` | 核准（handler 重放路徑） | 實際落庫的 direct operation id；operations 列表據此把 audit_log 認領回提案列（「比較」按鈕） |
 
-## 操作流程
+- `resource_original`＝提交當下的原始列快照（update／delete 提案）；核准時用於定位目標與計算 delta，restore 功能也讀它。
 
-1. 使用者在新增或編輯頁面填寫表單。
-2. 若選擇 **直接儲存**，沿用原流程，資料立即寫回代碼表並產生 `op_type = 1/2` 的操作紀錄。
-3. 若選擇 **提交提案**：
-   - 後端呼叫：
-     - `CodesController@proposalStore` / `@proposalUpdate`（codes 模組）
-     - `BasicInformationProposalController@proposalStore` / `@proposalUpdateWithPk`（basicinformation 模組）
-   - 依主鍵確認資料是否存在，以決定屬於新增提案或修改提案。
-   - 組出 `resource_data`，附帶：
-     ```json
-     {
-       "...欄位內容...": "...",
-       "__proposal_meta": {
-         "action": "create|update",
-         "table": "TABLE_NAME",
-         "submitted_by": "使用者名",
-         "submitted_by_id": 123,
-         "submitted_at": "2025-11-01 23:40:00",
-         "comment": "提案說明"
-       },
-       "__review_status": "pending"
-     }
-     ```
-   - 透過 `OperationRepository::store()` 寫入 `operations` 表，`op_type` 分別為：
-     - `8` (`Operation::TYPE_PROPOSAL_CREATE`)
-     - `9` (`Operation::TYPE_PROPOSAL_UPDATE`)
-   - 預設 `resource_original` 保存原始資料（修改提案）。
-   - 回傳提示：「已提交提案，等待管理員審核」。
-- 提案送出後，使用者可於 `/operations?proposals_only=1` 檢視自己的提案，若狀態為 `pending` 或 `rejected`，介面會提供「修改提案」與「撤回提案」按鈕。
+**payload 的語義注意**：`resource_data`／`resource_original` 是**快照**——可能含系統代管欄（稽核欄四欄）；
+handler 的 `changes` 是**使用者意圖**——白名單刻意不含稽核欄。核准端負責兩者間的翻譯（見 §3）。
+這個「快照 vs 意圖」的張力是既有建模的已知缺陷，長期方向見 PERSON_PROPOSAL_PATHS.md §7。
 
-### BIOG_MAIN（基本資料）提案前處理
+## 2. 提交端
 
-- `BasicInformationController@update` 當 `action=proposal` 時，會先做：
-  - 姓名欄位合成（`c_name_chn`、`c_name`、`c_name_proper`、`c_name_rm`）。
-  - 旗標欄位型別轉換（如 `c_female`）。
-  - timestamp 填充（沿用 `ToolsRepository::timestamp()`）。
-- 僅在 `pinyin` 表存在時才執行 `auto_pinyin()`。
-  - 目的：避免 SQLite/in-memory 測試最小 schema 下因缺少 `pinyin` 表導致 500。
+| 入口 | 現況 |
+|---|---|
+| **`/api/v2/mutate`（`mode=proposal`）** | **現役唯一的人物記錄提案入口**。React 13 個編輯器全走此路；欄位白名單於提交當下生效，稽核欄等系統欄根本進不了 payload。create／update／delete 三種提案皆支援 |
+| codes 模組（`CodesController@proposalStore/@proposalUpdate`） | 現役（codes 自有流程，不在 LegacyBladeFormGate 範圍） |
+| legacy Blade（`BasicInformationProposalController@proposalStore/@proposalUpdate`） | **已下架**：flag=new 時 `LegacyBladeFormGate` 對這兩條 POST 一律回 410。此入口**沒有欄位白名單**（任何表真實欄位照單全收，含稽核欄），是 2026-08-05 髒提案事故的源頭。flag=old 回退時才放行，且 `extractFormData()` 已加剔除稽核欄的保險帶 |
 
-## 審核流程（已實作於 `/operations`）
+- 只有活躍帳號（`is_active == 1`）能送出提案或直接儲存。
+- 新增提案在提交時即檢查資料表與其它 pending 提案的主鍵衝突，避免審核階段才失敗。
 
-- **核准**：
-  - 進入操作紀錄頁面，管理員可見「核准」按鈕。
-  - 套用方式**依資源而定**（`OperationsProposalController::applyProposal()` 分派）：
-    - **重放 v2 handler**（多數人物子資源）：把提案還原成一次 direct mutation，交回與「直接編輯」
-      同一個 handler 落庫，派生／白名單／引用完整性／幂等正規化全部生效，`operations` 與
-      `audit_log` 由 handler 自行寫入。
-    - **legacy 委派 ／ 通用行覆寫**（其餘資源）：依 `op_type` 執行 `insert`／`update`／`delete`
-      套用資料表，`operations`（`op_type = 1/2/4`）與 `audit_log` 由核准端事後補記。
-    - 各資源實際落在哪一條，見 [PERSON_PROPOSAL_PATHS.md](./PERSON_PROPOSAL_PATHS.md) §3。
-  - 成功後更新提案紀錄：`__review_status = 'approved'`，並記錄審核者與時間。
-  - 任何一條路徑失敗都整筆交易回滾、提案維持待審（fail-closed）。
-- **退回**：
-  - 於提案卡片點選「退回」，可填寫備註。
-  - 提案紀錄會標示 `__review_status = 'rejected'` 與審核備註，但不變更原資料表內容。
-- 若提案仍為 `pending`，只允許管理員操作；審核後按鈕自動隱藏。
+## 3. 稽核欄語義（2026-08-05 定案）
 
-## 提案修改與撤回
+- `c_modified_by/date`＝**最後一次實際寫入**：核准提案、還原（restore）都是寫入，落庫一律蓋當下，
+  不從 payload／快照沿用舊值；`c_created_*` 只在 create 蓋、之後永遠沿用（建檔是歷史事實）。
+- 核准署名採雙人名 **`審核人 (Proposed by: 提案人)`**（提案人取自 `__proposal_meta.submitted_by`；
+  相同或缺失時只署審核人）。署名統一經 [app/Support/AuditActor.php](../app/Support/AuditActor.php)
+  注入，核准期間 override、平時＝當前登入者。**新增程式碼不得直接寫 `Auth::user()->name` 進稽核欄。**
+- 核准重放前，`applyViaMutationHandler()` 統一從 changes 剔除四個稽核欄（`AUDIT_COLUMNS`）；
+  非 handler 表的通用路徑由 `enforceAuditFieldsForCreate/Update()` 無條件蓋章。
+- 快照裡的稽核欄**保留不動**——它們是審計事實（restore／比對用），只是任何寫入路徑不得原樣回寫。
 
-- **提案者修改**：`pending`／`rejected` 狀態下可重新開啟表單調整內容，儲存後 `__review_status` 會重設為 `pending`，並更新 `__proposal_meta.updated_at`。新增提案若更換主鍵，`resource_id` 也會同步更新。
-- **提案者撤回**：點選「撤回提案」後，系統會將狀態改為 `cancelled`，紀錄撤回者、時間與選填原因，提案不再出現在待審核清單。
-- **主鍵衝突保護**：新增提案在提交與修改時都會檢查資料表與其它提案是否已使用相同主鍵，若有衝突會請提案者調整後再送出，避免審核階段才失敗。
+## 4. 審核流程（`/operations`）
 
-## 提案列表操作
+- **核准**（`POST /operations/{operation}/approve`）：
+  - 套用方式依資源分派（`OperationsProposalController::applyProposal()`），三條路徑
+    （handler 重放／legacy 委派／通用行覆寫）的逐資源矩陣見 PERSON_PROPOSAL_PATHS.md §2–§3。
+    多數人物資源已走 **handler 重放**：把提案還原成一次 direct mutation
+    `{resource, 'direct', operation, personId, targetPk, changes}` 交回與「直接編輯」同一個
+    handler，派生／白名單／引用完整性／幂等正規化全部生效，operations＋audit_log 由 handler 自寫。
+  - 成功後：`__review_status='approved'`、記審核者與時間；handler 重放路徑另寫
+    `__applied_operation_id`（供「比較」認領 audit）。
+  - 任何路徑失敗都整筆交易回滾、提案維持待審（fail-closed）；handler 的欄位級錯誤會攤平附在
+    flash 訊息後，保留對審核者的指向性。
+- **退回**（`reject`）：標記 `rejected` 與備註，不動資料表。
+- **修改／撤回**（提案者）：`pending`／`rejected` 可修改（狀態重設 `pending`）；撤回標記
+  `cancelled`、記錄撤回者／時間／原因。
+- 提案列表：`/operations?proposals_only=1`，可按狀態篩選；行內按鈕依身分顯示。
 
-- `/operations?proposals_only=1` 新增篩選列，可勾選「待審核」、「已核准」、「已退修」、「已撤回」快速檢視特定狀態。
-- 行內按鈕依使用者身份顯示：提案者可見「修改提案」「撤回提案」，管理員可見「核准」「退修」。
-- 提案卡片會同步顯示提案者、撤回者與審核備註等資訊，方便追蹤處理進度。
+## 5. 已知限制
 
-## Known Limitations（已知限制）
+- `/operations` 的「修改提案／撤回提案」統一復用 codes 模組的通用提案編輯流程（`codes.proposals.*`），
+  表單排列與原 Basic Information 子頁不完全一致；任官兩表（`POSTED_TO_OFFICE_DATA`／
+  `POSTED_TO_ADDR_DATA`）例外、需回原頁面處理。依賴複雜聯動欄位的資源建議回原頁面重新發起提案。
+- kinship／associations 的核准仍走 legacy 委派（路徑 B），其鏡像語義收斂與「比較」支援
+  （`__applied_operation_id` 回報）待 PERSON_PROPOSAL_PATHS.md §6 順序處理。
+- 存量舊格式提案**不做兼容與回填**（2026-08-05 維護者決策）：核准端的稽核欄剔除能讓髒 payload
+  存量正常核准，但缺 `__applied_operation_id` 的歷史已核准提案「比較」維持不可用。
 
-- `/operations` 中的「修改提案 / 撤回提案」入口目前統一復用 `CODES` 模組的通用提案編輯流程（`codes.proposals.*` 路由）。
-- 因此，即使提案來自 `basicinformation/*` 子資源，多數情況仍可透過該通用介面修改或撤回，但表單欄位排列、互動方式與原本的 Basic Information 子頁面表單不完全一致。
-- 目前此通用提案編輯/撤回流程對大多數 `basicinformation` 子資源可用，但 **任官相關兩表** 為例外，需個別處理：
-  - `POSTED_TO_OFFICE_DATA`
-  - `POSTED_TO_ADDR_DATA`
-- 對於依賴複雜前置處理、聯動欄位或專用 UI 的資源，建議優先回到原頁面重新發起提案，以避免通用表單造成欄位理解或輸入上的落差。
+## 6. 參考路由
 
-## 延伸建議
-
-- 其他模組若欲導入提案制，可：
-  1. 新增對應的 `proposalStore`／`proposalUpdate` 動作或整合至既有 Controller。
-  2. 重複利用 `recordProposalOperation()` 的概念，統一差異與審核欄位。
-  3. 在 `operations` 頁面依 `op_type` 加上醒目標示，提供核准／退回按鈕。
-- 視需求補充通知機制（Mail、Slack 等），於提案或審核時提醒相關人員。
-
-## 參考路由
-
-- 提案審核：
-  - `POST /operations/{operation}/approve` (`operations.proposals.approve`)
-  - `POST /operations/{operation}/reject` (`operations.proposals.reject`)
-- basicinformation 提案：
-  - `POST /basicinformation/{personid}/{resource}/proposal`
-  - `POST /basicinformation/{personid}/{resource}/{id}/proposal`
-- codes 提案：
-  - `POST|PATCH /codes/{table_name}/{id}/proposal`
-  - `POST /codes/{table_name}/proposal`
+- 審核：`POST /operations/{operation}/approve`（`operations.proposals.approve`）／
+  `POST /operations/{operation}/reject`（`operations.proposals.reject`）
+- 人物提案（現役）：`POST /api/v2/mutate`（`mode=proposal`）
+- 人物提案（legacy，flag=new 時 410）：`POST /basicinformation/{personid}/{resource}/proposal`／
+  `POST /basicinformation/{personid}/{resource}/{id}/proposal`
+- codes 提案：`POST /codes/{table_name}/proposal`／`POST|PATCH /codes/{table_name}/{id}/proposal`

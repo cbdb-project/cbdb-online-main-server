@@ -10,7 +10,6 @@ use App\Services\Mutations\Concerns\ResolvesKinshipReversePair;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class KinshipMutationHandler extends AbstractPersonSubresourceMutationHandler {
@@ -140,7 +139,7 @@ class KinshipMutationHandler extends AbstractPersonSubresourceMutationHandler {
         $kin = $this->pendingKin ?? [];
         $dataMirror = (array) $original;
         unset($dataMirror['c_created_by'], $dataMirror['c_created_date']);
-        $dataMirror['c_modified_by'] = Auth::user()->name ?? '';
+        $dataMirror['c_modified_by'] = \App\Support\AuditActor::currentName();
         $dataMirror['c_modified_date'] = Carbon::now();
         $dataMirror['c_kin_code'] = CompositePrimaryKey::emptyToSentinel($kin['mirrorCode'] ?? null);
         $dataMirror['c_personid'] = $original->c_kin_id; // 反向列主體＝對方
@@ -200,7 +199,7 @@ class KinshipMutationHandler extends AbstractPersonSubresourceMutationHandler {
 
         $dataMirror = $newArray;
         unset($dataMirror['__operation_id'], $dataMirror['__note'], $dataMirror['c_created_by'], $dataMirror['c_created_date']);
-        $dataMirror['c_modified_by'] = Auth::user()->name ?? '';
+        $dataMirror['c_modified_by'] = \App\Support\AuditActor::currentName();
         $dataMirror['c_modified_date'] = Carbon::now();
         if (!empty($kin['preserveMirrorCode'])) {
             // 未送覆寫且正向碼未變：不動鏡像 c_kin_code（保留使用者先前手選的反向碼，不洗回 c_kin_pair1）。

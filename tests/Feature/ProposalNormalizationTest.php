@@ -13,6 +13,7 @@ use Tests\TestCase;
 class ProposalNormalizationTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
+        $this->useLegacyPersonForms(); // 本類測 legacy Blade CRUD 行為，撥回 flag=old 越過下架閘門
 
         // 使用 SQLite 記憶體資料庫進行測試
         config()->set('database.default', 'sqlite');

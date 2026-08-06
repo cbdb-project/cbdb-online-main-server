@@ -4,6 +4,13 @@
 
 ## 2026-08
 
+### 稽核欄語義定案＋legacy Blade 表單下架閘門（修核准 422 與「比較」灰按鈕）
+- **語義定案（2026-08-05）**：`c_modified_by/date` 一律記「最後一次實際寫入」——核准提案、還原記錄都是寫入，落庫時蓋當下，不從提案 payload 或歷史快照沿用舊值；`c_created_*` 只在 create 蓋、之後永遠沿用。核准署名採雙人名「審核人 (Proposed by: 提案人)」，經新增的 `App\Support\AuditActor`（請求級 override）統一注入 `ToolsRepository::timestamp()` 與各處直接蓋章點（update handler、kinship/assoc 鏡像列、Codes、BiogMain 匯入等）。
+- **修核准 422**：提案 payload 是「快照」語義、可能夾帶四個稽核欄（legacy 提案入口無欄位白名單；update 提案 data＝original∪changes 天然含），核准重放 v2 handler 時會被白名單擋成 `disallowed_fields` 整筆失敗（2026-08-05 別名 create 提案實案）。`applyViaMutationHandler` 重放前統一剔除稽核欄（create／update 兩分支），由 handler 重新蓋章；通用路徑 `enforceAuditFieldsForCreate/Update` 同步改為無條件蓋章。restore 兩路徑（update／delete）也改蓋還原人＋還原時刻。
+- **legacy Blade 表單下架**：新增 `LegacyBladeFormGate` middleware 把 migration flag 語義做實——flag=new 時 legacy 表單 GET（人物 index/create/edit/show 與 12 個子資源的 index/create/edit）302 導向 `/app` 對應頁（edit.query 的 PK 查詢參數原樣轉發直接進編輯模式），寫入端點（store/update/updateQuery/destroyQuery/proposalStore/proposalUpdate）回 410；flag 改回 old 即完整放行、不需改碼。髒 payload 源頭（無白名單的 `proposalStore`）從此封死；其 `extractFormData` 亦加保險帶剔除稽核欄。
+- **修「比較」灰按鈕**：核准改走 handler 重放後 audit_log 掛在新建 direct operation id 上，提案列自身撈不到 audit 而灰掉。核准時把落庫 operation id 寫回提案 payload（`__applied_operation_id`），operations 列表據此把 audit 認領回提案列。（此前核准的存量提案無此指標、仍灰；kinship/assoc bespoke 路徑暫未回報 id——連同三套差異機制的收斂見 `docs/OPERATIONS_COMPARE_CONSOLIDATION_PLAN.md`。）
+- 回歸測試：`ProposalAuditFieldSemanticsTest`（髒 payload 可核准／雙人名署名／restore 蓋章／audit 認領）、`LegacyBladeFormGateTest`（導向／410／flag=old 放行）；14 個仍測 legacy Blade CRUD 的既有測試類改在 setUp 撥回 flag=old（`TestCase::useLegacyPersonForms()`）。全量 2423 測試綠。
+
 ### 執行時間／記憶體上限改為「只放寬不縮限」，修掉整套 phpunit 跑不完的元凶
 - `set_time_limit()`／`ini_set('max_execution_time')`／`ini_set('memory_limit')` 的作用域是**整個 PHP process**，而 PHPUnit 共用單一 process。原本散在 `AiPostingAutofillController`、`QueryPlaygroundController`（SSE）、`Api/ApiController*`、`BiogMainRepository`、`CbdbTableMaintenanceController` 的呼叫——執行時間 13 處（10 處在 class 宣告前的**檔案頂層**、autoload 到就生效）、記憶體 11 處（10 處在頂層）——會把上限套到其後整段測試流程，使全套測試必定被 `Maximum execution time exceeded` 攔腰砍斷，錯誤還指向無關檔案。全套實測需 368 秒，先撞 120 秒（autofill）再撞 300 秒（頂層 `ini_set`）兩層卡點。
 - 新增 `App\Support\ExecutionTimeLimit` 與 `App\Support\MemoryLimit`，語義統一為**只放寬、絕不縮限**（現值為 0／-1＝無限制，或已更寬時一律 no-op）。**生產實測（2026-08-03）**：web（php-fpm 8.4）`max_execution_time = 30`／`memory_limit = 1G`，CLI `0`／`-1`。因此舊寫法在生產其實在**降級**——每次 `/api/select/*` 請求被從 1G 壓到 512M，artisan 則從無限制被壓到 300 秒／512M。收斂後 web 放寬行為完全不變，CLI 與測試環境不再被誤傷。

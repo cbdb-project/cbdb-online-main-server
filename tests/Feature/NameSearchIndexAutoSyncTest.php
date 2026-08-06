@@ -22,6 +22,7 @@ use Tests\TestCase;
 class NameSearchIndexAutoSyncTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
+        $this->useLegacyPersonForms(); // 本類測 legacy Blade CRUD 行為，撥回 flag=old 越過下架閘門
 
         // 設定使用 SQLite in-memory 資料庫
         config()->set('database.default', 'sqlite');

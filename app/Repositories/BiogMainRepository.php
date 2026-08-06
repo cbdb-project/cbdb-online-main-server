@@ -2715,7 +2715,7 @@ class BiogMainRepository {
 
             $insert = $dataMirror;
             if (empty($insert['c_created_by'])) {
-                $insert['c_created_by'] = Auth::user()->name ?? '';
+                $insert['c_created_by'] = \App\Support\AuditActor::currentName();
                 $insert['c_created_date'] = Carbon::now();
             }
             DB::table('ASSOC_DATA')->insert($insert);
@@ -2810,7 +2810,7 @@ class BiogMainRepository {
             $insert = $dataMirror;
             $insert['c_kin_id'] = $cPersonid; // 反向列客體＝本人（dataMirror 不含 c_kin_id，補回）
             if (empty($insert['c_created_by'])) {
-                $insert['c_created_by'] = Auth::user()->name ?? '';
+                $insert['c_created_by'] = \App\Support\AuditActor::currentName();
                 $insert['c_created_date'] = Carbon::now();
             }
             DB::table('KIN_DATA')->insert($insert);
@@ -3845,7 +3845,7 @@ class BiogMainRepository {
         $data['c_textid'] = $data['c_textid'] == -999 ? '0' : $data['c_textid'];
         $data['c_main_source'] = (int)$data['c_main_source'];
         $data['c_self_bio'] = (int)$data['c_self_bio'];
-        $c_modified_by = Auth::user()->name ?? Auth::id();
+        $c_modified_by = \App\Support\AuditActor::currentName();
         $c_modified_date = Carbon::now();
         $data['c_modified_by'] = $c_modified_by;
         $data['c_modified_date'] = $c_modified_date;
@@ -3886,7 +3886,7 @@ class BiogMainRepository {
         $data['c_textid'] = $data['c_textid'] == -999 ? '0' : $data['c_textid'];
         $data['c_main_source'] = (int)$data['c_main_source'];
         $data['c_self_bio'] = (int)$data['c_self_bio'];
-        $c_created_by = Auth::user()->name ?? Auth::id();
+        $c_created_by = \App\Support\AuditActor::currentName();
         $c_created_date = Carbon::now();
         $data['c_created_by'] = $c_created_by;
         $data['c_created_date'] = $c_created_date;

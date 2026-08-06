@@ -12,6 +12,7 @@ use Tests\TestCase;
 class BasicInformationTextsControllerTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
+        $this->useLegacyPersonForms(); // 本類測 legacy Blade CRUD 行為，撥回 flag=old 越過下架閘門
 
         config()->set('database.default', 'sqlite');
         config()->set('database.connections.sqlite', [

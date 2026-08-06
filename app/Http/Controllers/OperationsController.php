@@ -1061,6 +1061,14 @@ class OperationsController extends Controller {
         } elseif ($this->hasColumn($table, 'updated_at')) {
             $payload['updated_at'] = Carbon::now();
         }
+        // 還原也是一次實際寫入：c_modified_* 蓋還原人＋還原時刻，不回填快照裡的舊值
+        // （2026-08-05 語義定案：last modified＝最後一次寫入）。c_created_* 維持快照值。
+        if ($this->hasColumn($table, 'c_modified_by')) {
+            $payload['c_modified_by'] = \App\Support\AuditActor::currentName();
+        }
+        if ($this->hasColumn($table, 'c_modified_date')) {
+            $payload['c_modified_date'] = Carbon::now();
+        }
         $query = DB::table($table)->where($conditions);
         if (!$query->exists()) {
             throw new \RuntimeException(__('operations.restore_row_not_found'));
@@ -1085,6 +1093,14 @@ class OperationsController extends Controller {
         }
         if ($this->hasColumn($table, 'updated_at')) {
             $payload['updated_at'] = Carbon::now();
+        }
+        // 同 restoreUpdate：重建被刪列也是一次寫入，c_modified_* 蓋還原人＋還原時刻；
+        // c_created_*（建檔事實）維持快照值。
+        if ($this->hasColumn($table, 'c_modified_by')) {
+            $payload['c_modified_by'] = \App\Support\AuditActor::currentName();
+        }
+        if ($this->hasColumn($table, 'c_modified_date')) {
+            $payload['c_modified_date'] = Carbon::now();
         }
         $conditions = $this->buildKeyConditions($operation, $target, $target);
         if (!empty($conditions)) {
@@ -1477,11 +1493,22 @@ class OperationsController extends Controller {
         }
 
         $operationIds = [];
+        // 提案核准走 v2 handler 重放後，audit_log 掛在 handler 新建的 direct operation id（記於提案
+        // payload 的 __applied_operation_id），不再掛提案列自身 id——此處把套用列的 audit 一併認領回
+        // 提案列，否則核准後的提案在列表上撈不到 audit、「比較」按鈕會灰掉。
+        $appliedToProposal = [];
         foreach ($dataRows as $row) {
             if (!isset($row['id'])) {
                 continue;
             }
             $operationIds[] = (string) $row['id'];
+
+            $payload = json_decode((string) ($row['resource_data'] ?? ''), true);
+            $appliedId = is_array($payload) ? (string) ($payload['__applied_operation_id'] ?? '') : '';
+            if ($appliedId !== '') {
+                $operationIds[] = $appliedId;
+                $appliedToProposal[$appliedId][] = (string) $row['id'];
+            }
         }
         $operationIds = array_values(array_unique($operationIds));
         if (empty($operationIds)) {
@@ -1514,7 +1541,7 @@ class OperationsController extends Controller {
             $rowPk = $this->decodeJsonNullable($log->row_pk ?? null);
             $currentData = $this->resolveAuditCurrentRow((string) $log->table_name, $rowPk);
 
-            $grouped[$operationId][] = [
+            $entry = [
                 'id' => (int) $log->id,
                 'table_name' => (string) $log->table_name,
                 'operation' => (string) $log->operation,
@@ -1524,6 +1551,12 @@ class OperationsController extends Controller {
                 'new_data' => $newData,
                 'diff' => $this->buildAuditDiff($oldData, $newData, $currentData),
             ];
+            $grouped[$operationId][] = $entry;
+
+            // 認領：套用列的 audit 也算到對應提案列頭上（見上方 __applied_operation_id 註解）。
+            foreach ($appliedToProposal[$operationId] ?? [] as $proposalId) {
+                $grouped[$proposalId][] = $entry;
+            }
         }
 
         return $grouped;

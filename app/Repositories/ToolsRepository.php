@@ -10,7 +10,6 @@
 namespace App\Repositories;
 
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Auth;
 
 class ToolsRepository {
     /**
@@ -18,7 +17,8 @@ class ToolsRepository {
      */
     public function timestamp(array $data, $isCreat = false) {
         if ($isCreat) {
-            $data['c_created_by'] = Auth::user()->name;
+            // 經 AuditActor：核准提案時為雙人名署名「審核人 (Proposed by: 提案人)」，平時＝當前登入者。
+            $data['c_created_by'] = \App\Support\AuditActor::currentName();
             // Store as Carbon object in server's configured timezone (config('app.timezone'))
             //
             // CRITICAL: DB_TIMEZONE (.env) MUST match APP_TIMEZONE (config/app.php)!
@@ -41,7 +41,7 @@ class ToolsRepository {
         } else {
             // 更新時移除建檔欄位，防止意外覆寫原始建檔資訊
             unset($data['c_created_by'], $data['c_created_date']);
-            $data['c_modified_by'] = Auth::user()->name;
+            $data['c_modified_by'] = \App\Support\AuditActor::currentName();
             $data['c_modified_date'] = Carbon::now();
         }
 

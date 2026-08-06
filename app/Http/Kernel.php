@@ -64,6 +64,7 @@ class Kernel extends HttpKernel {
      */
     protected $middlewareAliases = [
         'auth' => \Illuminate\Auth\Middleware\Authenticate::class,
+        'legacy.form' => \App\Http\Middleware\LegacyBladeFormGate::class,
         'auth.basic' => \Illuminate\Auth\Middleware\AuthenticateWithBasicAuth::class,
         'auth.optional' => \App\Http\Middleware\OptionalAuthentication::class,
         'superadmin' => \App\Http\Middleware\RequireSuperAdmin::class,

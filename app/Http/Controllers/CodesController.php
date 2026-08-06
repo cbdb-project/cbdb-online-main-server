@@ -1972,7 +1972,7 @@ class CodesController extends Controller {
         $now = Carbon::now();
 
         if (in_array('c_created_by', $columns, true) && Auth::check()) {
-            $data['c_created_by'] = Auth::user()->name;
+            $data['c_created_by'] = \App\Support\AuditActor::currentName();
         }
 
         if (in_array('c_created_date', $columns, true)) {
@@ -2113,7 +2113,7 @@ class CodesController extends Controller {
         // 更新 c_modified_by
         if (array_key_exists('c_modified_by', $data)) {
             if (Auth::check()) {
-                $data['c_modified_by'] = Auth::user()->name;
+                $data['c_modified_by'] = \App\Support\AuditActor::currentName();
             } elseif (array_key_exists('c_modified_by', $original)) {
                 $data['c_modified_by'] = $original['c_modified_by'];
             }

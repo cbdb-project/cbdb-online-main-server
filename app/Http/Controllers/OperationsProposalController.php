@@ -105,6 +105,17 @@ class OperationsProposalController extends Controller {
         $auxiliaryPayload = $this->extractAuxiliaryPayload($payload, $table);
         $comment = trim((string) $request->input('review_comment', ''));
 
+        // 核准＝一次實際寫入：稽核欄一律蓋核准當下，署名採雙人名「審核人 (Proposed by: 提案人)」。
+        // override 覆蓋套用期間所有經 ToolsRepository::timestamp() 的寫入（含 handler 重放與鏡像同步）。
+        $proposerName = is_array($payload['__proposal_meta'] ?? null)
+            ? ($payload['__proposal_meta']['submitted_by'] ?? null)
+            : null;
+        \App\Support\AuditActor::override(
+            \App\Support\AuditActor::approvalName(is_scalar($proposerName) ? (string) $proposerName : null)
+        );
+
+        $this->lastAppliedOperationId = null;
+
         try {
             DB::transaction(function () use ($opType, $table, $data, $keyColumns, $original, $operation, $comment, $auxiliaryPayload) {
                 [$appliedRow, $usedDirectWorkflow] = $this->applyProposal(
@@ -137,7 +148,8 @@ class OperationsProposalController extends Controller {
                     $comment,
                     $opType === Operation::TYPE_PROPOSAL_CREATE ? $appliedRow : null,
                     $keyColumns,
-                    $opType === Operation::TYPE_PROPOSAL_CREATE
+                    $opType === Operation::TYPE_PROPOSAL_CREATE,
+                    $this->lastAppliedOperationId
                 );
             });
         } catch (ValidationException $e) {
@@ -197,6 +209,8 @@ class OperationsProposalController extends Controller {
             flash('審核失敗：'.$e->getMessage(), 'error');
 
             return redirect()->back();
+        } finally {
+            \App\Support\AuditActor::clear();
         }
 
         flash('提案已核准並套用至資料表 @ '.Carbon::now(), 'success');
@@ -235,6 +249,14 @@ class OperationsProposalController extends Controller {
 
         $pkField = $definition->pkField();
         $targetPk = $entityPk !== null ? [$pkField => $entityPk] : [];
+
+        // 同單表核准：稽核署名採雙人名「審核人 (Proposed by: 提案人)」。
+        $proposerName = is_array($payload['__proposal_meta'] ?? null)
+            ? ($payload['__proposal_meta']['submitted_by'] ?? null)
+            : null;
+        \App\Support\AuditActor::override(
+            \App\Support\AuditActor::approvalName(is_scalar($proposerName) ? (string) $proposerName : null)
+        );
 
         try {
             DB::transaction(function () use (
@@ -284,6 +306,8 @@ class OperationsProposalController extends Controller {
             flash('審核失敗：'.$e->getMessage(), 'error');
 
             return redirect()->back();
+        } finally {
+            \App\Support\AuditActor::clear();
         }
 
         flash('提案已核准並套用 @ '.Carbon::now(), 'success');
@@ -441,6 +465,21 @@ class OperationsProposalController extends Controller {
      */
     private const ADDRESS_AUX_KEYS = ['c_addr', 'c_addr_id', 'c_addr_cleared'];
 
+    /**
+     * 系統代管的稽核欄。提案 payload 是「快照」語義、可能含這四欄（legacy 提案入口存整列，update
+     * 提案 data＝original∪changes 也天然含），但 handler 的 changes 是「使用者意圖」語義、白名單
+     * 刻意不含稽核欄——重放前必須剔除，否則核准直接 422（disallowed_fields）。剔除後由
+     * ToolsRepository::timestamp() 以核准當下＋雙人名署名重新蓋章（見 AuditActor）。
+     */
+    private const AUDIT_COLUMNS = ['c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date'];
+
+    /**
+     * 本次核准經 handler 重放實際落庫的 direct operation id。audit_log 掛在該 id 而非提案列 id，
+     * 核准後寫回提案 payload（__applied_operation_id）供 operations 列表認領 audit（「比較」按鈕）。
+     * kinship／assoc bespoke 路徑（BiogMainRepository 內部自建 operation）目前未回報 id，維持 null。
+     */
+    private ?string $lastAppliedOperationId = null;
+
     protected function applyViaMutationHandler(
         Operation $operation,
         string $table,
@@ -475,8 +514,13 @@ class OperationsProposalController extends Controller {
         } else {
             $handlerOperation = 'update';
             $targetPk = $this->pickColumns($original, $keyColumns);
+            // 稽核欄雖多半在 diff 中因兩快照相等而抵銷，但只要序列化格式有絲毫差異就會漏進來，
+            // 與 create 同樣會被白名單擋下——一併剔除（下方統一處理）。
             $changes = array_merge($this->diffChangedColumns($original, $data), $addressAux);
         }
+
+        // 快照 → 意圖的翻譯：剔除系統代管稽核欄（見 AUDIT_COLUMNS 註解）。
+        $changes = array_diff_key($changes, array_flip(self::AUDIT_COLUMNS));
 
         /** @var \App\Services\Mutations\MutationHandlerRegistry $registry */
         $registry = app(\App\Services\Mutations\MutationHandlerRegistry::class);
@@ -508,6 +552,10 @@ class OperationsProposalController extends Controller {
             // 交回外層交易回滾；訊息不外洩底層細節（approve() 已有 ValidationException/QueryException 友善提示）。
             throw new \RuntimeException("提案套用失敗（{$resource}/{$handlerOperation}）：{$message}");
         }
+
+        $this->lastAppliedOperationId = isset($body['result']['operation_id']) && $body['result']['operation_id'] !== null
+            ? (string) $body['result']['operation_id']
+            : null;
 
         if ($opType === Operation::TYPE_PROPOSAL_DELETE) {
             // appliedRow 於刪除後僅供日誌，回傳刪除前的原始列即可（下游 updateProposalStatus 只在 create 用到）。
@@ -895,43 +943,48 @@ class OperationsProposalController extends Controller {
         return $row;
     }
 
+    /**
+     * 核准＝一次實際寫入：稽核欄一律以核准當下無條件蓋章（payload 帶來的值一律忽略——
+     * legacy 提案入口與 Codes 表單可能夾帶稽核欄），署名經 AuditActor 取得（核准期間為
+     * 雙人名「審核人 (Proposed by: 提案人)」）。create 只蓋 c_created_*、清除 c_modified_*，
+     * 對齊 ToolsRepository::timestamp() 的 direct 行為。
+     */
     protected function enforceAuditFieldsForCreate(string $table, array $data): array {
         $columns = $this->getTableColumnMap($table);
         if ($columns === null) {
             return $data;
         }
 
-        $now = Carbon::now();
+        unset($data['c_created_by'], $data['c_created_date'], $data['c_modified_by'], $data['c_modified_date']);
 
-        if (isset($columns['c_created_by']) && (!array_key_exists('c_created_by', $data) || trim((string) ($data['c_created_by'] ?? '')) === '') && Auth::check()) {
-            $data['c_created_by'] = Auth::user()->name ?? Auth::id();
+        if (isset($columns['c_created_by']) && Auth::check()) {
+            $data['c_created_by'] = \App\Support\AuditActor::currentName();
         }
-
-        if (isset($columns['c_created_date']) && (!array_key_exists('c_created_date', $data) || $data['c_created_date'] === null || trim((string) $data['c_created_date']) === '')) {
-            $data['c_created_date'] = $now;
+        if (isset($columns['c_created_date'])) {
+            $data['c_created_date'] = Carbon::now();
         }
 
         return $data;
     }
 
+    /** update：無條件蓋 c_modified_*；c_created_* 沿用原始列（建檔事實不因更新改變）。 */
     protected function enforceAuditFieldsForUpdate(string $table, array $data, array $original): array {
         $columns = $this->getTableColumnMap($table);
         if ($columns === null) {
             return $data;
         }
 
-        $now = Carbon::now();
+        unset($data['c_created_by'], $data['c_created_date'], $data['c_modified_by'], $data['c_modified_date']);
 
-        if (isset($columns['c_modified_by']) && (!array_key_exists('c_modified_by', $data) || trim((string) ($data['c_modified_by'] ?? '')) === '') && Auth::check()) {
-            $data['c_modified_by'] = Auth::user()->name ?? Auth::id();
+        if (isset($columns['c_modified_by']) && Auth::check()) {
+            $data['c_modified_by'] = \App\Support\AuditActor::currentName();
         }
-
-        if (isset($columns['c_modified_date']) && (!array_key_exists('c_modified_date', $data) || $data['c_modified_date'] === null || trim((string) $data['c_modified_date']) === '')) {
-            $data['c_modified_date'] = $now;
+        if (isset($columns['c_modified_date'])) {
+            $data['c_modified_date'] = Carbon::now();
         }
 
         foreach (['c_created_by', 'c_created_date'] as $field) {
-            if (isset($columns[$field]) && array_key_exists($field, $original) && !array_key_exists($field, $data)) {
+            if (isset($columns[$field]) && array_key_exists($field, $original)) {
                 $data[$field] = $original[$field];
             }
         }
@@ -1061,11 +1114,16 @@ class OperationsProposalController extends Controller {
         string $comment = null,
         ?array $appliedRow = null,
         array $keyColumns = [],
-        bool $updateResourceId = false
+        bool $updateResourceId = false,
+        ?string $appliedOperationId = null
     ): void {
         $payload = json_decode($proposal->resource_data, true) ?: [];
 
         $payload['__review_status'] = $status;
+        if ($appliedOperationId !== null && $appliedOperationId !== '') {
+            // handler 重放實際落庫的 direct operation id；operations 列表據此把 audit 認領回提案列（「比較」）。
+            $payload['__applied_operation_id'] = $appliedOperationId;
+        }
         $payload['__reviewed_by'] = Auth::user()->name ?? Auth::id();
         $payload['__reviewed_by_id'] = Auth::id();
         $payload['__reviewed_at'] = Carbon::now()->format('Y-m-d H:i:s');

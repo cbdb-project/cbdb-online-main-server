@@ -35,6 +35,15 @@ class CodesController extends Controller {
      */
     protected const AUDIT_COLUMNS = ['c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date'];
 
+    /** 人物搜尋端點（姓名或 ID 皆可查），與 KinEditor 的親屬姓名欄同一支。 */
+    protected const PERSON_SEARCH_ENDPOINT = '/api/select/search/biog';
+
+    /** 每個 request 內的「指向 BIOG_MAIN 的欄位」快取，避免同一頁重複做外鍵反射。 */
+    protected array $personFkColumnsCache = [];
+
+    /** 每個 request 內快取「-999 是否確定不是真實人物」，見 personSentinelIsSafeToNormalize()。 */
+    protected ?bool $personSentinelSafe = null;
+
     protected $codesrepostory;
     protected $operationRepository;
 
@@ -952,7 +961,7 @@ class CodesController extends Controller {
             'can_propose' => Auth::check() && Auth::user()->isActive(),
             'tier2_fields' => $this->codeTableTier2Fields($table),
             // 逐欄特殊行為（稽核欄唯讀＋替換預覽、欄位提示、Load Data 動作）。
-            'column_behaviour' => $this->codeColumnBehaviour($table, array_keys($rowArray), 'edit'),
+            'column_behaviour' => $this->codeColumnBehaviour($table, array_keys($rowArray), 'edit', $rowArray),
             'text_title_endpoint' => route('app.codes.text-title', ['textId' => '__TEXT_ID__'], false),
             // TEXT_CODES：附上該書的作者／編者等關係人（唯讀錄入參考）。其餘碼表為 null，前端不渲染。
             // 用 isset 而非 ?? 0：c_textid=0 是真實可編輯的「未知」書目列（其下掛著 37 筆關係人），
@@ -1075,8 +1084,39 @@ class CodesController extends Controller {
      *                                  現在預告一個署名與時間都會不同的值只會誤導。
      * @return array<string, array<string, mixed>>
      */
-    protected function codeColumnBehaviour(string $table, array $columns, string $mode): array {
+    protected function codeColumnBehaviour(string $table, array $columns, string $mode, array $values = []): array {
         $behaviour = [];
+
+        // 人物欄 → 可搜尋的人物選擇器（姓名或 ID 皆可查），對齊舊版 select2；判準見 personFkColumns()。
+        $personColumns = array_values(array_intersect($this->personFkColumns($table), $columns));
+        if ($personColumns !== []) {
+            $currentIds = [];
+            foreach ($personColumns as $column) {
+                $raw = $values[$column] ?? null;
+                if (is_numeric($raw)) {
+                    $currentIds[] = (int) $raw;
+                }
+            }
+            $labels = $this->personLabels($currentIds);
+
+            foreach ($personColumns as $column) {
+                $raw = $values[$column] ?? null;
+                // 有值就一定要有可顯示的文字：查不到人物時退回顯示 ID。
+                // 否則 CodeAutocomplete 會顯示空白，而 form.data 裡仍藏著那個值——
+                // 使用者以為沒填、送出後卻撞外鍵，看到的是「關聯值不存在」而非「必填未填」。
+                $label = null;
+                if (is_numeric($raw)) {
+                    $label = $labels[(int) $raw] ?? (string) $raw;
+                }
+                $behaviour[$column] = [
+                    'picker' => [
+                        'kind' => 'person',
+                        'endpoint' => self::PERSON_SEARCH_ENDPOINT,
+                        'label' => $label,
+                    ],
+                ];
+            }
+        }
 
         // 稽核欄一律由系統蓋章，任何模式都不開放使用者編輯 → 灰底唯讀（可看、可複製、不可改）。
         // 新增與編輯採同一條規則，不做「新增時隱藏」的第二套行為。
@@ -1086,7 +1126,8 @@ class CodesController extends Controller {
             if (!in_array($column, $columns, true)) {
                 continue;
             }
-            $behaviour[$column] = ['readonly' => true];
+            // 用 merge 而非覆寫：目前稽核欄與人物欄不會重疊，但別讓順序決定誰活下來。
+            $behaviour[$column] = array_merge($behaviour[$column] ?? [], ['readonly' => true]);
         }
 
         // 「提交後會被替換為 X」：只有 c_modified_* 會被改寫成當下值，故只有這兩欄給預覽。
@@ -1138,6 +1179,76 @@ class CodesController extends Controller {
         }
 
         return $behaviour;
+    }
+
+    /**
+     * 該表哪些欄位是「人物欄」——判準為**外鍵實際指向 BIOG_MAIN**。
+     *
+     * 以 schema 宣告的外鍵為唯一權威（使用者定調）：外鍵說指向 BIOG_MAIN 就給人物選擇器，
+     * 沒有外鍵就不給。好處是規則只有一條、隨 schema 自動跟上，不必維護人工白名單。
+     * 已知取捨（皆為刻意）：
+     *   - `BIOG_MAIN.c_index_year_source_id` 會被納入（欄名像出處，但外鍵確實宣告指向 BIOG_MAIN）。
+     *   - `MERGED_PERSON_DATA.c_personid` 不會被納入（沒有外鍵——被合併的人可能已不存在）。
+     * 舊版是按欄名硬編碼 `c_personid`／`c_kin_id`，會漏掉 ASSOC_DATA 的 4 個關係人欄與
+     * ENTRY_DATA.c_assoc_id（社會關係「對方是誰」正是最需要搜尋的欄位）。
+     *
+     * 用 Schema::getForeignKeys()（Laravel 11+）而非 information_schema：後者在 SQLite 不存在，
+     * 前者由 driver 各自實作（SQLite 走 PRAGMA foreign_key_list），符合雙資料庫相容要求。
+     *
+     * @return array<int, string>
+     */
+    protected function personFkColumns(string $table): array {
+        if (array_key_exists($table, $this->personFkColumnsCache)) {
+            return $this->personFkColumnsCache[$table];
+        }
+
+        $columns = [];
+
+        try {
+            foreach (Schema::getForeignKeys($table) as $fk) {
+                // 大小寫不敏感比對：MySQL 在 lower_case_table_names=1（Windows 預設）時
+                // 回報的是 biog_main，硬比大寫會讓所有選擇器無聲消失。
+                // 控制器其他處（guardTable／getKeyColumns／isReadOnlyTable）也都先 strtoupper。
+                if (strtoupper((string) ($fk['foreign_table'] ?? '')) !== 'BIOG_MAIN') {
+                    continue;
+                }
+                foreach ($fk['columns'] ?? [] as $column) {
+                    $columns[] = $column;
+                }
+            }
+        } catch (\Throwable $e) {
+            // 外鍵反射失敗（權限不足、driver 不支援等）只該讓選擇器退回純輸入框，
+            // 不該讓整個碼表編輯頁掛掉。
+            report($e);
+            $columns = [];
+        }
+
+        return $this->personFkColumnsCache[$table] = array_values(array_unique($columns));
+    }
+
+    /**
+     * 取回一批人物 ID 的顯示名稱（供人物選擇器初始顯示，否則只看到一個數字）。
+     *
+     * @param  array<int, int>      $personIds
+     * @return array<int, string>   personId => 「中文名 / 拼音名」
+     */
+    protected function personLabels(array $personIds): array {
+        $ids = array_values(array_unique(array_filter($personIds, static fn ($id) => $id !== null)));
+        if ($ids === []) {
+            return [];
+        }
+
+        $labels = [];
+        foreach (DB::table('BIOG_MAIN')->whereIn('c_personid', $ids)->get(['c_personid', 'c_name_chn', 'c_name']) as $row) {
+            $parts = array_filter([$row->c_name_chn, $row->c_name], static fn ($v) => $v !== null && $v !== '');
+            // 保留人物 ID：改成選擇器後欄位本身不再顯示數字，而編目者是以 ID 工作的；
+            // 搜尋端點回傳的候選文字同樣以 ID 開頭，選前選後的讀法一致。
+            $labels[(int) $row->c_personid] = $parts === []
+                ? (string) $row->c_personid
+                : $row->c_personid . ' ' . implode(' / ', $parts);
+        }
+
+        return $labels;
     }
 
     /**
@@ -1204,7 +1315,8 @@ class CodesController extends Controller {
         foreach ($conditions as $column => $value) {
             $query->where($column, $value);
         }
-        $data = Arr::except($request->all(), ['_method', '_token', '__proposal_comment']);
+        // 與提案路徑共用同一個取值收口（控制鍵清單相同），順帶歸一化人物欄的 -999 哨兵。
+        $data = $this->extractFormData($request, $table);
         $data = $this->enforceAuditFieldsForUpdate($data, $originalRow ?: []);
         $data = $this->normalizeCodeTablePinyin($table, $data);
         // 與 performStore 一致：留白的 NOT NULL（有預設值）欄不寫入 null（更新時等於保留原值），
@@ -1302,7 +1414,13 @@ class CodesController extends Controller {
 
         $defaults = [];
         $firstKey = $keyColumns[0] ?? null;
-        if ($firstKey && in_array($firstKey, $columns, true)) {
+        // 人物欄不預填「下一個可用值」：max(c_personid)+1 對人物毫無意義，而 CBDB 的人物 ID 很密集，
+        // 那個猜測值往往真的存在，於是人物選擇器會把它解析成一位真實人物姓名——看起來像是「已選好某人」，
+        // 使用者填完其他欄一存，資料就被歸到一個隨機的人身上（如 BIOG_ADDR_DATA、STATUS_DATA 的
+        // 第一個主鍵欄就是 c_personid）。留空反而能得到正確的「請確認主鍵欄位已填寫完整」提示。
+        // 先前是純數字輸入框，數字看起來就是佔位符，風險較低；改成選擇器後必須擋掉。
+        $isPersonKey = $firstKey !== null && in_array($firstKey, $this->personFkColumns($table), true);
+        if ($firstKey && !$isPersonKey && in_array($firstKey, $columns, true)) {
             $nextValue = $this->guessNextKeyValue($table, $firstKey);
             if ($nextValue !== null) {
                 $defaults[$firstKey] = $nextValue;
@@ -1326,7 +1444,7 @@ class CodesController extends Controller {
             'can_propose' => Auth::check() && Auth::user()->isActive(),
             'tier2_fields' => $this->codeTableTier2Fields($table),
             // 與 edit 共用同一份逐欄行為（此頁的欄位提示原為前端硬編碼中文，改由此處統一供給）。
-            'column_behaviour' => $this->codeColumnBehaviour($table, array_values($columns), 'create'),
+            'column_behaviour' => $this->codeColumnBehaviour($table, array_values($columns), 'create', $defaults),
             'text_title_endpoint' => route('app.codes.text-title', ['textId' => '__TEXT_ID__'], false),
             'urls' => [
                 'store' => route('app.codes.store', ['table_name' => $table], false),
@@ -1362,7 +1480,7 @@ class CodesController extends Controller {
             return $redirect;
         }
 
-        $payload = $this->extractFormData($request);
+        $payload = $this->extractFormData($request, $table);
         $payload = $this->normalizeCodeTablePinyin($table, $payload);
         $keyColumns = $this->getKeyColumns($table);
 
@@ -1457,7 +1575,7 @@ class CodesController extends Controller {
             'is_create_proposal' => (int) $operation['op_type'] === Operation::TYPE_PROPOSAL_CREATE,
             // 提案調整頁同樣不開放編輯稽核欄（三個碼表表單一致）。核准端本來就會剔除並重蓋，
             // 但讓使用者對著一個會被丟棄的輸入框打字沒有意義。mode=proposal → 唯讀但不給替換預覽。
-            'column_behaviour' => $this->codeColumnBehaviour($table, array_values($columns), 'proposal'),
+            'column_behaviour' => $this->codeColumnBehaviour($table, array_values($columns), 'proposal', $values),
             'urls' => [
                 'update' => route('app.codes.proposals.update', ['table_name' => $table, 'operation' => $operation['id']], false),
                 'return' => route('operations.index', ['proposals_only' => 1], false),
@@ -1474,7 +1592,7 @@ class CodesController extends Controller {
         $payload = $this->ensureProposalEditable($operation, $table);
         $keyColumns = $payload['__key_columns'] ?? $this->getKeyColumns($table);
 
-        $data = $this->extractFormData($request);
+        $data = $this->extractFormData($request, $table);
         $data = $this->normalizeCodeTablePinyin($table, $data); // §D-6：編輯既有提案時亦歸一化 Tier 1，避免核准落庫仍帶 v
         $isCreate = (int) $operation['op_type'] === Operation::TYPE_PROPOSAL_CREATE;
 
@@ -1606,7 +1724,8 @@ class CodesController extends Controller {
 
             return redirect()->route($showRoute, ['table_name' => $table]);
         }
-        $data = Arr::except($request->all(), ['_token', '__proposal_comment']);
+        // 與 performUpdate／提案路徑共用同一個取值收口，順帶歸一化人物欄的 -999 哨兵。
+        $data = $this->extractFormData($request, $table);
         $keyColumns = $this->getKeyColumns($table);
         if (!$this->hasPrimaryKeyValues($keyColumns, $data)) {
             flash('新增失敗：請確認主鍵欄位已填寫完整。', 'error');
@@ -1690,7 +1809,7 @@ class CodesController extends Controller {
         }
 
         $payload = $this->enforceAuditFieldsForUpdate(
-            $this->extractFormData($request),
+            $this->extractFormData($request, $table),
             $originalRow
         );
         $payload = $this->normalizeCodeTablePinyin($table, $payload);
@@ -2554,8 +2673,61 @@ class CodesController extends Controller {
         return null;
     }
 
-    protected function extractFormData(Request $request): array {
-        return Arr::except($request->all(), ['_token', '_method', '__proposal_comment']);
+    /**
+     * 從請求取出要落庫／記入提案的欄位值。
+     *
+     * 傳入 $table 時額外歸一化人物欄的 -999：人物選擇器打的 /api/select/search/biog 刻意把
+     * person 0（未詳）的 option value 編成 -999（ApiController::searchBiog），那是「未設定」的
+     * 前端哨兵、不是人物 ID。BIOG_MAIN 沒有 -999 這一列，直接落庫會撞外鍵 1452，而提案路徑
+     * 不碰資料表、會把 -999 原樣存進 resource_data，讓審核人看到 -999 並在核准時才爆掉。
+     * 使用者選「未詳」的本意就是 person 0（BIOG_MAIN 確實有這一列），故還原成 0。
+     *
+     * 只在「-999 不是真實人物」時才還原：c_personid 是有號 int、無 UNSIGNED／CHECK 限制，
+     * schema 允許負值（現行資料 min=0、無負值、無 -999）。若有人真的建了 person -999，
+     * 無條件改寫會把關係靜默改指到別人身上——寧可停止改寫，讓 searchBiog 的編碼歧義留在原處，
+     * 也不要動別人的資料。同一份顧慮見 ExactCodeMatchGuard（db0f388）。
+     */
+    protected function extractFormData(Request $request, ?string $table = null): array {
+        $data = Arr::except($request->all(), ['_token', '_method', '__proposal_comment']);
+
+        if ($table === null) {
+            return $data;
+        }
+
+        // 先找出「這次真的送了 -999 的人物欄」，沒有就完全不碰資料庫——否則會在沒有 BIOG_MAIN 的
+        // 環境（例如只造了自己那張表的測試）憑空多一次查詢而炸掉不相關的流程。
+        $pending = [];
+        foreach ($this->personFkColumns($table) as $column) {
+            if (array_key_exists($column, $data) && (string) $data[$column] === '-999') {
+                $pending[] = $column;
+            }
+        }
+        if ($pending === [] || !$this->personSentinelIsSafeToNormalize()) {
+            return $data;
+        }
+
+        foreach ($pending as $column) {
+            $data[$column] = '0';
+        }
+
+        return $data;
+    }
+
+    /**
+     * -999 是否確定不是真實人物（因此可安全視為選擇器的「未設定」哨兵）。每 request 查一次。
+     * 查不到 BIOG_MAIN（環境不完整）時回 false：不改寫勝過依猜測改寫別人的資料。
+     */
+    protected function personSentinelIsSafeToNormalize(): bool {
+        if ($this->personSentinelSafe === null) {
+            try {
+                $this->personSentinelSafe = !DB::table('BIOG_MAIN')->where('c_personid', -999)->exists();
+            } catch (\Throwable $e) {
+                report($e);
+                $this->personSentinelSafe = false;
+            }
+        }
+
+        return $this->personSentinelSafe;
     }
 
     protected function hasPrimaryKeyValues(array $keyColumns, array $data): bool {

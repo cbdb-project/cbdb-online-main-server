@@ -2,6 +2,7 @@ import React from 'react';
 import * as LabelPrimitive from '@radix-ui/react-label';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
+import CodeAutocomplete from '../PersonBrowser/shared/CodeAutocomplete';
 
 /**
  * 泛用 codes 表單的單一欄位。
@@ -33,6 +34,12 @@ export interface ColumnBehaviour {
     hint?: { text: string; link?: { href: string; label: string }; tone?: 'info' | 'warn' };
     /** 額外互動。目前僅 'load_text_title'（依 c_textid 帶入書名）。 */
     action?: string;
+    /**
+     * 該欄改用可搜尋的選擇器而非純輸入框。
+     * 目前只有 kind='person'（外鍵指向 BIOG_MAIN 的欄位，見 CodesController::personFkColumns）。
+     * label 是目前值的顯示名稱，供選擇器初始顯示——否則使用者只看到一個數字。
+     */
+    picker?: { kind: 'person'; endpoint: string; label?: string | null };
 }
 
 interface Props {
@@ -101,6 +108,7 @@ export function CodesColumnField({
 }: Props) {
     const readOnly = behaviour?.readonly === true;
     const hint = behaviour?.hint;
+    const picker = behaviour?.picker;
     const messages = Array.isArray(error) ? error : error ? [error] : [];
     const hasError = messages.length > 0;
     const describedById = `${column}-desc`;
@@ -114,20 +122,38 @@ export function CodesColumnField({
             </LabelPrimitive.Root>
 
             <div className="flex items-start gap-2">
-                <Input
-                    id={column}
-                    value={value}
-                    onChange={(e) => onChange(e.target.value)}
-                    readOnly={readOnly}
-                    aria-readonly={readOnly || undefined}
-                    aria-invalid={hasError ? true : undefined}
-                    aria-describedby={hasError || hint || actionMessage ? describedById : undefined}
-                    // 唯讀欄位灰底表示「系統維護」；剛被帶入的欄位黃底表示「這是剛填上的」。
-                    className={
-                        (readOnly ? 'bg-muted text-muted-foreground ' : '')
-                        + (highlighted ? 'bg-yellow-100 dark:bg-yellow-900/40' : '')
-                    }
-                />
+                {picker ? (
+                    // 人物欄：可用姓名或 ID 搜尋。CodeAutocomplete 自行維護選定後的顯示文字，
+                    // 故此處只需回寫代碼；初始顯示名稱由後端 picker.label 提供。
+                    <div className="flex-1">
+                        <CodeAutocomplete
+                            mode="search"
+                            id={column}
+                            endpoint={picker.endpoint}
+                            value={value}
+                            initialLabel={picker.label ?? ''}
+                            disabled={readOnly}
+                            aria-invalid={hasError ? true : undefined}
+                            aria-describedby={hasError || hint || actionMessage ? describedById : undefined}
+                            onChange={(v) => onChange(v)}
+                        />
+                    </div>
+                ) : (
+                    <Input
+                        id={column}
+                        value={value}
+                        onChange={(e) => onChange(e.target.value)}
+                        readOnly={readOnly}
+                        aria-readonly={readOnly || undefined}
+                        aria-invalid={hasError ? true : undefined}
+                        aria-describedby={hasError || hint || actionMessage ? describedById : undefined}
+                        // 唯讀欄位灰底表示「系統維護」；剛被帶入的欄位黃底表示「這是剛填上的」。
+                        className={
+                            (readOnly ? 'bg-muted text-muted-foreground ' : '')
+                            + (highlighted ? 'bg-yellow-100 dark:bg-yellow-900/40' : '')
+                        }
+                    />
+                )}
                 {behaviour?.action && onAction && (
                     <Button
                         type="button"

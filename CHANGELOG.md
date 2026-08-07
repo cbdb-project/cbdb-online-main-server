@@ -4,6 +4,20 @@
 
 ## 2026-08
 
+### codes 表單的人物欄改為可搜尋的人物選擇器（判準改用外鍵）
+- 承上一則：泛用 codes 表單漏移植的最後一項。舊版 `codes/edit.blade.php` 把人物欄渲染成 select2（姓名或 ID 皆可查），React 版是純數字輸入框——使用者必須先知道人物 ID 才能填。
+- **判準改為「外鍵實際指向 `BIOG_MAIN`」，以 schema 宣告為唯一權威**（`CodesController::personFkColumns()`）。舊版是按欄名硬編碼 `c_personid`／`c_kin_id`，會漏掉 `ASSOC_DATA` 的 `c_assoc_id`（社會關係「對方是誰」）、`c_assoc_kin_id`、`c_assoc_claimer_id`、`c_tertiary_personid` 與 `ENTRY_DATA.c_assoc_id` 共 5 個真人物欄——恰恰是最需要用姓名搜尋的地方。改用外鍵後涵蓋 **17 張碼表、25 個欄位**，且隨 schema 自動跟上，不需維護人工白名單。
+- 兩項刻意的取捨（已與使用者確認「錯判和漏都符合設計」）：`BIOG_MAIN.c_index_year_source_id` 會被納入（欄名像出處，但 schema 確實宣告外鍵指向 `BIOG_MAIN`）；`MERGED_PERSON_DATA.c_personid` 不納入（無外鍵——被合併的人可能已不存在）。兩者都由測試明文鎖住。
+- 外鍵反射用 `Schema::getForeignKeys()` 而非 `information_schema`：後者在 SQLite 不存在，前者由 driver 各自實作（SQLite 走 `PRAGMA foreign_key_list`），符合雙資料庫相容要求；反射失敗只讓該欄退回純輸入框並記錄例外，不讓整頁掛掉。
+- 選擇器沿用既有的 `CodeAutocomplete`（`mode="search"`，端點 `/api/select/search/biog`，與親屬編輯頁的「親屬姓名」同一支），因此自動獲得同一份 debounce 與過期回應守衛。後端另附上目前值的顯示名稱（`picker.label`，如「晁公武 / Chao Gongwu」），否則畫面上只看到一個數字；姓名兩欄皆空的人物退回顯示 ID，不讓欄位看起來像沒選。
+- **「未詳」哨兵**：人物搜尋端點 `ApiController::searchBiog` 刻意把 person 0（未詳）的 option value 編成 `-999`，那是前端「未設定」哨兵、不是人物 ID。`BIOG_MAIN` 沒有 `-999` 這一列，直接落庫會撞外鍵 1452（錯誤訊息還指向「必填未填」），而提案路徑不碰資料表、會把 `-999` 原樣存進 `resource_data`，讓審核人看到 `-999` 並在核准時才爆掉——而「未詳」在 CBDB 極常見。改為在 `extractFormData()` 這個單一收口把人物欄的 `-999` 還原成 `0`（五條 codes 寫入／記錄路徑全部經過它；先前兩處 inline `Arr::except` 的控制鍵清單與它完全等價）。**只在「`-999` 確定不是真實人物」時才還原**：`c_personid` 是有號 int、無 UNSIGNED／CHECK 限制，schema 允許負值（現行資料 min=0、無負值），若真有 person `-999`，無條件改寫會把關係靜默改指到別人身上；查不到 `BIOG_MAIN` 時亦不改寫。同一份顧慮見 `ExactCodeMatchGuard`。
+- **人物主鍵欄不再預填猜測值**：`appCreate` 原本把第一個主鍵欄預填成 `max+1`，而 `BIOG_ADDR_DATA`、`STATUS_DATA` 的第一個主鍵欄就是 `c_personid`；CBDB 人物 ID 很密集，那個猜測值往往真的存在，於是選擇器會把它解析成一位**真實人物姓名**，看起來像「已選好某人」——使用者填完其他欄一存，資料就被歸到隨機的人身上。先前是純數字輸入框，數字看起來就是佔位符，風險較低；改成選擇器後必須擋掉。留空反而能得到正確的「請確認主鍵欄位已填寫完整」提示。
+- 有值就一定有可顯示文字：查不到人物時 `picker.label` 退回顯示 ID。否則 `CodeAutocomplete` 顯示空白而 `form.data` 仍藏著那個值，使用者以為沒填、送出後撞外鍵（提案調整頁尤其會遇到——`resource_data` 裡的人物可能在送審後被合併掉）。
+- 外鍵表名比對改為大小寫不敏感：MySQL 在 `lower_case_table_names=1`（Windows 預設）會回報 `biog_main`，硬比大寫會讓**所有選擇器無聲消失**。控制器其他處（`guardTable`／`getKeyColumns`／`isReadOnlyTable`）也都先 `strtoupper`。
+- 送出內容不變：選擇器回寫的仍是代碼字串，清空得到空字串——與先前純文字輸入框可被清空的行為一致。人物欄若同時是主鍵（如 `KIN_DATA.c_personid`），透過選擇器改值與先前用文字框改值走同一條 `performUpdate` 路徑（依 URL 主鍵定位、`update()` 就地換鍵，重複鍵與完整性違規各有友善訊息），**不是本次新增的能力**。
+- 選擇器的顯示文字帶人物 ID（如「11 晁公武 / Chao Gongwu」）：改成選擇器後欄位本身不再顯示數字，而編目者是以 ID 工作的；搜尋候選同樣以 ID 開頭，選前選後讀法一致。
+- 回歸測試 `CodesPersonPickerTest`（15 tests：六個有外鍵的欄位都有選擇器／涵蓋舊版按欄名會漏掉的 4 欄／非人物欄不給／帶 ID 的顯示名稱／無值與查不到時的退回行為／欄名像人物但無外鍵者不給／無人物欄的表為空／新增頁不預填人物主鍵／選未詳落庫為 0／`-999` 是真實人物時不改寫／非人物欄的 `-999` 原樣保留／提案不留 `-999`／人物選擇器與稽核欄唯讀互不覆寫）。另以 headless Chrome 對真實庫驗證 7 項（含姓名搜尋、ID 搜尋、`MERGED_PERSON_DATA` 維持純輸入）。
+
 ### 補回 codes 表單的逐欄行為：稽核欄不可編輯、欄位提示、依 c_textid 帶入書名
 - 起因：上一則作者清單的缺口不是孤例。以「Blade 有用、React 端完全找不到的翻譯鍵」為橋樑掃過全站（961 個鍵→275 個孤兒；扣掉 `cbdbapi/person`、`maps`、`home` 三個本來就沒有 React 版也沒有 flag 的頁面共 81 個），確認**真缺口集中在 `Codes/Edit.tsx`**——React 版把新增／編輯頁寫成泛用表單（`columns` → 純 `Input`），舊版 `codes/edit.blade.php` 的逐欄特殊處理因此整批漏移植。掃描方法的侷限一併記下：先前想用「Blade 呼叫但 React 沒呼叫的端點」當主訊號會誤報，因為 React 的端點多由 server props 傳入（`Welcome.tsx` 的姓名搜尋即為例）。
 - 新增 `CodesController::codeColumnBehaviour()` 作為逐欄行為的單一落點，Create／Edit 兩頁共用，避免各自再長出一套硬編碼：

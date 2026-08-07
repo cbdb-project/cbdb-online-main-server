@@ -10,6 +10,7 @@
 namespace App\Repositories;
 
 use App\Models\AltnameCode;
+use App\Support\ExactCodeMatchGuard;
 use Illuminate\Http\Request;
 
 class AltCodeRepository {
@@ -20,7 +21,7 @@ class AltCodeRepository {
         if (!$request->q) {
             return AltnameCode::paginate($num);
         }
-        $names = AltnameCode::where('c_name_type_desc_chn', 'like', '%'.$request->q.'%')->orWhere('c_name_type_desc', 'like', '%'.$request->q.'%')->orWhere('c_name_type_code', $request->q)->paginate($num);
+        $names = AltnameCode::where('c_name_type_desc_chn', 'like', '%'.$request->q.'%')->orWhere('c_name_type_desc', 'like', '%'.$request->q.'%')->when(ExactCodeMatchGuard::isNumeric($request->q), fn ($q) => $q->orWhere('c_name_type_code', $request->q))->paginate($num);
         $names->appends(['q' => $request->q])->links();
 
         return $names;

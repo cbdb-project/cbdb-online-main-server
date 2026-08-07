@@ -37,7 +37,7 @@ class v1 extends Model {
         $qForms = \App\Support\PinyinSearchNormalizer::expand($rawQ);
         $data = BiogMain::where(function ($sub) use ($request, $qForms) {
             $sub->where('c_name_chn', 'like', $request->q)
-                ->orWhere('c_personid', $request->q);
+                ->when(\App\Support\ExactCodeMatchGuard::isNumeric($request->q), fn ($q) => $q->orWhere('c_personid', $request->q));
             foreach ($qForms as $form) {
                 $sub->orWhere('c_name', 'like', $form);
             }

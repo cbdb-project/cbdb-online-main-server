@@ -585,9 +585,11 @@ class BiogMainRepository {
                   ->where('A2.c_alt_name_type_code', '=', 5);
         });
 
+        // 註：走到這裡時 $request->q 必為非純數字（純數字已在上方 ctype_digit 分支處理），
+        // 不再加 orWhere('BIOG_MAIN.c_personid', $request->q)——否則 MySQL/MariaDB 會把非數字字串
+        // 寬鬆轉型成 0，誤中 c_personid=0（「未詳」占位列）。
         $names = $names->where(function ($query) use ($request, $qForms) {
-            $query->where('BIOG_MAIN.c_name_chn', 'like', '%'.$request->q.'%')
-                ->orWhere('BIOG_MAIN.c_personid', $request->q);
+            $query->where('BIOG_MAIN.c_name_chn', 'like', '%'.$request->q.'%');
             // §D-8：拼音／羅馬字欄位以展開集 OR 同查 v／ü 形（單一形輸入時 $qForms 僅一元、行為不變）。
             #20230626增加[外文全名]與[外文羅馬字轉寫姓名]可查得
             $pinyinCols = [
@@ -682,12 +684,12 @@ class BiogMainRepository {
             return self::appendUnknownDynastyFacet($validDynasties, $unknownCount);
         }
 
-        // 回退 LIKE 路徑
+        // 回退 LIKE 路徑（走到這裡時 $q 必為非純數字，見上方 ctype_digit 分支，
+        // 故不加 orWhere('BIOG_MAIN.c_personid', $q)，避免 MySQL/MariaDB 寬鬆轉型誤中 c_personid=0）。
         $fallbackBaseQuery = DB::table('BIOG_MAIN')
             ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
             ->where(function ($query) use ($q, $qForms) {
-                $query->where('BIOG_MAIN.c_name_chn', 'like', '%' . $q . '%')
-                    ->orWhere('BIOG_MAIN.c_personid', $q);
+                $query->where('BIOG_MAIN.c_name_chn', 'like', '%' . $q . '%');
                 // §D-8：與 namesByQuery 一致，拼音／羅馬字欄位以展開集 OR 同查 v／ü 形。
                 $pinyinCols = [
                     'c_name', 'c_surname', 'c_mingzi',

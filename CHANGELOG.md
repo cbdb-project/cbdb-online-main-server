@@ -4,6 +4,14 @@
 
 ## 2026-08
 
+### 補回 TEXT_CODES 編輯頁的作者清單（React 遷移時漏移植）
+- 使用者回報 `/app/codes/TEXT_CODES/{id}/edit` 不再顯示作者。查證：該區塊只存在於舊版 `codes/edit.blade.php`（2022-01 #186 引入、2025-12 #655 改善多作者顯示），**2026-06-26 React/Inertia 上線（3f131d6）時漏移植**，而同一個 commit 把 `codes` flag 翻成 `new`，功能自此在正式站消失。旁證三項：後端端點 `/api/select/search/textauthor` 完好（12497 回 1 筆、35232 回 98 筆）、翻譯鍵 `author_label`／`no_author_data` 等留在原地無人使用、React 端零引用。
+- 補回方式改為**伺服器端隨頁面一次 JOIN 取回**（`CodesController::textCodesAuthors()` → `text_authors` prop），順手修掉舊版三個缺陷：舊版走 AJAX 且每列再各查一次 `BIOG_MAIN` 與 `TEXT_ROLE_CODES`（N+1）、`paginate(100)` 會靜默截斷、連 `c_personid=0`（未詳哨兵）也給連結。現行回報真實 `total` 與顯示上限（200；全庫單書最多 98 位），超過時前端明示「共 N 位，僅顯示前 M 位」。
+- **可直接跳轉到作者**：每位作者連到 `/app/basicinformation/{id}?tab=texts`（該作者的著述分頁，對齊舊版語義；此路徑正是 `LegacyBladeFormGate` 把舊 URL 導向的目標），另開新分頁以免弄丟表單上未儲存的輸入；`c_personid=0` 不給連結。`BIOG_TEXT_DATA` 主鍵為 `(c_personid, c_role_id, c_textid)`、含 `c_role_id`，同一人可在同一本書掛多個角色，故逐（人物, 角色）成對列出、React key 用此複合鍵；`c_textid` 固定時 `ORDER BY c_personid, c_role_id` 即全序，截斷取的永遠是同一批前 N 筆。
+- 這一區是唯讀參考，不可拖垮編輯本身：`appEdit` 的 `try/catch` 在呼叫點之前就結束，故 `textCodesAuthors()` 自行接住例外並降級為 `failed` 態（前端顯示既有的 `codes.load_failed`），對齊舊版「AJAX 失敗只顯示紅字、表單照樣可編輯可儲存」的爆炸半徑。未加此保護時，缺表會讓整頁 500（已用測試反向驗證）。
+- `c_textid=0` 不特別排除：它是真實可編輯的「未知」書目列，其下 37 筆關係人是「著作不明」的真實資料（角色含撰著者／編纂者），編目者編輯該列時需要看得到才能重新歸屬；改以 `isset($rowArray['c_textid'])` 區分「真的是 0」與「取不到欄位」。
+- 回歸測試 `CodesTextAuthorsTest`（8 tests：單作者含連結／同一人多角色不去重／未詳哨兵無連結／未知書目列仍列出自己的關係人／不跨書洩漏／無作者空清單／非 TEXT_CODES 無此 prop／上限截斷回報真實總數）。另以 headless Chrome 對真實庫驗證 12 項（含 98 位多作者全列與滾動、實際點擊跳轉後落在該作者的著述分頁）。
+
 ### 人物編輯中樞切分頁一律重抓資料（修「別人改了、切分頁看不到」）
 - 現象（使用者回報 `/app/basicinformation/{id}/edit`）：某條記錄被別人或自己在另一個瀏覽器分頁新增／刪除／修改後，在本頁切分頁（例如別名→親屬→別名）時，分頁徽章計數與列表內容都不變，必須整頁重載才看得到。
 - 根因一：`TabContentLoader` 的分頁資料是「一載入就永久快取」（同一 personId 不重複請求），切走再切回沿用首次載入的快照。此前兩個 commit 只修了**自己在本頁的修改**（409fd9e 徽章、7f8d7a8 基本資料切分頁顯示舊值），別人的修改仍看不到。

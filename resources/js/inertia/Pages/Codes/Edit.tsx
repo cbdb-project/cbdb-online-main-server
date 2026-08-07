@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { ProposalModeDialog } from '../../components/ui/ProposalModeDialog';
 import { PinyinUmlautConfirmDialog } from '../../components/PinyinUmlautConfirmDialog';
 import { collectUmlautConversions, type Tier2UmlautHit } from '../../utils/pinyinUmlaut';
+import { TextCodesAuthorList, type TextAuthors } from '../../components/TextCodesAuthorList';
 import { useTranslation } from '../../hooks/useTranslation';
 import type { SharedProps } from '../../types/page';
 
@@ -25,12 +26,14 @@ interface CodesEditPageProps extends SharedProps {
     required_columns?: string[];
     can_propose: boolean;
     tier2_fields?: string[];
+    /** 僅 TEXT_CODES 有值（該書的作者／編者等關係人）；其餘碼表為 null。 */
+    text_authors?: TextAuthors | null;
     urls: { update: string; propose: string; destroy: string; show: string };
 }
 
 export default function CodesEdit() {
     const props = usePage<CodesEditPageProps>().props;
-    const { table, columns, values, key_columns, required_columns, can_propose, tier2_fields, urls } = props;
+    const { table, columns, values, key_columns, required_columns, can_propose, tier2_fields, text_authors, urls } = props;
     const requiredSet = new Set(required_columns ?? []);
     const t = useTranslation('codes');
     const tc = useTranslation('common');
@@ -80,6 +83,16 @@ export default function CodesEdit() {
             breadcrumbs={[{ label: 'Codes', url: '/app/codes' }, { label: table, url: urls.show }, { label: tc('edit') }]}
         >
             <form onSubmit={submit} className="max-w-3xl space-y-3 rounded-lg border border-border bg-card p-4">
+                {/* TEXT_CODES：作者／編者等關係人（唯讀錄入參考），置於欄位之上、對齊舊版版位。
+                    不用 FormField：它會把 id 注入單一子節點並讓 <label for> 指過去，而這一區沒有
+                    表單控制項，label 指向 <div> 是無效關聯；改用純標題文字。 */}
+                {text_authors && (
+                    <div className="space-y-1">
+                        <p className="text-sm font-medium">{t('author_label')}</p>
+                        <TextCodesAuthorList authors={text_authors} t={t} />
+                    </div>
+                )}
+
                 {columns.map((col) => (
                     <FormField
                         key={col}

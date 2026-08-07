@@ -4,6 +4,8 @@ return [
     'save'              => '保存',
     'confirm'           => '確定',
     'cancel'            => '取消',
+    // 兩段確認的第一段按鈕（如刪除使用者：先確認知悉不可恢復，再最後確認）
+    'continue'          => '繼續',
     'search'            => '搜尋',
     'delete'            => '刪除',
     'add'               => '新增',
@@ -156,5 +158,7 @@ return [
     'query_profile_time'    => '耗時 (ms)',
     'query_profile_sql'     => 'SQL',
     'query_profile_bindings' => '綁定參數',
-    'query_profile_truncated' => '僅顯示前 :n 筆查詢。',
+    // 不寫「前 :n 筆」：明細從身分解析之後才開始保留，列出的未必是最前面幾筆。
+    'query_profile_truncated' => '僅列出其中 :n 筆明細。',
+    'query_profile_from_page_load' => '以下明細為本頁載入時的查詢；局部更新只更新上方筆數。',
 ];

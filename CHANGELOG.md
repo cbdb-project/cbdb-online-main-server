@@ -4,6 +4,23 @@
 
 ## 2026-08
 
+### 補回 React 殼的 SQL 查詢明細，並把收集成本收斂到看得到的人身上；刪除使用者恢復兩段確認
+- 起因：`AppServiceProvider` 的 `DB::listen` **無條件**把每筆查詢的 SQL 與 bindings 累進記憶體，而 React layout 從來沒有渲染這份資料——舊版 `layouts/dashboard-v3.blade.php` 底部的「本次查詢共 N 筆，耗時 X ms」＋管理員可開的明細 modal 在遷移時漏移植。等於每個 request（含 artisan 匯入、訪客瀏覽）都照樣收集、卻沒人看得到。
+- **權限分界完全對齊舊版**，而不是順手改掉：舊版那條摘要行 **沒有任何權限閘**（`dashboard-v3.blade.php:346`，訪客也看得到），只有「查看詳細」連結與 modal 限管理員（同檔 `:348`／`:369`）。因此閘的是「**保留明細**」而不是「整個收集」：筆數與耗時一律累計，每筆 SQL／bindings 只在使用者已解析為 `isAdmin()` 時保留。若連筆數都不收，flag 回退到 Blade 的頁面也會少一行，那不在本次範圍。
+- **顯示端自己再授權一次**，不只依賴收集端：`HandleInertiaRequests::queryProfile()` 獨立檢查 `isAdmin()`，非管理員的 `queries` 為空陣列。收集端的閘門長在全域 `DB::listen` 回呼裡、還包著 try/catch，一旦有人為了「讓筆數回到舊版數字」把它放寬，原始 SQL 與 bind 值就會直接出現在每個訪客的 `data-page` JSON（AGENTS.md §5：授權不該只有一道，更不該只長在除錯收集器內）。已用瀏覽器驗證非管理員的 payload 裡完全沒有 `"sql":`。
+- **shared prop 必須延後求值**（實際踩到並修掉的 bug）：inertia-laravel 的 `Middleware::handle` 是在 `$next($request)` **之前**呼叫 `share()`，此刻控制器一筆查詢都還沒跑。原本直接呼叫 `queryProfile()`，摘要永遠只有 session／撈使用者那兩筆——畫面上看起來有東西、數字卻是錯的（實測 codes 頁 2 筆 vs 實際 6～7 筆）。改為 closure，由 `Response::resolveArrayableProperties` 在 `toResponse()` 才求值。
+- 再包一層 `Inertia::always()`：局部重載只回傳 `only` 指定的 props，其餘 shared props 會被丟掉、前端沿用舊值——除錯輔助顯示上一次請求的筆數比不顯示更誤導。此行為以**真正的局部重載**測試鎖住（帶 `X-Inertia-Partial-Data` 指定別的 prop），換回普通 closure 即紅。
+- **局部重載只更新摘要、不夾帶明細**：Inertia 會把整份 page props 存進 `window.history.state`，而切換人物分頁這類局部重載在編目工作中極頻繁；每個 XHR 都夾帶上百句 SQL 與 bind 值，只為了一個偶爾打開的 modal，並不划算，也會把 bind 值留在瀏覽器歷史。前端記住最後一次拿到的明細，讓「查看詳細」不會在局部更新後忽然消失，並在 modal 內明示「以下明細為本頁載入時的查詢」。兩個方向都有測試（局部重載回應不得出現 `"sql"`；整頁載入必須給管理員明細，否則「不夾帶」會退化成「永遠拿不到」）。
+- 閘門判斷**刻意不做跨請求記憶**：`ServiceProvider` 是長生命週期物件，在 Octane／RoadRunner 這類常駐 worker 下會活過請求邊界，一旦某個管理員請求把「可留明細」記成 true，後續訪客請求就會開始保留 SQL——那是跨請求外洩。省下的只是每筆查詢幾個不碰資料庫的屬性讀取（`hasResolvedGuards()` 是 count、`hasUser()` 是 `is_null`、`user()` 走已快取屬性、`isAdmin()` 是 `in_array`），不值得用正確性去換。同理 `QueryProfile` 由 `singleton` 改為 **`scoped`**：它記的是「本次請求的查詢」，語意上就該隨請求結束；傳統 php-fpm 下兩者等價，常駐 worker 下 singleton 會讓筆數愈跑愈大、且管理員留下的明細可能被後續請求讀到。
+- 前端沿用舊明細的條件由後端明說（`details_omitted`），不是「本次沒帶就沿用」：同一個 React 殼會活過登出／被降權／換 session，那時回應是 `queries: []` 且 `details_omitted=false`，前端因此會**清掉**先前的明細，而不是把管理員的 SQL 繼續顯示給已經不是管理員的人。非管理員的回應永遠 `details_omitted=false`（有測試明文鎖住）。
+- 收集端加上記憶體上限（`QueryProfile::MAX_STORED = 200`），但**筆數與總耗時另行累計、永遠精確**——否則管理員在一個跑幾千筆查詢的頁面上只看到「200 筆」，反而掩蓋了要抓的效能問題。`summary()` 改為先切再編碼（先前編碼 200 筆再丟掉一半），`View::composer` 由 `'*'` 收窄到真正使用該變數的 `layouts.dashboard-v3`（先前一個 Blade 頁面渲染數十個 partial 就重複編碼數十遍）。
+- 閘門判斷本身的兩個修正：**明確指定 web guard**（`OptionalAuthentication` 會在執行期 `Auth::shouldUse('sanctum')` 改寫預設 guard，否則「帶 token 打 API 的管理員」也開始留明細，而 JSON 回應永遠不顯示這份資料——正是要消除的浪費）；try/catch 只 **report 第一次**（每筆都 report 會淹沒日誌，完全不記錄則會讓閘門壞掉、功能無聲消失卻查不出原因），且 `report()` 自身再包一層 try/catch——它若丟出去就繞過了外層 catch，讓一個純除錯輔助弄壞請求。
+- 判斷絕不能呼叫 `Auth::check()`／`Auth::user()`：那會在「解析使用者」那句 select 的監聽器裡再次觸發解析（遞迴）。改用 `hasResolvedGuards()` + `hasUser()`（皆不碰資料庫）。此性質改由**真的從 session 解析**的測試守住——先前的測試用 `actingAs()`，那是直接 `setUser()`、永遠走不到解析路徑，把閘門換成 `Auth::user()` 照樣綠燈。已知代價：解析完成前的查詢沒有明細（筆數仍算），故明細列數略少於總筆數，訊息文案因此不寫「前 N 筆」。
+- 顯示端沿用共用 `Modal`（Radix：focus trap／Esc／a11y 內建）而非自製對話框，補回舊版 modal 底部的「關閉」鈕，總毫秒數用千分位（對齊舊版 `number_format`）。
+- **刪除使用者恢復兩段確認**：舊版 `manage/edit.blade.php` 有兩道 `confirm()`（第一段說明不可恢復、第二段最後確認），React 遷移時收斂成一道。改用兩個 `ConfirmDialog` 串接，沿用同一組翻譯鍵；第一段的 `\n\n` 以 `whitespace-pre-line` 保住斷行（舊版走 `window.confirm`，空行就是重點強調）。送出 payload（`delete_user=1`）與後端契約未改動。
+- 收集端與顯示端**用同一個 guard**（皆為 `web`）：兩端若各自看執行期可被改寫的預設 guard，會出現「有收集卻不給看」的不一致。
+- 回歸測試 `QueryProfileGateTest`（15 tests：訪客／一般／眾包使用者有筆數但無明細、超級管理員與專家有明細、非管理員的 shared prop 不帶任何 SQL、延後求值含控制器查詢、真正的局部重載仍帶此 prop 但不帶明細、整頁載入才給明細、`details_omitted` 僅對「本來看得到明細的人」為 true、明細上限與筆數精確、記憶體上限不扭曲總計、從 session 解析使用者時不遞迴且解析前不留明細、summary 形狀穩定）。另以 headless Chrome 對真實庫驗證 11 項（6 項查詢明細，含非管理員 payload 無 SQL；5 項兩段刪除，含第一段按繼續不會刪除、第二段取消不會刪除、兩段都確認才真的刪除）。
+
 ### codes 表單的人物欄改為可搜尋的人物選擇器（判準改用外鍵）
 - 承上一則：泛用 codes 表單漏移植的最後一項。舊版 `codes/edit.blade.php` 把人物欄渲染成 select2（姓名或 ID 皆可查），React 版是純數字輸入框——使用者必須先知道人物 ID 才能填。
 - **判準改為「外鍵實際指向 `BIOG_MAIN`」，以 schema 宣告為唯一權威**（`CodesController::personFkColumns()`）。舊版是按欄名硬編碼 `c_personid`／`c_kin_id`，會漏掉 `ASSOC_DATA` 的 `c_assoc_id`（社會關係「對方是誰」）、`c_assoc_kin_id`、`c_assoc_claimer_id`、`c_tertiary_personid` 與 `ENTRY_DATA.c_assoc_id` 共 5 個真人物欄——恰恰是最需要用姓名搜尋的地方。改用外鍵後涵蓋 **17 張碼表、25 個欄位**，且隨 schema 自動跟上，不需維護人工白名單。

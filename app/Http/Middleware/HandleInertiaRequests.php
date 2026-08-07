@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Support\Navigation;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware {
@@ -72,6 +73,19 @@ class HandleInertiaRequests extends Middleware {
             // flash 訊息橋接：把 laracasts/flash 的 session 訊息轉成陣列，
             // 由 React AppShell 統一渲染 toast/alert（取代 Blade flash::message partial）。
             'flash' => $this->flashMessages(),
+            // SQL 查詢明細（管理員的效能除錯輔助）。舊版 Blade layout 有這一區、React layout 沒有，
+            // 於是 DB::listen 照樣收集卻沒人看得到；連同收集端的閘門一起補回。null＝不顯示。
+            //
+            // ⚠️ 必須是 closure（且用 Inertia::always 包起來），不可直接呼叫：
+            // inertia-laravel 的 Middleware::handle 是在 `$next($request)` **之前**
+            // 呼叫 share()，此刻控制器一筆查詢都還沒跑，直接求值只會拿到 session／撈使用者
+            // 那兩筆，摘要永遠顯示個位數。closure 由 Response::resolveArrayableProperties
+            // 以 App::call() 在 toResponse()（控制器跑完之後）才求值，才是本次請求的真實筆數。
+            //
+            // always()：局部重載（partial reload，如切換人物分頁）只回傳 `only` 指定的 props，
+            // 其餘 shared props 會被丟掉，前端於是沿用舊值——除錯輔助顯示上一次請求的筆數
+            // 比不顯示更誤導。包成 AlwaysProp 讓每個回應都帶上當次的實際筆數。
+            'query_profile' => Inertia::always(fn () => $this->queryProfile($request)),
             // ⚠️ 頁面特定翻譯群組（views、codes、operations、admin）
             //   請由控制器以 'page_translations' key 傳入，不可複用此 'translations' key，
             //   否則 inertia-laravel 的淺合併會覆蓋此處的 shared 翻譯。
@@ -103,6 +117,64 @@ class HandleInertiaRequests extends Middleware {
         }
 
         return null;
+    }
+
+    /**
+     * SQL 查詢明細，供 React layout 顯示。
+     *
+     * 筆數與耗時給所有人（對齊舊版 Blade 那一行本來就沒有權限閘）；**每筆 SQL 與 bindings
+     * 只給管理員**。這裡自己再檢查一次 isAdmin，不只依賴收集端的閘門
+     * （AppServiceProvider::shouldRetainQueryDetails()）：那個閘門長在全域 DB::listen 回呼裡、
+     * 還包著 try/catch，一旦有人為了「讓筆數回到舊版的數字」把它放寬，原始 SQL 與 bind 值
+     * 就會直接出現在每個訪客的 data-page JSON 裡。授權不該只有一道，且不該只長在除錯收集器內
+     * （AGENTS.md §5）。此處不在 DB::listen 內，可以安全呼叫 Auth。
+     *
+     * 明細只取前 100 筆（與舊版 modal 的 array_slice 一致）並回報是否被截斷，避免把一頁上千筆
+     * 查詢全部塞進 Inertia props。沒有任何查詢時回 null，前端就不渲染這一區。
+     *
+     * **局部重載不帶明細**：Inertia 會把整份 page props 存進 window.history.state，而
+     * 局部重載（切換人物分頁等）在管理員操作中非常頻繁；每次都夾帶上百句 SQL 與 bind 值，
+     * 等於為了一個偶爾打開的 modal 讓每個 XHR 都變胖、並把 bind 值留在瀏覽器歷史裡。
+     * 摘要（筆數／耗時）仍每次更新，明細則以整頁載入那次為準。
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function queryProfile(Request $request): ?array {
+        $profiler = app(\App\Services\QueryProfile::class);
+        if ($profiler->count() === 0) {
+            return null;
+        }
+
+        // 與收集端同一個 guard（AppServiceProvider::shouldRetainQueryDetails() 用 web）：
+        // OptionalAuthentication 會在執行期改寫預設 guard，兩端若各看各的預設值，就會出現
+        // 「有收集卻不給看」這種不一致。
+        $user = \Illuminate\Support\Facades\Auth::guard('web')->user();
+        $isAdmin = $user instanceof \App\Models\User && $user->isAdmin();
+        // 兩個 partial header 都要在：inertia-laravel 的 Response::isPartial() 除了 partial-data
+        // 還要求 partial-component 與本次元件相符，只看單一 header 會把畸形請求也當成局部重載
+        // （後果只是不給明細，不會外洩，但沒必要）。
+        $isPartial = $request->hasHeader('X-Inertia-Partial-Data')
+            && $request->hasHeader('X-Inertia-Partial-Component');
+        $canSeeDetails = $isAdmin && !$isPartial;
+
+        $limit = 100;
+        $summary = $profiler->summary($canSeeDetails ? $limit : 0);
+
+        return [
+            'count' => $summary['count'],
+            'time_ms' => round((float) $summary['time_ms'], 2),
+            // 「這次刻意不送明細，但你本來看得到」——前端據此保留上一次整頁載入的明細。
+            // 非管理員永遠是 false，因此降權／登出後的回應會讓前端**清掉**先前的明細，
+            // 而不是繼續顯示（同一個 React 殼會活過這種身分變化）。
+            'details_omitted' => $isAdmin && $isPartial,
+            // 非管理員沒有明細，但那不叫「被截斷」——前端據此決定要不要顯示「查看詳細」。
+            'truncated' => $canSeeDetails && $summary['count'] > count($summary['queries']),
+            'queries' => array_map(static fn (array $q): array => [
+                'time' => round((float) $q['time'], 2),
+                'sql' => $q['sql'],
+                'bindings' => $q['bindings_json'],
+            ], $summary['queries']),
+        ];
     }
 
     /**

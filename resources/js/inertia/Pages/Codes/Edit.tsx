@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import DashboardLayout from '../../Layouts/DashboardLayout';
 import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
 import { FormField } from '../../components/ui/FormField';
+import { CodesColumnField, type ColumnBehaviour } from '../../components/Codes/CodesColumnField';
+import { useLoadTextTitle } from '../../components/Codes/useLoadTextTitle';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { ProposalModeDialog } from '../../components/ui/ProposalModeDialog';
 import { PinyinUmlautConfirmDialog } from '../../components/PinyinUmlautConfirmDialog';
@@ -28,12 +29,19 @@ interface CodesEditPageProps extends SharedProps {
     tier2_fields?: string[];
     /** 僅 TEXT_CODES 有值（該書的作者／編者等關係人）；其餘碼表為 null。 */
     text_authors?: TextAuthors | null;
+    /** 逐欄特殊行為（稽核欄唯讀＋替換預覽、欄位提示、Load Data 動作），由後端供給。 */
+    column_behaviour?: Record<string, ColumnBehaviour>;
+    text_title_endpoint?: string;
     urls: { update: string; propose: string; destroy: string; show: string };
 }
 
 export default function CodesEdit() {
     const props = usePage<CodesEditPageProps>().props;
-    const { table, columns, values, key_columns, required_columns, can_propose, tier2_fields, text_authors, urls } = props;
+    const {
+        table, columns, values, key_columns, required_columns, can_propose, tier2_fields,
+        text_authors, column_behaviour, text_title_endpoint, urls,
+    } = props;
+    const behaviourOf = column_behaviour ?? {};
     const requiredSet = new Set(required_columns ?? []);
     const t = useTranslation('codes');
     const tc = useTranslation('common');
@@ -77,6 +85,14 @@ export default function CodesEdit() {
     };
     const propose = () => gate((ov) => submitVia('post', urls.propose, ov));
 
+    // TEXT_INSTANCE_DATA：依 c_textid 帶入書名（只填空欄）。
+    const loadTitle = useLoadTextTitle({
+        endpoint: text_title_endpoint ?? '',
+        getField: (c) => form.data[c] ?? '',
+        setField: (c, v) => form.setData(c, v),
+        t,
+    });
+
     return (
         <DashboardLayout
             title={`${tc('edit')} — ${table}`}
@@ -94,22 +110,24 @@ export default function CodesEdit() {
                 )}
 
                 {columns.map((col) => (
-                    <FormField
+                    <CodesColumnField
                         key={col}
-                        label={col}
-                        htmlFor={col}
-                        required={requiredSet.has(col)}
+                        column={col}
+                        value={form.data[col] ?? ''}
+                        // 動一下表單就清掉上次帶入的訊息與黃底（那是對上一次動作的描述）。
+                        onChange={(v) => { form.setData(col, v); loadTitle.reset(); }}
                         error={form.errors[col]}
-                    >
-                        <Input
-                            id={col}
-                            value={form.data[col] ?? ''}
-                            onChange={(e) => form.setData(col, e.target.value)}
-                        />
-                        {key_columns.includes(col) && (
-                            <span className="text-xs text-blue-700">PK</span>
-                        )}
-                    </FormField>
+                        required={requiredSet.has(col)}
+                        isKey={key_columns.includes(col)}
+                        behaviour={behaviourOf[col]}
+                        actionLabel={t('load_text_title_btn')}
+                        onAction={() => void loadTitle.run()}
+                        actionPending={loadTitle.pending}
+                        // 訊息就近顯示在觸發它的欄位下方（TEXT_INSTANCE_DATA 欄位多，放表單底部會離按鈕太遠）。
+                        actionMessage={behaviourOf[col]?.action ? loadTitle.message : null}
+                        actionFailed={loadTitle.failed}
+                        highlighted={loadTitle.filled.includes(col)}
+                    />
                 ))}
 
                 {can_propose && (
@@ -122,6 +140,8 @@ export default function CodesEdit() {
                             value={form.data.__proposal_comment ?? ''}
                             onChange={(e) => form.setData('__proposal_comment', e.target.value)}
                         />
+                        {/* 舊版 codes/edit.blade.php 與 create.blade.php 兩頁都有這句，React 只有 Create 有。 */}
+                        <p className="text-xs text-muted-foreground">{t('proposal_ignore_hint')}</p>
                     </FormField>
                 )}
 

@@ -127,6 +127,19 @@ return [
     'proposal_ignore_hint' => 'If you save directly, this field will be ignored.',
     'no_textid_msg' => 'No c_textid, cannot load author.',
     'no_author_data' => 'No author data',
+    // Column hints for the React generic form (no HTML; the link is passed separately as data).
+    // These coexist with the *_copy_hint keys above, which still carry <a> tags for the legacy Blade page.
+    // :link is replaced by a real <a> in the frontend (keeps the legacy in-sentence link without HTML in the string)
+    'hint_text_codes_copy' => 'Make sure the book\'s c_textid exists in the :link table, then copy the ID here.',
+    'hint_addr_copy' => 'Copy c_addr_id from the :link table.',
+    // TEXT_INSTANCE_DATA "Load Data" (fill the titles from c_textid)
+    'load_text_title_btn' => 'Load title',
+    'load_text_title_filled' => 'Filled: :fields',
+    'load_text_title_all_present' => 'Both title fields already have values; nothing changed (empty fields only).',
+    'load_text_title_source_empty' => 'The book has no matching title in TEXT_CODES, so these stay empty: :fields',
+    'load_text_title_not_found' => 'No book found with c_textid = :id',
+    'load_text_title_need_textid' => 'Please fill in c_textid first.',
+    'load_text_title_failed' => 'Load failed',
     // TEXT_CODES edit page author block (React version)
     'author_hint' => 'Read-only reference; click a linked name to open that author\'s texts page in a new tab (unknown persons are not linked).',
     'author_unknown_person' => 'Unknown (no matching person record)',

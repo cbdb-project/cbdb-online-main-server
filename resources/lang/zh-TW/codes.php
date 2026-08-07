@@ -125,6 +125,19 @@ return [
     'proposal_ignore_hint' => '如果直接儲存，此欄位會被忽略。',
     'no_textid_msg' => '無 c_textid，無法載入作者',
     'no_author_data' => '無作者資料',
+    // React 版泛用表單的欄位提示（無 HTML；連結由後端另以結構化資料傳出）。
+    // 與上方帶 <a> 的 *_copy_hint 並存：那兩個仍由舊版 Blade 使用。
+    // :link 由前端替換成真正的 <a>（保留舊版「連結在句中」的讀法，又不必回到 HTML 字串）
+    'hint_text_codes_copy' => '請確保 :link 表中存在這本書的 c_textid，再複製 ID 填入',
+    'hint_addr_copy' => '請從 :link 表中複製 c_addr_id 填入',
+    // TEXT_INSTANCE_DATA 的「Load Data」（依 c_textid 帶入書名）
+    'load_text_title_btn' => '帶入書名',
+    'load_text_title_filled' => '已帶入：:fields',
+    'load_text_title_all_present' => '兩個書名欄皆已有值，未變更（只填空欄）',
+    'load_text_title_source_empty' => '該書目在 TEXT_CODES 沒有對應書名，這些欄位仍為空：:fields',
+    'load_text_title_not_found' => '找不到 c_textid = :id 的書目',
+    'load_text_title_need_textid' => '請先填入 c_textid',
+    'load_text_title_failed' => '帶入失敗',
     // TEXT_CODES 編輯頁作者區塊（React 版）
     'author_hint' => '唯讀，作為錄入參考；點有連結的人名可另開該作者的著述頁（未詳者無連結）',
     'author_unknown_person' => '未詳（無對應人物記錄）',

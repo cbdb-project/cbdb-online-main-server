@@ -4,6 +4,21 @@
 
 ## 2026-08
 
+### 補回 codes 表單的逐欄行為：稽核欄不可編輯、欄位提示、依 c_textid 帶入書名
+- 起因：上一則作者清單的缺口不是孤例。以「Blade 有用、React 端完全找不到的翻譯鍵」為橋樑掃過全站（961 個鍵→275 個孤兒；扣掉 `cbdbapi/person`、`maps`、`home` 三個本來就沒有 React 版也沒有 flag 的頁面共 81 個），確認**真缺口集中在 `Codes/Edit.tsx`**——React 版把新增／編輯頁寫成泛用表單（`columns` → 純 `Input`），舊版 `codes/edit.blade.php` 的逐欄特殊處理因此整批漏移植。掃描方法的侷限一併記下：先前想用「Blade 呼叫但 React 沒呼叫的端點」當主訊號會誤報，因為 React 的端點多由 server props 傳入（`Welcome.tsx` 的姓名搜尋即為例）。
+- 新增 `CodesController::codeColumnBehaviour()` 作為逐欄行為的單一落點，Create／Edit 兩頁共用，避免各自再長出一套硬編碼：
+  - **稽核欄（`c_created_by/date`、`c_modified_by/date`）一律灰底唯讀**。先前 React 可自由輸入卻毫無提示，而後端 `enforceAuditFieldsForUpdate` 本來就會覆蓋（`c_created_*` 還原原值、`c_modified_*` 蓋當下），等於讓使用者對著會被丟棄的輸入框打字。新增與編輯採同一條規則；用 `readOnly` 而非 `disabled`——這四欄的用途就是被讀，`disabled` 會讓文字無法選取複製，而舊版用的也是 `readonly`。**送出內容與改動前逐位元相同**（欄位仍在 `columns` 與 `form.data` 裡，只改 UI），另補測試鎖住「偽造稽核值送出也不生效」。
+  - `c_modified_*` 補回「提交後會被替換為 X」預覽，且改走 `AuditActor::currentName()`——與實際落庫的署名同源，舊版用 `Auth::user()->name`，在核准情境下與實際寫入的雙人名不一致。
+  - 欄位提示（TEXT_CODES／ADDR_CODES 複製提示）改由後端供給：`Edit.tsx` 先前完全沒有，`Create.tsx` 則是**硬編碼中文**（英文語境漏字、且與既有 `codes.*` 鍵重複）。新增無 HTML 的 `hint_*` 鍵，連結以結構化資料另傳（前端不需要 `dangerouslySetInnerHTML`），並用 flag-aware 的 `codesShowUrl()` 指向 React 版碼表頁。
+- **TEXT_INSTANCE_DATA 依 `c_textid` 帶入書名**（舊版的「Load Data」鈕）。修掉舊版兩個缺陷：舊版打 `/api/select/search/text`（`c_title_chn LIKE %q% OR c_textid = q`）再取 `data[0]`，用 ID 查時可能撈到「標題剛好含這串數字」的別本書——改為新端點 `app/codes/text-title/{textId}` 主鍵精確查詢；舊版無條件覆寫兩個書名欄——改為**只填空欄**（使用者指定），不蓋掉人工修訂過的書名，並沿用舊版填入後標黃底的提示。
+- 附帶修掉 `Create.tsx` 的結構缺陷：兩顆送出按鈕原本被包在 `{can_propose && ...}` 內，而 `app.codes.create` 沒有 auth middleware，訪客／非活躍帳號會看到一個完整表單卻一顆按鈕都沒有；改為與 `Edit.tsx` 對齊（「直接保存」永在、「提交建議」看 `can_propose`）。
+- 新欄位元件刻意**不套用 `ui/FormField`**：它會把 id 與 aria 注入「單一子節點」，而這裡的子節點是包住輸入框＋動作鈕＋提示的 `<div>`——會讓 `<div>` 與 `<input>` 拿到相同 id（每頁重複十餘個），且 `<label for>` 指到不可標記的 `<div>` 而失效（點欄位標籤不再聚焦輸入框），`aria-invalid`／`aria-describedby` 也會落在 div 上而使 `Input` 的紅框與螢幕報讀關聯失效。改為自行組出 label／aria 關聯。
+- 新端點補 `throttle:60,1`（與 `codes.export` 同理由：直連 live 生產庫且無登入門檻）。帶入結果訊息就近顯示在 `c_textid` 下方並帶 `role="status"`（原本放表單底部，`TEXT_INSTANCE_DATA` 欄位多時會離按鈕太遠），使用者一動表單即清除訊息與黃底。請求期間若使用者改了 `c_textid` 或手動填了書名欄，回應會被丟棄或跳過該欄，不覆蓋剛輸入的內容。
+- 帶入結果的訊息**逐欄判定**而非看「整次請求有沒有書名」：書目常只有中文書名而無拼音書名（實測 21 筆 TEXT_CODES 如此、7 筆 instance 正好是這形狀），用單一旗標會把「拼音欄還空著、來源也沒有拼音書名」誤報成「兩欄皆已有值」。現在會如實列出哪些欄被帶入、哪些欄因來源沒有書名而仍為空。
+- 欄位提示的連結改以 `:link` 佔位就地嵌回句中（保留舊版 inline `<a>` 的讀法，字串本身仍無 HTML）；「提交後會被替換為 X」加 `tone=warn` 以粗體主色呈現——舊版是 `text-info` + `<strong>`，不該與一般說明同重量。
+- 提案調整頁（`Codes/ProposalEdit.tsx`）一併套用同一份逐欄行為：稽核欄同樣唯讀，但**不給替換預覽**（替換發生在核准當下、由審核人蓋章，此刻預告的署名與時間都會不同）。核准端本來就會剔除並重蓋，此處只是不再邀請使用者對著會被丟棄的輸入框打字。`Edit.tsx` 也補上舊版兩頁都有、React 只有 Create 有的「直接儲存會忽略此欄」提示。
+- 回歸測試 `CodesColumnBehaviourTest`（18 tests：四個稽核欄唯讀／提案調整頁同樣唯讀但無替換預覽／替換預覽只給 `c_modified_*`／未登入無預覽但仍唯讀／新增頁同規則且欄位清單不變／偽造稽核值不生效／`c_textid` 提示與動作且提示不含 HTML／提示連結 flag-aware 指向 `/app/codes/TEXT_CODES`／新增頁也有提示／en 語境真的拿到英文／ADDR_BELONGS_DATA 兩欄提示／無特殊行為的表為空／端點精確查詢且不退回標題模糊命中／可查 `c_textid=0` 的「未知」書目／回報無書名的書目／非數字 ID 被拒）。另以 headless Chrome 對真實庫驗證 16 項（含實際按下帶入書名取得「愛日齋叢鈔」、第二次按不覆蓋、每欄僅一個 DOM id 且 label 正確關聯）。
+
 ### 補回 TEXT_CODES 編輯頁的作者清單（React 遷移時漏移植）
 - 使用者回報 `/app/codes/TEXT_CODES/{id}/edit` 不再顯示作者。查證：該區塊只存在於舊版 `codes/edit.blade.php`（2022-01 #186 引入、2025-12 #655 改善多作者顯示），**2026-06-26 React/Inertia 上線（3f131d6）時漏移植**，而同一個 commit 把 `codes` flag 翻成 `new`，功能自此在正式站消失。旁證三項：後端端點 `/api/select/search/textauthor` 完好（12497 回 1 筆、35232 回 98 筆）、翻譯鍵 `author_label`／`no_author_data` 等留在原地無人使用、React 端零引用。
 - 補回方式改為**伺服器端隨頁面一次 JOIN 取回**（`CodesController::textCodesAuthors()` → `text_authors` prop），順手修掉舊版三個缺陷：舊版走 AJAX 且每列再各查一次 `BIOG_MAIN` 與 `TEXT_ROLE_CODES`（N+1）、`paginate(100)` 會靜默截斷、連 `c_personid=0`（未詳哨兵）也給連結。現行回報真實 `total` 與顯示上限（200；全庫單書最多 98 位），超過時前端明示「共 N 位，僅顯示前 M 位」。

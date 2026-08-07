@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { useForm, usePage } from '@inertiajs/react';
 import DashboardLayout from '../../Layouts/DashboardLayout';
 import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
 import { FormField } from '../../components/ui/FormField';
+import { CodesColumnField, type ColumnBehaviour } from '../../components/Codes/CodesColumnField';
+import { useLoadTextTitle } from '../../components/Codes/useLoadTextTitle';
 import { PinyinUmlautConfirmDialog } from '../../components/PinyinUmlautConfirmDialog';
 import { ProposalModeDialog } from '../../components/ui/ProposalModeDialog';
 import { collectUmlautConversions, type Tier2UmlautHit } from '../../utils/pinyinUmlaut';
@@ -17,23 +18,22 @@ interface CodesCreatePageProps extends SharedProps {
     required_columns?: string[];
     can_propose: boolean;
     tier2_fields?: string[];
+    /**
+     * 逐欄特殊行為（稽核欄唯讀、欄位提示、Load Data 動作），由後端 codeColumnBehaviour() 供給。
+     * 先前此頁的欄位提示是前端硬編碼中文（英文語境會漏字，且與 codes.* 既有鍵重複），已移除。
+     */
+    column_behaviour?: Record<string, ColumnBehaviour>;
+    text_title_endpoint?: string;
     urls: { store: string; propose: string; show: string };
 }
 
-// 特定表的欄位輔助說明（沿用舊頁 help-block 文案）。
-const COLUMN_HINTS: Record<string, Record<string, { text: string; link?: { href: string; label: string } }>> = {
-    ADDR_BELONGS_DATA: {
-        c_addr_id: { text: '請從 ADDR_CODES 表中複製 c_addr_id 填入', link: { href: '/codes/ADDR_CODES', label: 'ADDR_CODES' } },
-        c_belongs_to: { text: '請從 ADDR_CODES 表中複製 c_addr_id 填入', link: { href: '/codes/ADDR_CODES', label: 'ADDR_CODES' } },
-    },
-    TEXT_INSTANCE_DATA: {
-        c_textid: { text: '請確保 TEXT_CODES 表中存在這本書的 c_textid，再複製 ID 填入', link: { href: '/codes/TEXT_CODES', label: 'TEXT_CODES' } },
-    },
-};
-
 export default function CodesCreate() {
     const props = usePage<CodesCreatePageProps>().props;
-    const { table, columns, defaults, required_columns, can_propose, tier2_fields, urls } = props;
+    const {
+        table, columns, defaults, required_columns, can_propose, tier2_fields,
+        column_behaviour, text_title_endpoint, urls,
+    } = props;
+    const behaviourOf = column_behaviour ?? {};
     const requiredSet = new Set(required_columns ?? []);
     const t = useTranslation('codes');
     const tc = useTranslation('common');
@@ -68,9 +68,16 @@ export default function CodesCreate() {
         }
         run();
     };
-    const tableHints = COLUMN_HINTS[table] ?? {};
     const saveDirect = () => gate((ov) => submitPost(urls.store, ov));
     const propose = () => gate((ov) => submitPost(urls.propose, ov));
+
+    // TEXT_INSTANCE_DATA：依 c_textid 帶入書名（只填空欄）。
+    const loadTitle = useLoadTextTitle({
+        endpoint: text_title_endpoint ?? '',
+        getField: (c) => form.data[c] ?? '',
+        setField: (c, v) => form.setData(c, v),
+        t,
+    });
 
     return (
         <DashboardLayout
@@ -84,54 +91,53 @@ export default function CodesCreate() {
                 }}
                 className="max-w-3xl space-y-3 rounded-lg border border-border bg-card p-4"
             >
-                {columns.map((col) => {
-                    const hint = tableHints[col];
-                    return (
-                        <FormField key={col} label={col} htmlFor={col} required={requiredSet.has(col)} error={form.errors[col]}>
-                            <Input
-                                id={col}
-                                value={form.data[col] ?? ''}
-                                onChange={(e) => form.setData(col, e.target.value)}
-                            />
-                            {hint && (
-                                <p className="text-xs text-muted-foreground">
-                                    {hint.text}
-                                    {hint.link && (
-                                        <>
-                                            {' '}
-                                            <a href={hint.link.href} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-                                                {hint.link.label}
-                                            </a>
-                                        </>
-                                    )}
-                                </p>
-                            )}
-                        </FormField>
-                    );
-                })}
+                {columns.map((col) => (
+                    <CodesColumnField
+                        key={col}
+                        column={col}
+                        value={form.data[col] ?? ''}
+                        // 動一下表單就清掉上次帶入的訊息與黃底（那是對上一次動作的描述）。
+                        onChange={(v) => { form.setData(col, v); loadTitle.reset(); }}
+                        error={form.errors[col]}
+                        required={requiredSet.has(col)}
+                        behaviour={behaviourOf[col]}
+                        actionLabel={t('load_text_title_btn')}
+                        onAction={() => void loadTitle.run()}
+                        actionPending={loadTitle.pending}
+                        actionMessage={behaviourOf[col]?.action ? loadTitle.message : null}
+                        actionFailed={loadTitle.failed}
+                        highlighted={loadTitle.filled.includes(col)}
+                    />
+                ))}
 
                 {can_propose && (
-                    <>
-                        <FormField label={t('proposal_desc')} htmlFor="__proposal_comment" hint={t('proposal_desc_hint')}>
-                            <textarea
-                                id="__proposal_comment"
-                                rows={3}
-                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                placeholder={t('proposal_desc_hint')}
-                                value={form.data.__proposal_comment ?? ''}
-                                onChange={(e) => form.setData('__proposal_comment', e.target.value)}
-                            />
-                            <p className="text-xs text-muted-foreground">如果直接儲存，此欄位會被忽略。</p>
-                        </FormField>
-
-                        <div className="flex gap-2">
-                            <Button type="submit" disabled={form.processing}>{t('save_direct')}</Button>
-                            <Button type="button" variant="secondary" disabled={form.processing} onClick={() => (canWriteDirectly ? setConfirmProposalMode(true) : propose())}>
-                                {t('submit_proposal')}
-                            </Button>
-                        </div>
-                    </>
+                    <FormField label={t('proposal_desc')} htmlFor="__proposal_comment" hint={t('proposal_desc_hint')}>
+                        <textarea
+                            id="__proposal_comment"
+                            rows={3}
+                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            placeholder={t('proposal_desc_hint')}
+                            value={form.data.__proposal_comment ?? ''}
+                            onChange={(e) => form.setData('__proposal_comment', e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">{t('proposal_ignore_hint')}</p>
+                    </FormField>
                 )}
+
+                {/* 送出按鈕移出 can_propose：先前兩顆鈕被包在該條件裡，非活躍帳號／訪客會看到
+                    一個完整表單卻一顆按鈕都沒有（app.codes.create 無 auth middleware）。
+                    與 Edit.tsx 的結構對齊——「直接保存」永遠在，「提交建議」才看 can_propose。 */}
+                <div className="flex flex-wrap gap-2">
+                    <Button type="submit" disabled={form.processing}>{t('save_direct')}</Button>
+                    {can_propose && (
+                        <Button type="button" variant="secondary" disabled={form.processing} onClick={() => (canWriteDirectly ? setConfirmProposalMode(true) : propose())}>
+                            {t('submit_proposal')}
+                        </Button>
+                    )}
+                    <a href={urls.show} className="inline-flex items-center rounded-md border border-input px-4 py-2 text-sm hover:bg-muted">
+                        {tc('cancel')}
+                    </a>
+                </div>
             </form>
 
             <PinyinUmlautConfirmDialog

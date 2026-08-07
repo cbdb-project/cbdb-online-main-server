@@ -21,6 +21,14 @@ use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class CodesController extends Controller {
+    /**
+     * TEXT_CODES 編輯頁作者清單的顯示上限。
+     *
+     * 目前全庫單書最多 98 位（2026-08 實測），200 留足餘裕；超過時前端會明示「顯示前 N 筆／共 M 筆」，
+     * 不像舊版 /api/select/search/textauthor 的 paginate(100) 那樣靜默截斷。
+     */
+    protected const TEXT_AUTHOR_DISPLAY_LIMIT = 200;
+
     protected $codesrepostory;
     protected $operationRepository;
 
@@ -937,6 +945,12 @@ class CodesController extends Controller {
             'required_columns' => $this->codeColumnFormMeta($table)['required'],
             'can_propose' => Auth::check() && Auth::user()->isActive(),
             'tier2_fields' => $this->codeTableTier2Fields($table),
+            // TEXT_CODES：附上該書的作者／編者等關係人（唯讀錄入參考）。其餘碼表為 null，前端不渲染。
+            // 用 isset 而非 ?? 0：c_textid=0 是真實可編輯的「未知」書目列（其下掛著 37 筆關係人），
+            // 不能與「取不到 c_textid」混為一談而一律查 0。
+            'text_authors' => $table === 'TEXT_CODES' && isset($rowArray['c_textid'])
+                ? $this->textCodesAuthors((int) $rowArray['c_textid'])
+                : null,
             'urls' => [
                 'update' => route('app.codes.update', ['table_name' => $table, 'id' => $compositeId], false),
                 'propose' => route('app.codes.propose.update', ['table_name' => $table, 'id' => $compositeId], false),
@@ -947,6 +961,92 @@ class CodesController extends Controller {
                 'codes' => is_array($t = trans('codes')) ? $t : [],
             ],
         ]);
+    }
+
+    /**
+     * TEXT_CODES 編輯頁用：該書的作者／編者等關係人（唯讀，作為錄入參考）。
+     *
+     * 對齊舊版 codes/edit.blade.php 的作者區塊（2022-01 #186、2025-12 #655），但改為伺服器端一次 JOIN
+     * 隨頁面取回，修掉舊版三個問題：舊版走 /api/select/search/textauthor，每列再各查一次 BIOG_MAIN 與
+     * TEXT_ROLE_CODES（N+1）、paginate(100) 會靜默截斷、且連 c_personid=0（未詳哨兵）也給連結。
+     *
+     * BIOG_TEXT_DATA 主鍵為 (c_personid, c_role_id, c_textid)——含 c_role_id，故同一人可在同一本書
+     * 掛多個角色，須以 personid + role_id 成對回傳（前端 key 亦用此組合，不可只用 personid）。
+     * c_textid 固定時，ORDER BY c_personid, c_role_id 即為全序，截斷取的永遠是同一批前 N 筆。
+     *
+     * @return array{total: int, limit: int, items: array<int, array<string, mixed>>, failed: bool}
+     */
+    protected function textCodesAuthors(int $textId): array {
+        try {
+            // 不特別排除 c_textid=0：它是真實可編輯的「未知」書目列，其下 37 筆關係人是「著作不明」的
+            // 真實資料（角色含撰著者／編纂者），舊版也照列。編目者編輯該列時看得到才能重新歸屬。
+            // 這個 count 只餵截斷提示裡的數字（是否截斷由下方多取一筆決定，不靠它）。
+            // 目前全庫單書最多 98 筆、上限 200，提示實際上還用不到；仍保留是因為 c_textid 有索引、
+            // 單書 count 幾乎零成本，資料成長後才不必回頭補。
+            $total = (int) DB::table('BIOG_TEXT_DATA')->where('c_textid', $textId)->count();
+
+            $rows = DB::table('BIOG_TEXT_DATA as btd')
+                ->leftJoin('BIOG_MAIN as bm', 'bm.c_personid', '=', 'btd.c_personid')
+                ->leftJoin('TEXT_ROLE_CODES as trc', 'trc.c_role_id', '=', 'btd.c_role_id')
+                ->where('btd.c_textid', $textId)
+                ->orderBy('btd.c_personid')
+                ->orderBy('btd.c_role_id')
+                // 多取一筆用來判斷「是否還有更多」。若改用 total > count(items) 判斷，count 與 select
+                // 是兩次獨立查詢／快照，兩者之間插入一列就可能讓兩數相等而**靜默**吞掉截斷提示。
+                ->limit(self::TEXT_AUTHOR_DISPLAY_LIMIT + 1)
+                ->get([
+                    'btd.c_personid',
+                    'btd.c_role_id',
+                    'bm.c_name_chn',
+                    'bm.c_name',
+                    'trc.c_role_desc_chn',
+                    'trc.c_role_desc',
+                ]);
+        } catch (\Throwable $e) {
+            // 這一區只是唯讀的錄入參考，不該讓它把整個編輯頁打成 500——appEdit 的 try/catch 到本方法
+            // 呼叫點之前就結束了。舊版 AJAX 失敗時僅顯示紅字「載入失敗」、表單照樣可編輯可儲存，
+            // 這裡沿用同一語義：記錄例外後降級為失敗態，前端以同一個 codes.load_failed 提示。
+            report($e);
+
+            return [
+                'total' => 0,
+                'limit' => self::TEXT_AUTHOR_DISPLAY_LIMIT,
+                'items' => [],
+                'truncated' => false,
+                'failed' => true,
+            ];
+        }
+
+        $truncated = $rows->count() > self::TEXT_AUTHOR_DISPLAY_LIMIT;
+        $rows = $rows->take(self::TEXT_AUTHOR_DISPLAY_LIMIT);
+
+        $items = [];
+        foreach ($rows as $row) {
+            $personId = (int) $row->c_personid;
+
+            $items[] = [
+                'c_personid' => $personId,
+                'c_role_id' => (int) $row->c_role_id,
+                'name_chn' => $row->c_name_chn,
+                'name' => $row->c_name,
+                'role_chn' => $row->c_role_desc_chn,
+                'role' => $row->c_role_desc,
+                // c_personid=0 是「未詳」哨兵（BIOG_MAIN 確實有這一列），跳過去沒有意義，故不給連結。
+                // 其餘指向 React 人物中樞的著述分頁（對齊舊版連到該人物 texts 的語義）。
+                'url' => $personId > 0
+                    ? route('app.basicinformation.show', ['id' => $personId, 'tab' => 'texts'], false)
+                    : null,
+            ];
+        }
+
+        return [
+            // total 是「關係列」數而非人數——同一人的多個角色是多列（見上方主鍵說明），前端字串用「筆」。
+            'total' => $total,
+            'limit' => self::TEXT_AUTHOR_DISPLAY_LIMIT,
+            'items' => $items,
+            'truncated' => $truncated,
+            'failed' => false,
+        ];
     }
 
     public function update(Request $request, $table_name, $id) {

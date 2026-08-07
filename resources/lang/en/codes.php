@@ -127,6 +127,11 @@ return [
     'proposal_ignore_hint' => 'If you save directly, this field will be ignored.',
     'no_textid_msg' => 'No c_textid, cannot load author.',
     'no_author_data' => 'No author data',
+    // TEXT_CODES edit page author block (React version)
+    'author_hint' => 'Read-only reference; click a linked name to open that author\'s texts page in a new tab (unknown persons are not linked).',
+    'author_unknown_person' => 'Unknown (no matching person record)',
+    // "entries" not "people": one person holding several roles counts as several entries.
+    'author_truncated' => ':total entries in total (each role counted separately), showing the first :shown',
     'load_failed' => 'Load failed',
     'load_no_data_alert' => 'Load Data: No results found',
     'load_success_alert' => 'Load Data: Updated c_instance_title_chn and c_instance_title',

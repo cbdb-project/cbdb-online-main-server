@@ -125,6 +125,11 @@ return [
     'proposal_ignore_hint' => '如果直接儲存，此欄位會被忽略。',
     'no_textid_msg' => '無 c_textid，無法載入作者',
     'no_author_data' => '無作者資料',
+    // TEXT_CODES 編輯頁作者區塊（React 版）
+    'author_hint' => '唯讀，作為錄入參考；點有連結的人名可另開該作者的著述頁（未詳者無連結）',
+    'author_unknown_person' => '未詳（無對應人物記錄）',
+    // 「筆」而非「位」：同一人可掛多個角色，一人可能佔多筆，這裡數的是關係列。
+    'author_truncated' => '共 :total 筆（同一人的多個角色分列計算），僅顯示前 :shown 筆',
     'load_failed' => '載入失敗',
     'load_no_data_alert' => 'Load Data：無查詢結果',
     'load_success_alert' => 'Load Data：已更新 c_instance_title_chn 與 c_instance_title',

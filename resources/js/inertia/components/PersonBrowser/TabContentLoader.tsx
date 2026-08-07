@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import BasicInfoView from './BasicInfoView';
 import BasicInfoEditor from '../BasicInfoEditor';
 import { useTranslation } from '../../hooks/useTranslation';
@@ -14,6 +14,14 @@ import TextsTab from './tabs/TextsTab';
 import PostingsTab from './tabs/PostingsTab';
 import InstitutionsTab from './tabs/InstitutionsTab';
 import KinshipTab from './tabs/KinshipTab';
+import {
+    activationKeyOf,
+    applyError,
+    applySuccess,
+    beginActivation,
+    dropTab,
+    type TabCache,
+} from './tabCachePolicy';
 
 interface Props {
     personId: number | null;
@@ -50,12 +58,6 @@ interface Props {
     onRegisterBasicInfoSaveHandler?: (handler: (() => Promise<boolean>) | null) => void;
 }
 
-interface TabState {
-    loading: boolean;
-    error: string | null;
-    data: unknown;
-}
-
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 type TypedTabComponent = React.ComponentType<{ data: any; canEdit: boolean; postCE?: boolean; onSelectPerson?: (personId: number) => void }>;
 
@@ -65,8 +67,12 @@ const TAB_COMPONENTS: Record<string, TypedTabComponent> = {
 };
 
 /**
- * 根據 activeTab 和 personId lazy load 對應 tab 資料。
- * 已載入的 tab 資料會快取（同一 personId 不重複請求）。
+ * 根據 activeTab 和 personId 載入對應 tab 資料。
+ *
+ * **每次切分頁都會重新向後端取資料**（見 tabCachePolicy）：分頁資料不再永久沿用首次載入的快照，
+ * 否則其他人、或自己在另一個瀏覽器分頁的新增／刪除／修改，在不整頁重載的情況下永遠看不到。
+ * 已有舊資料的分頁在重新驗證期間先繼續顯示舊資料，不閃載入佔位；`basic_info` 例外（其編輯器
+ * 在掛載時快照欄位值，必須等新資料才渲染）。
  */
 export default function TabContentLoader({
     personId,
@@ -108,36 +114,46 @@ export default function TabContentLoader({
         const v2 = tPerson(k); if (v2 && v2 !== k) return v2;
         const v3 = tCommon(k); return v3 && v3 !== k ? v3 : k;
     };
-    const [cache, setCache] = useState<Record<string, TabState>>({});
+    const [cache, setCache] = useState<TabCache>({});
     const [fetchSeq, setFetchSeq] = useState(0);
-    const cachePersonRef = useRef<number | null>(personId);
+    const [cachePerson, setCachePerson] = useState<number | null>(personId);
+    const [activation, setActivation] = useState<string | null>(null);
 
-    // 人物切換時同步清快取，本次渲染直接使用空值
-    const personChanged = cachePersonRef.current !== personId;
-    if (personChanged) {
-        cachePersonRef.current = personId;
+    // 一次「分頁啟用」＝抓取 effect 的任一依賴改變。每次啟用都會重新抓資料（見下方 effect）。
+    // key 的組成必須與 effect 依賴完全一致，否則會出現「effect 重跑但沿用同一戳記」的漏洞。
+    const activationKey = activationKeyOf(personId, activeTab, fetchSeq, tabEndpoint);
+
+    // 標記啟用起始狀態刻意放在 render 期間、而非 effect 裡：effect 晚一拍會讓 basic_info 先以舊資料
+    // 掛載一次 BasicInfoEditor（閃動 + 多跑一輪 onRegisterSaveHandler／onEditorStateChange）再被替換。
+    // render 期間 setState 是 React 允許的「隨 props 調整 state」用法；條件下一輪即為 false，不會無限迴圈。
+    // 同時以區域變數 effectiveCache 讓本次渲染直接反映，不必等下一輪。
+    let effectiveCache = cache;
+
+    // 人物切換：整批丟棄舊人物的快取（其他分頁的資料也不再屬於這個人）。
+    if (cachePerson !== personId) {
+        setCachePerson(personId);
         if (Object.keys(cache).length > 0) {
             setCache({});
         }
+        effectiveCache = {};
     }
 
-    const effectiveCache = personChanged ? {} : cache;
+    if (activation !== activationKey) {
+        setActivation(activationKey);
+        setCache((prev) => beginActivation(prev, activeTab, activationKey));
+        effectiveCache = beginActivation(effectiveCache, activeTab, activationKey);
+    }
 
-    // lazy load — 由 personId / activeTab / fetchSeq 驅動
+    // 每次啟用都重新抓資料——不再有「已快取就跳過」的短路。
+    // （舊版的短路旗標是在 setCache 的 updater 裡設定的，而 React 只在 eager state 快路徑才會同步呼叫
+    //  updater，於是 13 個分頁裡有 7～8 個沿用舊快取、5～6 個湊巧重抓，行為並不確定。）
     useEffect(() => {
         if (personId == null || !activeTab) return;
 
-        // 透過 updater 讀取最新 cache，避免把 cache 引用放進依賴
-        let alreadyCached = false;
-        setCache((prev) => {
-            if (prev[activeTab]) {
-                alreadyCached = true;
-                return prev;
-            }
-            return { ...prev, [activeTab]: { loading: true, error: null, data: null } };
-        });
-        if (alreadyCached) return;
-
+        // 本輪的啟用識別碼。落庫由 applySuccess／applyError 比對快取裡的 activation 戳記——
+        // 已被新啟用取代的回應原封不動丟掉（abort 在 cleanup 才發生，仍有「新一輪已 commit、
+        // cleanup 未跑」的空隙）。比對在 updater 內對 committed state 進行，不靠 render 期間的 ref。
+        const myActivation = activationKeyOf(personId, activeTab, fetchSeq, tabEndpoint);
         const url = tabEndpoint
             .replace('__PERSON_ID__', String(personId))
             .replace('__TAB_KEY__', activeTab);
@@ -150,19 +166,18 @@ export default function TabContentLoader({
                 return res.json();
             })
             .then((data) => {
-                setCache((prev) => ({ ...prev, [activeTab]: { loading: false, error: null, data } }));
+                setCache((prev) => applySuccess(prev, activeTab, myActivation, data));
             })
             .catch((err: unknown) => {
                 if (err instanceof DOMException && err.name === 'AbortError') {
                     return;
                 }
 
-                const message = err instanceof Error ? err.message : '載入失敗';
+                // 只存技術細節（HTTP 狀態等）；使用者看到的「載入失敗」字樣由 render 端翻譯後加上，
+                // 這樣 effect 不必依賴 tPerson——依賴多一項而 activationKey 少一項就會產生共用戳記的漏洞。
+                const message = err instanceof Error ? err.message : '';
 
-                setCache((prev) => ({
-                    ...prev,
-                    [activeTab]: { loading: false, error: message, data: null },
-                }));
+                setCache((prev) => applyError(prev, activeTab, myActivation, message));
             });
 
         return () => {
@@ -171,11 +186,7 @@ export default function TabContentLoader({
     }, [personId, activeTab, tabEndpoint, fetchSeq]);
 
     const retryActiveTab = () => {
-        setCache((prev) => {
-            const next = { ...prev };
-            delete next[activeTab];
-            return next;
-        });
+        setCache((prev) => dropTab(prev, activeTab));
         setFetchSeq((s) => s + 1);
     };
 
@@ -186,44 +197,24 @@ export default function TabContentLoader({
         onSubresourceChanged?.();
     };
 
-    // 靜默刷新指定分頁的快取資料：於背景重新抓取並就地更新 cache[tabKey].data，
-    // 不觸發 loading 態、不卸載當前掛載的元件（其 state 為當前真相），
-    // 以便使用者切換分頁後再回來時「重新掛載」讀到最新資料，而非最初載入的舊快照。
-    // 失敗時保留既有快取，避免把已顯示的資料清成錯誤態。
-    const refreshTabCache = (tabKey: string) => {
-        if (personId == null || !tabKey) return;
-        const url = tabEndpoint
-            .replace('__PERSON_ID__', String(personId))
-            .replace('__TAB_KEY__', tabKey);
-        fetch(url)
-            .then((res) => {
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                return res.json();
-            })
-            .then((data) => {
-                setCache((prev) => ({ ...prev, [tabKey]: { loading: false, error: null, data } }));
-            })
-            .catch(() => {
-                /* 保留既有快取 */
-            });
-    };
-
     if (personId == null) {
         return null;
     }
 
     const state = effectiveCache[activeTab];
 
+    // 這幾個提示原為硬編碼中文。切分頁改為一律重抓後，載入佔位與失敗提示的出現頻率大增
+    // （尤其 basic_info 每次回訪都會短暫顯示），英文語境不能再落回中文，故改走 person 翻譯。
     if (!state || state.loading) {
-        return <div style={msgStyle}>載入中…</div>;
+        return <div style={msgStyle}>{tPerson('loading')}</div>;
     }
 
-    if (state.error) {
+    if (state.error != null) {
         return (
             <div style={{ ...msgStyle, color: 'var(--destructive)' }}>
-                <div>載入失敗：{state.error}</div>
+                <div>{tPerson('load_failed')}{state.error ? `：${state.error}` : ''}</div>
                 <button type="button" style={retryButtonStyle} onClick={retryActiveTab}>
-                    重新載入
+                    {tPerson('reload')}
                 </button>
             </div>
         );
@@ -271,12 +262,9 @@ export default function TabContentLoader({
                     t={tEditor}
                     onEditorStateChange={onBasicInfoEditorStateChange}
                     onRegisterSaveHandler={onRegisterBasicInfoSaveHandler}
-                    onSaved={() => {
-                        // 儲存成功後靜默刷新 basic_info 快取（修：切分頁再切回顯示舊值），
-                        // 並通知上層刷新摘要計數。
-                        refreshTabCache('basic_info');
-                        onBasicInfoSaved?.();
-                    }}
+                    // 儲存成功後只通知上層刷新摘要計數／標題；不必另外刷 basic_info 快取——
+                    // 編輯器保有剛存下的值，而下一次切回本分頁本來就會重新抓資料。
+                    onSaved={onBasicInfoSaved}
                 />
             );
         }
@@ -519,7 +507,7 @@ export default function TabContentLoader({
     }
 
     // Fallback（不應出現，但作為安全後備）
-    return <div style={msgStyle}>未支援的分頁：{activeTab}</div>;
+    return <div style={msgStyle}>{tPerson('unsupported_tab')}：{activeTab}</div>;
 }
 
 const msgStyle: React.CSSProperties = {

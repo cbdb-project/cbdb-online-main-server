@@ -4,6 +4,17 @@
 
 ## 2026-08
 
+### 人物編輯中樞切分頁一律重抓資料（修「別人改了、切分頁看不到」）
+- 現象（使用者回報 `/app/basicinformation/{id}/edit`）：某條記錄被別人或自己在另一個瀏覽器分頁新增／刪除／修改後，在本頁切分頁（例如別名→親屬→別名）時，分頁徽章計數與列表內容都不變，必須整頁重載才看得到。
+- 根因一：`TabContentLoader` 的分頁資料是「一載入就永久快取」（同一 personId 不重複請求），切走再切回沿用首次載入的快照。此前兩個 commit 只修了**自己在本頁的修改**（409fd9e 徽章、7f8d7a8 基本資料切分頁顯示舊值），別人的修改仍看不到。
+- 根因二：判斷「已快取」的旗標設在 `setCache` 的 updater 裡、下一行讀取——而 React 只在 eager state 快路徑才會同步呼叫 updater，因此該旗標並不可靠。實測（headless Chrome 對真實庫）13 個分頁裡 7～8 個沿用舊快取、5～6 個湊巧重抓，行為不確定。
+- 根因三：提供徽章計數與人物標題的 summary 端點只在掛載時抓一次（依賴不含 `activeTab`），切分頁完全不會重抓。兩個宿主頁（`PersonEditor` 中樞、`PersonBrowser/Index` 主從檢視）都是同一寫法。
+- 修法：新增純函式模組 `tabCachePolicy.ts`——**每次「分頁啟用」（personId／activeTab／重載序號任一改變）都重新向後端取資料**。已有資料的分頁在重新驗證期間先繼續顯示舊資料（不閃載入佔位；子資源端點約 13ms 伺服器工作、12 個計數皆為覆蓋索引查詢）；`basic_info` 例外一律等新資料才渲染，因為其內容 `BasicInfoEditor` 在掛載時把欄位值快照進自己的 state、之後不跟 props 同步，先用舊資料掛載會永遠停在舊值、按下儲存還會把舊值寫回覆蓋他人修改。啟用起始狀態在 render 期間標記（React 允許的「隨 props 調整 state」用法）而非 effect 裡，避免編輯器先以舊資料掛載一次再被替換。
+- 兩個宿主頁的 summary 依賴加入 `activeTab`：同一人物已有摘要時走靜默更新（不進 loading、失敗沿用舊摘要），並補 `AbortController` 讓慢的舊回應不會蓋掉新回應。每輪一律把 loading 設成「本輪的意圖」而非只在非靜默時設 true——否則「非靜默請求被中止→下一輪是靜默」會讓 `summaryLoading` 永遠卡住，而 `PersonSummaryPanel` 的 loading 分支在 summary 之前短路，整塊摘要面板會空掉（人物 A→B→A、或請求在途中 `person_id` 被移除即可重現）。連帶移除已無作用的 `refreshTabCache`（其職責由「每次啟用都重抓」結構性取代）與 `PersonEditor` 中從未被讀取的 `summaryLoading`／`summaryError`。
+- 每筆分頁快取帶一個 activation 戳記，回應落庫前比對：快取只以分頁為鍵，而 abort 發生在 effect cleanup（commit 之後），若回應落在「新一輪已 commit、cleanup 未跑」的空隙，就會把上一個人物／上一輪的資料寫進當前分頁。比對放在 `setCache` 的 updater 內、對 committed state 進行，不在 render 期間寫 ref（那會被丟棄的並行 render 汙染）。`activationKeyOf` 的組成必須與抓取 effect 的依賴**完全一致**（personId／分頁／重載序號／資料端點）——少涵蓋任一項就會出現「effect 重跑卻沿用同一戳記」，兩個請求共用戳記、舊回應可蓋掉新回應，且不重新標記啟用（`basic_info` 會在編輯器仍掛載時被塞進新資料、畫面仍停在舊快照）。此條由測試鎖住。
+- 順手補 i18n：`TabContentLoader` 的「載入中…／載入失敗／重新載入／未支援的分頁」原為硬編碼中文。改為一律重抓後這些提示的出現頻率大增（`basic_info` 每次回訪都會短暫顯示），英文語境不應再落回中文，故改走 `person` 翻譯（新增 `reload`／`unsupported_tab` 兩個鍵，zh-TW／en 同步）。
+- 回歸測試：`tabCachePolicy.test.ts`（vitest，鎖住「切分頁必須重抓」與 `basic_info` 不可先用舊資料渲染）。另以 headless Chrome 對真實 MariaDB 做端到端驗證：修復前後同一組 23 項檢查（外部新增／刪除／改親屬關係類型／改基本資料欄位在兩個宿主頁切分頁後即時反映；每次切分頁只發 1＋1 個請求、停在同頁不輪詢；快速連點與離線／重試路徑；不回歸 409fd9e／7f8d7a8 的自身修改情境）由 6 項失敗轉為全綠。
+
 ### 修改提案改為「同一編輯器＋同一管線重發」（resubmit），廢除通用全欄表單改提案
 - 根因追認（op 351725）：「修改提案」原復用 codes 通用編輯頁——按 `Schema::getColumnListing` **全欄**渲染（含四個稽核欄的空輸入框）、儲存時整包回寫 `resource_data` 且無白名單——提案被編輯一次，payload 就被灌入稽核欄 null 鍵，核准重放即撞 handler 白名單 422。「發提案」與「改提案」走不同介面與流程，正是髒 payload 的製造機。
 - 新流程：**修改提案＝單一交易內撤回舊提案＋以完全相同的提交流程重發**。新端點 `POST api/v2/proposals/{operation}/resubmit`（`MutationController::resubmit`）：驗擁有權／狀態 → 交易內先把舊提案標 `cancelled`（讓「同主鍵已有待審提案」護欄天然放行）→ 與 `store()` 相同 dispatch 重放 registry handler（mode 強制 proposal）→ 失敗整筆回滾（舊提案回到 pending、handler 欄位級錯誤原樣回給編輯器）→ 成功則舊 meta 記 `superseded_by`、新 meta 記 `resubmit_of`。「編輯後的 payload」與「新提交的 payload」由構造保證一致。

@@ -134,6 +134,9 @@ export default function CodeAutocomplete(props: Props) {
     const [selectedLabel, setSelectedLabel] = useState<string>(initialLabel ?? '');
     const containerRef = useRef<HTMLDivElement>(null);
     const debounceRef = useRef<number | null>(null);
+    // search 模式用：避免舊查詢（如常見姓氏字首，結果多、後端較慢）晚於新查詢（字數更多、結果少）
+    // 回應，導致 setOptions 被過期回應覆蓋、下拉顯示與目前輸入不符的候選（如誤留一筆不相干的舊結果）。
+    const searchSeqRef = useRef(0);
 
     // 同步 initialLabel（編輯既有資料時）。
     useEffect(() => {
@@ -168,7 +171,18 @@ export default function CodeAutocomplete(props: Props) {
 
     // search 模式：依輸入 debounce 查詢。
     useEffect(() => {
-        if (props.mode !== 'search' || !open) {
+        if (props.mode !== 'search') {
+            return;
+        }
+        // 一進 effect（即使用者按鍵、開關下拉的當下）就立刻認領新序號，而非等 250ms debounce
+        // 觸發才認領：這樣任何仍在飛行中的舊查詢回應，只要使用者已再次按鍵／關閉下拉，
+        // 就立刻失效（seq 落後），不需等到下一次 debounce 真正送出新請求才失效——
+        // 否則舊回應可能剛好在「使用者已打字但新請求尚未送出」的空窗期回來，覆蓋畫面。
+        const seq = ++searchSeqRef.current;
+        if (!open) {
+            // 認領新 seq 已讓任何仍在飛行中的舊請求的 finally 失效（guard 擋下），
+            // 這裡改由本次 effect 負責重置 loading，避免卡在「載入中」。
+            setLoading(false);
             return;
         }
         if (debounceRef.current) {
@@ -177,20 +191,24 @@ export default function CodeAutocomplete(props: Props) {
         const q = query.trim();
         if (q === '') {
             setOptions([]);
+            setLoading(false);
             return;
         }
         debounceRef.current = window.setTimeout(() => {
             setLoading(true);
             setError(null);
             fetchSearch((props as SearchProps).endpoint, q, (props as SearchProps).extraQuery)
-                .then(setOptions)
-                .catch((e) => setError(e instanceof Error ? e.message : '查詢失敗'))
-                .finally(() => setLoading(false));
+                .then((opts) => { if (seq === searchSeqRef.current) setOptions(opts); })
+                .catch((e) => { if (seq === searchSeqRef.current) setError(e instanceof Error ? e.message : '查詢失敗'); })
+                .finally(() => { if (seq === searchSeqRef.current) setLoading(false); });
         }, 250);
         return () => {
             if (debounceRef.current) {
                 window.clearTimeout(debounceRef.current);
             }
+            // 防禦性處理：若 mode 從 'search' 切換離開（目前無呼叫端會動態切換，但避免未來新增
+            // 用法時遺漏），讓本次仍在飛行中的 search 請求跟著失效，不讓其回應影響切換後的狀態。
+            ++searchSeqRef.current;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [query, open, props.mode]);

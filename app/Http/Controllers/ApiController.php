@@ -26,6 +26,7 @@ use App\Repositories\NianHaoRepository;
 use App\Repositories\YearRangeRepository;
 use App\Services\PinyinDictionary;
 use App\Services\VariantCharNormalizer;
+use App\Support\ExactCodeMatchGuard;
 use App\Support\PinyinUmlaut;
 use App\v1;
 use Illuminate\Http\Request;
@@ -168,7 +169,7 @@ class ApiController extends Controller {
 
     public function searchText(Request $request) {
         //20190708依據需求修改輸出內容
-        $data = TextCode::where('c_title_chn', 'like', '%'.$request->q.'%')->orWhere('c_title', 'like', '%'.$request->q.'%')->orWhere('c_textid', $request->q)->paginate(20);
+        $data = TextCode::where('c_title_chn', 'like', '%'.$request->q.'%')->orWhere('c_title', 'like', '%'.$request->q.'%')->when(ExactCodeMatchGuard::isNumeric($request->q), fn ($q) => $q->orWhere('c_textid', $request->q))->paginate(20);
         $data->appends(['q' => $request->q])->links();
         foreach ($data as $item) {
             $item['id'] = $item->c_textid;
@@ -241,7 +242,7 @@ class ApiController extends Controller {
         $baseQuery = OfficeCode::where(function ($q) use ($request) {
             $q->where('c_office_chn', 'like', '%'.$request->q.'%')
                 ->orWhere('c_office_pinyin', 'like', '%'.$request->q.'%')
-                ->orWhere('c_office_id', $request->q);
+                ->when(ExactCodeMatchGuard::isNumeric($request->q), fn ($q2) => $q2->orWhere('c_office_id', $request->q));
         });
 
         if ((int) $request->c_dy > 0) {
@@ -272,7 +273,7 @@ class ApiController extends Controller {
     }
 
     public function socialinst(Request $request) {
-        $data = SocialInst::where('c_inst_name_hz', 'like', '%'.$request->q.'%')->orWhere('c_inst_name_py', 'like', '%'.$request->q.'%')->orWhere('c_inst_name_code', $request->q)->paginate(20);
+        $data = SocialInst::where('c_inst_name_hz', 'like', '%'.$request->q.'%')->orWhere('c_inst_name_py', 'like', '%'.$request->q.'%')->when(ExactCodeMatchGuard::isNumeric($request->q), fn ($q) => $q->orWhere('c_inst_name_code', $request->q))->paginate(20);
         $data->appends(['q' => $request->q])->links();
         foreach ($data as $item) {
             $item['id'] = $item->c_inst_name_code;
@@ -422,7 +423,7 @@ class ApiController extends Controller {
     }
 
     public function searchEntry(Request $request) {
-        $data = EntryCode::where('c_entry_desc_chn', 'like', '%'.$request->q.'%')->orWhere('c_entry_desc', 'like', '%'.$request->q.'%')->orWhere('c_entry_code', $request->q)->paginate(20);
+        $data = EntryCode::where('c_entry_desc_chn', 'like', '%'.$request->q.'%')->orWhere('c_entry_desc', 'like', '%'.$request->q.'%')->when(ExactCodeMatchGuard::isNumeric($request->q), fn ($q) => $q->orWhere('c_entry_code', $request->q))->paginate(20);
         $data->appends(['q' => $request->q])->links();
         foreach ($data as $item) {
             $item['id'] = $item->c_entry_code;
@@ -436,7 +437,7 @@ class ApiController extends Controller {
     }
 
     public function searchKincode(Request $request) {
-        $data = KinshipCode::where('c_kinrel_chn', 'like', '%'.$request->q.'%')->orWhere('c_kinrel', 'like', '%'.$request->q.'%')->orWhere('c_kincode', $request->q)->paginate(20);
+        $data = KinshipCode::where('c_kinrel_chn', 'like', '%'.$request->q.'%')->orWhere('c_kinrel', 'like', '%'.$request->q.'%')->when(ExactCodeMatchGuard::isNumeric($request->q), fn ($q) => $q->orWhere('c_kincode', $request->q))->paginate(20);
         $data->appends(['q' => $request->q])->links();
         foreach ($data as $item) {
             $item['id'] = $item->c_kincode;
@@ -450,7 +451,7 @@ class ApiController extends Controller {
     }
 
     public function searchAssoccode(Request $request) {
-        $data = AssocCode::where('c_assoc_desc', 'like', '%'.$request->q.'%')->orWhere('c_assoc_desc_chn', 'like', '%'.$request->q.'%')->orWhere('c_assoc_code', $request->q)->paginate(20);
+        $data = AssocCode::where('c_assoc_desc', 'like', '%'.$request->q.'%')->orWhere('c_assoc_desc_chn', 'like', '%'.$request->q.'%')->when(ExactCodeMatchGuard::isNumeric($request->q), fn ($q) => $q->orWhere('c_assoc_code', $request->q))->paginate(20);
         $data->appends(['q' => $request->q])->links();
         foreach ($data as $item) {
             $item['id'] = $item->c_assoc_code;
@@ -464,7 +465,7 @@ class ApiController extends Controller {
     }
 
     public function searchStatuscode(Request $request) {
-        $data = StatusCode::where('c_status_desc', 'like', '%'.$request->q.'%')->orWhere('c_status_desc_chn', 'like', '%'.$request->q.'%')->orWhere('c_status_code', $request->q)->paginate(20);
+        $data = StatusCode::where('c_status_desc', 'like', '%'.$request->q.'%')->orWhere('c_status_desc_chn', 'like', '%'.$request->q.'%')->when(ExactCodeMatchGuard::isNumeric($request->q), fn ($q) => $q->orWhere('c_status_code', $request->q))->paginate(20);
         $data->appends(['q' => $request->q])->links();
         foreach ($data as $item) {
             $item['id'] = $item->c_status_code;
@@ -522,10 +523,12 @@ class ApiController extends Controller {
 
                 $data = $query->paginate($num);
             } else {
-                // 回退方案：FTS 未找到結果時，使用原有的 LIKE 查詢（§D-8：c_name 以展開集 OR 同查 v／ü 形）
+                // 回退方案：FTS 未找到結果時，使用原有的 LIKE 查詢（§D-8：c_name 以展開集 OR 同查 v／ü 形）。
+                // 註：走到這個 else 分支時 $request->q 必為非純數字（純數字已在上方 ctype_digit 分支處理），
+                // 不再加 orWhere('c_personid', $request->q)——否則 MySQL/MariaDB 會把非數字字串寬鬆轉型成 0，
+                // 誤中 c_personid=0（「未詳」占位列）。
                 $data = BiogMain::where(function ($sub) use ($request, $qForms) {
-                    $sub->where('c_name_chn', 'like', '%'.$request->q.'%')
-                        ->orWhere('c_personid', $request->q);
+                    $sub->where('c_name_chn', 'like', '%'.$request->q.'%');
                     foreach ($qForms as $form) {
                         $sub->orWhere('c_name', 'like', '%'.$form.'%');
                     }
@@ -547,7 +550,7 @@ class ApiController extends Controller {
     }
 
     public function searchEvent(Request $request) {
-        $data = EventCode::where('c_event_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_event_name', 'like', '%'.$request->q.'%')->orWhere('c_event_code', $request->q)->paginate(20);
+        $data = EventCode::where('c_event_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_event_name', 'like', '%'.$request->q.'%')->when(ExactCodeMatchGuard::isNumeric($request->q), fn ($q) => $q->orWhere('c_event_code', $request->q))->paginate(20);
         $data->appends(['q' => $request->q])->links();
         foreach ($data as $item) {
             $item['id'] = $item->c_event_code;
@@ -562,7 +565,7 @@ class ApiController extends Controller {
 
     public function codeAddr(Request $request) {
         $num = is_null($request->num) ? 20 : $request->num;
-        $data = AddressCode::where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_addr_id', $request->q)->paginate($num);
+        $data = AddressCode::where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->when(ExactCodeMatchGuard::isNumeric($request->q), fn ($q) => $q->orWhere('c_addr_id', $request->q))->paginate($num);
         $data->appends(['q' => $request->q])->links();
 
         return $data;

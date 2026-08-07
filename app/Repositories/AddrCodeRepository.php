@@ -12,6 +12,7 @@ namespace App\Repositories;
 use App\Models\AddrBelong;
 use App\Models\AddrCode;
 use App\Models\AddressCode;
+use App\Support\ExactCodeMatchGuard;
 use Illuminate\Http\Request;
 
 /**
@@ -38,7 +39,7 @@ class AddrCodeRepository {
         if (!$request->q) {
             return AddressCode::select(['c_addr_id', 'c_name_chn', 'c_name'])->paginate($num);
         }
-        $names = AddressCode::select(['c_addr_id', 'c_name_chn', 'c_name'])->where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->orWhere('c_addr_id', $request->q)->paginate($num);
+        $names = AddressCode::select(['c_addr_id', 'c_name_chn', 'c_name'])->where('c_name_chn', 'like', '%'.$request->q.'%')->orWhere('c_name', 'like', '%'.$request->q.'%')->when(ExactCodeMatchGuard::isNumeric($request->q), fn ($q) => $q->orWhere('c_addr_id', $request->q))->paginate($num);
         $names->appends(['q' => $request->q])->links();
 
         return $names;
@@ -84,7 +85,7 @@ class AddrCodeRepository {
         $query = AddrCode::where(function ($q) use ($request) {
             $q->where('c_name_chn', 'like', '%'.$request->q.'%')
                 ->orWhere('c_name', 'like', '%'.$request->q.'%')
-                ->orWhere('c_addr_id', $request->q);
+                ->when(ExactCodeMatchGuard::isNumeric($request->q), fn ($q2) => $q2->orWhere('c_addr_id', $request->q));
         });
 
         // 根據朝代起止年過濾地址：地址的 c_firstyear~c_lastyear 必須與朝代起止年有交集

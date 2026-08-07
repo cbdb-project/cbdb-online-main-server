@@ -290,6 +290,13 @@ Route::get('app/codes', 'CodesController@appIndex')
 // 直連 live 生產庫，故加 throttle 防爬蟲爆量。設計見 docs/OFFICE_CODES_EXPORT_SYNC.md。
 Route::get('codes/{table_name}/export', 'CodesController@export')->name('codes.export')->middleware('throttle:6,1');
 Route::get('codes/{table_name}', 'CodesController@show')->name('codes.show');
+// TEXT_INSTANCE_DATA 的「Load Data」用：依 c_textid 精確取回書名（JSON，不掛 inertia）。
+// 額外路徑段，置於下方 {table_name} 泛用路由之前，避免被攔截。
+// 直連 live 生產庫、且與 codes 讀取面一樣無登入門檻，故加 throttle（同 codes.export 的理由）。
+Route::get('app/codes/text-title/{textId}', 'CodesController@textTitle')
+    ->where('textId', '[0-9]+')
+    ->middleware('throttle:60,1')
+    ->name('app.codes.text-title');
 // Inertia + React 版（單表資料檢視 + 新增流程）
 Route::get('app/codes/{table_name}/create', 'CodesController@appCreate')
     ->middleware('inertia')

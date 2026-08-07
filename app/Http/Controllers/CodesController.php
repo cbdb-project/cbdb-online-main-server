@@ -29,6 +29,12 @@ class CodesController extends Controller {
      */
     protected const TEXT_AUTHOR_DISPLAY_LIMIT = 200;
 
+    /**
+     * 稽核欄：一律由系統蓋章（見 AGENTS.md §1.2、enforceAuditFieldsForCreate/Update），
+     * 因此在泛用 codes 表單上為唯讀——使用者輸入不會生效，開放編輯只會誤導。
+     */
+    protected const AUDIT_COLUMNS = ['c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date'];
+
     protected $codesrepostory;
     protected $operationRepository;
 
@@ -945,6 +951,9 @@ class CodesController extends Controller {
             'required_columns' => $this->codeColumnFormMeta($table)['required'],
             'can_propose' => Auth::check() && Auth::user()->isActive(),
             'tier2_fields' => $this->codeTableTier2Fields($table),
+            // 逐欄特殊行為（稽核欄唯讀＋替換預覽、欄位提示、Load Data 動作）。
+            'column_behaviour' => $this->codeColumnBehaviour($table, array_keys($rowArray), 'edit'),
+            'text_title_endpoint' => route('app.codes.text-title', ['textId' => '__TEXT_ID__'], false),
             // TEXT_CODES：附上該書的作者／編者等關係人（唯讀錄入參考）。其餘碼表為 null，前端不渲染。
             // 用 isset 而非 ?? 0：c_textid=0 是真實可編輯的「未知」書目列（其下掛著 37 筆關係人），
             // 不能與「取不到 c_textid」混為一談而一律查 0。
@@ -1047,6 +1056,111 @@ class CodesController extends Controller {
             'truncated' => $truncated,
             'failed' => false,
         ];
+    }
+
+    /**
+     * 泛用 codes 表單的「按表／按欄位」特殊行為。
+     *
+     * React 版把 codes 新增／編輯頁寫成泛用表單（columns → input），舊版 codes/edit.blade.php 的
+     * 逐欄特殊處理因此全部漏移植：稽核欄唯讀與「提交後會被替換為 X」提示、TEXT_CODES／ADDR_CODES
+     * 的複製提示、TEXT_INSTANCE_DATA 的「Load Data」按鈕。這裡把那些知識集中成一份資料，
+     * 由 Create／Edit 兩頁共用，避免各自再長出一套硬編碼。
+     *
+     * 提示文字刻意在後端翻譯：`field_will_be_replaced` 要串當下的署名與時間戳（與實際落庫的
+     * AuditActor::currentName() 一致）。連結另以結構化資料傳出，前端不需要 dangerouslySetInnerHTML。
+     *
+     * @param  array<int, string> $columns
+     * @param  string             $mode edit|create|proposal。稽核欄唯讀三者皆同；「提交後會被替換為 X」
+     *                                  只在 edit 有意義——proposal 的替換發生在核准當下、由審核人蓋章，
+     *                                  現在預告一個署名與時間都會不同的值只會誤導。
+     * @return array<string, array<string, mixed>>
+     */
+    protected function codeColumnBehaviour(string $table, array $columns, string $mode): array {
+        $behaviour = [];
+
+        // 稽核欄一律由系統蓋章，任何模式都不開放使用者編輯 → 灰底唯讀（可看、可複製、不可改）。
+        // 新增與編輯採同一條規則，不做「新增時隱藏」的第二套行為。
+        // 用 readonly 而非 disabled：這四欄的用途就是被讀，disabled 會讓文字無法選取；
+        // 舊版 codes/edit.blade.php 用的也是 readonly。
+        foreach (self::AUDIT_COLUMNS as $column) {
+            if (!in_array($column, $columns, true)) {
+                continue;
+            }
+            $behaviour[$column] = ['readonly' => true];
+        }
+
+        // 「提交後會被替換為 X」：只有 c_modified_* 會被改寫成當下值，故只有這兩欄給預覽。
+        if ($mode === 'edit' && Auth::check() && Auth::user()->isActive()) {
+            $preview = [
+                'c_modified_by' => \App\Support\AuditActor::currentName(),
+                'c_modified_date' => Carbon::now(config('app.timezone'))->format('Y-m-d H:i:s'),
+            ];
+            foreach ($preview as $column => $value) {
+                if (isset($behaviour[$column]) && $value !== null && $value !== '') {
+                    // tone=warn：這不是一般說明，是「你看到的值會被覆蓋」的警示（舊版是 text-info + <strong>）。
+                    $behaviour[$column]['hint'] = [
+                        'text' => __('codes.field_will_be_replaced').$value,
+                        'tone' => 'warn',
+                    ];
+                }
+            }
+        }
+
+        // 逐表欄位提示（文案無 HTML，連結另傳）＋額外互動。
+        $hints = [
+            'TEXT_INSTANCE_DATA' => [
+                'c_textid' => [
+                    'hint' => [
+                        'text' => __('codes.hint_text_codes_copy'),
+                        'link' => ['href' => $this->codesShowUrl('TEXT_CODES'), 'label' => 'TEXT_CODES'],
+                    ],
+                    // 依 c_textid 從 TEXT_CODES 帶入書名（對齊舊版「Load Data」鈕）。
+                    'action' => 'load_text_title',
+                ],
+            ],
+            'ADDR_BELONGS_DATA' => [
+                'c_addr_id' => ['hint' => [
+                    'text' => __('codes.hint_addr_copy'),
+                    'link' => ['href' => $this->codesShowUrl('ADDR_CODES'), 'label' => 'ADDR_CODES'],
+                ]],
+                'c_belongs_to' => ['hint' => [
+                    'text' => __('codes.hint_addr_copy'),
+                    'link' => ['href' => $this->codesShowUrl('ADDR_CODES'), 'label' => 'ADDR_CODES'],
+                ]],
+            ],
+        ];
+
+        foreach ($hints[$table] ?? [] as $column => $extra) {
+            if (!in_array($column, $columns, true)) {
+                continue;
+            }
+            $behaviour[$column] = array_merge($behaviour[$column] ?? [], $extra);
+        }
+
+        return $behaviour;
+    }
+
+    /**
+     * TEXT_INSTANCE_DATA 的「Load Data」用：依 c_textid 精確取回書名。
+     *
+     * 舊版按鈕打的是 /api/select/search/text（`c_title_chn LIKE %q% OR c_textid = q` 再取 data[0]），
+     * 用 ID 查時可能撈到「標題剛好含這串數字」的別本書。這裡改為主鍵精確查詢，不重現該缺陷。
+     */
+    public function textTitle($textId) {
+        $row = DB::table('TEXT_CODES')
+            ->where('c_textid', (int) $textId)
+            ->first(['c_textid', 'c_title_chn', 'c_title']);
+
+        if (!$row) {
+            return response()->json(['found' => false], 404);
+        }
+
+        return response()->json([
+            'found' => true,
+            'c_textid' => (int) $row->c_textid,
+            'c_title_chn' => $row->c_title_chn,
+            'c_title' => $row->c_title,
+        ]);
     }
 
     public function update(Request $request, $table_name, $id) {
@@ -1183,6 +1297,8 @@ class CodesController extends Controller {
         $columns = $this->getTableColumns($table);
         $keyColumns = $this->getKeyColumns($table);
         $columns = $this->orderColumnsForCreate($columns, $keyColumns);
+        // 稽核欄仍留在欄位清單內（送出內容與先前完全相同，不改寫入行為）；
+        // 只在 UI 上停用——見 codeColumnBehaviour()。
 
         $defaults = [];
         $firstKey = $keyColumns[0] ?? null;
@@ -1209,6 +1325,9 @@ class CodesController extends Controller {
             'required_columns' => $formMeta['required'],
             'can_propose' => Auth::check() && Auth::user()->isActive(),
             'tier2_fields' => $this->codeTableTier2Fields($table),
+            // 與 edit 共用同一份逐欄行為（此頁的欄位提示原為前端硬編碼中文，改由此處統一供給）。
+            'column_behaviour' => $this->codeColumnBehaviour($table, array_values($columns), 'create'),
+            'text_title_endpoint' => route('app.codes.text-title', ['textId' => '__TEXT_ID__'], false),
             'urls' => [
                 'store' => route('app.codes.store', ['table_name' => $table], false),
                 'propose' => route('app.codes.propose.store', ['table_name' => $table], false),
@@ -1336,6 +1455,9 @@ class CodesController extends Controller {
             'review_status' => $payload['__review_status'] ?? 'pending',
             'review_comment' => $payload['__review_comment'] ?? null,
             'is_create_proposal' => (int) $operation['op_type'] === Operation::TYPE_PROPOSAL_CREATE,
+            // 提案調整頁同樣不開放編輯稽核欄（三個碼表表單一致）。核准端本來就會剔除並重蓋，
+            // 但讓使用者對著一個會被丟棄的輸入框打字沒有意義。mode=proposal → 唯讀但不給替換預覽。
+            'column_behaviour' => $this->codeColumnBehaviour($table, array_values($columns), 'proposal'),
             'urls' => [
                 'update' => route('app.codes.proposals.update', ['table_name' => $table, 'operation' => $operation['id']], false),
                 'return' => route('operations.index', ['proposals_only' => 1], false),

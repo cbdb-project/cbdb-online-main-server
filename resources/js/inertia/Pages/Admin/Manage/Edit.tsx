@@ -50,7 +50,10 @@ export default function ManageEdit() {
         is_admin: user.is_admin,
         delete_user: 0,
     });
+    // 刪除帳號不可逆，沿用舊版 manage/edit.blade.php 的**兩段確認**（第一段說明不可恢復、
+    // 第二段最後確認）。React 版遷移時收斂成單一 modal，這裡補回第二道閘。
     const [confirmDelete, setConfirmDelete] = useState(false);
+    const [confirmDeleteFinal, setConfirmDeleteFinal] = useState(false);
 
     const save = (e: React.FormEvent) => {
         e.preventDefault();
@@ -132,15 +135,36 @@ export default function ManageEdit() {
                 </form>
             </div>
 
+            {/* 第一段：說明此操作不可恢復（對齊舊版 manage_confirm_delete_1）。 */}
             <ConfirmDialog
                 open={confirmDelete}
                 onOpenChange={setConfirmDelete}
                 title={t('manage_delete_user')}
-                confirmLabel={tc('delete')}
+                // 翻譯字串本身帶 \n\n（舊版走 window.confirm，空行就是重點強調），
+                // HTML 會把換行摺成空白，故用 whitespace-pre-line 保住斷行。
+                description={<span className="whitespace-pre-line">{t('manage_confirm_delete_1')}</span>}
+                confirmLabel={tc('continue')}
                 cancelLabel={tc('cancel')}
                 destructive
                 onConfirm={() => {
                     setConfirmDelete(false);
+                    setConfirmDeleteFinal(true);
+                }}
+            />
+
+            {/* 第二段：最後確認才真的送出（對齊舊版 manage_confirm_delete_2）。 */}
+            <ConfirmDialog
+                open={confirmDeleteFinal}
+                onOpenChange={setConfirmDeleteFinal}
+                title={t('manage_delete_user')}
+                description={t('manage_confirm_delete_2')}
+                confirmLabel={tc('delete')}
+                cancelLabel={tc('cancel')}
+                destructive
+                // 不傳 loading：onConfirm 會先關掉這個對話框再送出，loading 態永遠不會被看到。
+                // 送出期間的重複點擊由表單裡「刪除此用戶」鈕的 disabled={form.processing} 擋住。
+                onConfirm={() => {
+                    setConfirmDeleteFinal(false);
                     submitDelete();
                 }}
             />

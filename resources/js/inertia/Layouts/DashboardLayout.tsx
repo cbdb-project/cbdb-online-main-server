@@ -6,6 +6,7 @@ import { useFontMode } from '../hooks/useFontMode';
 import Sidebar from '../components/shell/Sidebar';
 import Navbar from '../components/shell/Navbar';
 import FlashMessages from '../components/shell/FlashMessages';
+import QueryProfile from '../components/shell/QueryProfile';
 import { type Crumb } from '../components/shell/Breadcrumbs';
 
 interface DashboardLayoutProps {
@@ -72,6 +73,12 @@ export default function DashboardLayout({ children, title, description, breadcru
 
                     {children}
                 </main>
+
+                {/* SQL 查詢明細（僅管理員；非管理員的 request 連收集都不做）。舊版 Blade layout 有、
+                    React layout 漏移植，導致照樣收集卻沒人看得到。
+                    外層留白由元件自帶：包在這裡的話，非管理員（回傳 null）每頁都會多一個
+                    只有 padding 的空 div，在頁尾上方留下一條無來由的空白。 */}
+                <QueryProfile />
 
                 <footer className="border-t border-border bg-card px-4 py-3 text-sm text-muted-foreground">
                     <div className="flex flex-wrap justify-between gap-2">

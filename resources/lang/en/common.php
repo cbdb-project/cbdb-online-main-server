@@ -4,6 +4,8 @@ return [
     'save'              => 'Save',
     'confirm'           => 'Confirm',
     'cancel'            => 'Cancel',
+    // First step of a two-step confirmation (e.g. deleting a user: acknowledge, then confirm).
+    'continue'          => 'Continue',
     'search'            => 'Search',
     'delete'            => 'Delete',
     'add'               => 'New',
@@ -156,5 +158,8 @@ return [
     'query_profile_time'    => 'Time (ms)',
     'query_profile_sql'     => 'SQL',
     'query_profile_bindings' => 'Bindings',
-    'query_profile_truncated' => 'Showing first :n queries only.',
+    // Not "first :n": details are only retained once the user is resolved, so the
+    // listed queries are not necessarily the earliest ones.
+    'query_profile_truncated' => 'Only :n of them are listed in detail.',
+    'query_profile_from_page_load' => 'These details are from the initial page load; partial updates refresh the counts above only.',
 ];

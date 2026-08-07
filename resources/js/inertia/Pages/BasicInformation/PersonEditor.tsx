@@ -78,9 +78,9 @@ export default function PersonEditor() {
 
     const tPerson = useTranslation('person');
 
+    // 本頁不渲染摘要的 loading／error 態（標題與徽章在摘要到齊前分別退回 person_label／person_banner.counts），
+    // 故不保留對應 state——先前那兩個 state 從未被讀取。
     const [summary, setSummary] = useState<PersonSummary | null>(null);
-    const [summaryLoading, setSummaryLoading] = useState(false);
-    const [summaryError, setSummaryError] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState(initialTab || 'basic_info');
     const [summaryRefreshKey, setSummaryRefreshKey] = useState(0);
     const [basicInfoEditorState, setBasicInfoEditorState] = useState({ editing: false, dirty: false });
@@ -96,22 +96,30 @@ export default function PersonEditor() {
     useEffect(() => registerDirtyChecker(() => dirtyRef.current), []);
 
     // ── 載入摘要（header + tab_counts）──
+    // 依賴含 activeTab：**每次切分頁都重新抓摘要**，否則分頁徽章計數會停在頁面初載的數字——
+    // 其他人（或自己在另一個瀏覽器分頁）新增／刪除記錄後，切分頁時計數不會變（須整頁重載才更新）。
+    // 已有「同一個人物」的摘要時，失敗就沿用舊摘要（計數暫時偏舊勝過把標題與徽章清空）。
+    const summaryPersonRef = useRef<number | null>(null);
+    summaryPersonRef.current = summary?.c_personid ?? null;
     useEffect(() => {
-        setSummaryLoading(true);
-        setSummaryError(null);
+        const hasSamePerson = summaryPersonRef.current === personId;
+        // 快速連續切分頁會疊發多個請求；abort 舊請求，避免慢的舊回應蓋掉新回應。
+        const controller = new AbortController();
         const url = summaryEndpoint.replace('__PERSON_ID__', String(personId));
-        fetch(url)
+        fetch(url, { signal: controller.signal })
             .then((r) => {
                 if (!r.ok) throw new Error(`HTTP ${r.status}`);
                 return r.json();
             })
             .then((data) => setSummary(data))
             .catch((err) => {
-                setSummaryError(err instanceof Error ? err.message : tPerson('load_failed'));
+                if (err instanceof DOMException && err.name === 'AbortError') return;
+                if (hasSamePerson) return;
                 setSummary(null);
-            })
-            .finally(() => setSummaryLoading(false));
-    }, [personId, summaryEndpoint, summaryRefreshKey, tPerson]);
+            });
+
+        return () => controller.abort();
+    }, [personId, summaryEndpoint, summaryRefreshKey, activeTab]);
 
     // ── 離頁守衛（編輯中有未儲存變更時）──
     useEffect(() => {

@@ -341,28 +341,54 @@ export default function PersonBrowserIndex() {
     }, []);
 
     // ── Load summary when selectedId changes ──
+    // 依賴含 activeTab：**每次切分頁都重新抓摘要**，否則分頁徽章計數會停在選取人物時的數字——
+    // 其他人（或自己在另一個瀏覽器分頁）新增／刪除記錄後，切分頁時計數不會變（須整頁重載才更新）。
+    // 已有摘要時為靜默更新：不進 loading、失敗也保留舊摘要，避免每次切分頁都閃一下摘要面板。
+    // 只有「同一個人物、已有摘要」才靜默更新；換人物時仍走 loading，避免面板短暫顯示上一個人的摘要。
+    const summaryPersonRef = useRef<number | null>(null);
+    summaryPersonRef.current = summary?.c_personid ?? null;
     useEffect(() => {
         if (selectedId == null) {
             setSummary(null);
+            setSummaryLoading(false);
+            setSummaryError(null);
             return;
         }
-        setSummaryLoading(true);
-        setSummaryError(null);
+        const silent = summaryPersonRef.current === selectedId;
+        // 每次執行都把 loading 設成「本次的意圖」，不是只在非靜默時設 true：
+        // 否則「非靜默請求被中止 → 下一輪是靜默」會讓 loading 永遠卡在 true
+        // （PersonSummaryPanel 的 loading 分支在 summary 之前短路，面板會整塊空掉）。
+        setSummaryLoading(!silent);
+        if (!silent) {
+            setSummaryError(null);
+        }
+        // 快速連續切分頁會疊發多個請求；abort 舊請求，避免慢的舊回應蓋掉新回應。
+        const controller = new AbortController();
         const url = summaryEndpoint.replace('__PERSON_ID__', String(selectedId));
-        fetch(url)
+        fetch(url, { signal: controller.signal })
             .then((r) => {
                 if (!r.ok) throw new Error(`HTTP ${r.status}`);
                 return r.json();
             })
             .then((data) => {
                 setSummary(data);
+                setSummaryError(null);
             })
             .catch((err) => {
+                if (err instanceof DOMException && err.name === 'AbortError') return;
+                // 靜默更新失敗就沿用既有摘要（計數暫時偏舊勝過把摘要面板清空）。
+                if (silent) return;
                 setSummaryError(err.message || tPerson('load_failed'));
                 setSummary(null);
             })
-            .finally(() => setSummaryLoading(false));
-    }, [selectedId, summaryEndpoint, summaryRefreshKey]);
+            .finally(() => {
+                // 已被中止＝已有新的一輪接手（cleanup 先於新 effect 執行，而本回呼在其後才跑），
+                // 此時不可再覆寫新一輪剛設好的 loading。
+                if (!controller.signal.aborted) setSummaryLoading(false);
+            });
+
+        return () => controller.abort();
+    }, [selectedId, summaryEndpoint, summaryRefreshKey, activeTab]);
 
     // ── Tab change ──
     const handleTabChange = useCallback(

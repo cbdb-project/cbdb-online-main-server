@@ -190,6 +190,8 @@ return [
     'text_type_explanatory' => 'Explanatory Texts',
 
     'load_failed' => 'Load failed',
+    'reload' => 'Reload',
+    'unsupported_tab' => 'Unsupported tab',
     'query_failed' => 'Query failed',
     'results_record_summary' => 'Records: :record_count / Persons: :person_count',
     'results_empty_hint' => 'Set filters above; click any tile to open the filter dialog, then run the query.',

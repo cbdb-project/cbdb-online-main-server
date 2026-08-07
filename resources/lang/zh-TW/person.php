@@ -190,6 +190,8 @@ return [
     'text_type_explanatory' => '論說',
 
     'load_failed' => '載入失敗',
+    'reload' => '重新載入',
+    'unsupported_tab' => '未支援的分頁',
     'query_failed' => '查詢失敗',
     'results_record_summary' => '記錄 :record_count 筆 / 人物 :person_count 位',
     'results_empty_hint' => '先在上方設定條件；每一格都可以直接點開 modal 編輯，再執行查詢。',

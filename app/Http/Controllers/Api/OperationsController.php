@@ -8,12 +8,30 @@ use App\Models\OfficeCode;
 use App\Models\OfficeCodeTypeRel;
 use App\Models\OfficeTypeTree;
 use App\Models\Operation;
+use App\Models\User;
 use App\Repositories\BiogMainRepository;
 use Auth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class OperationsController extends Controller {
+    /**
+     * 依 confirmation_token 解析呼叫者，並要求帳號為啟用狀態（is_active=1）。
+     * 找不到對應使用者、或帳號未啟用（含被停用者）一律回 null，寫入端據此拒絕，
+     * 避免未啟用帳號僅憑外洩／自查的 token 就能經此通道寫入 operations。
+     */
+    private function resolveActiveUserByToken($token): ?User {
+        if (!is_string($token) || $token === '') {
+            return null;
+        }
+        $user = User::where('confirmation_token', $token)->first();
+        if (!$user || !$user->isActive()) {
+            return null;
+        }
+
+        return $user;
+    }
+
     public function add(Request $request) {
         //用來將json存入operations
         $x = $this->add_operations($request);
@@ -36,13 +54,11 @@ class OperationsController extends Controller {
     }
 
     public function add_operations($keyword) {
-        $z = $keyword['token'];
-        $token = DB::table('users')->where('confirmation_token', $z)->get();
-        $token = json_decode($token, true);
-        $token = $token[0]['id'];
-        if (empty($token)) {
-            return '500';
+        $user = $this->resolveActiveUserByToken($keyword['token'] ?? null);
+        if (!$user) {
+            return response('403', 403);
         }
+        $token = $user->id;
         $x = $keyword['json'];
         if (empty($x)) {
             return '500';
@@ -72,13 +88,11 @@ class OperationsController extends Controller {
     }
 
     public function update_operations($keyword) {
-        $z = $keyword['token'];
-        $token = DB::table('users')->where('confirmation_token', $z)->get();
-        $token = json_decode($token, true);
-        $token = $token[0]['id'];
-        if (empty($token)) {
-            return '500';
+        $user = $this->resolveActiveUserByToken($keyword['token'] ?? null);
+        if (!$user) {
+            return response('403', 403);
         }
+        $token = $user->id;
         $x = $keyword['json'];
         if (empty($x)) {
             return '500';
@@ -136,13 +150,11 @@ class OperationsController extends Controller {
     }
 
     public function destroy_operations($keyword) {
-        $z = $keyword['token'];
-        $token = DB::table('users')->where('confirmation_token', $z)->get();
-        $token = json_decode($token, true);
-        $token = $token[0]['id'];
-        if (empty($token)) {
-            return '500';
+        $user = $this->resolveActiveUserByToken($keyword['token'] ?? null);
+        if (!$user) {
+            return response('403', 403);
         }
+        $token = $user->id;
         $y = $keyword['resource'];
         if (empty($y)) {
             return '500';

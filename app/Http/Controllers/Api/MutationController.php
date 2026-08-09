@@ -25,7 +25,31 @@ class MutationController extends Controller {
         $this->mirrorService = $mirrorService;
     }
 
+    /**
+     * 所有寫入端點（store/create/delete/batchStore/resubmit）的最外層守衛：
+     * 未登入回 401、已登入但帳號未啟用（is_active != 1，含被停用者）回 403。
+     *
+     * 各 handler 內部仍會依 direct／proposal 再做角色級授權（canWriteDirectly／canPropose，
+     * 見 AbstractMutationHandler），此處是縱深防禦——即使未來新增的 handler 漏掉授權，
+     * 未啟用帳號也無法從這裡進入任何寫入路徑。回傳非 null 即代表應直接以該回應中止。
+     */
+    private function guardActiveUser(): ?JsonResponse {
+        $user = Auth::user();
+        if (!$user) {
+            return $this->errorResponse('Unauthenticated.', 401);
+        }
+        if (!$user->isActive()) {
+            return $this->errorResponse('該使用者沒有權限，請聯繫管理員', 403);
+        }
+
+        return null;
+    }
+
     public function store(Request $request): JsonResponse {
+        if ($guard = $this->guardActiveUser()) {
+            return $guard;
+        }
+
         $payload = $request->json()->all();
         if (!is_array($payload) || empty($payload)) {
             $payload = $request->all();
@@ -82,6 +106,10 @@ class MutationController extends Controller {
         }
 
         $user = Auth::user();
+        // 未啟用（含被停用）帳號一律不得重發提案，即使是提案本人。
+        if (!$user->isActive()) {
+            return $this->errorResponse('該使用者沒有權限，請聯繫管理員', 403);
+        }
         $isOwner = (int) $operation->user_id === (int) Auth::id();
         if (!$isOwner && !$user->canReviewProposals()) {
             return $this->errorResponse('只有提案人或審核人可以修改提案', 403);
@@ -335,6 +363,10 @@ class MutationController extends Controller {
     }
 
     public function create(Request $request): JsonResponse {
+        if ($guard = $this->guardActiveUser()) {
+            return $guard;
+        }
+
         $payload = $request->json()->all();
         if (!is_array($payload) || empty($payload)) {
             $payload = $request->all();
@@ -368,6 +400,10 @@ class MutationController extends Controller {
     }
 
     public function delete(Request $request): JsonResponse {
+        if ($guard = $this->guardActiveUser()) {
+            return $guard;
+        }
+
         $payload = $request->json()->all();
         if (!is_array($payload) || empty($payload)) {
             $payload = $request->all();
@@ -411,6 +447,10 @@ class MutationController extends Controller {
      * atomic=true：整批單一交易，任一筆失敗整批回滾，回 409 並帶 failed_index。
      */
     public function batchStore(Request $request): JsonResponse {
+        if ($guard = $this->guardActiveUser()) {
+            return $guard;
+        }
+
         $payload = $request->json()->all();
         if (!is_array($payload) || empty($payload)) {
             $payload = $request->all();

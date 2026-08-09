@@ -515,65 +515,6 @@ class OfficePostingRepository {
         });
     }
 
-    public function officeCloneById($id, $cpk) {
-        return DB::transaction(function () use ($id, $cpk) {
-            $temp = explode('-', $cpk);
-            $sourceRow = DB::table('POSTED_TO_OFFICE_DATA')->where([
-                ['c_office_id', '=', $temp[0]],
-                ['c_posting_id', '=', $temp[1]],
-            ])->first();
-
-            if (!$sourceRow) {
-                return null;
-            }
-
-            $payload = json_decode(json_encode($sourceRow), true);
-            $c_addr = DB::table('POSTED_TO_ADDR_DATA')
-                ->where('c_personid', $sourceRow->c_personid)
-                ->where('c_posting_id', $sourceRow->c_posting_id)
-                ->pluck('c_addr_id')
-                ->all();
-
-            $data = Arr::except($payload, ['_token', 'c_addr']);
-            $data['c_fy_intercalary'] = (int)($data['c_fy_intercalary']);
-            $data['c_ly_intercalary'] = (int)($data['c_ly_intercalary']);
-
-            $lastPostingId = DB::table('POSTING_DATA')
-                ->lockForUpdate()
-                ->orderByDesc('c_posting_id')
-                ->value('c_posting_id');
-            $data['c_posting_id'] = ((int) $lastPostingId) + 1;
-            $data['c_personid'] = $id;
-
-            $c_created_by = \App\Support\AuditActor::currentName();
-            $c_created_date = Carbon::now();
-            $data['c_modified_by'] = $data['c_modified_date'] = '';
-            $data['c_created_by'] = $c_created_by;
-            $data['c_created_date'] = $c_created_date;
-
-            DB::table('POSTING_DATA')->insert([
-                'c_personid' => $data['c_personid'],
-                'c_posting_id' => $data['c_posting_id'],
-                'c_created_by' => $data['c_created_by'],
-                'c_created_date' => $data['c_created_date'],
-            ]);
-
-            $this->insertAddr($c_addr, $id, $data['c_posting_id'], $data['c_office_id'], $c_created_by, $c_created_date);
-
-            $data = (new ToolsRepository())->timestamp($data, true);
-            DB::table('POSTED_TO_OFFICE_DATA')->insert($data);
-
-            $officeResourceId = CompositePrimaryKey::buildStoredResourceId([
-                'c_office_id' => $data['c_office_id'],
-                'c_posting_id' => $data['c_posting_id'],
-            ]);
-
-            (new OperationRepository())->store(Auth::id(), $id, 1, 'POSTED_TO_OFFICE_DATA', $officeResourceId, $data);
-
-            return $officeResourceId;
-        });
-    }
-
     public function officeDeleteById($id, $c_personid) {
         DB::transaction(function () use ($id, $c_personid) {
             $auditLog = new AuditLogService();

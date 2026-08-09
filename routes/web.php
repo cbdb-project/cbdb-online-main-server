@@ -77,17 +77,17 @@ Route::get('app/basicinformation/{id}/edit', 'BasicInformationController@appEdit
     ->middleware('inertia')
     ->name('app.basicinformation.edit');
 // Task 27 重做：對齊 legacy /edit 的 React 基本資料編輯器（BasicInfoEditor）。
-// 獨立路由供逐步重做/驗證；不受 flag 影響、不上線（驗證通過並全面重做後再整合）。
+// 這些 edit-v2 路由即為現行上線的 React 編輯器：legacy 表單被 LegacyBladeFormGate 攔截後 302 導向對應 *.editv2。
 Route::get('app/basicinformation/{id}/edit-v2', 'BasicInformationController@appEditV2')
     ->where('id', '[0-9]+')
     ->middleware(['auth', 'inertia'])
     ->name('app.basicinformation.editv2');
-// 地址編輯器 V2（對齊 legacy addresses/_form）。獨立測試路由、flag 仍 old、不上線。
+// 地址編輯器 V2（對齊 legacy addresses/_form）。
 Route::get('app/basicinformation/{id}/addresses/edit-v2', 'BasicInformationController@appAddressEditV2')
     ->where('id', '[0-9]+')
     ->middleware(['auth', 'inertia'])
     ->name('app.basicinformation.addresses.editv2');
-// 著述編輯器 V2（對齊 legacy texts/_form）。獨立測試路由、flag 仍 old、不上線。
+// 著述編輯器 V2（對齊 legacy texts/_form）。
 Route::get('app/basicinformation/{id}/texts/edit-v2', 'BasicInformationController@appTextEditV2')
     ->where('id', '[0-9]+')
     ->middleware(['auth', 'inertia'])
@@ -96,17 +96,17 @@ Route::get('app/basicinformation/{id}/altnames/edit-v2', 'BasicInformationContro
     ->where('id', '[0-9]+')
     ->middleware(['auth', 'inertia'])
     ->name('app.basicinformation.altnames.editv2');
-// 社會機構編輯器 V2（對齊 legacy socialinst/_form）。獨立測試路由、flag 仍 old、不上線。
+// 社會機構編輯器 V2（對齊 legacy socialinst/_form）。
 Route::get('app/basicinformation/{id}/socialinst/edit-v2', 'BasicInformationController@appSocialinstEditV2')
     ->where('id', '[0-9]+')
     ->middleware(['auth', 'inertia'])
     ->name('app.basicinformation.socialinst.editv2');
-// 占有／財產編輯器 V2（對齊 legacy possession/_form）。獨立測試路由、flag 仍 old、不上線。
+// 占有／財產編輯器 V2（對齊 legacy possession/_form）。
 Route::get('app/basicinformation/{id}/possession/edit-v2', 'BasicInformationController@appPossessionEditV2')
     ->where('id', '[0-9]+')
     ->middleware(['auth', 'inertia'])
     ->name('app.basicinformation.possession.editv2');
-// 事件編輯器 V2（對齊 legacy events/_form）。獨立測試路由、flag 仍 old、不上線。
+// 事件編輯器 V2（對齊 legacy events/_form）。
 Route::get('app/basicinformation/{id}/events/edit-v2', 'BasicInformationController@appEventEditV2')
     ->where('id', '[0-9]+')
     ->middleware(['auth', 'inertia'])
@@ -116,27 +116,26 @@ Route::get('app/basicinformation/{id}/entries/edit-v2', 'BasicInformationControl
     ->middleware(['auth', 'inertia'])
     ->name('app.basicinformation.entries.editv2');
 // 社會區分編輯器 V2（對齊 legacy statuses/_form，含 AI 智能識別社會區分類別代碼）。
-// 獨立測試路由，statuses flag 仍 old、不上線。
 Route::get('app/basicinformation/{id}/statuses/edit-v2', 'BasicInformationController@appStatusEditV2')
     ->where('id', '[0-9]+')
     ->middleware(['auth', 'inertia'])
     ->name('app.basicinformation.statuses.editv2');
-// 著述出處編輯器 V2（對齊 legacy sources/_form）。獨立測試路由，sources flag 仍 old、不上線。
+// 著述出處編輯器 V2（對齊 legacy sources/_form）。
 Route::get('app/basicinformation/{id}/sources/edit-v2', 'BasicInformationController@appSourceEditV2')
     ->where('id', '[0-9]+')
     ->middleware(['auth', 'inertia'])
     ->name('app.basicinformation.sources.editv2');
-// 官名／任官編輯器 V2（對齊 legacy offices/_form，含多地址＋雙 era＋社會機構）。獨立測試路由，offices flag 仍 old、不上線。
+// 官名／任官編輯器 V2（對齊 legacy offices/_form，含多地址＋雙 era＋社會機構）。
 Route::get('app/basicinformation/{id}/offices/edit-v2', 'BasicInformationController@appOfficeEditV2')
     ->where('id', '[0-9]+')
     ->middleware(['auth', 'inertia'])
     ->name('app.basicinformation.offices.editv2');
-// 社會關係編輯器 V2（對齊 legacy assoc/_form，9 段 PK＋雙 era＋多人物搜尋＋AI 代碼識別；pair 後端權威補齊）。獨立測試路由，assoc flag 仍 old、不上線。
+// 社會關係編輯器 V2（對齊 legacy assoc/_form，9 段 PK＋雙 era＋多人物搜尋＋AI 代碼識別；pair 後端權威補齊）。
 Route::get('app/basicinformation/{id}/assoc/edit-v2', 'BasicInformationController@appAssocEditV2')
     ->where('id', '[0-9]+')
     ->middleware(['auth', 'inertia'])
     ->name('app.basicinformation.assoc.editv2');
-// 親屬關係編輯器 V2（對齊 legacy kinship/_form，3 段 PK＋親屬碼/人物/出處搜尋；互逆配對碼後端權威補齊＋雙向 mirror）。獨立測試路由，kinship flag 仍 old、不上線。
+// 親屬關係編輯器 V2（對齊 legacy kinship/_form，3 段 PK＋親屬碼/人物/出處搜尋；互逆配對碼後端權威補齊＋雙向 mirror）。
 Route::get('app/basicinformation/{id}/kinship/edit-v2', 'BasicInformationController@appKinshipEditV2')
     ->where('id', '[0-9]+')
     ->middleware(['auth', 'inertia'])
@@ -155,7 +154,6 @@ Route::get('app/basicinformation/{id}', 'BasicInformationController@appShow')
     ->name('app.basicinformation.show');
 Route::get('basicinformation/{id}/saveas', 'BasicInformationController@saveas');
 Route::get('basicinformation/{id}/Duplicate_Collateral_Info', 'BasicInformationController@Duplicate_Collateral_Info');
-Route::get('basicinformation/{id}/offices/{cpk}/saveas', 'BasicInformationOfficesController@saveas');
 
 // ===================================================================
 // 查詢參數模式路由（推薦使用，與舊的 path-based 路由並存）

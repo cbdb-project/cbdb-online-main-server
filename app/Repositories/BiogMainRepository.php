@@ -1254,10 +1254,6 @@ class BiogMainRepository {
         return $this->officePostingRepository()->officeStoreById($request, $id);
     }
 
-    public function officeCloneById($id, $cpk) {
-        return $this->officePostingRepository()->officeCloneById($id, $cpk);
-    }
-
     public function officeDeleteById($id, $c_personid) {
         $this->officePostingRepository()->officeDeleteById($id, $c_personid);
     }

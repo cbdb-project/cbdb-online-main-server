@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { usePage } from '@inertiajs/react';
-import type { ColumnDef, SortingState } from '@tanstack/react-table';
+import type { SortingState } from '@tanstack/react-table';
 import DashboardLayout from '../../../Layouts/DashboardLayout';
-import { DataTable } from '../../../components/data-table/DataTable';
+import { DataTable, type DataTableColumn } from '../../../components/data-table/DataTable';
 import { useDataTableQuery } from '../../../components/data-table/useDataTableQuery';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
@@ -131,7 +131,7 @@ export default function AuditLogsIndex() {
     // 檢視 modal 狀態：{row, view}
     const [modal, setModal] = useState<{ row: AuditRow; view: 'diff' | 'old' | 'new' } | null>(null);
 
-    const columns = useMemo<ColumnDef<AuditRow, unknown>[]>(
+    const columns = useMemo<DataTableColumn<AuditRow>[]>(
         () => [
             { accessorKey: 'id', header: '#', enableSorting: true },
             {

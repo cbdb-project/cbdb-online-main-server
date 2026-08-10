@@ -33,7 +33,7 @@
     "@tanstack/react-table": "^8.21.3",
     "@ttskch/select2-bootstrap4-theme": "^1.5.2",
     "@vitejs/plugin-react": "^6.0.5",
-    "admin-lte": "^3.2.0",
+    "admin-lte": "^4.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cn-era": "^0.4.1",

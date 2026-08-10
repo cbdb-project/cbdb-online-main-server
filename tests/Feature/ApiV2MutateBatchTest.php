@@ -140,7 +140,7 @@ class ApiV2MutateBatchTest extends TestCase {
     }
 
     protected function makeUser(int $status = User::STATUS_ACTIVE, int $role = User::ROLE_REGULAR, string $email = 'batch@example.com'): User {
-        return User::create([
+        return User::forceCreate([
             'name' => 'batch-tester',
             'email' => $email,
             'confirmation_token' => 'token-b',

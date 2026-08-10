@@ -51,6 +51,9 @@ class UserIpLoggingTest extends TestCase {
                 'institution' => 'Test Institute',
                 'password' => 'secret123',
                 'password_confirmation' => 'secret123',
+                // 模擬有人在註冊表單夾帶提權欄位，必須被忽略。
+                'is_active' => 1,
+                'is_admin' => 3,
             ]);
 
         $response->assertRedirect('/home');
@@ -63,11 +66,15 @@ class UserIpLoggingTest extends TestCase {
         $this->assertSame('123.45.67.89', $settings['last_login_ip'] ?? null);
         $this->assertArrayNotHasKey('registration_at', $settings);
         $this->assertArrayNotHasKey('last_login_at', $settings);
+
+        // 註冊絕不可自帶啟用狀態或角色：兩者都不在 User::$fillable，一律落 DB default 0。
+        $this->assertSame(User::STATUS_INACTIVE, $user->is_active);
+        $this->assertSame(User::ROLE_REGULAR, $user->is_admin);
     }
 
     #[Test]
     public function testLoginUpdatesLastLoginIp() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Login Tester',
             'email' => 'login@example.com',
             'institution' => 'Test Institute',
@@ -97,7 +104,7 @@ class UserIpLoggingTest extends TestCase {
 
     #[Test]
     public function testLoginDoesNotBackfillRegistrationFields() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'No Registration Info',
             'email' => 'noreg@example.com',
             'institution' => null,

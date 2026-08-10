@@ -301,7 +301,7 @@ class BasicInformationSourcesControllerTest extends TestCase {
     private function createWriterUser(): User {
         $this->createUsersTable();
 
-        return User::create([
+        return User::forceCreate([
             'name' => 'Writer User',
             'email' => 'writer@example.com',
             'password' => bcrypt('password'),

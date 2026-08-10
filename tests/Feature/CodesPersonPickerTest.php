@@ -134,13 +134,14 @@ class CodesPersonPickerTest extends TestCase {
     }
 
     private function activeUser(): User {
-        return User::firstOrCreate(
+        // is_active／is_admin 是提權欄位、刻意不在 User::$fillable，測試 fixture 需顯式解除守衛。
+        return User::unguarded(fn () => User::firstOrCreate(
             ['email' => 'u@example.com'],
             [
                 'name' => '張三', 'password' => bcrypt('x'),
                 'confirmation_token' => 't', 'is_active' => 1, 'is_admin' => User::ROLE_SUPER_ADMIN,
             ]
-        );
+        ));
     }
 
     private function editAssoc() {

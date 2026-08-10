@@ -95,7 +95,7 @@ class ApiV2MutateCodeTableCharVariantMapTest extends TestCase {
     }
 
     protected function makeUser(int $status = User::STATUS_ACTIVE, int $role = User::ROLE_REGULAR, string $email = 'cvm@example.com'): User {
-        return User::create([
+        return User::forceCreate([
             'name' => 'Code Tester',
             'email' => $email,
             'confirmation_token' => 'tok',

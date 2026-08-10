@@ -62,7 +62,7 @@ class QueryProfileGateTest extends TestCase {
     }
 
     private function makeUser(int $isAdmin): User {
-        return User::create([
+        return User::forceCreate([
             'name' => 'U' . $isAdmin, 'email' => "u{$isAdmin}@example.com", 'password' => bcrypt('x'),
             'confirmation_token' => 't', 'is_active' => 1, 'is_admin' => $isAdmin,
         ]);

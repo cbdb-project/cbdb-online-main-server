@@ -106,7 +106,7 @@ class OperationsIndexLinksTest extends TestCase {
     #[Test]
     public function test_operations_index_generates_links_for_non_person_code_resources() {
         // 创建测试用戶
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
@@ -167,7 +167,7 @@ class OperationsIndexLinksTest extends TestCase {
 
     #[Test]
     public function test_operations_index_normalizes_single_key_query_string_resource_id_for_code_links(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'nianhao-link@example.com',
             'password' => bcrypt('password'),
@@ -241,7 +241,7 @@ class OperationsIndexLinksTest extends TestCase {
     #[Test]
     public function test_operations_index_does_not_generate_links_for_deleted_operations() {
         // 创建测试用戶
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
@@ -276,7 +276,7 @@ class OperationsIndexLinksTest extends TestCase {
 
     #[Test]
     public function test_operations_index_hides_editor_full_name_for_guests(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Hidden Editor',
             'email' => 'guest-hidden@example.com',
             'password' => bcrypt('password'),
@@ -305,7 +305,7 @@ class OperationsIndexLinksTest extends TestCase {
 
     #[Test]
     public function test_operations_index_shows_multiple_audit_records_for_one_operation() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'audit@example.com',
             'password' => bcrypt('password'),
@@ -374,7 +374,7 @@ class OperationsIndexLinksTest extends TestCase {
 
     #[Test]
     public function test_operations_index_renders_composite_rows_for_multi_person_operation(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'multi-person@example.com',
             'password' => bcrypt('password'),
@@ -448,7 +448,7 @@ class OperationsIndexLinksTest extends TestCase {
 
     #[Test]
     public function test_operations_index_renders_person_specific_resource_links_for_kin_data(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'kin-links@example.com',
             'password' => bcrypt('password'),
@@ -521,7 +521,7 @@ class OperationsIndexLinksTest extends TestCase {
 
     #[Test]
     public function test_operations_index_renders_person_specific_resource_links_for_assoc_data(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'assoc-links@example.com',
             'password' => bcrypt('password'),
@@ -653,7 +653,7 @@ class OperationsIndexLinksTest extends TestCase {
 
     #[Test]
     public function test_operations_index_does_not_render_person_specific_resource_links_for_deleted_kin_data(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'deleted-kin-links@example.com',
             'password' => bcrypt('password'),

@@ -156,14 +156,16 @@ class ManageUser extends Command {
         $role = $roleInputMap[$roleInput] ?? User::ROLE_REGULAR;
 
         // 創建用戶（直接使用模型，避免依賴 dev-only 的 Faker）
-        $user = User::create([
+        // is_active／is_admin 不在 $fillable（提權欄位），必須顯式單欄賦值。
+        $user = new User([
             'name' => $name,
             'email' => $email,
             'password' => Hash::make($password),
-            'is_active' => (int)$active,
-            'is_admin' => $role,
             'confirmation_token' => Str::random(32),
         ]);
+        $user->is_active = (int)$active;
+        $user->is_admin = $role;
+        $user->save();
 
         $this->newLine();
         $this->info('✓ 用戶創建成功！');

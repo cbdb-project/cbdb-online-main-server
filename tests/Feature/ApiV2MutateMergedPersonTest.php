@@ -89,7 +89,7 @@ class ApiV2MutateMergedPersonTest extends TestCase {
     }
 
     protected function makeUser(int $status = User::STATUS_ACTIVE, int $role = User::ROLE_REGULAR, string $email = 'mp@example.com'): User {
-        return User::create([
+        return User::forceCreate([
             'name' => 'Merge Tester',
             'email' => $email,
             'confirmation_token' => 'tok',

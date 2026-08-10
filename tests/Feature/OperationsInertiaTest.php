@@ -61,7 +61,7 @@ class OperationsInertiaTest extends TestCase {
     }
 
     private function admin(): User {
-        return User::create([
+        return User::forceCreate([
             'name' => 'Admin', 'email' => 'a@example.com', 'password' => bcrypt('x'),
             'confirmation_token' => 't', 'is_active' => 1, 'is_admin' => User::ROLE_SUPER_ADMIN,
         ]);

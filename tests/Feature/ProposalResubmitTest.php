@@ -109,7 +109,7 @@ class ProposalResubmitTest extends TestCase {
     }
 
     protected function makeUser(string $name, string $email, int $role = User::ROLE_REGULAR): User {
-        return User::create([
+        return User::forceCreate([
             'name' => $name,
             'email' => $email,
             'confirmation_token' => 'token-123',

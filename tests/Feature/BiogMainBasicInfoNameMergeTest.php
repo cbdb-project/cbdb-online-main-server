@@ -536,7 +536,7 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
      */
     #[Test]
     public function testInactiveUserCannotUpdateNames() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Inactive User',
             'email' => 'inactive@example.com',
             'password' => bcrypt('password'),

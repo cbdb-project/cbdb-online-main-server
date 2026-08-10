@@ -56,7 +56,7 @@ class NlQueryLogsInertiaTest extends TestCase {
     }
 
     private function makeSuperAdmin(): User {
-        return User::create([
+        return User::forceCreate([
             'name' => 'Admin', 'email' => 'a@example.com', 'password' => bcrypt('x'),
             'confirmation_token' => 't', 'is_active' => 1, 'is_admin' => User::ROLE_SUPER_ADMIN,
         ]);
@@ -129,7 +129,7 @@ class NlQueryLogsInertiaTest extends TestCase {
 
     #[Test]
     public function non_super_admin_gets_403(): void {
-        $expert = User::create([
+        $expert = User::forceCreate([
             'name' => 'E', 'email' => 'e@example.com', 'password' => bcrypt('x'),
             'confirmation_token' => 't', 'is_active' => 1, 'is_admin' => User::ROLE_EXPERT,
         ]);

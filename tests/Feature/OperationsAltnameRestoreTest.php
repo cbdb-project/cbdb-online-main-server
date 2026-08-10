@@ -73,7 +73,7 @@ class OperationsAltnameRestoreTest extends TestCase {
     }
 
     protected function actingAsAdmin(): User {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Admin',
             'email' => 'admin@example.com',
             'password' => bcrypt('secret'),

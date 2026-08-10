@@ -91,7 +91,7 @@ class ApiV2OppositeEdgesTest extends TestCase {
     }
 
     private function makeUser(int $role = User::ROLE_REGULAR, string $email = 'oe@example.com'): User {
-        return User::create([
+        return User::forceCreate([
             'name' => 'tester', 'email' => $email, 'confirmation_token' => 't',
             'is_active' => User::STATUS_ACTIVE, 'is_admin' => $role,
         ]);

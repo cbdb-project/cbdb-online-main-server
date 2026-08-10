@@ -45,7 +45,7 @@ class HistoricalMapsControllerTest extends TestCase {
     }
 
     protected function createUser(): User {
-        return User::create([
+        return User::forceCreate([
             'name' => 'Test User',
             'email' => 'maps@example.com',
             'password' => Hash::make('password'),
@@ -75,7 +75,7 @@ class HistoricalMapsControllerTest extends TestCase {
 
     #[Test]
     public function test_non_superadmin_cannot_access_historical_maps_page(): void {
-        $regularUser = User::create([
+        $regularUser = User::forceCreate([
             'name' => 'Regular User',
             'email' => 'regular@example.com',
             'password' => Hash::make('password'),

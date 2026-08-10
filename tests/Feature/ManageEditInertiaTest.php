@@ -43,7 +43,7 @@ class ManageEditInertiaTest extends TestCase {
     }
 
     private function makeUser(string $name, int $role, int $active = 1): User {
-        return User::create([
+        return User::forceCreate([
             'name' => $name, 'email' => strtolower($name) . '@example.com', 'password' => bcrypt('secret'),
             'confirmation_token' => 'token', 'is_active' => $active, 'is_admin' => $role, 'institution' => 'Inst',
         ]);

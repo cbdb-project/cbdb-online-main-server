@@ -112,7 +112,7 @@ class ProposalAuditFieldSemanticsTest extends TestCase {
     }
 
     protected function actingAsReviewer(): User {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'reviewer-a',
             'email' => 'reviewer-a@example.com',
             'confirmation_token' => 'token-123',

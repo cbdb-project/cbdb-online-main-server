@@ -45,7 +45,7 @@ class LegacyBladeFormGateTest extends TestCase {
     }
 
     protected function actingAsActiveUser(): User {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'gate-tester',
             'email' => 'gate-tester@example.com',
             'confirmation_token' => 'token-123',

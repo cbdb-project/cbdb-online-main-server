@@ -61,7 +61,7 @@ class ApiV2OperationListTest extends TestCase {
     }
 
     protected function makeUser(string $email = 'tester@example.com'): User {
-        return User::create([
+        return User::forceCreate([
             'name' => 'tester',
             'email' => $email,
             'is_active' => User::STATUS_ACTIVE,

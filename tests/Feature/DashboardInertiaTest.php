@@ -56,7 +56,7 @@ class DashboardInertiaTest extends TestCase {
 
     #[Test]
     public function it_renders_dashboard_component_with_stats(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Alice', 'email' => 'a@example.com', 'password' => bcrypt('x'),
             'confirmation_token' => 't', 'is_active' => 1, 'is_admin' => User::ROLE_REGULAR,
         ]);

@@ -42,6 +42,30 @@
 
 ---
 
+## 三之一、`is_admin` / `is_active` 不可批量賦值（提權防線）
+
+這兩欄是**提權欄位**，刻意不放進 `User::$fillable`（見 `app/Models/User.php`）。原因：一旦
+它們可批量賦值，任何一處 `User::create($request->all())` 或 `$user->update($request->validated())`
+就會立刻變成提權漏洞——請求只要夾帶 `is_admin=3` 就能把自己變成系統管理員。
+
+因此：
+
+- **應用層寫入一律顯式單欄賦值**：`$user->is_admin = ...; $user->save();`。線上唯一的寫入端點是
+  `ManagementController::performUserUpdate()`。
+- 這是**縱深防禦**，不是唯一防線。`performUserUpdate()` 目前的閘門只是 `canManageUsers()`
+  （活躍的專家或系統管理員），驗證只有 `in:0,1,2,3`，**尚未**依操作者自身等級限制可授予的
+  目標角色——專家（`is_admin=1`）仍能把任意帳號（包含自己）提為系統管理員，也能軟刪除任何帳號。
+  收斂 `$fillable` 不會擋住這條路，那是獨立待修項。
+- **不要**用 `create()` / `update()` / `fill()` / `firstOrCreate()` / `updateOrCreate()` 的陣列參數
+  傳這兩欄——Laravel 未啟用 strict mode，未 fillable 的欄位會被**靜默丟棄**，不會報錯，
+  只會讓帳號默默停在「未啟用的一般用戶」。
+- **測試 fixture** 可用 `User::factory()`（factory 本身跑在 `Model::unguarded` 內）、
+  `User::forceCreate([...])`，或 `User::unguarded(fn () => ...)` 包住需要的呼叫。
+- 回歸防線：`tests/Feature/UserMassAssignmentGuardTest.php`。若有人把欄位加回 `$fillable`，
+  該測試會紅。
+
+---
+
 ## 四、User 模型輔助方法
 
 `User` 模型（`app/User.php`）提供以下輔助方法簡化權限檢查：

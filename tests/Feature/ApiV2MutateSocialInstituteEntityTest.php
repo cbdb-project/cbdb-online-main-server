@@ -186,7 +186,7 @@ class ApiV2MutateSocialInstituteEntityTest extends TestCase {
     }
 
     protected function makeUser(string $email = 'si@example.com'): User {
-        return User::create([
+        return User::forceCreate([
             'name' => 'SI Tester',
             'email' => $email,
             'confirmation_token' => 'tok',

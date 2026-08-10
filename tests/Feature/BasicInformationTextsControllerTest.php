@@ -90,7 +90,7 @@ class BasicInformationTextsControllerTest extends TestCase {
 
     #[Test]
     public function testDestroyQueryDeletesRowAndWritesAuditLog(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'texts-delete@example.com',
             'password' => bcrypt('password'),
@@ -138,7 +138,7 @@ class BasicInformationTextsControllerTest extends TestCase {
 
     #[Test]
     public function testUpdateQueryWritesAuditPayloadWithOperationId(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'texts-update@example.com',
             'password' => bcrypt('password'),
@@ -191,7 +191,7 @@ class BasicInformationTextsControllerTest extends TestCase {
 
     #[Test]
     public function testUpdateQueryReturns400WhenPathPersonIdMismatchesQueryPk(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'texts-update-mismatch@example.com',
             'password' => bcrypt('password'),
@@ -227,7 +227,7 @@ class BasicInformationTextsControllerTest extends TestCase {
 
     #[Test]
     public function testStoreDuplicateTextShowsErrorAndDoesNotInsertAgain(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'texts-duplicate@example.com',
             'password' => bcrypt('password'),
@@ -254,7 +254,7 @@ class BasicInformationTextsControllerTest extends TestCase {
 
     #[Test]
     public function testDestroyQueryReturns404WhenRowDoesNotExist(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'texts-delete-missing@example.com',
             'password' => bcrypt('password'),

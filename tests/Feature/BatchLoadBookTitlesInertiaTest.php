@@ -52,7 +52,7 @@ class BatchLoadBookTitlesInertiaTest extends TestCase {
     }
 
     private function admin(): User {
-        return User::create([
+        return User::forceCreate([
             'name' => 'Admin', 'email' => 'a@example.com', 'password' => bcrypt('x'),
             'confirmation_token' => 't', 'is_active' => 1, 'is_admin' => User::ROLE_SUPER_ADMIN,
         ]);
@@ -73,7 +73,7 @@ class BatchLoadBookTitlesInertiaTest extends TestCase {
 
     #[Test]
     public function non_admin_forbidden(): void {
-        $regular = User::create([
+        $regular = User::forceCreate([
             'name' => 'R', 'email' => 'r@example.com', 'password' => bcrypt('x'),
             'confirmation_token' => 't', 'is_active' => 1, 'is_admin' => User::ROLE_REGULAR,
         ]);

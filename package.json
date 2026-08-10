@@ -37,7 +37,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cn-era": "^0.4.1",
-    "datatables.net": "^1.13.8",
+    "datatables.net": "^2.3.8",
     "datatables.net-bs4": "^2.3.5",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.29.0",

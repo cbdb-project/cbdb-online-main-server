@@ -71,7 +71,7 @@ class ManagePagesLoadTest extends TestCase {
             'name' => 'Admin User',
             'email' => 'admin@example.com',
             'is_active' => 1,
-            'is_admin' => 1,  // 管理员权限
+            'is_admin' => User::ROLE_SUPER_ADMIN,  // 系統管理員（變更他人角色需超級管理員）
             'confirmation_token' => 'admin_token_' . time(),
             'remember_token' => 'admin_remember_' . time(),
         ]);

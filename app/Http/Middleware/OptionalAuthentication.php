@@ -38,6 +38,12 @@ class OptionalAuthentication {
                 } catch (\Exception $e) {
                     abort(401, 'Invalid API token.');
                 }
+
+                // 未啟用（含被停用）帳號的 token 一律拒絕——停用帳號不應仍能以既有 token 認證。
+                // 置於 try/catch 之外，避免 abort(403) 被上面的 catch(\Exception) 吞成 401。
+                if (!$request->user()->isActive()) {
+                    abort(403, '帳號未啟用或已停用。');
+                }
             }
         }
 

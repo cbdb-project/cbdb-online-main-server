@@ -71,6 +71,12 @@ class RegisterController extends Controller {
      * @param  \App\Models\User  $user
      */
     protected function registered(Request $request, $user) {
+        // 新帳號預設未啟用（is_active=0）：不保留 RegistersUsers 自動建立的登入 session，
+        // 否則未啟用帳號可帶著 session 觸及 auth-only 端點（例如 POST /api-tokens 建立 API token）。
+        // 待管理員啟用後再由使用者自行登入。維持既有導向（Inertia location / 預設 redirect）不變。
+        $this->guard()->logout();
+        session()->flash('status', '註冊成功，帳號待管理員啟用後即可登入。');
+
         if ($request->header('X-Inertia')) {
             return Inertia::location($this->redirectPath());
         }

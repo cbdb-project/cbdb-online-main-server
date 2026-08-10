@@ -7,7 +7,7 @@
 ## 一、帳號啟用狀態（`users.is_active`）
 | 值 | 名稱 | 說明 | 實際行為 |
 |----|------|------|-----------|
-| `0` | 未啟用 | 預設值、待審 / 停用狀態 | 可登入，但所有寫入動作會被 Controller 拒絕。 |
+| `0` | 未啟用 | 預設值、待審 / 停用狀態 | **不可登入**（登入流程、email 驗證連結、Sanctum token 皆直接拒絕未啟用帳號；註冊完成也不保留自動登入 session）；即使經其他途徑取得 session，所有寫入動作仍會被 Controller 拒絕。 |
 | `1` | 已啟用 | 正式啟用 | 能照角色權限執行對資料庫的新增 / 修改。 |
 | `2` | 保留 | Migration 註解為「寄送激活郵件」 | 目前程式視同未啟用；不具任何寫入權限。 |
 
@@ -52,10 +52,29 @@
 
 - **應用層寫入一律顯式單欄賦值**：`$user->is_admin = ...; $user->save();`。線上唯一的寫入端點是
   `ManagementController::performUserUpdate()`。
-- 這是**縱深防禦**，不是唯一防線。`performUserUpdate()` 目前的閘門只是 `canManageUsers()`
-  （活躍的專家或系統管理員），驗證只有 `in:0,1,2,3`，**尚未**依操作者自身等級限制可授予的
-  目標角色——專家（`is_admin=1`）仍能把任意帳號（包含自己）提為系統管理員，也能軟刪除任何帳號。
-  收斂 `$fillable` 不會擋住這條路，那是獨立待修項。
+- 這是**縱深防禦**，不是唯一防線。線上唯一寫入端點 `performUserUpdate()` 除了 `canManageUsers()`
+  （活躍的專家或系統管理員）外，已再收斂**角色變更**授權（2026-08，見 `ManagementController`）：
+    - **僅系統管理員可變更 `is_admin`**——專家仍可調整帳號啟用（`is_active`），但不得授予/調整任何
+      帳號的角色，封死「專家把自己或他人提為系統管理員」的提權路徑；
+    - **不得變更自己的角色**（避免自我提權，或自我降權後失去管理權而鎖死）；
+    - **停用或角色異動時撤銷該帳號的 API token**（`personal_access_tokens`）——停用帳號不再保留可用憑證；
+    - 每次變更寫入應用層審計（`audit_log`，操作者 + old→new），與 users 表的 DB trigger tripwire
+      互為獨立佐證。
+  （未採「不得授予高於自身」的數值比較：角色值非線性——`2`＝眾包並不比 `1`＝專家高權；而「僅系統
+    管理員可改角色」已使該比較無實質意義。）
+
+## 三之二、未啟用（`is_active != 1`）帳號不得取得可用 session
+
+「未啟用不可操作」這條假設，過去只由各 Controller 的寫入檢查把守；登入本身不檢查 `is_active`，
+未啟用帳號仍能拿到 session、再觸及 `auth`-only 端點（例如 `POST /api-tokens` 建立 API token）。
+現已在**認證邊界**逐條封死（2026-08）：
+
+- **登入**（`LoginController::authenticated`）：帳密正確但未啟用 → 登出並回驗證錯誤，不建立 session。
+- **註冊**（`RegisterController::registered`）：`RegistersUsers` 自動登入的 session 立即登出，
+  待管理員啟用後再由使用者自行登入。
+- **email 驗證連結**（`EmailController::verify`）：僅能登入「已啟用」帳號，不再是繞過 `is_active` 的後門。
+- **Sanctum token**（`OptionalAuthentication`）：Bearer token 對應帳號未啟用 → `403`。搭配上節
+  「停用即撤銷 token」，被停用帳號既無法登入、既有 token 也失效。
 - **不要**用 `create()` / `update()` / `fill()` / `firstOrCreate()` / `updateOrCreate()` 的陣列參數
   傳這兩欄——Laravel 未啟用 strict mode，未 fillable 的欄位會被**靜默丟棄**，不會報錯，
   只會讓帳號默默停在「未啟用的一般用戶」。

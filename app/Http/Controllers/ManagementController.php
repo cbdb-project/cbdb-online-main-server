@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\AuditLogService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class ManagementController extends Controller {
@@ -281,8 +283,11 @@ class ManagementController extends Controller {
      * 更新/軟刪除使用者的共用實作；$indexRoute 控制完成後重導目標。
      */
     protected function performUserUpdate(Request $request, User $user, string $indexRoute) {
+        $actor = Auth::user();
+
         // 检查是否要删除用戶
         if ($request->has('delete_user') && $request->delete_user == 1) {
+            $before = ['is_active' => (int) $user->is_active, 'is_admin' => (int) $user->is_admin];
             $email = $user->email;
             $user->email = $email . '-' . Carbon::now();
             $user->password = '-';
@@ -290,6 +295,11 @@ class ManagementController extends Controller {
             $user->remember_token = '-';
             $user->updated_at = Carbon::now();
             $user->save();
+
+            // 刪除/停用帳號一律撤銷其 API token（sanctum token 不會因帳號失效而自動失效）。
+            $this->revokeApiTokens($user);
+            $this->auditUserChange($user, $before, ['is_active' => (int) $user->is_active, 'is_admin' => (int) $user->is_admin], $actor, 'DELETE');
+
             flash('用戶已刪除 @ '.Carbon::now(), 'danger');
 
             return redirect()->route($indexRoute);
@@ -301,14 +311,84 @@ class ManagementController extends Controller {
             'is_admin' => 'required|integer|in:0,1,2,3',
         ]);
 
+        $currentActive = (int) $user->is_active;
+        $currentAdmin = (int) $user->is_admin;
+        $newActive = (int) $validated['is_active'];
+        $newAdmin = (int) $validated['is_admin'];
+
+        // 角色（is_admin）變更為高敏感操作，於 canManageUsers() 之上再收斂授權：
+        //  1) 僅系統管理員可變更角色——專家（is_admin=1）雖能管理帳號啟用，但不得授予/調整
+        //     任何帳號的角色，杜絕「專家把自己或他人提為系統管理員」這條提權路徑；
+        //  2) 不得變更自己的角色——避免自我提權，或自我降權後失去管理權而鎖死。
+        // （不採「不得授予高於自身」的數值比較：角色值非線性——2=眾包並不高於 1=專家；
+        //   規則 1 僅允許系統管理員改角色、其本身已是最高級，數值比較無實質意義。）
+        if ($newAdmin !== $currentAdmin) {
+            if (!$actor->isSuperAdmin()) {
+                flash('僅系統管理員可變更使用者角色 @ '.Carbon::now(), 'error');
+
+                return redirect()->back();
+            }
+            if ((int) $actor->id === (int) $user->id) {
+                flash('不可變更自己的角色 @ '.Carbon::now(), 'error');
+
+                return redirect()->back();
+            }
+        }
+
         // 更新用戶設定
-        $user->is_active = $validated['is_active'];
-        $user->is_admin = $validated['is_admin'];
+        $user->is_active = $newActive;
+        $user->is_admin = $newAdmin;
         $user->save();
+
+        // 停用或角色異動時撤銷既有 API token（停用不再保留可用憑證；改權亦重置憑證）。
+        if ($newActive === User::STATUS_INACTIVE || $newAdmin !== $currentAdmin) {
+            $this->revokeApiTokens($user);
+        }
+
+        // 應用層審計：記錄操作者與 old→new，與 DB trigger 互為獨立佐證，且能帶到 app 端操作者。
+        $this->auditUserChange(
+            $user,
+            ['is_active' => $currentActive, 'is_admin' => $currentAdmin],
+            ['is_active' => $newActive, 'is_admin' => $newAdmin],
+            $actor,
+            'UPDATE'
+        );
 
         flash('用戶設定已更新 @ '.Carbon::now(), 'success');
 
         return redirect()->route($indexRoute);
+    }
+
+    /** 撤銷指定使用者的所有 personal access token；表不存在時為 no-op（兼容未建該表的測試）。 */
+    private function revokeApiTokens(User $user): void {
+        if (Schema::hasTable('personal_access_tokens')) {
+            $user->tokens()->delete();
+        }
+    }
+
+    /**
+     * 寫入 users 表變更的應用層審計（audit_log 不存在時為 no-op）。
+     * 審計寫入失敗絕不可回退已完成的帳號變更，故以 try/catch 包住、僅記 warning——
+     * DB trigger 才是權威 tripwire，此處是帶 app 端操作者的補充佐證。
+     */
+    private function auditUserChange(User $user, array $before, array $after, ?User $actor, string $operation): void {
+        if (!Schema::hasTable('audit_log')) {
+            return;
+        }
+
+        try {
+            app(AuditLogService::class)->write(
+                'users',
+                $operation,
+                ['id' => (int) $user->id],
+                $before,
+                $after,
+                'user',
+                $actor ? (string) $actor->id : null
+            );
+        } catch (\Throwable $e) {
+            \Log::warning('performUserUpdate 審計寫入失敗: '.$e->getMessage());
+        }
     }
 
     /**

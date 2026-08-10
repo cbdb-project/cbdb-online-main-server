@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class LoginController extends Controller {
@@ -116,6 +117,19 @@ class LoginController extends Controller {
      * The user has been authenticated.
      */
     protected function authenticated(Request $request, $user) {
+        // 未啟用（含被停用）帳號一律不得取得登入 session——即使帳密正確。
+        // 這是全站「未啟用不可操作」假設的入口防線：先前登入流程不檢查 is_active，
+        // 未啟用帳號可拿到 session 再觸及 auth-only 端點（例如建立 API token）。
+        if (!$user->isActive()) {
+            $this->guard()->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            throw ValidationException::withMessages([
+                $this->username() => ['帳號尚未啟用或已停用，請聯繫管理員。'],
+            ]);
+        }
+
         $settings = $user->settings ?? [];
         unset($settings['last_login_at'], $settings['registration_at']);
         $settings['last_login_ip'] = $request->ip();

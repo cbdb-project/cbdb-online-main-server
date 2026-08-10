@@ -92,7 +92,7 @@ class ProposalNormalizationTest extends TestCase {
     }
 
     protected function makeActiveUser(): User {
-        return User::create([
+        return User::forceCreate([
             'name' => 'activeuser',
             'email' => 'active@example.com',
             'is_active' => 1,

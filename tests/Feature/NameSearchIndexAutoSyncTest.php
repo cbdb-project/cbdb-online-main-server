@@ -184,7 +184,7 @@ class NameSearchIndexAutoSyncTest extends TestCase {
     }
 
     protected function createActiveExpert(): User {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Admin Tester',
             'email' => 'admin@example.com',
             'password' => bcrypt('secret'),

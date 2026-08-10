@@ -53,7 +53,7 @@ class AdminAuditLogHistoryFilterTest extends TestCase {
     }
 
     private function makeAdmin(): User {
-        return User::create([
+        return User::forceCreate([
             'name' => 'Admin',
             'email' => 'admin@example.com',
             'password' => bcrypt('password'),

@@ -130,7 +130,7 @@ class ApiV2MutateSocialInstituteImportTest extends TestCase {
     }
 
     protected function makeUser(int $status = User::STATUS_ACTIVE, int $role = User::ROLE_REGULAR, string $email = 'si@example.com'): User {
-        return User::create([
+        return User::forceCreate([
             'name' => 'SocialInst Tester',
             'email' => $email,
             'confirmation_token' => 'tok',

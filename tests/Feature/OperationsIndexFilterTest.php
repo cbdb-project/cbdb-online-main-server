@@ -92,7 +92,7 @@ class OperationsIndexFilterTest extends TestCase {
     }
 
     private function makeUser(string $name, string $email, array $overrides = []): User {
-        return User::create(array_merge([
+        return User::forceCreate(array_merge([
             'name' => $name,
             'email' => $email,
             'password' => bcrypt('password'),

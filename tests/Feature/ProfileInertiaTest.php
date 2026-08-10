@@ -44,7 +44,7 @@ class ProfileInertiaTest extends TestCase {
     }
 
     private function makeUser(array $overrides = []): User {
-        return User::create(array_merge([
+        return User::forceCreate(array_merge([
             'name' => 'Alice', 'email' => 'a@example.com', 'password' => bcrypt('secret123'),
             'confirmation_token' => 't', 'is_active' => 1, 'is_admin' => User::ROLE_REGULAR,
             'avatar' => 'avatar0.png',

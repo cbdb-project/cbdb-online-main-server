@@ -166,7 +166,7 @@ class ApiV2PkSegmentBoundaryTest extends TestCase {
     }
 
     protected function makeUser(string $email): User {
-        return User::create([
+        return User::forceCreate([
             'name' => 'tester',
             'email' => $email,
             'confirmation_token' => 'token-123',

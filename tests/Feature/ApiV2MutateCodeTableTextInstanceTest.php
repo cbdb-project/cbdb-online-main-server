@@ -96,7 +96,7 @@ class ApiV2MutateCodeTableTextInstanceTest extends TestCase {
     }
 
     protected function makeUser(string $email = 'ti@example.com'): User {
-        return User::create([
+        return User::forceCreate([
             'name' => 'Instance Tester',
             'email' => $email,
             'confirmation_token' => 'tok',

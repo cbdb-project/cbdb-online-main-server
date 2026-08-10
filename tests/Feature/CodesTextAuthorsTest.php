@@ -120,13 +120,14 @@ class CodesTextAuthorsTest extends TestCase {
 
     /** 同一個測試可能發多次請求（如 displayLimit()），故取用既有帳號而非每次新建。 */
     private function activeUser(): User {
-        return User::firstOrCreate(
+        // is_active／is_admin 是提權欄位、刻意不在 User::$fillable，測試 fixture 需顯式解除守衛。
+        return User::unguarded(fn () => User::firstOrCreate(
             ['email' => 'u@example.com'],
             [
                 'name' => 'U', 'password' => bcrypt('x'),
                 'confirmation_token' => 't', 'is_active' => 1, 'is_admin' => User::ROLE_SUPER_ADMIN,
             ]
-        );
+        ));
     }
 
     private function editTextCode(int $textId) {

@@ -26,6 +26,16 @@ class User extends Authenticatable {
     /**
      * The attributes that are mass assignable.
      *
+     * 安全性：`is_admin`（角色）與 `is_active`（啟用狀態）是提權欄位，刻意不放進
+     * $fillable，避免任何 `User::create($request->all())` / `$user->update($validated)`
+     * 之類的寫法被動變成提權漏洞。要改這兩個欄位一律顯式單欄賦值
+     * （`$user->is_admin = ...; $user->save();`）。
+     *
+     * 這是縱深防禦，不是唯一防線：真正的授權判斷仍在寫入端點
+     * （`ManagementController::performUserUpdate()`）。注意該閘門目前只是
+     * `canManageUsers()`（活躍的專家或系統管理員），尚未依操作者等級限制可授予的
+     * 目標角色，專家仍能把任意帳號（含自己）提為系統管理員。
+     *
      * @var array
      */
     protected $fillable = [
@@ -36,8 +46,6 @@ class User extends Authenticatable {
         'password',
         'avatar',
         'confirmation_token',
-        'is_active',
-        'is_admin',
     ];
 
     /**

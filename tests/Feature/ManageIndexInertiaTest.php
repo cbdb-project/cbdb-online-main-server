@@ -43,7 +43,7 @@ class ManageIndexInertiaTest extends TestCase {
     }
 
     private function makeUser(string $name, int $role, int $active = 1): User {
-        return User::create([
+        return User::forceCreate([
             'name' => $name,
             'email' => strtolower($name) . '@example.com',
             'password' => bcrypt('secret'),

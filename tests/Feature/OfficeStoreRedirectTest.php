@@ -124,7 +124,7 @@ class OfficeStoreRedirectTest extends TestCase {
     }
 
     private function createUser(): User {
-        return User::create([
+        return User::forceCreate([
             'name' => 'Test Admin',
             'email' => 'admin@example.com',
             'password' => bcrypt('password'),

@@ -87,7 +87,7 @@ class CodesCharVariantMapAuditTest extends TestCase {
     }
 
     private function activeUser(): User {
-        return User::create([
+        return User::forceCreate([
             'name' => 'U', 'email' => 'u@example.com', 'password' => bcrypt('x'),
             'confirmation_token' => 't', 'is_active' => 1, 'is_admin' => User::ROLE_SUPER_ADMIN,
         ]);

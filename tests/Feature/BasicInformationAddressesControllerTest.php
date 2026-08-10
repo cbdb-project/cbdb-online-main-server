@@ -93,7 +93,7 @@ class BasicInformationAddressesControllerTest extends TestCase {
 
     #[Test]
     public function testUpdateQueryWritesAuditPayloadWithOperationId(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'addr-update@example.com',
             'password' => bcrypt('password'),
@@ -156,7 +156,7 @@ class BasicInformationAddressesControllerTest extends TestCase {
 
     #[Test]
     public function testUpdateQueryPersistsNewAddrId(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'addr-update-addrid@example.com',
             'password' => bcrypt('password'),
@@ -210,7 +210,7 @@ class BasicInformationAddressesControllerTest extends TestCase {
 
     #[Test]
     public function testLegacyUpdateRedirectsWithErrorOnAddrIdConflict(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'addr-legacy-conflict@example.com',
             'password' => bcrypt('password'),
@@ -266,7 +266,7 @@ class BasicInformationAddressesControllerTest extends TestCase {
 
     #[Test]
     public function testUpdateQueryReturns400WhenPathPersonIdMismatchesQueryPk(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'addr-update-mismatch@example.com',
             'password' => bcrypt('password'),

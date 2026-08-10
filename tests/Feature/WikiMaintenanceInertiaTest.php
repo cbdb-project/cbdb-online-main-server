@@ -73,7 +73,7 @@ class WikiMaintenanceInertiaTest extends TestCase {
     }
 
     private function admin(): User {
-        return User::create([
+        return User::forceCreate([
             'name' => 'Admin', 'email' => 'a@example.com', 'password' => bcrypt('x'),
             'confirmation_token' => 't', 'is_active' => 1, 'is_admin' => User::ROLE_SUPER_ADMIN,
         ]);
@@ -179,7 +179,7 @@ class WikiMaintenanceInertiaTest extends TestCase {
 
     #[Test]
     public function active_regular_user_can_access(): void {
-        $regular = User::create([
+        $regular = User::forceCreate([
             'name' => 'R', 'email' => 'r@example.com', 'password' => bcrypt('x'),
             'confirmation_token' => 't', 'is_active' => 1, 'is_admin' => User::ROLE_REGULAR,
         ]);
@@ -205,7 +205,7 @@ class WikiMaintenanceInertiaTest extends TestCase {
 
     #[Test]
     public function inactive_user_forbidden(): void {
-        $inactive = User::create([
+        $inactive = User::forceCreate([
             'name' => 'I', 'email' => 'i@example.com', 'password' => bcrypt('x'),
             'confirmation_token' => 't', 'is_active' => 0, 'is_admin' => User::ROLE_REGULAR,
         ]);

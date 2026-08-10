@@ -189,7 +189,7 @@ class ApiV2CreateBiogMainTest extends TestCase {
     // ── Helpers ──────────────────────────────────────────────
 
     protected function makeUser(int $status = User::STATUS_ACTIVE, int $role = User::ROLE_REGULAR, string $email = 'create-biog-tester@example.com'): User {
-        return User::create([
+        return User::forceCreate([
             'name' => 'tester',
             'email' => $email,
             'confirmation_token' => 'token-123',

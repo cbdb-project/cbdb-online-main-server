@@ -162,7 +162,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
     #[Test]
     public function testStoreWritesAuditLog() {
         // 創建用戶
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
@@ -204,7 +204,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
 
     #[Test]
     public function testStoreReplacesStrictModeVariantAndFlashesNotice(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'altname-legacy-store-variant@example.com',
             'password' => bcrypt('password'),
@@ -244,7 +244,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
 
     #[Test]
     public function testStoreDoesNotReplaceStrictExcludedVariant(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'altname-legacy-store-excluded@example.com',
             'password' => bcrypt('password'),
@@ -269,7 +269,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
 
     #[Test]
     public function testStoreDuplicateAltnameShowsErrorAndDoesNotInsertAgain() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'duplicate-altname@example.com',
             'password' => bcrypt('password'),
@@ -307,7 +307,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
     #[Test]
     public function testEditReturns404WhenAltnameNotFound() {
         // 創建用戶
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
@@ -334,7 +334,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
     #[Test]
     public function testEditHandlesNullCSource() {
         // 創建用戶
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
@@ -371,7 +371,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
     #[Test]
     public function testEditHandlesNonExistentTextCode() {
         // 創建用戶
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
@@ -408,7 +408,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
     #[Test]
     public function testEditLoadsTextCodeSuccessfully() {
         // 創建用戶
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
@@ -448,7 +448,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
 
     #[Test]
     public function testDestroyQueryCanDeleteWhenSequenceIsNull() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'null-sequence@example.com',
             'password' => bcrypt('password'),
@@ -483,7 +483,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
 
     #[Test]
     public function testUpdateQueryWritesProposalCommentIntoOperationNote() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'update-note@example.com',
             'password' => bcrypt('password'),
@@ -530,7 +530,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
 
     #[Test]
     public function testUpdateQueryReplacesStrictModeVariantAndFlashesNotice(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'altname-legacy-update-variant@example.com',
             'password' => bcrypt('password'),
@@ -578,7 +578,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
 
     #[Test]
     public function testUpdateQueryDoesNotReplaceStrictExcludedVariant(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'altname-legacy-update-excluded@example.com',
             'password' => bcrypt('password'),
@@ -613,7 +613,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
 
     #[Test]
     public function testUpdateReplacesStrictModeVariantAndFlashesNotice(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'altname-legacy-update-path-variant@example.com',
             'password' => bcrypt('password'),
@@ -660,7 +660,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
     public function testUpdateQueryDetectsPkConflictUsingReplacedValue(): void {
         // 替換後的新 c_alt_name_chn（淸X → 清X）與同一人物下另一筆既有別名衝突：
         // 既有的括號衝突偵測邏輯須用替換後的值判斷，而非替換前的原始輸入。
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'altname-legacy-update-conflict@example.com',
             'password' => bcrypt('password'),
@@ -706,7 +706,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
 
     #[Test]
     public function testUpdateProposalWithNullSequenceUsesNullPkCorrectly() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'proposal-null-sequence@example.com',
             'password' => bcrypt('password'),
@@ -751,7 +751,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
     #[Test]
     public function testEditHandlesZeroCSource() {
         // 創建用戶
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
@@ -794,7 +794,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
      */
     #[Test]
     public function testEditQueryHandlesNullCSequence() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
@@ -828,7 +828,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
      */
     #[Test]
     public function testUpdateQueryWithNullCSequenceDoesNotThrow() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
@@ -891,7 +891,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
      */
     #[Test]
     public function testStoreNormalizesFullwidthBrackets(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'bracket-store@example.com',
             'password' => bcrypt('password'),
@@ -930,7 +930,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
      */
     #[Test]
     public function testUpdateQueryNormalizesPinyinBrackets(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'bracket-update@example.com',
             'password' => bcrypt('password'),
@@ -978,7 +978,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
      */
     #[Test]
     public function testUpdateQueryBlocksBracketConflict(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'bracket-conflict@example.com',
             'password' => bcrypt('password'),
@@ -1034,7 +1034,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
      */
     #[Test]
     public function testUpdateQueryBlocksTypeCodeConflict(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'type-conflict@example.com',
             'password' => bcrypt('password'),
@@ -1103,7 +1103,7 @@ class BasicInformationAltnamesControllerTest extends TestCase {
      */
     #[Test]
     public function testStoreBlocksBracketConflict(): void {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'bracket-store-conflict@example.com',
             'password' => bcrypt('password'),

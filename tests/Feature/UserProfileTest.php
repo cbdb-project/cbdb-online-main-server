@@ -50,7 +50,7 @@ class UserProfileTest extends TestCase {
 
     #[Test]
     public function testAuthenticatedUserCanAccessProfile() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => Hash::make('password'),
@@ -70,7 +70,7 @@ class UserProfileTest extends TestCase {
 
     #[Test]
     public function testUserCanUpdateBasicProfile() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Old Name',
             'email' => 'old@example.com',
             'password' => Hash::make('password'),
@@ -97,7 +97,7 @@ class UserProfileTest extends TestCase {
 
     #[Test]
     public function testUserCanChangePassword() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => Hash::make('oldpassword'),
@@ -125,7 +125,7 @@ class UserProfileTest extends TestCase {
 
     #[Test]
     public function testPasswordChangeRequiresCurrentPassword() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => Hash::make('oldpassword'),
@@ -148,7 +148,7 @@ class UserProfileTest extends TestCase {
 
     #[Test]
     public function testPasswordChangeMustVerifyCurrentPassword() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => Hash::make('oldpassword'),
@@ -175,7 +175,7 @@ class UserProfileTest extends TestCase {
 
     #[Test]
     public function testPasswordChangeMustBeConfirmed() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => Hash::make('oldpassword'),
@@ -202,7 +202,7 @@ class UserProfileTest extends TestCase {
 
     #[Test]
     public function testEmailMustBeUnique() {
-        $existingUser = User::create([
+        $existingUser = User::forceCreate([
             'name' => 'Existing User',
             'email' => 'existing@example.com',
             'password' => Hash::make('password'),
@@ -211,7 +211,7 @@ class UserProfileTest extends TestCase {
             'is_active' => 1,
         ]);
 
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => Hash::make('password'),
@@ -235,7 +235,7 @@ class UserProfileTest extends TestCase {
 
     #[Test]
     public function testUserCanUpdateProfileWithoutChangingPassword() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => Hash::make('password'),
@@ -264,7 +264,7 @@ class UserProfileTest extends TestCase {
 
     #[Test]
     public function testNameIsRequired() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => Hash::make('password'),
@@ -285,7 +285,7 @@ class UserProfileTest extends TestCase {
 
     #[Test]
     public function testEmailIsRequired() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => Hash::make('password'),
@@ -306,7 +306,7 @@ class UserProfileTest extends TestCase {
 
     #[Test]
     public function testInstitutionIsOptional() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => Hash::make('password'),
@@ -331,7 +331,7 @@ class UserProfileTest extends TestCase {
 
     #[Test]
     public function testUserCanUpdateAvatar() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => Hash::make('password'),
@@ -357,7 +357,7 @@ class UserProfileTest extends TestCase {
 
     #[Test]
     public function testAvatarIsRequired() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => Hash::make('password'),
@@ -379,7 +379,7 @@ class UserProfileTest extends TestCase {
 
     #[Test]
     public function testInvalidAvatarIsRejected() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => Hash::make('password'),
@@ -404,7 +404,7 @@ class UserProfileTest extends TestCase {
 
     #[Test]
     public function testAvatarMustBeInValidRange() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => Hash::make('password'),
@@ -430,7 +430,7 @@ class UserProfileTest extends TestCase {
 
     #[Test]
     public function testAllValidAvatarsAreAccepted() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => Hash::make('password'),

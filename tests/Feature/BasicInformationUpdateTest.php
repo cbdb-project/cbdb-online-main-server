@@ -142,7 +142,7 @@ class BasicInformationUpdateTest extends TestCase {
     #[Test]
     public function testNoUpdateWhenNoChanges() {
         // 創建測試用戶（活躍且非眾包）
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => Hash::make('password'),
@@ -233,7 +233,7 @@ class BasicInformationUpdateTest extends TestCase {
     #[Test]
     public function testUpdateWhenChangesExist() {
         // 創建測試用戶（活躍且非眾包）
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => Hash::make('password'),
@@ -339,7 +339,7 @@ class BasicInformationUpdateTest extends TestCase {
     #[Test]
     public function testFrameworkFieldsAreFilteredCorrectly() {
         // 創建測試用戶（活躍且非眾包）
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => Hash::make('password'),
@@ -421,7 +421,7 @@ class BasicInformationUpdateTest extends TestCase {
      */
     #[Test]
     public function testUpdateGenderToNullPersistsAsDatabaseNull() {
-        $user = User::create([
+        $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'null-gender@example.com',
             'password' => Hash::make('password'),

@@ -1,9 +1,12 @@
 import React from 'react';
 import {
     flexRender,
-    getCoreRowModel,
-    useReactTable,
+    rowPaginationFeature,
+    rowSortingFeature,
+    tableFeatures,
+    useTable,
     type ColumnDef,
+    type RowData,
     type SortingState,
     type OnChangeFn,
 } from '@tanstack/react-table';
@@ -11,6 +14,12 @@ import { Pagination, type PaginationMeta } from '../ui/Pagination';
 import { Button } from '../ui/Button';
 import { downloadCsv, printTable, type ExportColumn } from './export';
 import { cn } from '../../lib/utils';
+
+// v9 要求靜態宣告啟用的功能；manual 模式只需排序/分頁的狀態管理，不需 row model 工廠。
+const features = tableFeatures({ rowSortingFeature, rowPaginationFeature });
+
+/** 供各頁面宣告欄位用的 ColumnDef 別名（v9 起 ColumnDef 需綁定 features 泛型）。 */
+export type DataTableColumn<T extends RowData> = ColumnDef<typeof features, T, unknown>;
 
 export interface DataTableLabels {
     empty: string;
@@ -22,8 +31,8 @@ export interface DataTableLabels {
     summaryTemplate: string;
 }
 
-interface DataTableProps<T> {
-    columns: ColumnDef<T, unknown>[];
+interface DataTableProps<T extends RowData> {
+    columns: DataTableColumn<T>[];
     data: T[];
     /** Laravel 分頁 meta（伺服器端分頁）。 */
     meta: PaginationMeta;
@@ -47,7 +56,7 @@ interface DataTableProps<T> {
  * 伺服器端 DataTable（TanStack headless）。manualPagination/Sorting：資料與分頁由
  * 伺服器提供，排序/換頁透過回呼觸發 Inertia partial reload。匯出/列印自建。
  */
-export function DataTable<T>({
+export function DataTable<T extends RowData>({
     columns,
     data,
     meta,
@@ -62,11 +71,11 @@ export function DataTable<T>({
     toolbar,
     getRowId,
 }: DataTableProps<T>) {
-    const table = useReactTable({
+    const table = useTable({
+        features,
         data,
         columns,
         getRowId,
-        getCoreRowModel: getCoreRowModel(),
         manualPagination: true,
         manualSorting: true,
         // 預設欄位不可排序；需排序的欄位於 columnDef 設 enableSorting: true，
@@ -162,7 +171,7 @@ export function DataTable<T>({
                         ) : (
                             table.getRowModel().rows.map((row) => (
                                 <tr key={row.id} className="border-t border-border hover:bg-muted/30">
-                                    {row.getVisibleCells().map((cell) => (
+                                    {row.getAllCells().map((cell) => (
                                         <td key={cell.id} className="px-3 py-2 align-top">
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </td>

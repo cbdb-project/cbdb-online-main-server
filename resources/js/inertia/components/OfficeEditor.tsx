@@ -439,10 +439,10 @@ export default function OfficeEditor({
 
             <div style={gSubmitRow}>
                 {canEdit && !isResubmit ? <button type="button" style={gPrimaryBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
-                {mode === 'edit' && canEdit && !isResubmit ? <button type="button" style={gSuccessBtn} disabled={saving} onClick={() => void save('direct', true)}>{tr('save_as', '另存新檔')}</button> : null}
                 {(canEdit || canPropose) ? <button type="button" style={gInfoBtn} disabled={saving || (mode === 'edit' && !dirty && !isResubmit)} onClick={() => (canEdit && !isResubmit ? setConfirmProposalMode(true) : void save('proposal'))}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : (isResubmit ? tr('resubmit_proposal', '更新提案') : tr('submit_proposal', '提交建議'))}</button> : null}
                 <ActionStatus saving={saving} deleting={deleting} message={message} error={error} t={t} />
                 <div style={gBtnGroupRight}>
+                    {mode === 'edit' && canEdit && !isResubmit ? <button type="button" style={gSuccessBtn} disabled={saving} onClick={() => void save('direct', true)}>{tr('save_as', '另存新檔')}</button> : null}
                     {mode === 'edit' && canEdit && deleteEndpoint && !isResubmit ? <button type="button" style={gDangerBtn} disabled={deleting} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
                     <a href={indexUrl} style={gCancelBtn}>{tr('cancel', '取消')}</a>
                 </div>

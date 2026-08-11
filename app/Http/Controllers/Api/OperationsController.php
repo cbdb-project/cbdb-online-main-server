@@ -258,12 +258,21 @@ class OperationsController extends Controller {
         $audit = app(SecurityAuditLogger::class);
 
         if (!$user || !is_string($user_password) || !Hash::check($user_password, $user->password)) {
+            // 查不到帳號時 rowPk 留空，不要記成 id=0：那會憑空生出一列「受影響的 users.id=0」，
+            // 反覆用不存在的 email 嘗試時，調查者會誤以為真有這個使用者。
+            // 也不回記使用者送來的原始 email——那是未驗證、無長度限制的輸入，
+            // 而這個端點沒有 throttle，原樣入庫等於讓人隨意撐大 audit_log。
             $audit->record(
                 table: 'users',
                 operation: 'UPDATE',
-                rowPk: ['id' => (int) ($user->id ?? 0)],
+                rowPk: $user ? ['id' => (int) $user->id] : [],
                 event: 'crowdsourcing_token_denied',
-                after: ['reason' => 'bad_credentials', 'email' => is_string($user_id) ? $user_id : null]
+                after: [
+                    'reason' => 'bad_credentials',
+                    'matched_user' => (bool) $user,
+                    // 只有查到帳號時才記 email，且用 DB 裡的值（有界）而非請求輸入。
+                    'email' => $user?->email,
+                ]
             );
 
             return "您的帳號與密碼輸入錯誤";

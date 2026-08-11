@@ -45,7 +45,8 @@ class SecurityAuditLogger {
         string $event,
         array $before = [],
         array $after = [],
-        ?string $channel = null
+        ?string $channel = null,
+        bool $actorIsUnknown = false
     ): void {
         try {
             // hasTable 也放在 try 內：它會下 information_schema／sqlite_master 查詢，
@@ -54,7 +55,8 @@ class SecurityAuditLogger {
                 return;
             }
 
-            $context = ['__security' => $this->requestContext($event, $channel)];
+            $attributable = !$actorIsUnknown && Auth::check();
+            $context = ['__security' => $this->requestContext($event, $channel, $attributable)];
 
             $isDelete = strtoupper($operation) === 'DELETE';
             $oldData = $isDelete ? array_merge($before, $context) : ($before === [] ? null : $before);
@@ -68,8 +70,11 @@ class SecurityAuditLogger {
                 newData: $newData,
                 // 未登入（CLI／系統作業）時是 system，不是「不明的 user」——
                 // 硬寫 'user' 會讓 AuditLogService 落成 actor_type=user / actor_id=system 的自相矛盾列。
-                actorType: Auth::check() ? 'user' : 'system',
-                actorId: Auth::check() ? (string) Auth::id() : null
+                actorType: $attributable ? 'user' : 'system',
+                // 顯式傳 'system' 而不是 null：AuditLogService 對 null 會自己回退去看 Auth，
+                // 於是「不可歸因」的事件（密碼重設連結）又會被記成當下登入的那個帳號——
+                // 而 trait 正好在寫入密碼後就把人登入了，等於白做。
+                actorId: $attributable ? (string) Auth::id() : 'system'
             );
         } catch (\Throwable $e) {
             // 只記 exception 類別與截短訊息：QueryException 的 getMessage() 含完整 SQL 與繫結值，
@@ -86,7 +91,7 @@ class SecurityAuditLogger {
     /**
      * @return array<string, mixed>
      */
-    private function requestContext(string $event, ?string $channel): array {
+    private function requestContext(string $event, ?string $channel, bool $attributable): array {
         $channel = $channel ?? $this->detectChannel();
         $isConsole = $channel === self::CHANNEL_CLI;
         $request = request();
@@ -95,8 +100,11 @@ class SecurityAuditLogger {
             'event' => $event,
             // 明確標出來源通道，讓「沒有 IP」與「IP 查不到」可以區分。
             'channel' => $channel,
-            'actor_id' => Auth::check() ? (int) Auth::id() : null,
-            'actor_name' => Auth::check() ? Auth::user()->name : null,
+            // $attributable=false 代表「動作者身分不可歸因」（例如持有密碼重設連結的人——
+            // 那可能是本人也可能是攻擊者）。此時 actor 一律留空：把它記成受影響帳號本人，
+            // 事後會被讀成「使用者自己改了密碼」，比不記更糟。IP 才是那種情境的關鍵線索。
+            'actor_id' => $attributable ? (int) Auth::id() : null,
+            'actor_name' => $attributable ? Auth::user()->name : null,
             // CLI 情境刻意寫 null：Laravel 的 SetRequestForConsole 會用 Request::create() 造一個
             // 假請求，`ip()` 回 '127.0.0.1'、`userAgent()` 回 'Symfony'（都是 Symfony 的預設值，
             // 因為 CLI 的 $_SERVER 沒有真的 REMOTE_ADDR／HTTP_USER_AGENT）。把那組值寫進審計，

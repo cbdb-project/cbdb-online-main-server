@@ -98,14 +98,38 @@ class SecurityAuditLogTest extends TestCase {
         ]));
     }
 
-    /** @return array<string, mixed>|null */
-    private function securityContextFor(string $event): ?array {
+    /**
+     * 取某個事件的 __security 脈絡，並可一併驗 table_name／operation／row_pk。
+     *
+     * 加上這些條件而不只比對事件名：只掃 event 的話，任何「事件寫到了錯的表、錯的
+     * operation、或錯的受影響列」都不會被抓到。
+     *
+     * @return array<string, mixed>|null
+     */
+    private function securityContextFor(
+        string $event,
+        ?string $table = null,
+        ?string $operation = null,
+        ?array $rowPk = null
+    ): ?array {
         foreach (DB::table('audit_log')->get() as $row) {
             foreach (['new_data', 'old_data'] as $column) {
                 $payload = json_decode((string) $row->{$column}, true);
-                if (is_array($payload) && ($payload['__security']['event'] ?? null) === $event) {
-                    return $payload['__security'];
+                if (!is_array($payload) || ($payload['__security']['event'] ?? null) !== $event) {
+                    continue;
                 }
+
+                if ($table !== null) {
+                    $this->assertSame($table, $row->table_name, "事件 {$event} 寫到了錯的表");
+                }
+                if ($operation !== null) {
+                    $this->assertSame($operation, $row->operation, "事件 {$event} 用了錯的 operation");
+                }
+                if ($rowPk !== null) {
+                    $this->assertSame($rowPk, json_decode((string) $row->row_pk, true), "事件 {$event} 的 row_pk 不符");
+                }
+
+                return $payload['__security'];
             }
         }
 
@@ -221,16 +245,24 @@ class SecurityAuditLogTest extends TestCase {
             'password_confirmation' => 'brandnew123',
         ])->assertRedirect();
 
-        $context = $this->securityContextFor('password_reset_via_email');
+        $context = $this->securityContextFor(
+            'password_reset_via_email',
+            table: 'users',
+            operation: 'UPDATE',
+            rowPk: ['id' => (int) $user->id]
+        );
         $this->assertNotNull($context, '經重設連結改密碼必須留下審計');
         $this->assertSame('http', $context['channel']);
-        // ResetsPasswords::resetPassword 會在寫入密碼後 Auth::login()，所以審計時已經登入，
-        // actor 就是該帳號本人——這正確反映「持有重設連結者現在以此身分行動」。
-        $this->assertSame((int) $user->id, $context['actor_id']);
+
+        // actor 必須留空：trait 會在寫入密碼後 Auth::login()，若照常歸因就會把「持有重設連結
+        // 的人」記成受影響帳號本人——攻擊者用竊得的 token 改密碼，事後卻顯示「使用者自己改的」，
+        // 比不記更糟。受影響帳號由 row_pk 標明，可用線索是 IP。
+        $this->assertNull($context['actor_id'], '重設連結的動作者不可歸因，actor 必須留空');
+        $this->assertNull($context['actor_name']);
 
         $row = DB::table('audit_log')->where('table_name', 'users')->first();
-        $this->assertSame('user', $row->actor_type);
-        $this->assertSame((string) $user->id, $row->actor_id);
+        $this->assertSame('system', $row->actor_type);
+        $this->assertSame('system', $row->actor_id);
 
         Schema::dropIfExists('password_resets');
     }
@@ -283,6 +315,72 @@ class SecurityAuditLogTest extends TestCase {
         // 憑證本身絕不入庫。
         $dump = DB::table('audit_log')->get()->toJson();
         $this->assertStringNotContainsString('crowd-token', $dump);
+    }
+
+    #[Test]
+    public function a_denial_for_an_unknown_account_does_not_invent_a_user_row(): void {
+        // 記成 id=0 會憑空生出一列「受影響的 users.id=0」，反覆用不存在的 email 嘗試時，
+        // 調查者會誤以為真有這個使用者。也不得把未驗證、無長度限制的請求輸入原樣入庫——
+        // 這個端點沒有 throttle。
+        $longEmail = str_repeat('a', 5000).'@example.com';
+
+        $this->get('/api/operations/token?q='.urlencode($longEmail).'&p=whatever')->assertOk();
+
+        $context = $this->securityContextFor(
+            'crowdsourcing_token_denied',
+            table: 'users',
+            operation: 'UPDATE',
+            rowPk: []
+        );
+        $this->assertNotNull($context);
+
+        $row = DB::table('audit_log')->first();
+        $payload = json_decode((string) $row->new_data, true);
+        $this->assertFalse($payload['matched_user']);
+        $this->assertNull($payload['email'], '查不到帳號時不得回記請求輸入的 email');
+        $this->assertStringNotContainsString(str_repeat('a', 100), (string) $row->new_data);
+    }
+
+    #[Test]
+    public function soft_delete_records_that_credentials_were_invalidated(): void {
+        // 軟刪除實際改寫了 email／password／confirmation_token／remember_token，但審計原本
+        // 只看得到 is_active／is_admin，事後無從確認那些憑證是否同步作廢。只記布林旗標。
+        $admin = User::unguarded(fn () => User::create([
+            'name' => '管理員',
+            'email' => 'admin@example.com',
+            'password' => Hash::make('secret123'),
+            'confirmation_token' => 'token',
+            'is_active' => User::STATUS_ACTIVE,
+            'is_admin' => User::ROLE_SUPER_ADMIN,
+        ]));
+        $victim = $this->activeUser('victim@example.com');
+        $victim->refresh();
+        $originalHash = $victim->password;
+
+        $this->actingAs($admin)->put('/manage/'.$victim->id, [
+            'is_active' => User::STATUS_ACTIVE,
+            'is_admin' => User::ROLE_REGULAR,
+            'delete_user' => 1,
+        ])->assertRedirect(route('manage.index'));
+
+        $this->assertNotNull($this->securityContextFor(
+            'user_soft_deleted',
+            table: 'users',
+            operation: 'DELETE',
+            rowPk: ['id' => (int) $victim->id]
+        ));
+
+        $row = DB::table('audit_log')->where('table_name', 'users')->first();
+        $payload = json_decode((string) $row->new_data, true);
+        $this->assertTrue($payload['password_invalidated']);
+        $this->assertTrue($payload['confirmation_token_invalidated']);
+        $this->assertTrue($payload['remember_token_invalidated']);
+
+        // 旗標而已，被作廢的實際憑證不得入庫（比對刪除前的雜湊；刪除後的值是哨兵 '-'，
+        // 拿它去斷言「dump 不含 -」毫無意義，日期裡就有）。
+        $dump = DB::table('audit_log')->get()->toJson();
+        $this->assertStringNotContainsString($originalHash, $dump);
+        $this->assertStringNotContainsString('victim@example.com', $dump);
     }
 
     #[Test]

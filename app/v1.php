@@ -6,29 +6,16 @@ use Auth;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class v1 extends Model {
     public function info() {
         return phpinfo();
     }
 
-    public function token(Request $request) {
-        $user_id = $request->q;
-        $user_password = $request->p;
-        //呼叫這行就可以進行帳號與密碼的認證了
-        if (Auth::attempt(['email' => $user_id, 'password' => $user_password])) {
-            $data = DB::table('users')->where('email', '=', $user_id)->get();
-            foreach ($data as $item) {
-                $data = $item->confirmation_token;
-            }
-
-            return $data;
-        } else {
-            return "您的帳號與密碼輸入錯誤";
-        }
-        //return DB::table('users')->get();
-    }
+    // token() 已於 P0-2 下架（連同 GET /api/v1/user 路由與 ApiController@userC_presonid）：
+    // 它用密碼換 confirmation_token，卻既不查 isActive() 也不查眾包身分，是
+    // Api\OperationsController@token 那道閘門的直通後門。取得 token 請改用
+    // POST /api/operations/token（該處已具備完整閘門）。
 
     public function search(Request $request) {
         // #85 + §D-8：$request->q 主要形式，$qForms 為綁定用的 v／ü 展開集。

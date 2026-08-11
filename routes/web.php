@@ -18,7 +18,13 @@ Route::get('/', 'WelcomeController@index');
 
 Auth::routes();
 
-Route::get('email/verify/{token}', ['as' => 'email.verify', 'uses' => 'EmailController@verify']);
+// email/verify/{token} 已於 P0-2 下架（連同 EmailController）。
+// 它是一條不掛 auth、直接 Auth::login() 的無密碼登入端點：confirmation_token 永久有效、
+// 會經 URL 路徑流入 access log／Referer／瀏覽器歷史，任何知道它的人都能取得該帳號 session；
+// 被停用的帳號也能靠它繞過 is_active 複查重拿 session。而它連名義上的「啟用帳號」都沒做
+// （$user->is_active = 2 早被註解），啟用信自 2021-08 起停發 → 沒有合法用途。
+// 日後若要恢復啟用信，應另建一次性、有期限的 email_verifications 表，不得重用
+// confirmation_token，且不得 Auth::login()。
 Route::get('operations', ['as' => 'operations.index', 'uses' => 'OperationsController@index']);
 Route::get('app/operations', ['as' => 'app.operations.index', 'uses' => 'OperationsController@appIndex'])->middleware('inertia');
 Route::post('locale', 'LocaleController@switch')->name('locale.switch')->middleware('throttle:20,1');

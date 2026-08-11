@@ -574,8 +574,9 @@ class BiogMainBasicInfoNameMergeTest extends TestCase {
             'c_dy_intercalary' => 0,
         ]);
 
-        // 非活躍用戶應被拒絕並重定向
-        $response->assertStatus(302);
+        // 非活躍用戶應被拒絕。自 P0-2 起由 auth middleware 直接回 403
+        // （見 App\Http\Middleware\Authenticate），不再由控制器重定向。
+        $response->assertStatus(403);
 
         // 驗證資料未變更
         $person = DB::table('BIOG_MAIN')->where('c_personid', 2352)->first();

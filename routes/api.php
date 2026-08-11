@@ -87,7 +87,9 @@ Route::group(['prefix' => 'v1'], function () {
     Route::get('add', 'ApiController@addC_presonid');
     Route::get('update', 'ApiController@updateC_presonid');
     Route::get('delete', 'ApiController@deleteC_presonid');
-    Route::get('user', 'ApiController@userC_presonid');
+    // v1/user 已於 P0-2 下架：它用密碼換 confirmation_token，卻既不查 isActive() 也不查眾包身分
+    // （對照 Api\OperationsController@token 兩者都查），等於是那道閘門的直通後門——停用帳號
+    // 仍能換到 token，任何已啟用帳號也能藉此取得 operations 寫入通道。
 });
 
 Route::group(['prefix' => 'operations'], function () {

@@ -63,7 +63,8 @@ class Kernel extends HttpKernel {
      * @var array<string, class-string|string>
      */
     protected $middlewareAliases = [
-        'auth' => \Illuminate\Auth\Middleware\Authenticate::class,
+        // 覆寫版：認證通過後再複查 is_active（同時覆蓋 auth 與 auth:sanctum）。
+        'auth' => \App\Http\Middleware\Authenticate::class,
         'legacy.form' => \App\Http\Middleware\LegacyBladeFormGate::class,
         'auth.basic' => \Illuminate\Auth\Middleware\AuthenticateWithBasicAuth::class,
         'auth.optional' => \App\Http\Middleware\OptionalAuthentication::class,

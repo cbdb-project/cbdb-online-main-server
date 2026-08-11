@@ -2,7 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
+use App\Support\ApiTokenAbilities;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class ApiTokenController extends Controller {
     /**
@@ -27,22 +31,64 @@ class ApiTokenController extends Controller {
      * 創建新的 API token
      */
     public function store(Request $request) {
+        ApiTokenAbilities::assertMcpAbilityIsIssuable();
+
+        // 先去重再驗證：重複元素對授權毫無意義，不該因此被 422 擋下；但 max 規則要看的是
+        // 去重後的筆數，否則「上千個重複值」會先撐爆 TEXT 欄位（見下方 max 註解）。
+        // SORT_REGULAR：元素可能不是字串（巢狀陣列會由 abilities.* 的 string 規則擋下），
+        // 預設的 SORT_STRING 會先觸發 Array to string conversion。
+        if (is_array($request->input('abilities'))) {
+            $request->merge([
+                'abilities' => array_values(array_unique($request->input('abilities'), SORT_REGULAR)),
+            ]);
+        }
+
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'abilities' => ['sometimes', 'array'],
+            // min:1：顯式傳空陣列會簽出一個「能認證但永遠進不了 MCP」的 token，
+            //   使用者完全看不出原因，寧可當場擋下。
+            // max:count(allowed)：abilities 是 TEXT 欄位而生產 sql_mode 沒有
+            //   STRICT_TRANS_TABLES，數千個重複元素會被靜默截斷到 65535 bytes，
+            //   之後 json_decode 回 null、Sanctum 的 can() 直接拋 TypeError，該 token 永久壞掉。
+            'abilities' => ['sometimes', 'array', 'min:1', 'max:'.count(ApiTokenAbilities::allowed())],
+            // 只接受登記過的能力；通配 '*' 不在清單內，會被這條擋下。
+            'abilities.*' => ['string', Rule::in(ApiTokenAbilities::allowed())],
             'expires_in' => ['sometimes', 'integer', 'min:1', 'max:3650'],
+        ], [
+            // Rule::in 的預設訊息（「所選的 abilities.0 無效」）看不出為什麼，
+            // 而請求通配是最可能的誤用，所以給它一句明確的說明。
+            'abilities.*.in' => '不支援的 token 能力。允許的能力：'
+                .implode('、', ApiTokenAbilities::allowed())
+                .'。通配能力（*）已停用——它等於自動授予日後新增的每一種能力。',
         ]);
 
-        $abilities = $request->input('abilities', ['*']);
+        // 未指定時給「能用的最小權限」，不再是通配（見 ApiTokenAbilities 註解）。
+        // 有指定時已在驗證前去重並通過允許清單，直接用。
+        $abilities = $request->has('abilities')
+            ? array_values($request->input('abilities'))
+            : ApiTokenAbilities::default();
+
         $expiresAt = $request->has('expires_in') && $request->input('expires_in')
             ? now()->addDays($request->input('expires_in'))
             : null;
 
-        $token = $request->user()->createToken(
-            $request->input('name'),
-            $abilities,
-            $expiresAt
-        );
+        // 與 AccountAccessRevoker 序列化：管理員停用帳號會在同一把 users 列鎖下撤銷 token。
+        // 沒有這把鎖時，兩者可能交錯成「撤銷讀到舊清單 → 建立寫入新 token → 停用完成但仍留
+        // 一個有效憑證」，等帳號日後重新啟用就復活。鎖內重讀 is_active，停用先提交就直接 403。
+        $token = DB::transaction(function () use ($request, $abilities, $expiresAt) {
+            $locked = DB::table('users')->where('id', $request->user()->id)->lockForUpdate()->first();
+            abort_if(
+                !$locked || (int) $locked->is_active !== User::STATUS_ACTIVE,
+                403,
+                __('auth.account_inactive')
+            );
+
+            return $request->user()->createToken(
+                $request->input('name'),
+                $abilities,
+                $expiresAt
+            );
+        });
 
         // If this is a JSON request, return JSON response
         if ($request->expectsJson()) {

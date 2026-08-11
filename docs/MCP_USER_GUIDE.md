@@ -11,9 +11,13 @@
 
 ## 2. 取得 API Token
 
-請在 CBDB 系統建立 Personal Access Token，並設定能力為至少包含：
+請在 CBDB 系統建立 Personal Access Token（個人資料頁）。**不需要手動設定能力**：介面沒有
+能力選擇器，新建 token 一律自動取得目前唯一可簽發的能力：
 
 - `mcp:read`
+
+（自 P1-4 起，預設值不再是 Sanctum 的通配能力 `*`。若你手上的舊 token 是 `*`，它已被
+migration 降級為 `mcp:read`，MCP 用法不受影響。）
 
 若 token 洩漏，請立即撤銷並重新建立。
 

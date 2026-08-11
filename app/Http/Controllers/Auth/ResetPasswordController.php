@@ -75,8 +75,10 @@ class ResetPasswordController extends Controller {
      * audit_log 只看得到 email 變更，看不到密碼何時被誰從哪個 IP 換掉。反過來也一樣：
      * 真正的使用者自助重設不留紀錄，事後就無法區分「本人重設」與「攻擊者用外洩的重設連結」。
      *
-     * 此時尚未登入（guest middleware），所以 actor 是 system；受影響帳號由 rowPk 標明。
-     * 一律不記密碼雜湊或明文。
+     * actor 刻意留空（actorIsUnknown）：trait 會在寫入密碼後 `Auth::login($user)`，所以審計時
+     * 已經「登入成功」，若照常歸因就會把持有重設連結的人記成受影響帳號**本人**——攻擊者用
+     * 竊得的 reset token 改掉密碼，事後 audit_log 卻顯示「使用者自己改了密碼」，比不記更糟。
+     * 真正可用的線索是 IP／UA，受影響帳號由 rowPk 標明。一律不記密碼雜湊或明文。
      *
      * @param  \App\Models\User  $user
      * @param  string  $password
@@ -89,7 +91,8 @@ class ResetPasswordController extends Controller {
             operation: 'UPDATE',
             rowPk: ['id' => (int) $user->id],
             event: 'password_reset_via_email',
-            after: ['password_changed' => true, 'email' => $user->email]
+            after: ['password_changed' => true, 'email' => $user->email],
+            actorIsUnknown: true
         );
     }
 

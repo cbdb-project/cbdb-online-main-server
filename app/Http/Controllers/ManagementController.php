@@ -303,7 +303,17 @@ class ManagementController extends Controller {
 
             // 刪除/停用帳號一律撤銷其 API token（sanctum token 不會因帳號失效而自動失效）。
             $this->revokeApiTokens($user);
-            $this->auditUserChange($user, $before, ['is_active' => (int) $user->is_active, 'is_admin' => (int) $user->is_admin], $actor, 'DELETE');
+            // 明記憑證已一併失效：軟刪除實際上改寫了 email／password／confirmation_token／
+            // remember_token，但審計只看得到 is_active／is_admin，事後無從確認那些憑證是否
+            // 同步作廢。只記布林旗標，不記任何實際值。
+            $this->auditUserChange($user, $before, [
+                'is_active' => (int) $user->is_active,
+                'is_admin' => (int) $user->is_admin,
+                'password_invalidated' => true,
+                'confirmation_token_invalidated' => true,
+                'remember_token_invalidated' => true,
+                'email_rewritten' => true,
+            ], $actor, 'DELETE');
 
             flash('用戶已刪除 @ '.Carbon::now(), 'danger');
 

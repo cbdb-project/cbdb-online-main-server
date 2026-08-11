@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\AccountAccessRevoker;
-use App\Services\AuditLogService;
+use App\Services\SecurityAuditLogger;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -382,23 +382,19 @@ class ManagementController extends Controller {
      * DB trigger 才是權威 tripwire，此處是帶 app 端操作者的補充佐證。
      */
     private function auditUserChange(User $user, array $before, array $after, ?User $actor, string $operation): void {
-        if (!Schema::hasTable('audit_log')) {
-            return;
-        }
-
-        try {
-            app(AuditLogService::class)->write(
-                'users',
-                $operation,
-                ['id' => (int) $user->id],
-                $before,
-                $after,
-                'user',
-                $actor ? (string) $actor->id : null
-            );
-        } catch (\Throwable $e) {
-            \Log::warning('performUserUpdate 審計寫入失敗: '.$e->getMessage());
-        }
+        // 委派給 SecurityAuditLogger：它統一處理請求脈絡（IP／User-Agent／操作者，且 CLI 下
+        // 寫 null 而不是 Laravel 造的假 127.0.0.1）、actor 型別、DELETE 的脈絡放 old_data
+        // 的慣例，以及「審計失敗絕不回退已完成的帳號變更」。
+        //
+        // DB trigger 看得到欄位變了，但看不到是誰從哪裡改的，而那正是入侵調查要問的第一個問題。
+        app(SecurityAuditLogger::class)->record(
+            table: 'users',
+            operation: $operation,
+            rowPk: ['id' => (int) $user->id],
+            event: $operation === 'DELETE' ? 'user_soft_deleted' : 'user_role_or_status_changed',
+            before: $before,
+            after: $after
+        );
     }
 
     /**

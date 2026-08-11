@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\User;
 use App\Services\AccountAccessRevoker;
+use App\Services\SecurityAuditLogger;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
@@ -169,6 +170,22 @@ class ManageUser extends Command {
         $user->is_admin = $role;
         $user->save();
 
+        // CLI 也要留紀錄：這支指令可以憑機器存取權建立任意角色的帳號（含系統管理員），
+        // 而 users 表沒有 DB trigger 兜底，所以應用層審計是唯一紀錄。
+        app(SecurityAuditLogger::class)->record(
+            table: 'users',
+            operation: 'INSERT',
+            rowPk: ['id' => (int) $user->id],
+            event: 'user_created_via_cli',
+            after: [
+                'email' => $user->email,
+                'is_active' => (int) $user->is_active,
+                'is_admin' => (int) $user->is_admin,
+            ],
+            // 顯式標明來源：自動判定在測試中無法區分（PHPUnit 本身就跑在 CLI）。
+            channel: SecurityAuditLogger::CHANNEL_CLI
+        );
+
         $this->newLine();
         $this->info('✓ 用戶創建成功！');
         $this->displayUserInfo($user);
@@ -183,6 +200,12 @@ class ManageUser extends Command {
         $this->info('=== 更新用戶信息 ===');
 
         $updated = false;
+        // 供審計比對：這支指令可以改任何人的密碼與角色，而 users 表沒有 DB trigger 兜底。
+        $before = [
+            'is_active' => (int) $user->is_active,
+            'is_admin' => (int) $user->is_admin,
+        ];
+        $passwordChanged = false;
 
         // 更新名稱
         $name = $this->option('name');
@@ -207,6 +230,7 @@ class ManageUser extends Command {
             }
             $user->password = Hash::make($password);
             $updated = true;
+            $passwordChanged = true;
         }
 
         // 更新激活狀態
@@ -277,6 +301,26 @@ class ManageUser extends Command {
         }
 
         $user->save();
+
+        $after = [
+            'is_active' => (int) $user->is_active,
+            'is_admin' => (int) $user->is_admin,
+        ];
+        if ($passwordChanged) {
+            $before['password_changed'] = true;
+            $after['password_changed'] = true;
+        }
+        if ($before !== $after || $passwordChanged) {
+            app(SecurityAuditLogger::class)->record(
+                table: 'users',
+                operation: 'UPDATE',
+                rowPk: ['id' => (int) $user->id],
+                event: $passwordChanged ? 'password_changed_via_cli' : 'user_role_or_status_changed_via_cli',
+                before: $before,
+                after: $after,
+                channel: SecurityAuditLogger::CHANNEL_CLI
+            );
+        }
 
         // 與管理介面一致：停用帳號連帶撤銷其所有 API token（Sanctum token 不會因帳號失效
         // 而自動失效，見 AccountAccessRevoker 註解）。

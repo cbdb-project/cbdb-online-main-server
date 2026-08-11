@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\SecurityAuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -15,7 +16,7 @@ class UserProfileController extends Controller {
      *
      * @return void
      */
-    public function __construct() {
+    public function __construct(private SecurityAuditLogger $securityAudit) {
         $this->middleware('auth');
     }
 
@@ -75,11 +76,15 @@ class UserProfileController extends Controller {
     protected function applyProfileUpdate(Request $request, array $validatedData): bool {
         $user = Auth::user();
 
+        $passwordChanged = false;
+        $emailBefore = $user->email;
+
         if ($request->filled('new_password')) {
             if (!Hash::check($request->current_password, $user->password)) {
                 return false;
             }
             $user->password = Hash::make($request->new_password);
+            $passwordChanged = true;
         }
 
         $user->name = $validatedData['name'];
@@ -88,6 +93,34 @@ class UserProfileController extends Controller {
         $user->institution = $validatedData['institution'] ?? null;
         $user->avatar = $validatedData['avatar'];
         $user->save();
+
+        // 安全敏感變更寫應用層審計（含 IP／UA——DB trigger 拿不到這兩個）：
+        //  - 密碼變更是帳號接管的首要指標；
+        //  - email 變更可用來劫持密碼重設，等於換走帳號的復原管道。
+        // 只記「變更發生了」與 email 的前後值，**不記密碼雜湊**。
+        if ($passwordChanged) {
+            $this->securityAudit->record(
+                table: 'users',
+                operation: 'UPDATE',
+                rowPk: ['id' => (int) $user->id],
+                event: 'password_changed',
+                // before 刻意留空（old_data 為 null）：兩邊都寫 password_changed=true 會讓
+                // 後台審計檢視器（相等即略過）把整條 diff 吃掉，而且「變更前 password_changed
+                // 就是 true」在 diff 視角下讀不通。
+                after: ['password_changed' => true]
+            );
+        }
+
+        if ($emailBefore !== $user->email) {
+            $this->securityAudit->record(
+                table: 'users',
+                operation: 'UPDATE',
+                rowPk: ['id' => (int) $user->id],
+                event: 'email_changed',
+                before: ['email' => $emailBefore],
+                after: ['email' => $user->email]
+            );
+        }
 
         return true;
     }

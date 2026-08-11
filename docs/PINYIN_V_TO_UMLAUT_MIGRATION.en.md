@@ -84,7 +84,7 @@
   - **Tier 1 | backend silent** — columns that are Hanyu pinyin by definition: BIOG `c_surname`/`c_mingzi`/`c_name`, ALTNAME `c_alt_name_pinyin`/`2`/`3`.
   - **Tier 2 | frontend interactive** — `c_alt_name`, which may hold a Western alias (e.g. Denver, where `nve` is real): the React `AltnameEditor` detects rule-matches on save and pops a dialog to convert-or-keep; the backend does **not** silently convert `c_alt_name`.
 - **Hooks (active React / `/api/v2` manual-input surface only)**: `BiogMainRepository::updateById`/`store`, `BiogMainMutationHandler::prepareProposalPayload`, the `preprocess*` of `AltnameMutationHandler`/`AltnameCreateHandler`; frontend `resources/js/inertia/utils/pinyinUmlaut.ts` + the `AltnameEditor` dialog.
-- **Scope**: code tables (`CodesController` / book-title inline) deferred to **Phase B** (needs a per-table Hanyu-pinyin column registry first, to avoid corrupting Wade-Giles / translation columns); old Blade controllers untouched (per AGENTS.md); legacy `/api/v1` and approval-time apply are documented out-of-scope residuals. See design §5/§9.
+- **Scope**: code tables (`CodesController` / book-title inline) deferred to **Phase B** (needs a per-table Hanyu-pinyin column registry first, to avoid corrupting Wade-Giles / translation columns); old Blade controllers untouched (per AGENTS.md); approval-time apply is a documented out-of-scope residual (legacy `/api/v1` was removed wholesale by security hardening P2-8, so it is no longer a residual). See design §5/§9.
 - **Tests**: `PinyinUmlautTest` (normalizeFields + the shared frontend/backend rule contract), `ApiV2Mutate*/Create*` per-hook regressions, and frontend `pinyinUmlaut.test.ts` (vitest).
 
 ## 0. Background and Agreed Decisions

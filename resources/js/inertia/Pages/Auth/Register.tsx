@@ -21,6 +21,11 @@ export default function Register() {
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
+        // register_url 為 null＝註冊已關閉；此頁本來就不該渲染得出來（GET /register 也一起消失），
+        // 這裡只是不要讓 form.post(null) 變成打到當前頁面的怪異請求。
+        if (!shell.register_url) {
+            return;
+        }
         // POST 到既有 /register（laravel/ui RegistersUsers），後端驗證/建立邏輯不變。
         form.post(shell.register_url, {
             onFinish: () => form.reset('password', 'password_confirmation'),

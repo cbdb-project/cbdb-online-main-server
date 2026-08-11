@@ -421,14 +421,25 @@ class BiogMainRepository {
      * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
     public static function namesByQuery(Request $request, $num = 20) {
-        //20220303增加addslashes()防禦查詢參數
-        // #85 + §D-8 查詢展開：遷移後人名以正字 ü 儲存；$request->q 保留主要形式（供數字判斷／
-        // FTS／orderByRaw 內插，addslashes 防禦），$qForms 為綁定用的 v／ü 展開集（OR 同查）。
+        // #85 + §D-8 查詢展開：遷移後人名以正字 ü 儲存；$request->q 保留主要形式（供數字判斷、
+        // FTS 前綴查詢與排序），$qForms 為綁定用的 v／ü 展開集（OR 同查）。
+        //
+        // 2022 年加的 addslashes() 已移除：當時它是 orderByRaw 內插的唯一防線，但那兩行現在
+        // 改用參數綁定（見下方 FIELD()／CASE WHEN），此檔已無任何地方把 $request->q 拼進 raw SQL。
+        // 留著只會反過來壞事——$request->q 之後全部進 binding，addslashes 會把使用者輸入的
+        // 引號變成字面反斜線，搜「O'Brien」會綁成「O\'Brien」而查不到任何人。
         $rawQ = $request->q ?? '';
-        $request->q = addslashes(\App\Support\PinyinSearchNormalizer::umlautToV($rawQ));
+        $request->q = \App\Support\PinyinSearchNormalizer::umlautToV($rawQ);
         $qForms = \App\Support\PinyinSearchNormalizer::expand($rawQ);
         if ($temp = $request->num) {
-            $num = addslashes($temp);
+            // 每頁筆數是整數語義，用型別轉換而不是 addslashes（後者對數字毫無意義）。
+            //
+            // 這個參數是**未認證可達**的（/api/name 只有 throttle:600,1），而舊寫法把字串原樣
+            // 丟進 paginate()：num=-1 會產生「有 offset 沒有 limit」的語法錯誤 500，
+            // num=abc 會 TypeError 500，num=999999999 則一次回上萬列（空 q 分支更糟：
+            // 先 pluck 六十幾萬個 id，再拿它們去組第二段 5-JOIN 查詢）。
+            // 因此夾在 [1, 100]——100 是既有分頁 UI 的實務上限。
+            $num = max(1, min((int) $temp, 100));
         }
         // 朝代篩選參數
         $cDy = $request->input('c_dy');
@@ -548,16 +559,19 @@ class BiogMainRepository {
 
             $query->groupBy('BIOG_MAIN.c_personid');
 
-            // 使用 FIELD() 排序保持匹配質量順序（完整匹配 → 長後綴 → 短後綴）
-            $driver = DB::connection()->getDriverName();
-            if ($driver === 'mysql') {
+            // 使用 FIELD() 排序保持匹配質量順序（完整匹配 → 長後綴 → 短後綴）。
+            // $personIds 來自 CBDB__NAME_FTS.c_personid（unsignedInteger），不是使用者輸入；
+            // 仍顯式轉整數，與 ApiController::searchBiog 的同型程式碼一致——讓「不會有字串被拼進
+            // raw SQL」在這裡就成立，不必回頭確認來源。
+            $orderedIds = array_map('intval', array_values($personIds));
+            if (is_mysql()) {
                 // MySQL/MariaDB：使用 FIELD() 函數
-                $query->orderByRaw('FIELD(BIOG_MAIN.c_personid, ' . implode(',', $personIds) . ')');
+                $query->orderByRaw('FIELD(BIOG_MAIN.c_personid, ' . implode(',', $orderedIds) . ')');
             } else {
                 // SQLite：使用 CASE WHEN 模擬 FIELD() 行為
                 $caseClauses = [];
-                foreach ($personIds as $index => $personId) {
-                    $caseClauses[] = "WHEN BIOG_MAIN.c_personid = {$personId} THEN {$index}";
+                foreach ($orderedIds as $index => $personId) {
+                    $caseClauses[] = 'WHEN BIOG_MAIN.c_personid = '.$personId.' THEN '.(int) $index;
                 }
                 $caseStatement = 'CASE ' . implode(' ', $caseClauses) . ' ELSE 999999 END';
                 $query->orderByRaw($caseStatement);
@@ -609,14 +623,19 @@ class BiogMainRepository {
             self::applyDynastyFilter($names, $cDy);
         }
 
-        // 使用 FIELD() 排序讓姓氏完全匹配的排在前面
-        $driver = DB::connection()->getDriverName();
-        if ($driver === 'mysql') {
+        // 使用 FIELD() 排序讓姓氏完全匹配的排在前面。
+        //
+        // 使用者輸入一律走參數綁定，不要內插進 raw SQL：這兩行原本是
+        // `"FIELD(BIOG_MAIN.c_surname, '$request->q') DESC"`，只靠上游的 addslashes()
+        // 與 utf8mb4 連線擋住注入——那是脆弱的（換連線編碼、上游少呼叫一次、或有人複製這段
+        // 到別處，就直接破功），而且 orderByRaw 支援綁定，沒有理由內插。
+        $surname = (string) ($request->q ?? '');
+        if (is_mysql()) {
             // MySQL/MariaDB：使用 FIELD() 函數
-            $names = $names->orderByRaw("FIELD(BIOG_MAIN.c_surname, '$request->q') DESC");
+            $names = $names->orderByRaw('FIELD(BIOG_MAIN.c_surname, ?) DESC', [$surname]);
         } else {
             // SQLite：使用 CASE WHEN 模擬姓氏優先排序
-            $names = $names->orderByRaw("CASE WHEN BIOG_MAIN.c_surname = '$request->q' THEN 0 ELSE 1 END ASC");
+            $names = $names->orderByRaw('CASE WHEN BIOG_MAIN.c_surname = ? THEN 0 ELSE 1 END ASC', [$surname]);
         }
 
         $names = $names->orderBy('BIOG_MAIN.c_personid', 'ASC')
@@ -640,8 +659,10 @@ class BiogMainRepository {
         }
 
         // #85 + §D-8：與 namesByQuery 同口徑——$q 為主要形式（FTS／personid），$qForms 為 v／ü 展開集。
+        // addslashes 已移除（同 namesByQuery 的理由）：此函式的 $q 全部進 binding，
+        // 不再有 raw SQL 內插，addslashes 只會讓含引號的查詢字串失配。
         $rawQ = $q;
-        $q = addslashes(\App\Support\PinyinSearchNormalizer::umlautToV($rawQ));
+        $q = \App\Support\PinyinSearchNormalizer::umlautToV($rawQ);
         $qForms = \App\Support\PinyinSearchNormalizer::expand($rawQ);
 
         // 純數字：單筆精確查詢，不需要 facet

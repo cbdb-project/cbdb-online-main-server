@@ -235,15 +235,15 @@ public const ALTNAME_PINYIN_V_FIELDS   = ['c_alt_name_pinyin', 'c_alt_name_pinyi
    - 正解：任何 Blade 回退應**連同**在對應 Blade 控制器補一次 `PinyinUmlaut::normalizeFields()`（沿用本 PR
      helper／allowlist，成本極低），列入回退檢查清單，而非在本 PR 預改休眠舊碼。
 
-2. **Legacy `/api/v1/add`、`/api/v1/update`（程式化整合 API，非 UI）**：`routes/api.php` v1 群組 →
-   `ApiController@addC_presonid/updateC_presonid` → `App\v1::addC/updateC`（`app/v1.php:50-77`）直接
-   `BiogMain::create/save`，**只寫呼叫端傳入的 `c_name`／`c_name_chn`**（不寫 `c_surname/c_mingzi`、不跑
-   `auto_pinyin`）。若呼叫端傳入含 `Lv` 的 `c_name` 會原樣入庫。
-   - 定位：2018 年建置的外部程式化 GET API，非人工 UI；與 `c_alt_name` 的 API-direct 例外同理（程式化呼叫
-     端自負其責）。**本 PR 不改**。
-   - ⚠️ **另註（非本 PR 職責、應另開 ticket）**：此 v1 寫入群組看來**未掛 `auth:sanctum`**（GET 即可新增／
-     更新／刪除 `BIOG_MAIN`），屬既有安全弱點，建議獨立處理（加認證或下架）；屆時若保留，可順手補 `c_name`
-     的 `PinyinUmlaut::normalize()`。
+2. ~~**Legacy `/api/v1/add`、`/api/v1/update`（程式化整合 API，非 UI）**~~ — **已於資安加固 P2-8
+   整組刪除，本節不再適用。**
+   - 上面那則「⚠️ 應另開 ticket：v1 寫入群組未掛 `auth:sanctum`」的提醒即由 P2-8 處理，結論是**整組
+     下架**（`routes/api.php` 的 v1 群組、`app/v1.php`、`ApiController` 的五個 action）。
+   - 補充一個查證結果：這四個端點在刪除前**其實全都是 500 的死碼**——`App\v1` 在 namespace `App` 下用
+     無限定的 `BiogMain`，解析成不存在的 `App\BiogMain`（真正的類別是 `App\Models\BiogMain`），
+     所以從未真的寫入過（`BIOG_MAIN` 裡 `c_created_by='Api'` 為零筆）。它是危險的設計但不是可用的攻擊面。
+   - 因此拼音正規化在此已無殘留缺口：程式化寫入請走 `/api/v2/*`，該管線已在 v2 handler／共用 repository
+     層跑 `PinyinUmlaut::normalizeFields()`。
 
 3. **提案核准落庫（approval-time apply）**：`OperationsProposalController` 的
    `applyCreateProposal()`／`applyUpdateProposal()`（L626 insert／L696 update）把 `resource_data` **逐字**

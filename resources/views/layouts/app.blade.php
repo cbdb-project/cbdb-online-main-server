@@ -62,7 +62,11 @@
                             <!-- Authentication Links -->
                             @if (Auth::guest())
                                 <li><a href="{{ route('login', ['redirect' => request()->getRequestUri()]) }}">Login</a></li>
-                                <li><a href="{{ route('register') }}">Register</a></li>
+                                {{-- 見 auth/login.blade.php 的說明：關閉註冊時未加保護會讓
+                                     **每個用到本版面的頁面**都 500，不只登入頁。 --}}
+                                @if (Route::has('register'))
+                                    <li><a href="{{ route('register') }}">Register</a></li>
+                                @endif
                             @else
                                 <li class="dropdown">
                                     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">{{ __('nav.expert_tools') }} <span class="caret"></span></a>

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 class WelcomeController extends Controller {
@@ -25,7 +26,10 @@ class WelcomeController extends Controller {
                 'urls' => [
                     'home' => url('home'),
                     'login' => route('login', [], false),
-                    'register' => route('register', [], false),
+                    // 註冊路由可被關閉（Auth::routes(['register' => false])）。這裡是**站台首頁**
+                    // （welcome flag 預設 new，GET / 走這條），無保護會讓首頁直接 500——比原本
+                    // 只壞掉 /login 更嚴重。null＝前端不渲染註冊入口。
+                    'register' => Route::has('register') ? route('register', [], false) : null,
                     'name_api' => url('api/name'),
                     'person_show' => person_show_base_url(),
                     'person_index' => person_index_base_url(),

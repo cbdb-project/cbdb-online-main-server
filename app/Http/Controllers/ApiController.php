@@ -28,7 +28,6 @@ use App\Services\PinyinDictionary;
 use App\Services\VariantCharNormalizer;
 use App\Support\ExactCodeMatchGuard;
 use App\Support\PinyinUmlaut;
-use App\v1;
 use Illuminate\Http\Request;
 //20181017建安新增
 use Illuminate\Support\Facades\DB;
@@ -36,34 +35,10 @@ use Illuminate\Support\Facades\DB;
 //end
 
 class ApiController extends Controller {
-    //20180815建安寫在最上面
-    public function searchC_presonid(Request $request) {
-        $data = new v1();
-
-        return $data->search($request);
-    }
-
-    public function addC_presonid(Request $request) {
-        $data = new v1();
-
-        return $data->addC($request);
-    }
-
-    public function updateC_presonid(Request $request) {
-        $data = new v1();
-
-        return $data->updateC($request);
-    }
-
-    public function deleteC_presonid(Request $request) {
-        $data = new v1();
-
-        return $data->deleteC($request);
-    }
-
-    // userC_presonid()（GET /api/v1/user）已於 P0-2 連同 App\v1::token() 一併下架，
-    // 原因見 routes/api.php 的註解。
-    //end
+    // searchC_presonid()／addC_presonid()／updateC_presonid()／deleteC_presonid()／
+    // userC_presonid()（遺留 /api/v1 群組）已整組刪除，連同其實作 App\v1。
+    // 那四個端點在刪除前全部都是 500 的死碼；下架原因與替代方案（/api/v2/*）見
+    // routes/api.php 的註解。
 
     public function ethnicity() {
         $ethnicityRepository = new EthnicityRepository();
@@ -477,9 +452,12 @@ class ApiController extends Controller {
 
     public function searchBiog(Request $request) {
         // 20251218性能優化：使用與 /api/name 相同的 FTS 索引查詢邏輯
-        // #85 + §D-8：$request->q 為主要形式（數字／FTS／orderByRaw），$qForms 為綁定用的 v／ü 展開集。
+        // #85 + §D-8：$request->q 為主要形式（數字判斷／FTS 前綴），$qForms 為綁定用的 v／ü 展開集。
+        // addslashes 已移除：此方法內 $request->q 只用於 ctype_digit 判斷與 binding
+        // （FTS 的 LIKE、回退 LIKE 都是綁定值），沒有 raw SQL 內插；留著會把使用者輸入的
+        // 引號變成字面反斜線而查不到資料。下方 orderByRaw 內插的是來自資料庫的整數 id。
         $rawQ = $request->q ?? '';
-        $request->q = addslashes(\App\Support\PinyinSearchNormalizer::umlautToV($rawQ));
+        $request->q = \App\Support\PinyinSearchNormalizer::umlautToV($rawQ);
         $qForms = \App\Support\PinyinSearchNormalizer::expand($rawQ);
         $num = 20;
 
@@ -502,17 +480,19 @@ class ApiController extends Controller {
             }
 
             if (!empty($personIds)) {
-                // 使用 FIELD() 排序保持匹配質量順序
-                $driver = DB::connection()->getDriverName();
-                $query = BiogMain::whereIn('c_personid', $personIds);
+                // 使用 FIELD() 排序保持匹配質量順序。
+                // $personIds 來自資料庫（pluck 出的 c_personid），不是使用者輸入；仍顯式轉成
+                // 整數，讓「不會有字串被拼進 raw SQL」這件事在這裡就成立，而不必回頭確認來源。
+                $orderedIds = array_map('intval', array_values($personIds));
+                $query = BiogMain::whereIn('c_personid', $orderedIds);
 
-                if ($driver === 'mysql') {
-                    $query->orderByRaw('FIELD(c_personid, ' . implode(',', $personIds) . ')');
+                if (is_mysql()) {
+                    $query->orderByRaw('FIELD(c_personid, ' . implode(',', $orderedIds) . ')');
                 } else {
                     // SQLite 回退方案
                     $caseClauses = [];
-                    foreach ($personIds as $index => $personId) {
-                        $caseClauses[] = "WHEN c_personid = {$personId} THEN {$index}";
+                    foreach ($orderedIds as $index => $personId) {
+                        $caseClauses[] = 'WHEN c_personid = '.$personId.' THEN '.(int) $index;
                     }
                     $caseStatement = 'CASE ' . implode(' ', $caseClauses) . ' ELSE 999999 END';
                     $query->orderByRaw($caseStatement);

@@ -36,12 +36,15 @@ export default function Login() {
             subtitle={t('sign_in_subtitle')}
             heading={t('welcome_back')}
             footer={
-                <span className="text-muted-foreground">
-                    {t('need_account')}{' '}
-                    <a href={shell.register_url} className="ml-1 text-primary hover:underline">
-                        {t('register_now')}
-                    </a>
-                </span>
+                // register_url 為 null＝註冊已關閉，不渲染入口（見 HandleInertiaRequests）。
+                shell.register_url ? (
+                    <span className="text-muted-foreground">
+                        {t('need_account')}{' '}
+                        <a href={shell.register_url} className="ml-1 text-primary hover:underline">
+                            {t('register_now')}
+                        </a>
+                    </span>
+                ) : null
             }
         >
             {status && (

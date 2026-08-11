@@ -84,7 +84,7 @@
   - **Tier 1｜後端靜默轉**——定義上即漢語拼音的欄：BIOG `c_surname`／`c_mingzi`／`c_name`、ALTNAME `c_alt_name_pinyin`/`2`/`3`。
   - **Tier 2｜前端互動確認**——可能含西文別名的 `c_alt_name`（如 Denver，`nve` 為真實西文）：React `AltnameEditor` 保存時用同一規則偵測，命中才彈窗由使用者「轉換／保留」；後端**不**靜默轉 `c_alt_name`。
 - **實作掛點（僅 active React／`/api/v2` 人工輸入面）**：`BiogMainRepository::updateById`／`store`、`BiogMainMutationHandler::prepareProposalPayload`、`AltnameMutationHandler`／`AltnameCreateHandler` 的 `preprocess*`；前端 `resources/js/inertia/utils/pinyinUmlaut.ts` + `AltnameEditor` 彈窗。
-- **範圍決策**：Code 表（`CodesController`／書名內聯）留 **Phase B**（需先建「表→漢語拼音欄」白名單，避免誤傷 Wade-Giles／譯名欄）；舊 Blade 控制器不改（遵 AGENTS.md）；legacy `/api/v1`、提案核准落庫為有意排除的殘留。詳見設計文件 §5／§9。
+- **範圍決策**：Code 表（`CodesController`／書名內聯）留 **Phase B**（需先建「表→漢語拼音欄」白名單，避免誤傷 Wade-Giles／譯名欄）；舊 Blade 控制器不改（遵 AGENTS.md）；提案核准落庫為有意排除的殘留（legacy `/api/v1` 已於資安加固 P2-8 整組刪除，不再是殘留）。詳見設計文件 §5／§9。
 - **測試**：`PinyinUmlautTest`（normalizeFields + 前後端規則位元一致契約）、`ApiV2Mutate*/Create*` 各掛點回歸、前端 `pinyinUmlaut.test.ts`（vitest）。
 
 ## 0. 背景與決議

@@ -41,7 +41,10 @@
                 <div class="card-body p-4">
                     <h1 class="h5 text-center mb-4">{{ __('common.join_us') }}</h1>
 
-                    <form action="{{ route('register') }}" method="post" novalidate>
+                    {{-- 保險起見用 Route::has 包住：正常情況下註冊關閉時這個視圖根本不會被渲染
+                         （GET /register 與 POST /register 都由 Auth::routes() 一起產生／一起消失），
+                         但若有人直接 view('auth.register')，沒保護就會 500 而不是顯示空表單。 --}}
+                    <form action="{{ Route::has('register') ? route('register') : '' }}" method="post" novalidate>
                         {{ csrf_field() }}
                         <div class="form-group mb-3">
                             <label for="name" class="form-label small text-muted">{{ __('common.name') }}</label>

@@ -35,7 +35,8 @@ export interface ShellRoutes {
     profile_url: string | null;
     logout_url: string;
     login_url: string;
-    register_url: string;
+    /** 註冊關閉時（Auth::routes(['register' => false])）為 null，前端不渲染註冊入口。 */
+    register_url: string | null;
 }
 
 export interface FlashMessage {

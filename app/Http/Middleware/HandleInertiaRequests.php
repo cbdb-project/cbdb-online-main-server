@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Support\Navigation;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Inertia\Middleware;
 
@@ -68,7 +69,11 @@ class HandleInertiaRequests extends Middleware {
                 'profile_url' => $this->profileUrl(),
                 'logout_url' => route('logout', [], false),
                 'login_url' => route('login', [], false),
-                'register_url' => route('register', [], false),
+                // 註冊路由可被關閉（Auth::routes(['register' => false])）。這是**每一頁**都會
+                // 求值的共享 prop，無條件呼叫 route('register') 會在關閉註冊時讓整個 React
+                // 站台每頁拋 RouteNotFoundException（比只壞掉 /login 嚴重得多）。
+                // null＝前端不渲染註冊入口。
+                'register_url' => Route::has('register') ? route('register', [], false) : null,
             ],
             // flash 訊息橋接：把 laracasts/flash 的 session 訊息轉成陣列，
             // 由 React AppShell 統一渲染 toast/alert（取代 Blade flash::message partial）。

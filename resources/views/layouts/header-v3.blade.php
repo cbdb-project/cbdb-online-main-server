@@ -83,9 +83,12 @@
             <li class="nav-item">
                 <a href="{{ route('login', ['redirect' => request()->getRequestUri()]) }}" class="nav-link">Login</a>
             </li>
-            <li class="nav-item">
-                <a href="{{ route('register') }}" class="nav-link">Register</a>
-            </li>
+            {{-- 見 auth/login.blade.php 的說明：關閉註冊時未加保護會讓每個用到本版面的頁面都 500。 --}}
+            @if (Route::has('register'))
+                <li class="nav-item">
+                    <a href="{{ route('register') }}" class="nav-link">Register</a>
+                </li>
+            @endif
         @else
             <!-- User Dropdown Menu -->
             <li class="nav-item dropdown user-menu">

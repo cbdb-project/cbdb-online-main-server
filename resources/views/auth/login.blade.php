@@ -70,10 +70,15 @@
                         <button type="submit" class="btn btn-primary btn-block">{{ __('common.sign_in') }}</button>
                     </form>
                 </div>
-                <div class="card-footer text-center bg-white">
-                    <span class="small text-muted">{{ __('common.need_account') }}</span>
-                    <a href="{{ route('register') }}" class="ml-1">{{ __('common.register_now') }}</a>
-                </div>
+                {{-- 註冊入口只在 register 路由存在時渲染。關閉註冊（Auth::routes(['register' => false])）
+                     時 route('register') 會拋 RouteNotFoundException，讓整個 /login 變成 500——
+                     使用者連登入都做不到。這正是先前關註冊時發生過的事故。 --}}
+                @if (Route::has('register'))
+                    <div class="card-footer text-center bg-white">
+                        <span class="small text-muted">{{ __('common.need_account') }}</span>
+                        <a href="{{ route('register') }}" class="ml-1">{{ __('common.register_now') }}</a>
+                    </div>
+                @endif
             </div>
         </div>
     </div>

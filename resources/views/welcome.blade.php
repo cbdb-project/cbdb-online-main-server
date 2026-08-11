@@ -191,7 +191,10 @@
                     @else
                         <a href="{{ url('home') }}">Guest</a>
                         <a href="{{ route('login', ['redirect' => request()->getRequestUri()]) }}">Login</a>
-                        <a href="{{ url('register') }}">Register</a>
+                        {{-- url() 不查路由所以不會 500，但關閉註冊後這會是個指向 404 的死連結。 --}}
+                        @if (Route::has('register'))
+                            <a href="{{ url('register') }}">Register</a>
+                        @endif
                     @endauth
                 </div>
             @endif

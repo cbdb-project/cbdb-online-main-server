@@ -81,16 +81,23 @@ Route::group(['prefix' => 'code'], function () {
 
 Route::middleware('guest')->post('v1/user/login', 'Api\LoginController@login');
 
-//20181105建安新增
-Route::group(['prefix' => 'v1'], function () {
-    Route::get('biog', 'ApiController@searchC_presonid');
-    Route::get('add', 'ApiController@addC_presonid');
-    Route::get('update', 'ApiController@updateC_presonid');
-    Route::get('delete', 'ApiController@deleteC_presonid');
-    // v1/user 已於 P0-2 下架：它用密碼換 confirmation_token，卻既不查 isActive() 也不查眾包身分
-    // （對照 Api\OperationsController@token 兩者都查），等於是那道閘門的直通後門——停用帳號
-    // 仍能換到 token，任何已啟用帳號也能藉此取得 operations 寫入通道。
-});
+// 遺留 /api/v1 群組（biog／add／update／delete／user）與其實作 App\v1 已整組刪除。
+//
+// 四個端點在刪除前**全部都是 500 的死碼**：App\v1 位於 namespace App，內部用無限定的
+// `BiogMain`，解析成不存在的 `App\BiogMain`（真正的類別是 App\Models\BiogMain）。
+// 實測四條都拋 `Class "App\BiogMain" not found`，這也是 BIOG_MAIN 裡
+// c_created_by='Api' 為零筆的原因。
+//
+// 之所以刪掉而不是修好 import：
+//  - add／update／delete 是無認證、無授權、不寫 operations／audit_log、連 c_modified_by
+//    都不蓋的 BIOG_MAIN 寫入設計。就算修好也不該存在——程式化寫入的正當管線是
+//    /api/v2/*（Api\MutationController），那條有認證、授權、operations、audit_log 與提案流程。
+//  - 唯讀的 biog 同樣壞著，修好 import 等於「新開一個實際上從未運作過的公開搜尋端點」，
+//    比刪除風險高，而且沒有任何客戶端在用（它一直回 500）。
+//  - App\v1::info() 直接 return phpinfo()（路徑／擴充／環境變數洩漏）。它沒有路由指向，
+//    但留在檔案裡就是等有人接上去。
+//  - App\v1::token() 用密碼換 confirmation_token，既不查 isActive() 也不查眾包身分，
+//    是 Api\OperationsController@token 那道閘門的直通後門（已於 P0-2 先行下架）。
 
 Route::group(['prefix' => 'operations'], function () {
     Route::match(['get', 'post'], 'token', 'Api\OperationsController@token');

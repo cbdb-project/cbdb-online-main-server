@@ -15,7 +15,8 @@ interface WelcomePageProps extends SharedProps {
     urls: {
         home: string;
         login: string;
-        register: string;
+        /** 註冊關閉時為 null，不渲染註冊入口（見 WelcomeController）。 */
+        register: string | null;
         name_api: string;
         person_show: string;
         person_index: string;
@@ -87,9 +88,11 @@ export default function Welcome() {
                         <a href={urls.login} className="px-3 text-muted-foreground no-underline hover:underline">
                             Login
                         </a>
-                        <a href={urls.register} className="px-3 text-muted-foreground no-underline hover:underline">
-                            Register
-                        </a>
+                        {urls.register && (
+                            <a href={urls.register} className="px-3 text-muted-foreground no-underline hover:underline">
+                                Register
+                            </a>
+                        )}
                     </>
                 )}
             </div>

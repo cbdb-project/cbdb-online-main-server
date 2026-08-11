@@ -183,7 +183,10 @@ export default function Navbar({ onToggleSidebar, isDark, onToggleDark, fontMode
                         >
                             Login
                         </a>
-                        <a href={shell.register_url} className="px-2 text-sm hover:text-primary">Register</a>
+                        {/* register_url 為 null＝註冊已關閉（見 HandleInertiaRequests）。 */}
+                        {shell.register_url && (
+                            <a href={shell.register_url} className="px-2 text-sm hover:text-primary">Register</a>
+                        )}
                     </>
                 )}
             </div>

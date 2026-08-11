@@ -61,11 +61,8 @@ class ApiController extends Controller {
         return $data->deleteC($request);
     }
 
-    public function userC_presonid(Request $request) {
-        $data = new v1();
-
-        return $data->token($request);
-    }
+    // userC_presonid()（GET /api/v1/user）已於 P0-2 連同 App\v1::token() 一併下架，
+    // 原因見 routes/api.php 的註解。
     //end
 
     public function ethnicity() {

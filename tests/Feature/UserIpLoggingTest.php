@@ -57,6 +57,9 @@ class UserIpLoggingTest extends TestCase {
             ]);
 
         $response->assertRedirect('/home');
+        // 註冊不再留下登入 session（RegisterController::registered 會登出）：新帳號
+        // is_active=0，帶著 session 就能觸及 auth-only 端點（例如 POST /api-tokens）。
+        $this->assertGuest();
 
         $user = User::where('email', 'register@example.com')->first();
         $this->assertNotNull($user);

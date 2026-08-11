@@ -40,6 +40,20 @@ class ManageEditInertiaTest extends TestCase {
             $table->tinyInteger('is_admin')->default(0);
             $table->timestamps();
         });
+
+        // 停用／軟刪除帳號會連帶撤銷 Sanctum token（AccountAccessRevoker），欄位對齊
+        // database/migrations/2025_12_17_000001_create_personal_access_tokens_table.php。
+        Schema::dropIfExists('personal_access_tokens');
+        Schema::create('personal_access_tokens', function ($table) {
+            $table->id();
+            $table->morphs('tokenable');
+            $table->string('name');
+            $table->string('token', 64)->unique();
+            $table->text('abilities')->nullable();
+            $table->timestamp('last_used_at')->nullable();
+            $table->timestamp('expires_at')->nullable();
+            $table->timestamps();
+        });
     }
 
     private function makeUser(string $name, int $role, int $active = 1): User {

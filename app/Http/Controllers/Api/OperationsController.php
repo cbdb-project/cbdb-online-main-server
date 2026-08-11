@@ -13,6 +13,7 @@ use App\Repositories\BiogMainRepository;
 use Auth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class OperationsController extends Controller {
     /**
@@ -242,16 +243,32 @@ class OperationsController extends Controller {
     public function token(Request $request) {
         $user_id = $request->q;
         $user_password = $request->p;
-        //呼叫這行就可以進行帳號與密碼的認證了
-        if (Auth::attempt(['email' => $user_id, 'password' => $user_password])) {
-            $user = \App\Models\User::where('email', $user_id)->first();
-            if ($user && !$user->isCrowdsourcingUser()) {
-                return "帳號須為眾包身分，才可以取得token。";
-            }
 
-            return $user ? $user->confirmation_token : "無法取得token";
-        } else {
+        // 刻意用 Hash::check 而不是 Auth::attempt：這條路由不掛 auth，但 api middleware group
+        // 的 EnsureFrontendRequestsAreStateful 在請求來自前端網域時會補上 StartSession，
+        // 此時 Auth::attempt 會順手建立一個 web session——一個「發放 token 的端點」不該有
+        // 登入副作用，停用帳號那條分支更不該留下已認證的 session 等帳號重新啟用後復活。
+        $user = is_string($user_id) && $user_id !== ''
+            ? User::where('email', $user_id)->first()
+            : null;
+
+        if (!$user || !is_string($user_password) || !Hash::check($user_password, $user->password)) {
             return "您的帳號與密碼輸入錯誤";
         }
+
+        // 停用（含從未啟用）帳號不得換到 token：resolveActiveUserByToken() 已擋住用它寫入，
+        // 但 confirmation_token 本身就是一個長期有效的憑證，不該外流。
+        if (!$user->isActive()) {
+            return __('auth.account_inactive');
+        }
+
+        if (!$user->isCrowdsourcingUser()) {
+            return "帳號須為眾包身分，才可以取得token。";
+        }
+
+        // 原樣回傳，不替空值補錯誤字串：既有眾包客戶端把 200 的 body 直接當 token 用，
+        // 換成人話錯誤反而會讓它拿著一個看起來合法的字串繼續打。
+        // （users.confirmation_token 是 NOT NULL，實務上不會是空值。）
+        return $user->confirmation_token;
     }
 }

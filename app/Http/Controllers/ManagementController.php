@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\AccountAccessRevoker;
 use App\Services\AuditLogService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -293,6 +294,10 @@ class ManagementController extends Controller {
             $user->password = '-';
             $user->confirmation_token = '-';
             $user->remember_token = '-';
+            // 一併停用：軟刪除原本只換掉密碼與 token，is_active 原封不動，於是被刪帳號
+            // 當下已存在的 session 仍會通過 App\Http\Middleware\Authenticate 的 is_active
+            // 複查而保有完整權限；capability helper（canManageUsers 等）也只看 isActive()+角色。
+            $user->is_active = User::STATUS_INACTIVE;
             $user->updated_at = Carbon::now();
             $user->save();
 
@@ -359,10 +364,15 @@ class ManagementController extends Controller {
         return redirect()->route($indexRoute);
     }
 
-    /** 撤銷指定使用者的所有 personal access token；表不存在時為 no-op（兼容未建該表的測試）。 */
+    /**
+     * 撤銷指定使用者的所有 personal access token；表不存在時為 no-op（兼容未建該表的測試）。
+     *
+     * 實作委派給 AccountAccessRevoker，讓「撤銷了哪些 token」本身也留下 audit_log 紀錄
+     * （上面的 auditUserChange 記的是 users 欄位 old→new，看不出憑證被銷毀了什麼）。
+     */
     private function revokeApiTokens(User $user): void {
         if (Schema::hasTable('personal_access_tokens')) {
-            $user->tokens()->delete();
+            app(AccountAccessRevoker::class)->revokeApiTokens($user, 'management_ui');
         }
     }
 

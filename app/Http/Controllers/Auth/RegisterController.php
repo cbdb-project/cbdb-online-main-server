@@ -9,8 +9,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
-use Mail;
-use Naux\Mail\SendCloudTemplate;
 
 class RegisterController extends Controller {
     /*
@@ -120,23 +118,10 @@ class RegisterController extends Controller {
             'password' => bcrypt($data['password']),
         ]);
 
-        //20210804遮除，禁止發送帳戶激活郵件。
-        //$this->sendVerifyEmailTo($user);
+        // 帳戶激活郵件自 2021-08 起停發，帳號改由管理員手動啟用（/manage 或
+        // php artisan cbdb:manage-user）。原本的 sendVerifyEmailTo() 已隨 email/verify
+        // 端點一併刪除——它引用 route('email.verify')，留著會在有人恢復呼叫時直接拋
+        // RouteNotFoundException（下架原因見 routes/web.php 的註解）。
         return $user;
-    }
-
-    private function sendVerifyEmailTo($user) {
-        // 模板变量
-        $bind_data = [
-            'url' => route('email.verify', ['token' => $user->confirmation_token]),
-            'name' => $user->name,
-        ];
-        $template = new SendCloudTemplate('cbdb_register', $bind_data);
-
-        Mail::raw($template, function ($message) use ($user) {
-            $message->from('cbdb.harvard@gmail.com', 'CBDB');
-
-            $message->to($user->email);
-        });
     }
 }

@@ -2602,6 +2602,14 @@ class CodesController extends Controller {
             abort(403, '請登入後再試。');
         }
 
+        // 其餘 codes 寫入路徑（performStore／performUpdate／performDestroy／ensureEditableAccess）
+        // 都自帶 isActive()，只有提案編輯／撤回這條漏了：被停用帳號只要 session 還沒過期，
+        // 仍能改寫自己 pending 提案的 payload 並把 __review_status 重設回 pending。
+        // 放在這個 helper 內即同時覆蓋 GET edit 與 PATCH／DELETE、legacy 與 React 四條路由。
+        if (!Auth::user()->isActive()) {
+            abort(403, __('auth.account_inactive'));
+        }
+
         if (($operation['resource'] ?? null) !== $table) {
             abort(404);
         }

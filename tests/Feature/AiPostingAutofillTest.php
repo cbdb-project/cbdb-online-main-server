@@ -57,11 +57,10 @@ class AiPostingAutofillTest extends TestCase {
             'person_id' => 1,
         ]);
 
+        // 自 P0-2 起，未啟用帳號在 auth middleware 就被擋掉（見 App\Http\Middleware\Authenticate），
+        // 比控制器自己的權限訊息更早、更一致，所以這裡驗的是 middleware 的 403。
         $response->assertStatus(403)
-            ->assertJson([
-                'success' => false,
-                'error' => '您沒有使用 AI 功能的權限',
-            ]);
+            ->assertJson(['message' => __('auth.account_inactive')]);
     }
 
     /**

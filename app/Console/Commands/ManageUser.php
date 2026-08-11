@@ -3,8 +3,10 @@
 namespace App\Console\Commands;
 
 use App\Models\User;
+use App\Services\AccountAccessRevoker;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
@@ -275,6 +277,15 @@ class ManageUser extends Command {
         }
 
         $user->save();
+
+        // 與管理介面一致：停用帳號連帶撤銷其所有 API token（Sanctum token 不會因帳號失效
+        // 而自動失效，見 AccountAccessRevoker 註解）。
+        if (!$user->isActive() && Schema::hasTable('personal_access_tokens')) {
+            $revoked = app(AccountAccessRevoker::class)->revokeApiTokens($user, 'cli');
+            if ($revoked > 0) {
+                $this->warn("已撤銷該帳號 {$revoked} 個 API token。");
+            }
+        }
 
         $this->newLine();
         $this->info('✓ 用戶信息更新成功！');

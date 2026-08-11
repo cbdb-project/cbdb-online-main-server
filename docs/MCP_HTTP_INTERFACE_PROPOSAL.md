@@ -56,8 +56,11 @@
 
 建議將 MCP 權限最小化：
 
-- `mcp:read`（必要）
-- `mcp:schema`（可選）
+- `mcp:read`（必要，且自 P1-4 起是**唯一**可簽發的能力）
+
+> 註：`mcp:schema` 曾列為可選能力，但自 P1-4 起 `ApiTokenController::store()` 只接受
+> `App\Support\ApiTokenAbilities::ISSUABLE` 登記過的能力，未登記者一律回 422。
+> 若要恢復這個能力，需先把它加進 `ISSUABLE`。
 
 於 MCP 工具入口檢查能力：
 

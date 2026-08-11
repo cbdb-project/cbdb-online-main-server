@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class AccountAccessRevoker {
@@ -20,13 +21,23 @@ class AccountAccessRevoker {
      * @return int 實際刪除的 token 筆數
      */
     public function revokeApiTokens(User $user, string $context): int {
-        $tokens = $user->tokens()->get(['id', 'name', 'abilities', 'last_used_at']);
+        // 讀清單與刪除放在同一把 users 列鎖下，與 ApiTokenController::store() 序列化：
+        // 沒有這把鎖時兩者可能交錯成「這裡讀到舊清單 → 對方寫入新 token → 撤銷完成但仍留
+        // 一個有效憑證」。刻意只鎖住「鎖＋讀＋刪」，審計留在交易外——審計失敗不得回退撤銷。
+        $tokens = DB::transaction(function () use ($user) {
+            DB::table('users')->where('id', $user->id)->lockForUpdate()->first();
+
+            $rows = $user->tokens()->get(['id', 'name', 'abilities', 'last_used_at']);
+            if ($rows->isNotEmpty()) {
+                $user->tokens()->delete();
+            }
+
+            return $rows;
+        });
 
         if ($tokens->isEmpty()) {
             return 0;
         }
-
-        $user->tokens()->delete();
 
         // DELETE 的語義：被銷毀的狀態記在 old_data，new_data 為 null。連 reason／context
         // 一起放進 old_data，日後查「這批 token 是誰在什麼情境下撤掉的」才有線索。

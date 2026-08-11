@@ -10,6 +10,7 @@ use App\Models\OfficeTypeTree;
 use App\Models\Operation;
 use App\Models\User;
 use App\Repositories\BiogMainRepository;
+use App\Services\SecurityAuditLogger;
 use Auth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -252,19 +253,55 @@ class OperationsController extends Controller {
             ? User::where('email', $user_id)->first()
             : null;
 
+        // 這是唯一剩下的長期憑證簽發路徑（confirmation_token），而且是無 throttle 的密碼驗證
+        // 端點，所以成功與被拒都要留紀錄——否則連暴力破解都看不見。一律不記 token 值。
+        $audit = app(SecurityAuditLogger::class);
+
         if (!$user || !is_string($user_password) || !Hash::check($user_password, $user->password)) {
+            $audit->record(
+                table: 'users',
+                operation: 'UPDATE',
+                rowPk: ['id' => (int) ($user->id ?? 0)],
+                event: 'crowdsourcing_token_denied',
+                after: ['reason' => 'bad_credentials', 'email' => is_string($user_id) ? $user_id : null]
+            );
+
             return "您的帳號與密碼輸入錯誤";
         }
 
         // 停用（含從未啟用）帳號不得換到 token：resolveActiveUserByToken() 已擋住用它寫入，
         // 但 confirmation_token 本身就是一個長期有效的憑證，不該外流。
         if (!$user->isActive()) {
+            $audit->record(
+                table: 'users',
+                operation: 'UPDATE',
+                rowPk: ['id' => (int) $user->id],
+                event: 'crowdsourcing_token_denied',
+                after: ['reason' => 'account_inactive']
+            );
+
             return __('auth.account_inactive');
         }
 
         if (!$user->isCrowdsourcingUser()) {
+            $audit->record(
+                table: 'users',
+                operation: 'UPDATE',
+                rowPk: ['id' => (int) $user->id],
+                event: 'crowdsourcing_token_denied',
+                after: ['reason' => 'not_crowdsourcing_role']
+            );
+
             return "帳號須為眾包身分，才可以取得token。";
         }
+
+        $audit->record(
+            table: 'users',
+            operation: 'UPDATE',
+            rowPk: ['id' => (int) $user->id],
+            event: 'crowdsourcing_token_issued',
+            after: ['email' => $user->email]
+        );
 
         // 原樣回傳，不替空值補錯誤字串：既有眾包客戶端把 200 的 body 直接當 token 用，
         // 換成人話錯誤反而會讓它拿著一個看起來合法的字串繼續打。

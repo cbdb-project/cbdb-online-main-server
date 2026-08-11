@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Services\SecurityAuditLogger;
 use Illuminate\Foundation\Auth\ResetsPasswords;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -19,7 +20,11 @@ class ResetPasswordController extends Controller {
     |
     */
 
-    use ResetsPasswords;
+    // resetPassword 在下面被覆寫以加上審計；trait 版本改名保留供其呼叫
+    // （它來自 trait 而不是父類，所以不能用 parent::）。
+    use ResetsPasswords {
+        resetPassword as baseResetPassword;
+    }
 
     /**
      * Where to redirect users after resetting their password.
@@ -33,7 +38,7 @@ class ResetPasswordController extends Controller {
      *
      * @return void
      */
-    public function __construct() {
+    public function __construct(private SecurityAuditLogger $securityAudit) {
         $this->middleware('guest');
         // Phase 6：重設密碼頁 React/Inertia 變體需 HandleInertiaRequests（共用 props/根模板）。
         // 僅作用於顯示表單的 GET 動作；POST 處理（reset）不掛，授權仍由 guest middleware 控制。
@@ -59,6 +64,32 @@ class ResetPasswordController extends Controller {
 
         return view('auth.passwords.reset')->with(
             ['token' => $token, 'email' => $request->email]
+        );
+    }
+
+    /**
+     * 密碼經「忘記密碼」連結重設。
+     *
+     * 密碼有兩條寫入路徑：`/profile`（已在 UserProfileController 記錄）與這一條。少了這裡，
+     * 攻擊鏈的後半段就沒有紀錄——先改走 email（會留下 email_changed），再用重設連結換密碼，
+     * audit_log 只看得到 email 變更，看不到密碼何時被誰從哪個 IP 換掉。反過來也一樣：
+     * 真正的使用者自助重設不留紀錄，事後就無法區分「本人重設」與「攻擊者用外洩的重設連結」。
+     *
+     * 此時尚未登入（guest middleware），所以 actor 是 system；受影響帳號由 rowPk 標明。
+     * 一律不記密碼雜湊或明文。
+     *
+     * @param  \App\Models\User  $user
+     * @param  string  $password
+     */
+    protected function resetPassword($user, $password) {
+        $this->baseResetPassword($user, $password);
+
+        $this->securityAudit->record(
+            table: 'users',
+            operation: 'UPDATE',
+            rowPk: ['id' => (int) $user->id],
+            event: 'password_reset_via_email',
+            after: ['password_changed' => true, 'email' => $user->email]
         );
     }
 

@@ -4,10 +4,9 @@ namespace App\Services;
 
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class AccountAccessRevoker {
-    public function __construct(private AuditLogService $auditLog) {
+    public function __construct(private SecurityAuditLogger $securityAudit) {
     }
 
     /**
@@ -39,32 +38,34 @@ class AccountAccessRevoker {
             return 0;
         }
 
-        // DELETE 的語義：被銷毀的狀態記在 old_data，new_data 為 null。連 reason／context
-        // 一起放進 old_data，日後查「這批 token 是誰在什麼情境下撤掉的」才有線索。
+        // DELETE 的語義：被銷毀的狀態記在 old_data。連 reason／context 一起放，
+        // 日後查「這批 token 是誰在什麼情境下撤掉的」才有線索。
         //
-        // 審計失敗絕不可讓撤銷失敗：token 已經刪掉了，此時拋例外只會讓管理員看到 500、
-        // 誤以為停用沒生效而重試（與 ManagementController::auditUserChange 同一取捨——
-        // DB trigger 才是權威 tripwire，這裡是帶操作者的補充佐證）。
-        try {
-            $this->auditLog->write(
-                table: 'personal_access_tokens',
-                operation: 'DELETE',
-                rowPk: ['tokenable_id' => $user->id],
-                oldData: [
-                    'context' => $context,
-                    'reason' => 'account_deactivated',
-                    'tokens' => $tokens->map(fn ($token) => [
-                        'id' => $token->id,
-                        'name' => $token->name,
-                        'abilities' => $token->abilities,
-                        'last_used_at' => optional($token->last_used_at)->toIso8601String(),
-                    ])->all(),
-                ],
-                newData: null
-            );
-        } catch (\Throwable $e) {
-            Log::warning('API token 撤銷的審計寫入失敗（撤銷本身已完成）: '.$e->getMessage());
-        }
+        // 走 SecurityAuditLogger 而不是自己組請求脈絡：它已經處理好 CLI／HTTP 的差異
+        // （CLI 下 ip/UA 寫 null 而不是 Laravel 造的假 127.0.0.1 / Symfony）、actor 型別，
+        // 以及「審計失敗絕不讓撤銷失敗」——token 已經刪掉了，此時拋例外只會讓管理員看到
+        // 500、誤以為停用沒生效而重試。
+        $this->securityAudit->record(
+            table: 'personal_access_tokens',
+            operation: 'DELETE',
+            rowPk: ['tokenable_id' => $user->id],
+            event: 'api_tokens_revoked_on_deactivation',
+            before: [
+                'context' => $context,
+                'reason' => 'account_deactivated',
+                'tokens' => $tokens->map(fn ($token) => [
+                    'id' => $token->id,
+                    'name' => $token->name,
+                    'abilities' => $token->abilities,
+                    'last_used_at' => optional($token->last_used_at)->toIso8601String(),
+                ])->all(),
+            ],
+            // 呼叫端已在 $context 標明來源（'cli' / 'management_ui'…），據此決定要不要記 IP／UA：
+            // CLI 情境的 ip/UA 是 Laravel 造的假值，寫進審計會誤導調查。
+            channel: str_starts_with($context, 'cli')
+                ? SecurityAuditLogger::CHANNEL_CLI
+                : SecurityAuditLogger::CHANNEL_HTTP
+        );
 
         return $tokens->count();
     }

@@ -281,6 +281,46 @@ class CodesPersonPickerTest extends TestCase {
             });
     }
 
+    // ───────── 列表頁（app.codes.show）：人物欄的 ID 本身可跳轉 ─────────
+
+    #[Test]
+    public function listing_page_marks_the_person_columns_and_ships_the_url_template(): void {
+        // 沒有這兩個 prop，列表就只能把 c_personid 印成一整欄數字（要查人得先點「編輯」）。
+        $this->actingAs($this->activeUser())
+            ->get(route('app.codes.show', ['table_name' => 'ASSOC_DATA']))
+            ->assertOk()
+            ->assertInertia(function (Assert $page) {
+                $props = $page->toArray()['props'];
+                // 順序跟著 thead（畫面欄序），不受外鍵反射順序影響
+                $this->assertSame(
+                    ['c_personid', 'c_assoc_id', 'c_kin_id', 'c_assoc_kin_id', 'c_tertiary_personid', 'c_assoc_claimer_id'],
+                    $props['person_fk_columns'],
+                );
+                $this->assertSame(
+                    array_values(array_intersect($props['thead'], $props['person_fk_columns'])),
+                    $props['person_fk_columns'],
+                );
+                $this->assertSame('/app/basicinformation/__ID__/edit', $props['person_edit_url_template']);
+            });
+    }
+
+    #[Test]
+    public function listing_page_marks_no_person_columns_for_a_table_without_them(): void {
+        $this->actingAs($this->activeUser())
+            ->get(route('app.codes.show', ['table_name' => 'TEST_PLAIN_CODES']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('person_fk_columns', []));
+    }
+
+    #[Test]
+    public function listing_page_does_not_mark_a_person_named_column_without_a_foreign_key(): void {
+        // 與表單頁同一條判準：沒有外鍵就不是人物欄（MERGED_PERSON_DATA 的人物可能已不存在）。
+        $this->actingAs($this->activeUser())
+            ->get(route('app.codes.show', ['table_name' => 'MERGED_PERSON_DATA']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('person_fk_columns', []));
+    }
+
     #[Test]
     public function person_edit_url_template_follows_the_editor_migration_flag(): void {
         // flag 翻回 old 時，碼表的人物連結必須跟著回到 legacy 編輯頁，

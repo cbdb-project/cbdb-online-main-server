@@ -51,6 +51,10 @@ interface CodesShowPageProps extends SharedProps {
     boolean_filter_available: boolean;
     filter_errors: Record<string, string>;
     filter_descriptions: Record<string, string>;
+    /** 外鍵指向 BIOG_MAIN 的欄位；這些欄的 ID 直接做成連往人物基本資料的連結。 */
+    person_fk_columns: string[];
+    /** 人物編輯頁 URL 模板（後端 flag-aware 產生），把 `__ID__` 換成人物 ID。 */
+    person_edit_url_template: string;
     can_edit: boolean;
     urls: {
         index: string;
@@ -73,6 +77,11 @@ export default function CodesShow() {
         computed_columns, copyright_note, sort_by, sort_dir, boolean_enabled, boolean_filter_available,
         filter_errors, filter_descriptions, can_edit, urls,
     } = props;
+
+    // 兩個新 prop 都取防禦值：缺了就退回純文字，不要因為少一個 prop 就整頁白畫面。
+    const person_edit_url_template = props.person_edit_url_template ?? '';
+
+    const personFkColumns = useMemo(() => new Set(props.person_fk_columns ?? []), [props.person_fk_columns]);
 
     const [search, setSearch] = useState(props.search ?? '');
     const [filters, setFilters] = useState<Record<string, string>>(props.filters ?? {});
@@ -178,6 +187,41 @@ export default function CodesShow() {
             if (dynasty_map[key]) v = `${v} - ${dynasty_map[key]}`;
         }
         return v == null ? '' : String(v);
+    };
+
+    /**
+     * 儲存格內容。人物欄（外鍵指向 BIOG_MAIN）的 ID 本身做成連往該人物基本資料的連結，
+     * 讓瀏覽者不必先點「編輯」才能查那個人；與 Admin/MergePreview 的人物 ID 儲存格同一種樣式。
+     *
+     * 一律新分頁開啟：這頁帶著使用者的搜尋／篩選／分頁狀態，同分頁跳走等於要他重新找回原處。
+     * 只連正整數：0（未詳）與空值不是可查的人物。列表資料直接來自資料表、受外鍵保證，
+     * 故不像表單頁那樣需要額外確認人物是否存在。
+     */
+    const renderCell = (row: Row, col: string): React.ReactNode => {
+        const text = cellValue(row, col);
+        if (!personFkColumns.has(col) || !person_edit_url_template) {
+            return text;
+        }
+        const id = Number(row[col]);
+        if (!Number.isInteger(id) || id <= 0) {
+            return text;
+        }
+
+        return (
+            <a
+                href={person_edit_url_template.replace('__ID__', String(id))}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={t('goto_person_edit_page_title')}
+                // 一列可能有多個人物欄（ASSOC_DATA 有 6 個），可見文字都只是數字；
+                // 以 aria-label 補上欄名，螢幕閱讀器列出連結時才分得出哪個是哪個。
+                aria-label={`${text} (${col})`}
+                // 底線而非只靠顏色：整欄都是數字，顏色是唯一線索就不夠（WCAG 1.4.1）。
+                className="text-primary underline decoration-dotted underline-offset-2"
+            >
+                {text}
+            </a>
+        );
     };
 
     const colSpan = thead.length + (can_edit ? 1 : 0);
@@ -346,7 +390,7 @@ export default function CodesShow() {
                                 return (
                                     <tr key={id} className="border-t border-border hover:bg-muted/30">
                                         {thead.map((col) => (
-                                            <td key={col} className="px-3 py-1.5">{cellValue(row, col)}</td>
+                                            <td key={col} className="px-3 py-1.5">{renderCell(row, col)}</td>
                                         ))}
                                         {can_edit && (
                                             <td className="px-3 py-1.5">

@@ -1325,6 +1325,19 @@ class CodesController extends Controller {
         $keyColumns = $this->getKeyColumns($table);
         $conditions = $this->buildConditionsFromId($keyColumns, $id);
         $originalRow = $this->fetchRowByKeys($table, $keyColumns, $conditions);
+        // 找不到目標列就停手（提案路徑 performProposalUpdate 早就這麼做，直接寫入這條漏了）。
+        // 兩個實際擋掉的後果：
+        //  1. $conditions 為空時（getKeyColumns 找不到主鍵），下面的 $query 沒有任何 where，
+        //     `update()` 會覆寫**整張表**。
+        //  2. 目標列不存在時，原本仍會照樣 flash「更新成功」並寫一筆 update 的 operations 記錄，
+        //     等於憑空造出一筆沒有對應資料的稽核歷史。
+        // 注意這道門擋不住「字串被 MySQL 轉成 0 而誤中 id=0 的列」：fetchRowByKeys 用的是同一組
+        // 條件，該情境下 SELECT 會同樣命中那一列。要關掉那個洞得對 int 主鍵欄另加數字形狀檢查。
+        if (!$originalRow) {
+            flash('更新失敗：找不到對應的資料列。', 'error');
+
+            return redirect()->back()->withInput();
+        }
 
         $query = DB::table($table);
         foreach ($conditions as $column => $value) {
@@ -2556,12 +2569,65 @@ class CodesController extends Controller {
     }
 
     protected function buildConditionsFromId(array $keyColumns, string $id): array {
+        // 先試「具名」格式：mutation handler 一律把 resource_id 存成 query-string
+        // （CompositePrimaryKey::buildStoredResourceId，如 c_personid=108625&c_merged_from_personid=404794），
+        // 而操作紀錄的「查閱」連結會把它原樣塞進 codes 編輯頁的 path。只認 '_._' 的話整段字串會被
+        // 當成第一個主鍵欄的值，於是複合主鍵的代碼表一點查閱就是「找不到該筆資料」。
+        // 具名比對同時免除欄序假設（SCHEMAS 欄序與資料庫 PK 欄序不必然一致）。
+        $named = $this->buildNamedConditionsFromId($keyColumns, $id);
+        if ($named !== null) {
+            return $named;
+        }
+
         $conditions = [];
         $parts = explode('_._', $id);
         foreach ($keyColumns as $index => $column) {
             if (isset($parts[$index]) && $parts[$index] !== '') {
                 $conditions[$column] = $parts[$index];
             }
+        }
+
+        return $conditions;
+    }
+
+    /**
+     * 把 query-string 格式的 path id 解析成「欄名 => 值」條件；不是該格式時回 null（交回舊解析）。
+     *
+     * 刻意全有全無：只要有任一主鍵欄缺失或值不是純量，就整個放棄。用殘缺條件查詢會撈到同前綴的
+     * 其他資料列（例如少了第二段主鍵時 first() 會回傳「剛好第一欄相同」的另一列），那比查不到更糟。
+     * 值為字面 'NULL'（buildStoredResourceId 對 null 的編碼）同樣放棄：主鍵欄不可為 null，而
+     * MySQL 拿字串 'NULL' 比對 int 欄會轉成 0、可能誤中 id 為 0 的列。
+     *
+     * 已知未涵蓋（皆刻意）：
+     *  - 值為空字串的主鍵欄。BIOG_SOURCE_DATA.c_pages 等字串主鍵確實存在「空字串」的資料慣例，
+     *    但空字串比對 int 欄同樣會被 MySQL 轉成 0，在此無法只憑 id 分辨兩者。
+     *  - **單一主鍵的表**。單主鍵的 query-string id 早就由
+     *    CompositePrimaryKey::normalizeSingleKeyResourceIdForCodeRoute() 在產生連結時就抽成純值，
+     *    這裡不需要再兜一次；而若在這裡也接受，`c_textid=a=b` 這種「值本身以 `欄名=` 開頭」的
+     *    舊 id 就會從『查值為 c_textid=a=b 的列』改成『查值為 a=b 的列』——同一個字串有兩種讀法，
+     *    且沒有任何線索能分辨哪個才是原意。只在複合主鍵時啟用，該歧義就不存在
+     *    （複合主鍵要湊出誤判，得讓多個欄名同時以 `欄名=` 形式出現在值裡）。
+     */
+    protected function buildNamedConditionsFromId(array $keyColumns, string $id): ?array {
+        if (count($keyColumns) < 2 || !str_contains($id, '=') || str_contains($id, '_._')) {
+            return null;
+        }
+
+        parse_str($id, $parsed);
+        if (!is_array($parsed) || $parsed === []) {
+            return null;
+        }
+
+        $conditions = [];
+        foreach ($keyColumns as $column) {
+            if (!array_key_exists($column, $parsed)) {
+                return null;
+            }
+            $value = $parsed[$column];
+            if (!is_scalar($value) || $value === '' || $value === 'NULL') {
+                return null;
+            }
+            $conditions[$column] = (string) $value;
         }
 
         return $conditions;

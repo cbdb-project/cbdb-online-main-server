@@ -1,12 +1,122 @@
 # API v2
 
-v1 與 v2 並行提供，兩者目前同時可用。本文件分兩部分：**上半部**為 v2（`/api/v2/...`，回傳 `ok` + `data` + `pagination` 結構）；**下半部**「舊版 API 文檔」為 v1 舊版端口（`/api/...`，如 `post_list`）。以下先介紹 v2。
+v1 與 v2 並行提供，兩者目前同時可用。本文件分兩部分：**上半部**為 v2（`/api/v2/...`，回傳 `ok` + `data` 或 `ok` + `result` 結構）；**下半部**「舊版 API 文檔」為 v1 舊版端口（`/api/...`，如 `post_list`）。以下先介紹 v2。
 
-v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagination` 結構。基底 URL：`https://input.cbdb.fas.harvard.edu/api/v2/...`
+v2 分成兩類端點：
+
+- **讀取端點**：`GET /api/v2/persons`、`GET /api/v2/operations` 等，使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagination`。
+- **寫入端點**：`POST /api/v2/create`、`/api/v2/mutate`、`/api/v2/delete`、`/api/v2/batch_mutate` 等，回傳 `ok` + `resource` + `mode` + `operation` + `result`。寫入一律需要認證，並依帳號角色決定是「直接寫入」還是「提交提案待審核」。
+
+基底 URL：`https://input.cbdb.fas.harvard.edu`
+
+### 章節導覽
+
+| 章節 | 端點 | 用途 |
+| ------ | ------ | ------ |
+| 一、通用約定 | — | 認證、限流、CSRF、輸入正規化、回應與錯誤格式 |
+| 二、人物清單 | `GET /api/v2/persons` | 全量／增量同步人物 ID 與修改時間 |
+| 三、操作記錄清單 | `GET /api/v2/operations` | 查詢操作記錄與提案（含審核狀態） |
+| 四、寫入 API 總覽 | — | direct／proposal 兩種模式、請求信封、資源一覽、錯誤碼 |
+| 五、讀取單列 | `GET|POST /api/v2/get` | 依複合主鍵讀回單列，供編輯前取原值 |
 
 ---
 
-## 一、人物清單
+## 一、通用約定
+
+### 1.1 認證方式
+
+公開（不需認證）的 v2 端點只有四個：`GET /api/v2/persons`、`GET /api/v2/operations`、`GET /api/v2/texts`、`GET /api/v2/texts/{textId}`。其餘 v2 端點都需要認證。支援兩種憑證：
+
+| 方式 | 用法 | 適用對象 |
+| ------ | ------ | ------ |
+| Bearer Token | `Authorization: Bearer <token>` | 外部程式、腳本、其他伺服器 |
+| Session Cookie | 瀏覽器登入後自動帶上 | 站內前端頁面 |
+
+Bearer Token 的取得：登入網站後於個人資料頁的「API Token」區塊簽發（後端為 `POST /api-tokens`，該端點本身需要 session 登入，無法只靠 token 取得新 token）。Token 明文**只在建立當次回傳**，之後無法再查看。
+
+關於 token 能力（abilities）：目前唯一可簽發的能力是 `mcp:read`（通配 `*` 已停用），而 v2 端點**不檢查 abilities**，因此任何有效且帳號啟用的 token 都能呼叫 v2 讀寫端點；abilities 只影響 `/api/mcp`。
+
+Token 有效期：建立時可指定 `expires_in`（1～3650 天），未指定即**永不過期**。管理員停用帳號時會連帶撤銷該帳號所有 token，之後呼叫會收到 401（而非 403）。持有 token 者可用 `GET /api/user`（帶 Bearer）取得自己的帳號資料，其中的 `id` 就是追蹤提案時 `GET /api/v2/operations?editor=` 要用的 user_id。
+
+認證失敗的回應：
+
+| 情況 | HTTP | message |
+| ------ | ------ | ------ |
+| 未帶任何憑證就呼叫需登入端點 | 401 | `Unauthenticated.` |
+| 帶了 Bearer 但 token 無效／已過期／已撤銷 | 401 | `Invalid API token.` |
+| Token 有效但帳號未啟用或已停用 | 403 | `帳號未啟用或已停用。` |
+| 帳號啟用但無此操作權限 | 403 | `該使用者沒有權限，請聯繫管理員` |
+
+**注意（外部客戶端請勿帶 `Origin` / `Referer`）**：v2 端點掛的是「可選認證」中間件，它先用 Sanctum 的 `EnsureFrontendRequestsAreStateful::fromFrontend()` 判斷請求是否來自站內前端——若 `Origin` 或 `Referer` 命中 `SANCTUM_STATEFUL_DOMAINS`，就只認 Session Cookie 而**忽略 Bearer Token**，結果會是 401。伺服器端呼叫時不要偽造這兩個標頭即可。
+
+**注意（瀏覽器跨域無法帶 Bearer）**：全站 CORS 回應的 `Access-Control-Allow-Headers` 未包含 `Authorization`，且 `Access-Control-Allow-Credentials` 為 `false`。因此跨網域的瀏覽器 JS 無法帶憑證呼叫本 API，請改由伺服器端程式呼叫。
+
+### 1.2 CSRF
+
+寫入端點掛在 `web` 中間件群組，因此會經過 CSRF 驗證。下列端點已列入豁免清單，外部程式可直接呼叫：
+
+`/api/v2/create`、`/api/v2/mutate`、`/api/v2/delete`、`/api/v2/batch_mutate`、`/api/v2/get`
+
+**未**列入豁免的寫入端點只有兩個——`/api/v2/proposals/{operation}/resubmit` 與 `/api/v2/relationship/opposite-edges`。它們需要 `X-CSRF-TOKEN`（或 `_token`）與對應 session，實務上只有站內前端能呼叫；外部 Bearer 客戶端會收到 **419**（`CSRF token mismatch`）。
+
+這件事對外部提交者有實際後果：**「修改自己的提案」與「撤回自己的提案」目前都沒有 API**（撤回與核准都只有站內頁面流程）。特別是新增提案被駁回後，同一主鍵會被該筆 `rejected` 提案持續占用（見 4.2），此時重送 `create` 只會得到 409，唯一解法是請審核人在站內處理。**提交前請先確認內容正確**，並在 `meta.comment` 寫清楚依據，以降低被駁回的機率。
+
+### 1.3 限流
+
+| 端點群組 | 限流 |
+| ------ | ------ |
+| `api` 群組（`/api/v2/persons`、`/api/v2/operations`、`/api/v2/texts`、`POST /api/v1/user/login`、舊版 `/api/...`） | 600 次／分鐘，超過回 **429** |
+| `web` 群組（`/api/v2/mutate`、`create`、`delete`、`batch_mutate`、`get` 等寫入端點） | 無應用層限流；請自行節流，大量寫入建議改用 `batch_mutate` |
+
+### 1.4 請求格式與輸入正規化
+
+- 寫入端點一律用 `POST`，請帶 `Content-Type: application/json`。後端先讀 JSON body，若 JSON body 為空才退回一般表單參數，因此 form-encoded 也可用，但巢狀結構（`target.pk`、`changes`）以 JSON 表達最不易出錯。
+- **`Accept: application/json` 是必要標頭，不是建議**。401／403／419 等由中間件擋下的錯誤走 Laravel 預設錯誤處理；沒帶這個標頭時可能收到 HTML 錯誤頁，未認證甚至會拿到 302 轉向 `/login`，而不是 JSON。
+- 全域中間件會對所有輸入做兩件事（**帶 `Content-Type: application/json` 時 JSON body 也會被遞歸處理**；form-encoded 則處理表單參數）：
+  1. `TrimStrings`：字串前後空白一律去除（唯一例外是密碼欄）。
+  2. `ConvertEmptyStringsToNull`：**空字串 `""` 一律轉成 `null`**。
+- 因此「送空字串清空欄位」與「送 null」對後端是同一件事。碼／外鍵欄位若要表達「未詳」，請顯式送 `0`（部分資源也接受 `-999`，後端會正規化為 `"0"`），不要依賴空字串。
+- 時間一律以伺服器時區 `+08:00` 解讀與輸出。
+
+### 1.5 回應與錯誤格式
+
+讀取端點（分頁）：
+
+```json
+{ "ok": true, "data": [], "pagination": {} }
+```
+
+寫入端點成功：
+
+```json
+{
+  "ok": true,
+  "resource": "altnames",
+  "mode": "direct",
+  "operation": "update",
+  "result": { "pk": {}, "operation_id": 123456 }
+}
+```
+
+部分寫入（別名、人物主檔）在伺服器對送出的值做過異體字或拼音正規化時，會多一個頂層 `notices` 陣列說明替換內容；其餘欄位不變。
+
+由控制器／handler 判定的失敗（多數 4xx 與 5xx）：
+
+```json
+{
+  "ok": false,
+  "message": "人類可讀的錯誤說明（繁體中文或英文）",
+  "errors": { "欄位或分類": ["機器可讀的錯誤代號"] }
+}
+```
+
+`errors` 只在有欄位級細節時出現。**請以 HTTP 狀態碼 + `errors` 的鍵值判斷失敗原因，不要比對 `message` 字串**（訊息可能隨介面文案調整）。
+
+**注意**：由框架／中間件層擋下的錯誤**沒有 `ok` 鍵**，只有 `{"message": "..."}`——包括 401 `Invalid API token.`、403 `帳號未啟用或已停用。`、419（CSRF）、429（限流）。客戶端請以 HTTP 狀態碼為第一判斷依據，不要假設 `ok` 一定存在。
+
+---
+
+## 二、人物清單
 
 ### `GET /api/v2/persons`
 
@@ -75,7 +185,7 @@ v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagin
 
 ---
 
-## 二、操作記錄清單
+## 三、操作記錄清單
 
 ### `GET /api/v2/operations`
 
@@ -91,6 +201,10 @@ v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagin
 | editor | 字串 | — | 依修改者篩選；純數字視為 user_id 精確比對，否則模糊匹配使用者名稱 |
 | op_type[] | 數字陣列 | — | 操作類型篩選（僅非提案模式有效）：1=新增、2=修改全部、3=修改部分、4=刪除 |
 | status[] | 字串陣列 | — | 提案審核狀態（僅 `proposals_only=true` 有效）：`pending`、`approved`、`rejected`、`cancelled` |
+
+排序固定為 `updated_at` 降冪（最近變動的在前）。只回傳 `crowdsourcing_status = 0` 的記錄。
+
+**注（刪除提案的 op_type = 10）**：`proposals_only=true` 目前只涵蓋 op_type 8（提案新增）與 9（提案修改），**不含 10（提案刪除）**；而 `proposals_only=false` 只排除 8/9，因此 op_type=10 的刪除提案會出現在「一般操作」清單中。若要一併追蹤刪除提案，請以 `proposals_only=false`（不帶 `op_type[]`）取回後，在客戶端依 `op_type === 10` 與 `resource_data.__review_status` 自行過濾。
 
 ### 輸入示例
 
@@ -137,7 +251,7 @@ v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagin
 | data[i].id | 數字 | 操作 ID |
 | data[i].user_id | 數字 | 操作者的 user ID |
 | data[i].c_personid | 數字 | 相關人物 ID |
-| data[i].op_type | 數字 | 操作類型（1=新增、2=修改全部、3=修改部分、4=刪除、8=提案新增、9=提案修改） |
+| data[i].op_type | 數字 | 操作類型（1=新增、2=修改全部、3=修改部分、4=刪除、8=提案新增、9=提案修改、10=提案刪除） |
 | data[i].resource | 字串 | 被操作的資料表名稱 |
 | data[i].resource_id | 字串 | 被操作的資料列識別碼 |
 | data[i].resource_data | 物件 | 操作後的資料內容（JSON 已解碼） |
@@ -146,6 +260,313 @@ v2 端口使用 `page` / `per_page` 分頁參數，回傳 `ok` + `data` + `pagin
 | data[i].created_at | 字串 | 建立時間（ISO 8601） |
 | data[i].updated_at | 字串 | 更新時間（ISO 8601） |
 | pagination | 物件 | 分頁資訊（欄位同人物清單） |
+
+---
+
+## 四、寫入 API 總覽
+
+### 4.1 端點一覽
+
+| 方法 | 路徑 | 用途 | 外部 Bearer 可用 |
+| ------ | ------ | ------ | ------ |
+| POST | `/api/v2/create` | 新增一列 | ✔ |
+| POST | `/api/v2/mutate` | 修改一列（部分欄位） | ✔ |
+| POST | `/api/v2/delete` | 刪除一列 | ✔ |
+| POST | `/api/v2/batch_mutate` | 一個請求內批次執行多筆 create／update／delete（單次上限 **500** 筆；可選 `atomic`） | ✔ |
+| GET/POST | `/api/v2/get` | 依複合主鍵讀回單列 | ✔ |
+| POST | `/api/v2/proposals/{operation}/resubmit` | 修改提案＝撤回舊提案並重發（提案人本人或審核人皆可） | ✘（需 CSRF，見 1.2） |
+| POST | `/api/v2/relationship/opposite-edges` | 偵測社會關係／親屬的對面互逆鏡像現況 | ✘（需 CSRF，見 1.2） |
+
+**注意**：`batch_mutate` 在非原子模式下**即使每一筆都失敗，HTTP 狀態碼仍是 200**（成敗看 body 的 `ok` 與 `summary`）。只看狀態碼的客戶端會把整批失敗誤判為成功，詳見〈批次寫入〉。
+
+### 4.2 direct 與 proposal 兩種模式
+
+所有寫入端點都以請求中的 `mode` 決定行為：
+
+| mode | 行為 | 落地時機 |
+| ------ | ------ | ------ |
+| `direct`（預設） | 直接寫入資料表，同一交易內寫 `operations` 與 `audit_log` | 立即 |
+| `proposal` | 不動資料表，只寫一筆待審核提案到 `operations` | 待審核人核准後才套用 |
+
+權限矩陣（所有角色都必須帳號啟用 `is_active = 1`，未啟用一律 403）：
+
+| 角色 | `mode=direct` | `mode=proposal` | 可審核他人提案 |
+| ------ | ------ | ------ | ------ |
+| 系統管理員 | ✔ | ✔ | ✔ |
+| 專家 | ✔ | ✔ | ✔ |
+| 一般用戶 | ✔ | ✔ | ✔ |
+| **眾包用戶** | ✘（403） | ✔ | ✘ |
+
+**眾包（crowdsourcing）帳號只能送 `mode=proposal`**；送 `mode=direct` 會得到 403 `該使用者沒有權限，請聯繫管理員`。外部協作者的帳號通常屬於此類，請一律帶 `"mode": "proposal"`。
+
+提案送出後：
+
+- 回應的 `result.operation_id` 就是該提案在 `operations` 表的 id，請保存下來以便追蹤。
+- 提案內容存於該筆 operation 的 `resource_data`，其中系統欄位包括 `__review_status`（`pending` / `approved` / `rejected` / `cancelled`）、`__proposal_meta`（提案人、時間、`comment`）、`__key_columns`。
+- 追蹤自己的提案：`GET /api/v2/operations?proposals_only=true&editor=<user_id 或名稱>&status[]=pending`（見第三章）。自己的 `user_id` 可用 `GET /api/user`（帶 Bearer）取得。提案的 `op_type` 為 8（新增）、9（修改）、10（刪除）；**刪除提案（10）不會被 `proposals_only=true` 涵蓋**，追蹤方式見第三章的注意事項。
+
+提案的「占位」規則（送出前務必理解，否則會被 409 卡住）：
+
+| 動作 | 占位判定 | 會擋下後續提交的狀態 |
+| ------ | ------ | ------ |
+| create（op_type 8） | 同一資料表 + 同一 `resource_id` | `pending` **或 `rejected`** |
+| update（op_type 9） | 同一資料表 + 同一 `resource_id` | 僅 `pending` |
+| delete（op_type 10） | 同一資料表 + 同一 `resource_id` | 僅 `pending` |
+
+- 占位**不分提案人**：別人針對同一列送出的待審提案，也會讓你收到 409 `pending_proposal_exists`。
+- **新增提案被駁回（`rejected`）後仍然占位**，重送同主鍵的 `create` 一律 409。因為撤回／修改提案沒有對外 API（見 1.2），此時只能請站內審核人處理。
+- `possessions` 的新增提案沒有任何重複防呆（主鍵是系統配發的流水號），重複送出會產生多筆提案、核准多次就產生多列，請自行避免重送。
+- `postings` 的新增提案只按 `c_office_id` 防呆（同一官職上任何人的待審提案會互擋），且錯誤鍵是 `changes: ["pending_proposal_exists"]` 而非 `target.pk`。
+
+### 4.3 通用請求信封
+
+所有寫入端點共用同一組頂層欄位：
+
+```json
+{
+  "resource": "altnames",
+  "mode": "proposal",
+  "operation": "update",
+  "person_id": 1762,
+  "target": { "pk": { "c_personid": 1762, "c_alt_name_chn": "半山", "c_alt_name_type_code": 4 } },
+  "changes": { "c_notes": "補充出處頁碼" },
+  "meta": { "comment": "據宋史列傳補正" }
+}
+```
+
+| 欄位名 | 參數類型 | 必填 | 說明 |
+| ------ | ------ | ------ | ------ |
+| resource | 字串 | ✔ | 資源名或別名（後端自動轉小寫，見 4.5） |
+| mode | 字串 | — | `direct`（預設）或 `proposal` |
+| operation | 字串 | — | `create` / `update` / `delete`。`/api/v2/mutate` 預設 `update`；`/api/v2/create` 與 `/api/v2/delete` 固定為對應動作，帶了也會被忽略 |
+| person_id | 數字 | ✔ | 該列所屬人物 ID。**必須與 `target.pk` 內的人物欄一致，也必須與資料庫該列的人物欄一致**，否則 422 `person_id: mismatch`。`possessions` 與 `postings` 的主鍵不含 `c_personid`，此時只比對資料庫該列的 `c_personid`；這兩者的 `create` 另外拒絕 `person_id = 0`（422 `person_id: invalid`）。**即使是與人物無關的資源（代碼表、複合實體聚合），`person_id` 仍為必填**（未提供即 422），請填相關人物 ID 或任一非空值 |
+| target.pk | 物件 | ✔ | 目標列的**完整**複合主鍵，缺任一欄即 422（見 4.4）。少數 create（如 `postings`、`possessions`）的主鍵由系統配發，此時送空物件 `{}` 即可 |
+| changes | 物件 | **update 必填** | 要寫入的欄位。`update` 缺 `changes` 回 422 `changes: required`、空物件回 422 `changes: empty`；**`create` 的 `changes` 非必填**（只帶完整 `target.pk` 也可能成功）。`delete`：走 `/api/v2/delete` 或 `batch_mutate` 時可省略，但**走 `/api/v2/mutate` 並帶 `operation: "delete"` 時仍必須帶 `changes` 鍵**（可為空物件），否則 422 `changes: required`；內容會被忽略 |
+| meta.comment | 字串 | — | 提案說明；`direct` 模式則寫入該筆 operation 的 `__note` |
+| meta.force | 布林 | — | 對「鏡像衝突／對面多筆反向列」的二次確認（見〈社會關係與親屬的互逆鏡像〉）。首次提交請勿帶；只有在收到 409 `mirror_conflict` / `mirror_suspected` / `mirror_delete_multiple` 並確認過影響範圍後才帶 |
+
+`update` 是 **PATCH 語義，不是整頁表單覆寫**：
+
+- **只送要改的欄位**。沒出現在 `changes` 的欄位保持原值，不會被清空。
+- 顯式送 `null`（含被中間件轉成 null 的空字串）**就是清空**該欄；但碼／外鍵欄位會被正規化成 `"0"`（哨兵值「未詳」），不會寫入 null。
+- 送出的值可能被伺服器改寫後才落庫：異體字會依對照表做嚴格替換、拼音欄的 `v` 會歸一化為 `ü`。若被改寫的欄位剛好是主鍵欄（例如別名的 `c_alt_name_chn`），**回應 `result.pk` 才是真正落庫的主鍵**，請以回應為準，不要沿用送出的值。發生替換時回應會多一個頂層 `notices` 陣列。
+
+### 4.4 `target.pk`：複合主鍵
+
+CBDB 子資源表幾乎都是複合主鍵，且不使用 Eloquent 主鍵行為。`target.pk` 必須列出該表**全部**主鍵欄位，任一欄缺失或為 `null` 都會回 422：
+
+```json
+{ "ok": false, "message": "主鍵格式不正確", "errors": { "pk": ["缺少必要的複合主鍵參數：c_sequence"] } }
+```
+
+要點：
+
+- 主鍵欄位定義的權威來源是 `app/Support/CompositePrimaryKey.php` 的 `SCHEMAS`；各資源的主鍵欄位見〈讀取單列〉一章的資源表，以及〈各資源欄位參考〉。
+- `update` 時如果 `changes` 內含主鍵欄位，等於「改鍵」。後端會檢查新主鍵是否已被其他列占用，衝突則回 409 `target.pk: conflict`。
+- 唯一允許主鍵欄為空的例外是**寫入端**的 `BIOG_SOURCE_DATA.c_pages`（`sources` 的 create／update／delete 會把它視為可空並正規化為空字串）；`/api/v2/get` **不**套用這個例外，詳見〈讀取單列〉一章的注意事項。
+- 想先確認某列現值再送修改，可先呼叫 `/api/v2/get`（見〈讀取單列〉）。
+
+**主鍵欄位的「未詳」必須用哨兵值顯式送出**：CBDB 的複合主鍵欄多為 NOT NULL，「這一欄未詳」在資料上是以哨兵值表達，而不是省略或送空值。又因為主鍵完整性檢查發生在後端正規化**之前**（且空字串已先被轉成 null），省略或送空值只會得到 422。常見哨兵值：
+
+| 型別 | 哨兵值 | 例 |
+| ------ | ------ | ------ |
+| 數值碼／ID | `0` | `ENTRY_DATA` 10 個主鍵欄中未詳者一律送 `0`；`ASSOC_DATA` 的 `c_kin_code`／`c_kin_id`／`c_assoc_kin_code`／`c_assoc_kin_id` 同理 |
+| 年份 | `-9999` | `ASSOC_DATA.c_assoc_first_year` |
+| 文字（出處書名） | `[n/a]` | `ASSOC_DATA.c_text_title` |
+
+（部分資源的主鍵欄也接受 `-999` 並在落庫前正規化為 `0`——例如 `ASSOC_DATA` 的 create——但這是逐資源的行為，並非通則。最保險的做法是一律直接送上表的哨兵值。）
+
+### 4.5 資源一覽與支援的操作
+
+`resource` 大小寫不敏感（後端一律轉小寫）。**別名逐操作獨立定義，並非全部一致**，下表的「別名」欄已標註差異；若無把握，一律使用「主名」最安全。
+
+| 主名 | 別名 | 資料表 | create | update | delete |
+| ------ | ------ | ------ | ------ | ------ | ------ |
+| basicinformation | biogmain, biog_main | BIOG_MAIN | 僅 direct | direct + proposal | 僅 direct（軟刪除） |
+| altnames | altname, altname_data | ALTNAME_DATA | ✔ | ✔ | ✔ |
+| addresses | address, biog_addr_data | BIOG_ADDR_DATA | ✔ | ✔ | ✔ |
+| entries | entry, entry_data | ENTRY_DATA | ✔ | ✔ | ✔ |
+| statuses | status, status_data | STATUS_DATA | ✔ | ✔ | ✔ |
+| events | event, events_data | EVENTS_DATA | ✔ | ✔ | ✔ |
+| associations | association, assoc_data | ASSOC_DATA | ✔ | ✔ | ✔ |
+| kinship | kin, kin_data | KIN_DATA | ✔ | ✔ | ✔ |
+| possessions | possession, possession_data | POSSESSION_DATA | ✔ | ✔ | ✔ |
+| texts | text, biog_text_data, text_data | BIOG_TEXT_DATA | ✔ | ✔ | ✔ |
+| postings | posting, offices, posted_to_office_data | POSTED_TO_OFFICE_DATA | ✔ | ✔ | ✔ |
+| social_institutions | social_institution, biog_inst_data（create／delete 另接受 socialinst） | BIOG_INST_DATA | ✔ | ✔ | ✔ |
+| sources | **create／update 只接受 `sources`**；delete 另接受 source, biog_source_data | BIOG_SOURCE_DATA | ✔ | ✔ | ✔ |
+| merged-person | merged_person, merged_person_data, mergedperson | MERGED_PERSON_DATA | ✔ | ✘ | ✔ |
+| 可修改的代碼表（nianhao、office_codes、dynasties…） | 見〈代碼表與複合實體寫入〉 | 各代碼表 | ✘（501） | ✔ | ✘（501） |
+| 可新增的代碼表（text-codes、char-variant-map） | 逐操作不同，見〈代碼表與複合實體寫入〉 | TEXT_CODES、char_variant_map | 僅 direct | ✔ | ✘（403，已停用） |
+| office、social-institution（複合實體聚合） | 見〈代碼表與複合實體寫入〉 | 多表聚合 | ✔ | ✔ | ✔ |
+
+- 表中 `✔` 表示 `direct` 與 `proposal` 兩種模式都支援。
+- 人物主檔（basicinformation）的 `create` 與 `delete` **不支援 proposal**，會回 501 `mode: ["proposal_not_supported"]`；`update` 則兩種模式都支援。
+- 人物主檔的 `delete` 是**軟刪除**：把 `c_name_chn` 改為 `<待删除>`（UPDATE，不是真的 DELETE，也不觸發外鍵連鎖），並記一筆 `op_type=4` 的 operation。
+- 代碼表分兩組：**只能改**的一組（`config/code_table_mutations.php`，如 nianhao、office_codes、dynasties、choronym_codes、ganzhi_codes 等）送 `create`／`delete` 會回 501；**可新增**的一組只有 `TEXT_CODES` 與 `char_variant_map`（`config/code_table_writes.php`）。代碼表的 `delete` 一律不開放——受支援的兩張表回 **403**（防止級聯刪除人物資料），其餘代碼表回 501。
+- 不支援的 `resource` / `mode` / `operation` 組合一律回 **501**：`{"ok":false,"message":"目前尚未支援此變更模式","errors":{"resource":"...","mode":"...","operation":"..."}}`。
+
+各資源的欄位白名單、必填規則與範例見〈各資源欄位參考〉。
+
+### 4.6 錯誤碼總表
+
+| HTTP | 意義 | 常見 `errors` 鍵值 |
+| ------ | ------ | ------ |
+| 401 | 未認證或 token 無效 | — |
+| 403 | 帳號未啟用；或眾包帳號使用 `mode=direct` | — |
+| 404 | 目標列不存在（訊息形如 `ALTNAME_DATA 記錄不存在`） | — |
+| 409 | 主鍵衝突或狀態衝突 | `target.pk: conflict` / `duplicate` / `pending_proposal_exists`、`changes: conflict`、`mirror_conflict`、`mirror_suspected`、`mirror_delete_multiple`、`mirror: conflict` |
+| 419 | CSRF token 不符（只會發生在 `resubmit`、`opposite-edges`） | — |
+| 422 | 參數校驗失敗 | `target.pk: required`、`person_id: required`、`pk`（主鍵缺欄位）、`person_id: mismatch`、`changes: required` / `empty` / `no_supported_fields` / `no_effective_changes` / `disallowed_fields: <欄位清單>`、各欄位級規則、`mirror_integrity: fail_closed` |
+| 429 | 讀取端點超過限流（600 次／分鐘） | — |
+| 500 | 未預期的伺服器錯誤 | — |
+| 501 | `resource` / `mode` / `operation` 組合不支援 | `resource`、`mode`、`operation` |
+
+較常踩到的 422 情境：
+
+| `errors` | 原因 |
+| ------ | ------ |
+| `changes: ["empty"]` | `update` 的 `changes` 是空物件 |
+| `changes: ["no_supported_fields"]` | `changes` 內沒有任何該資源可寫的欄位 |
+| `changes: ["disallowed_fields: c_foo, c_bar"]` | 送了白名單外的欄位。多數人物子資源的 `update`／`create` 會**整筆拒絕**（見下方警告） |
+| `person_id: ["invalid"]` | `postings`／`possessions` 的 `create` 收到 `person_id = 0` |
+| `changes: ["no_effective_changes"]` | 送出的值與現值完全相同（後端以字串比對），沒有任何實際變更 |
+| `person_id: ["mismatch"]` | `person_id` 與 `target.pk` 內人物欄不符，或與資料庫該列的人物欄不符 |
+| `pk: ["缺少必要的複合主鍵參數：..."]` | `target.pk` 缺欄位 |
+
+**警告（欄名打錯不一定會報錯）**：白名單外的欄位並非所有資源都會整筆拒絕。下列路徑是**靜默丟棄**未知欄位，會回 `200` / `ok: true` 但該欄根本沒寫進資料庫：
+
+- `basicinformation` 的 `update`（採黑名單過濾，未知鍵直接丟棄）與 `create`（採白名單交集，未知鍵直接丟棄）
+- `postings` 的 `create`、`possessions` 的 `create`
+- `sources` 的 `create`／`update`（只讀固定欄位）
+
+因此**寫入後請比對回應的 `result.row`（或另呼叫 `/api/v2/get`）確認欄位真的落庫**，不要只看 `ok: true`。
+
+### 4.7 寫入的稽核與追溯
+
+每一次成功的寫入（direct）都會在同一資料庫交易內：
+
+1. 更新目標資料表，並由系統蓋上 `c_modified_by` / `c_modified_date`（`create` 則蓋 `c_created_by` / `c_created_date`）。**請勿在 `changes` 內自行送稽核欄位**——它們不在白名單內，會導致整筆 422，或被後端剔除。
+2. 寫一筆 `operations`（`op_type`：1=新增、3=修改、4=刪除），回應的 `result.operation_id` 即其 id，可用 `GET /api/v2/operations` 查詢。
+3. 寫一筆 `audit_log`。
+
+失敗時整筆交易回滾，不會留下半套資料。
+
+提案（proposal）路徑的落地與署名：
+
+- 提案送出時**不動**資料表，只寫一筆 operation；核准是站內流程（沒有對外 API）。
+- 核准時後端會以 `mode=direct` **重放同一個 handler 並重新驗證**。因此提案在送出當下合法、核准當下卻不合法（例如目標列已被他人改鍵或刪除、主鍵已被占用），核准會失敗並整筆回滾，提案維持待審。這也是提案送出後不宜久放的原因。
+- 核准後 `c_modified_by` 記的是雙人名——形如「審核人 (Proposed by: 提案人)」；若提案人名稱缺失或與審核人相同，則只記審核人單名。提案人不會單獨署名。
+- `c_modified_date` 記的是**核准落庫的時間**，不是提案送出時間。
+
+---
+
+## 五、讀取單列（依複合主鍵）
+
+### `GET /api/v2/get`（也接受 `POST`）
+
+依複合主鍵讀回單一列的完整內容，通常用於「修改前先取得現值」或「寫入後回讀驗證」。**需要登入且帳號啟用**（眾包帳號亦可）。此端點純讀取，不寫 operations／audit_log。
+
+### 輸入參數
+
+| 參數名 | 參數類型 | 必填 | 說明 |
+| ------ | ------ | ------ | ------ |
+| resource | 字串 | ✔ | 資源名或別名，見下表 |
+| person_id | 數字 | ✔ | 該列所屬人物 ID；須與該列的 `c_personid` 一致 |
+| target.pk | 物件 | ✔ | 完整複合主鍵 |
+
+支援的資源與主鍵（此端點的別名清單與寫入端點**略有差異**，以本表為準）：
+
+| resource | 別名 | 資料表 | 主鍵欄位 |
+| ------ | ------ | ------ | ------ |
+| basicinformation | biogmain, biog_main | BIOG_MAIN | c_personid |
+| altnames | altname, altname_data | ALTNAME_DATA | c_personid, c_alt_name_chn, c_alt_name_type_code |
+| addresses | address, biog_addr_data | BIOG_ADDR_DATA | c_personid, c_addr_id, c_addr_type, c_sequence |
+| entries | entry, entry_data | ENTRY_DATA | c_personid, c_entry_code, c_sequence, c_kin_code, c_assoc_code, c_kin_id, c_year, c_assoc_id, c_inst_code, c_inst_name_code |
+| statuses | status, status_data | STATUS_DATA | c_personid, c_sequence, c_status_code |
+| events | event, events_data | EVENTS_DATA | c_personid, c_sequence, c_event_code |
+| associations | association, assoc_data | ASSOC_DATA | c_personid, c_assoc_code, c_assoc_id, c_kin_code, c_kin_id, c_assoc_kin_code, c_assoc_kin_id, c_text_title, c_assoc_first_year |
+| kinship | kin, kin_data | KIN_DATA | c_personid, c_kin_id, c_kin_code |
+| possessions | possession, possession_data | POSSESSION_DATA | c_possession_record_id |
+| texts | text, text_data, biog_text_data | BIOG_TEXT_DATA | c_personid, c_textid, c_role_id |
+| postings | posting, offices, posted_to_office_data | POSTED_TO_OFFICE_DATA | c_office_id, c_posting_id |
+| social_institutions | socialinstitution, social_institution, biog_inst_data | BIOG_INST_DATA | c_personid, c_inst_code, c_inst_name_code, c_bi_role_code |
+| sources | source, biog_source_data | BIOG_SOURCE_DATA | c_personid, c_textid, c_pages |
+| nianhao | nian_hao | NIAN_HAO | c_nianhao_id |
+
+**注 1：`possessions` 與 `postings` 的主鍵不含 `c_personid`，但 `person_id` 仍為必填，且後端會比對該列的 `c_personid` 是否相符。`nianhao` 不是人物資料（無人物欄），`person_id` 只需給任一非空值即可。**
+
+**注 2（`sources` 的空頁碼讀不回來）：`BIOG_SOURCE_DATA.c_pages` 在寫入端可為空，但本端點**不**套用該例外——空字串會先被中間件轉成 `null`，主鍵驗證即回 422 `缺少必要的複合主鍵參數：c_pages`。也就是「頁碼為空的出處列」可以用 `create`／`delete` 操作，卻無法用 `/api/v2/get` 讀回；這類列請改由人物詳情頁或 `GET /api/v2/operations` 取得內容。**
+
+**注 3：`merged-person` 可以寫入（create／delete），但本端點不支援讀取。**
+
+### 輸入示例
+
+以 POST（推薦）：
+
+```json
+POST /api/v2/get
+Content-Type: application/json
+Authorization: Bearer <token>
+
+{
+  "resource": "kinship",
+  "person_id": 1762,
+  "target": { "pk": { "c_personid": 1762, "c_kin_id": 1760, "c_kin_code": 180 } }
+}
+```
+
+以 GET（巢狀參數用陣列語法，中文需 URL 編碼）：
+
+```
+GET /api/v2/get?resource=kinship&person_id=1762&target[pk][c_personid]=1762&target[pk][c_kin_id]=1760&target[pk][c_kin_code]=180
+```
+
+### 輸出格式
+
+```json
+{
+  "ok": true,
+  "resource": "kinship",
+  "mode": "direct",
+  "operation": "get",
+  "result": {
+    "pk": { "c_personid": 1762, "c_kin_id": 1760, "c_kin_code": 180 },
+    "row": {
+      "c_personid": 1762,
+      "c_kin_id": 1760,
+      "c_kin_code": 180,
+      "c_source": 7596,
+      "c_pages": "31",
+      "c_notes": null,
+      "c_autogen_notes": null,
+      "c_created_by": null,
+      "c_created_date": null,
+      "c_modified_by": "系統匯入",
+      "c_modified_date": "2024-11-03 10:22:41"
+    }
+  }
+}
+```
+
+| 屬性名 | 屬性類型 | 說明 |
+| ------ | ------ | ------ |
+| ok | 布林 | 請求是否成功 |
+| resource | 字串 | 解析後的資源主名 |
+| mode | 字串 | 固定為 `direct` |
+| operation | 字串 | 固定為 `get` |
+| result.pk | 物件 | 回填請求的複合主鍵 |
+| result.row | 物件 | 該列所有欄位的原值（欄位視資料表而定） |
+
+### 錯誤
+
+| HTTP | 情況 |
+| ------ | ------ |
+| 401 | 未登入 |
+| 403 | 帳號未啟用或已停用 |
+| 404 | 該主鍵沒有對應的列（`<表名> 記錄不存在`） |
+| 422 | `target.pk` 缺欄位、缺 `person_id`、或 `person_id` 與該列不符 |
+| 501 | `resource` 不在上表（`目前尚未支援此取得模式`） |
 
 ---
 

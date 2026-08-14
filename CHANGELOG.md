@@ -4,6 +4,13 @@
 
 ## 2026-08
 
+### `/api/user` 不再外洩 `confirmation_token`（#1248）
+- 起因：`Api\UserController@show` 是 `return $request->user()`，序列化範圍全靠 `User::$hidden` 的黑名單，而 `confirmation_token` 不在其中。它不是普通欄位，而是**第二套長期憑證**——`/api/operations/token` 直接把它當眾包 API token 發出去，`/api/operations/{add,update,delete}` 只憑它認證，且**無到期、無撤銷、不驗欄位白名單**。因此一個只被授予唯讀能力的 Sanctum token，可以換到一個能繞過 v2 全部白名單／主鍵校驗、直接往 `operations` 寫入的憑證：這是提權路徑，不只是欄位過度曝露。
+- 端點改為**顯式白名單**（id／name／email／institution／avatar／is_admin／is_active／時間欄），而不是繼續維護黑名單——根因是「`users` 加一欄就默默對外」，白名單才治得住。順帶不再回傳 `settings`，它內含 `registration_ip`／`last_login_ip`。
+- `User::$hidden` 補上 `confirmation_token` 作縱深防禦，擋住其他把模型整包序列化的路徑。`$hidden` 只影響序列化，屬性讀取不受影響，故 `/api/operations/token` 與 `resolveActiveUserByToken()` 不會壞（有測試反向鎖住）。
+- 另修兩處 `$hidden` **擋不到**的同類洞：`AiFillLogController::logUsers()` 與 `QueryPlaygroundController::nlQueryLogUsers()` 用 query builder 撈 `users` 全欄列（stdClass，`$hidden` 對它零作用），補上 `select('id','name')`。目前 Blade 消費端只取 id/name 所以尚未實際印出，但同檔的 Inertia 分支都得手動收窄才安全——正說明這個形狀是陷阱。
+- 回歸測試 `ApiUserPayloadTest`（6 tests）：白名單以「鍵名相等」斷言（新增欄位必須是刻意決定）、不得出現任何憑證欄、模型整包序列化也不得帶、屬性讀取仍可用、無 token 回 401、只回 token 主人的資料。已驗證抽掉修改後測試會紅。
+
 ### API.md 補完所有現行對外 API（v2 寫入端＋其餘開放端點）
 - 起因：有外部協作者要以眾包帳號向 `/api/v2` 提交提案，但 `API.md` 原本只有讀取端（`persons`／`operations`），寫入端一字未提；寫入端的實用說明散在 `.claude/skills/mutation-api-record-editing.md`（內部技能檔、且通篇以 `mode=direct` 為前提）與不完整的 `docs/openapi/openapi.yaml`，沒有一份能直接交付給外部的文件。
 - 新增 v2 第一～十四章：通用約定（認證、`Origin`/`Referer` 會讓 Bearer 失效、CORS 不含 `Authorization`、CSRF 豁免清單、限流、空字串一律轉 null）、寫入 API 總覽（direct／proposal 權限矩陣、提案占位規則、`target.pk` 與主鍵哨兵值、錯誤碼總表）、`get`／`create`／`mutate`／`delete`／`batch_mutate`／`resubmit`／`opposite-edges` 逐端點規格、14 個資源的欄位白名單、互逆鏡像的衝突與復原、代碼表與複合實體聚合、以及其餘開放端點（`texts`、`api/user`、api-tokens、`select/*`、AI 輔助、MCP、`cbdbapi/person`）。

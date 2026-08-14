@@ -1445,7 +1445,7 @@ Authorization: Bearer <token>
 
 | 方法 | 路徑 | 認證 | 說明 |
 | ------ | ------ | ------ | ------ |
-| GET | `/api/user` | Bearer（`auth:sanctum`） | 回傳目前 token 對應的使用者資料。追蹤提案時 `GET /api/v2/operations?editor=` 要用的就是這裡的 `id`。帳號未啟用時回 403 |
+| GET | `/api/user` | Bearer（`auth:sanctum`） | 回傳目前 token 對應的帳號資料（欄位見下）。追蹤提案時 `GET /api/v2/operations?editor=` 要用的就是這裡的 `id`。帳號未啟用時回 403 |
 | GET | `/api-tokens` | Session | 列出自己的 token（不含明文） |
 | POST | `/api-tokens` | Session | 簽發新 token。可帶 `name`（必填）、`abilities`（預設 `["mcp:read"]`，通配 `*` 已停用）、`expires_in`（1～3650 天，未帶＝永不過期）。**明文只在此回傳一次** |
 | DELETE | `/api-tokens/{tokenId}` | Session | 撤銷指定 token |
@@ -1453,7 +1453,35 @@ Authorization: Bearer <token>
 
 `/api-tokens` 系列掛在 `web` 群組且需要登入 session，**無法只憑既有 token 換發新 token**；請在網站個人資料頁操作。
 
-⚠️ **`/api/user` 回傳的是使用者資料列的全部欄位**（只隱藏 `password` 與 `remember_token`），因此除了 `id`／`name`／`email`／`is_admin`／`is_active` 之外，也包含 `institution`／`settings`／`avatar`／時間欄，**以及 `confirmation_token`**——那正是 14.3 舊通道使用的長期憑證。呼叫端請只取需要的欄位，不要把整包回應記錄到日誌或轉發給第三方。
+`GET /api/user` 回傳固定的白名單欄位：
+
+```json
+{
+  "id": 42,
+  "name": "王小明",
+  "email": "u@example.com",
+  "institution": "Harvard",
+  "avatar": "avatar0.png",
+  "is_admin": 0,
+  "is_active": 1,
+  "created_at": "2026-03-01T02:11:04.000000Z",
+  "updated_at": "2026-08-14T03:22:41.000000Z"
+}
+```
+
+| 屬性名 | 屬性類型 | 說明 |
+| ------ | ------ | ------ |
+| id | 數字 | 帳號 ID，即 `GET /api/v2/operations?editor=` 要用的值 |
+| name | 字串 | 顯示名稱（也是稽核欄 `c_created_by`／`c_modified_by` 會蓋的署名） |
+| email | 字串 | 帳號 email |
+| institution | 字串/null | 所屬機構 |
+| avatar | 字串 | 頭像檔名，資料庫預設 `avatar0.png`（NOT NULL，實務上不會是 null） |
+| is_admin | 數字 | 角色：0=一般、1=專家、2=眾包、3=系統管理員 |
+| is_active | 數字 | 帳號啟用狀態。此端點在帳號未啟用時直接回 403，因此**成功回應中恆為 `1`** |
+| created_at | 字串 | 建立時間（ISO 8601，UTC） |
+| updated_at | 字串 | 更新時間（ISO 8601，UTC） |
+
+**不回傳**任何憑證欄位（`password`、`remember_token`、`confirmation_token`），也不回傳使用者偏好 `settings`。若日後需要新欄位，請在 `Api\UserController::show()` 顯式加入並同步本節。
 
 **`POST /api/v1/user/login` 已無實際用途**：它是 OAuth 時代的遺留，帳密驗證通過後會轉發到早已不存在的 `oauth/token` 路由，因此最終回 **404**、拿不到任何憑證。要注意兩個副作用：它實際用的是 session guard（不是 token guard），所以在 session 有被啟動的情境下，**驗證成功會先留下一個已登入的 session cookie 再回 404**；且此路由掛「訪客專用」中間件（見舊版章節的說明）。要程式化存取請改用上表簽發的 Bearer token。
 

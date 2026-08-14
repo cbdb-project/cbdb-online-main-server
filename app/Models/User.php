@@ -51,10 +51,22 @@ class User extends Authenticatable {
     /**
      * The attributes that should be hidden for arrays.
      *
+     * `confirmation_token` 必須在此：它不是普通欄位，而是**第二種長期憑證**——
+     * `/api/operations/token` 直接把它當眾包 API token 發出去
+     * （`Api\OperationsController::token()`），而 `/api/operations/{add,update,delete}`
+     * 只憑它認證（`resolveActiveUserByToken()`），且沒有任何到期或撤銷機制。
+     * 先前它不在 `$hidden`，於是 `GET /api/user`（回傳整個模型）會把它交給任何持有
+     * Sanctum token 的呼叫者——一個只被授予唯讀能力的 token 因此能換到可繞過 v2
+     * 白名單／主鍵校驗、直接寫 operations 的憑證。
+     *
+     * 這是縱深防禦：`/api/user` 已改為顯式白名單輸出（`Api\UserController::show()`），
+     * 此處再擋住任何把 User 整包序列化的路徑（回應、日誌、事件 payload）。
+     * **屬性讀取（`$user->confirmation_token`）不受影響**，故舊通道本身不會壞。
+     *
      * @var array
      */
     protected $hidden = [
-        'password', 'remember_token',
+        'password', 'remember_token', 'confirmation_token',
     ];
 
     protected $casts = [

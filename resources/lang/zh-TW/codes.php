@@ -130,6 +130,12 @@ return [
     // :link 由前端替換成真正的 <a>（保留舊版「連結在句中」的讀法，又不必回到 HTML 字串）
     'hint_text_codes_copy' => '請確保 :link 表中存在這本書的 c_textid，再複製 ID 填入',
     'hint_addr_copy' => '請從 :link 表中複製 c_addr_id 填入',
+    // 人物欄（外鍵指向 BIOG_MAIN）→ 就近直達該人物的基本資料編輯頁。
+    // PersonJumpLink 兩種模式的 key 都定義在此，避免元件被以本 group 取譯時退回硬編碼中文。
+    'goto_person_edit_page' => '前往人物基本資料',
+    'goto_person_edit_page_title' => '在新分頁開啟此人物的基本資料編輯頁',
+    'goto_person_page' => '前往人物頁面',
+    'goto_person_page_title' => '在新分頁開啟此人物的詳情頁',
     // TEXT_INSTANCE_DATA 的「Load Data」（依 c_textid 帶入書名）
     'load_text_title_btn' => '帶入書名',
     'load_text_title_filled' => '已帶入：:fields',

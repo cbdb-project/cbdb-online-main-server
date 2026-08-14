@@ -216,6 +216,9 @@ return [
     // 人物參照欄下方的「前往此人物頁」連結（關聯人物 / 親屬姓名共用）
     'goto_person_page' => '前往人物頁面',
     'goto_person_page_title' => '在新分頁開啟此人物的詳情頁',
+    // 同一元件的 to='edit' 版（碼表人物欄在用）；此 group 也定義，避免日後從人物編輯頁改用該模式時漏譯
+    'goto_person_edit_page' => '前往人物基本資料',
+    'goto_person_edit_page_title' => '在新分頁開啟此人物的基本資料編輯頁',
     'paired_kinship' => '成對親屬關係',
     'no_paired_kinship' => '無對應親屬關係',
     'reverse_pair_label' => '互逆配對碼',

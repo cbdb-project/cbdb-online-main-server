@@ -3,6 +3,8 @@ import * as LabelPrimitive from '@radix-ui/react-label';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import CodeAutocomplete from '../PersonBrowser/shared/CodeAutocomplete';
+import PersonJumpLink from '../PersonEditorShared/PersonJumpLink';
+import { useTranslation } from '../../hooks/useTranslation';
 
 /**
  * 泛用 codes 表單的單一欄位。
@@ -39,7 +41,19 @@ export interface ColumnBehaviour {
      * 目前只有 kind='person'（外鍵指向 BIOG_MAIN 的欄位，見 CodesController::personFkColumns）。
      * label 是目前值的顯示名稱，供選擇器初始顯示——否則使用者只看到一個數字。
      */
-    picker?: { kind: 'person'; endpoint: string; label?: string | null };
+    picker?: {
+        kind: 'person';
+        endpoint: string;
+        label?: string | null;
+        /**
+         * 目前值是否對應一位存在的人物。查不到時 label 是退回的原始 ID（見後端 codeColumnBehaviour），
+         * 故 false 時既不可把 label 當姓名、也不該給跳轉連結（會開到 404）。
+         * null＝目前沒有數值可判定。
+         */
+        exists?: boolean | null;
+        /** 人物編輯頁 URL 模板（後端 flag-aware 產生），把 `__ID__` 換成人物 ID。 */
+        edit_url_template?: string;
+    };
 }
 
 interface Props {
@@ -113,6 +127,26 @@ export function CodesColumnField({
     const hasError = messages.length > 0;
     const describedById = `${column}-desc`;
 
+    // 人物欄的「前往人物基本資料」連結文案。此元件的三個使用頁（Create／Edit／ProposalEdit）
+    // 都以 codes group 作為 page_translations，故直接在元件內取譯，不必逐頁再傳一個 tr。
+    const t = useTranslation('codes');
+    const tr = (k: string, fb: string) => { const v = t(k); return v && v !== k ? v : fb; };
+
+    /**
+     * 使用者在本頁自行選過的人物（值＋顯示名稱）。
+     *
+     * picker.label／picker.exists 只描述「隨頁面送來的那個值」；使用者改選他人後就過期了，
+     * 照樣沿用會把別人的姓名標到新的人身上。選擇器本身在 onChange 就給了新選項的 label，
+     * 這裡把它留住即可——既拿回姓名，也不需要去猜「現在的值還是不是原本那個」。
+     * 從選擇器選出來的一定是搜尋端點回傳的真實人物，故 exists 視為 true。
+     */
+    const [picked, setPicked] = React.useState<{ value: string; label: string } | null>(null);
+    const pickedHere = picked !== null && picked.value === value;
+    const personName = pickedHere ? picked.label : (picker?.exists ? (picker.label ?? undefined) : undefined);
+    // 連結只在「確定存在的人物」上出現：查不到的殘留 ID（例如提案送審後被合併掉的人物）
+    // 給了連結只會開到 404。
+    const personLinkable = picker?.kind === 'person' && (pickedHere || picker.exists === true);
+
     return (
         <div className="space-y-1">
             <LabelPrimitive.Root htmlFor={column} className="text-sm font-medium">
@@ -135,7 +169,7 @@ export function CodesColumnField({
                             disabled={readOnly}
                             aria-invalid={hasError ? true : undefined}
                             aria-describedby={hasError || hint || actionMessage ? describedById : undefined}
-                            onChange={(v) => onChange(v)}
+                            onChange={(v, label) => { setPicked({ value: v, label }); onChange(v); }}
                         />
                     </div>
                 ) : (
@@ -190,6 +224,20 @@ export function CodesColumnField({
                     </p>
                 ))}
             </div>
+
+            {/* 人物欄已選定一位真實人物 → 就近給一個可直達其基本資料的連結（與 KinEditor／
+                AssocEditor 的人物參照欄同一個元件、同一種樣式）。放在提示／錯誤之後，
+                驗證訊息才緊貼輸入框。 */}
+            {personLinkable && (
+                <PersonJumpLink
+                    personId={value}
+                    name={personName}
+                    tr={tr}
+                    to="edit"
+                    hrefTemplate={picker?.edit_url_template}
+                    context={column}
+                />
+            )}
         </div>
     );
 }

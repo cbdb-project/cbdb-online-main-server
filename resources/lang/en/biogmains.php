@@ -216,6 +216,10 @@ return [
     // "Go to person page" link shown under a person-reference field (Associated Person / Relative Name)
     'goto_person_page' => 'Open person page',
     'goto_person_page_title' => "Open this person's page in a new tab",
+    // Same component's to='edit' variant (used by the code-table person columns); defined here too
+    // so switching a person editor to that mode later cannot silently lose the translation.
+    'goto_person_edit_page' => "Open person's basic info",
+    'goto_person_edit_page_title' => "Open this person's basic information editor in a new tab",
     'paired_kinship' => 'Paired Kinship',
     'no_paired_kinship' => 'No corresponding kinship',
     'reverse_pair_label' => 'Reciprocal pair code',

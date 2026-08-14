@@ -796,7 +796,8 @@ class OperationsController extends Controller {
             $resourceLink = $resourceSpecificLink;
         } elseif ($isCodeResource && $opType !== 4) {
             $codeRouteId = CompositePrimaryKey::normalizeSingleKeyResourceIdForCodeRoute($resourceName, $rawResourceId);
-            $resourceLink = route('codes.edit', ['table_name' => $resourceName, 'id' => $codeRouteId], false);
+            // flag-aware：codes flag=new 時開 React 版編輯頁，不要從 React 操作紀錄掉回舊 Blade 頁。
+            $resourceLink = code_table_edit_url($resourceName, $codeRouteId);
         }
 
         // 每位受影響人物附上編輯連結與資源描述。

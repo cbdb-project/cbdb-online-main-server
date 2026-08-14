@@ -116,6 +116,9 @@ class OperationsIndexLinksTest extends TestCase {
 
     #[Test]
     public function test_operations_index_generates_links_for_non_person_code_resources() {
+        // 連結形狀依 codes flag 而定，明確釘住，別讓別人翻 flag 就變紅。
+        config(['migration_flags.pages.codes' => 'new']);
+
         // 创建测试用戶
         $user = User::forceCreate([
             'name' => 'Test User',
@@ -143,8 +146,10 @@ class OperationsIndexLinksTest extends TestCase {
 
         $response->assertStatus(200);
 
-        // 验证页面包含正确的链接
-        $response->assertSee('/codes/TEXT_CODES/68942/edit', false);
+        // 验证页面包含正确的链接。codes flag=new → 連 React 版（含 /app 前綴）；
+        // 只斷言 '/codes/...' 會同時被 '/app/codes/...' 命中，等於什麼都沒釘住，故寫全並排除舊路徑。
+        $response->assertSee('href="/app/codes/TEXT_CODES/68942/edit"', false);
+        $response->assertDontSee('href="/codes/TEXT_CODES/68942/edit"', false);
         $response->assertSee('查閱');
         $response->assertDontSee('>68942</a>', false);
         $response->assertSee('overflow-wrap: anywhere;', false);
@@ -171,13 +176,25 @@ class OperationsIndexLinksTest extends TestCase {
 
         $this->assertTrue($isCodeResource);
 
-        // 验证可以生成正确的路由
-        $expectedLink = route('codes.edit', ['table_name' => $resource, 'id' => $resourceId], false);
-        $this->assertEquals('/codes/OFFICE_CODES/803819/edit', $expectedLink);
+        // 验证可以生成正确的路由。React 操作紀錄實際用的是 flag-aware 的 code_table_edit_url()，
+        // 這裡兩個方向都釘住，避免這條測試繼續斷言與production相反的東西。
+        config(['migration_flags.pages.codes' => 'new']);
+        $this->assertEquals(
+            '/app/codes/OFFICE_CODES/803819/edit',
+            code_table_edit_url($resource, $resourceId)
+        );
+
+        config(['migration_flags.pages.codes' => 'old']);
+        $this->assertEquals(
+            '/codes/OFFICE_CODES/803819/edit',
+            code_table_edit_url($resource, $resourceId)
+        );
     }
 
     #[Test]
     public function test_operations_index_normalizes_single_key_query_string_resource_id_for_code_links(): void {
+        config(['migration_flags.pages.codes' => 'new']);
+
         $user = User::forceCreate([
             'name' => 'Test User',
             'email' => 'nianhao-link@example.com',
@@ -206,7 +223,7 @@ class OperationsIndexLinksTest extends TestCase {
         $response = $this->actingAs($user)->get('/operations');
 
         $response->assertStatus(200);
-        $response->assertSee('/codes/NIAN_HAO/464/edit', false);
+        $response->assertSee('href="/app/codes/NIAN_HAO/464/edit"', false);
         $response->assertDontSee('/codes/NIAN_HAO/c_nianhao_id=464/edit', false);
     }
 
@@ -221,6 +238,10 @@ class OperationsIndexLinksTest extends TestCase {
      */
     #[Test]
     public function test_composite_key_code_resource_view_link_actually_opens_the_row(): void {
+        // 明確釘住 flag：codes flag 本來就可被翻回 old（即時回退、不需改碼），
+        // 若靠預設值，別人一翻 flag 這條就變紅，而且連 id 解析的保證也一起失效。
+        config(['migration_flags.pages.codes' => 'new']);
+
         $user = User::forceCreate([
             'name' => 'Hongsu Wang',
             'email' => 'merged-person-link@example.com',
@@ -260,13 +281,66 @@ class OperationsIndexLinksTest extends TestCase {
             });
 
         // 連結本身就是 bug 的一半：resource_id 原樣進了 path（單主鍵才會被正規化）。
+        // 且 codes flag=new，連結要指向 React 版編輯頁，不該從 React 操作紀錄掉回舊 Blade 頁。
         $this->assertSame(
-            '/codes/MERGED_PERSON_DATA/c_personid=108625&c_merged_from_personid=404794/edit',
+            '/app/codes/MERGED_PERSON_DATA/c_personid=108625&c_merged_from_personid=404794/edit',
             $link
         );
 
         // 另一半：那個 path id 必須真的能開出對應的列，而不是被重導回上一頁並
         // flash「找不到該筆資料」。同時確認用上了第二段主鍵（開出 404794、不是 500001）。
+        $this->actingAs($user)->get($link)
+            ->assertOk()
+            ->assertSessionMissing('flash_notification')
+            ->assertInertia(fn ($page) => $page
+                ->component('Codes/Edit')
+                ->where('values.c_personid', 108625)
+                ->where('values.c_merged_from_personid', 404794));
+    }
+
+    #[Test]
+    public function test_code_resource_view_link_falls_back_to_blade_when_codes_flag_is_old(): void {
+        // codes flag 翻回 old 時，查閱連結要跟著回到 Blade 編輯頁（否則回退不完整）。
+        config(['migration_flags.pages.codes' => 'old']);
+
+        $user = User::forceCreate([
+            'name' => 'Hongsu Wang',
+            'email' => 'merged-person-oldflag@example.com',
+            'password' => bcrypt('password'),
+            'confirmation_token' => 'test-token',
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        Operation::create([
+            'user_id' => $user->id,
+            'c_personid' => 0,
+            'op_type' => Operation::TYPE_CREATE,
+            'resource' => 'MERGED_PERSON_DATA',
+            'resource_id' => 'c_personid=108625&c_merged_from_personid=404794',
+            'resource_data' => json_encode(['c_personid' => 108625]),
+            'crowdsourcing_status' => 0,
+        ]);
+
+        \DB::table('MERGED_PERSON_DATA')->insert([
+            ['c_personid' => 108625, 'c_merged_from_personid' => 500001],
+            ['c_personid' => 108625, 'c_merged_from_personid' => 404794],
+        ]);
+
+        $link = null;
+        $this->actingAs($user)
+            ->get('/app/operations')
+            ->assertOk()
+            ->assertInertia(function ($page) use (&$link) {
+                $link = $page->toArray()['props']['lists'][0]['resource_link'];
+            });
+
+        $this->assertSame(
+            '/codes/MERGED_PERSON_DATA/c_personid=108625&c_merged_from_personid=404794/edit',
+            $link
+        );
+
+        // id 解析的保證與 flag 無關：Blade 版編輯頁同樣要開出 404794 那一列（不是 500001）。
         $this->actingAs($user)->get($link)
             ->assertOk()
             ->assertSessionMissing('flash_notification')

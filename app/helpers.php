@@ -127,6 +127,24 @@ if (!function_exists('person_page_url')) {
     }
 }
 
+if (!function_exists('code_table_edit_url')) {
+    /**
+     * 代碼表編輯頁 flag-aware URL：codes flag=new 時導向 React /app 版，否則 legacy Blade。
+     *
+     * 操作紀錄的「查閱」連結原本寫死 route('codes.edit')，於是 flag 已是 new、整站都在 React
+     * 介面的情況下，從 /app/operations 點查閱會掉回舊 Blade 編輯頁（外觀與導覽都不同）。
+     *
+     * @param string     $table 代碼表名
+     * @param int|string $id    codes 編輯頁的 path id（單值、'_._' 複合鍵，或 operations 存的
+     *                          query-string 格式；後者由 CodesController::buildConditionsFromId 解析）
+     */
+    function code_table_edit_url(string $table, $id): string {
+        return (migration_flag_is_new('codes') && \Illuminate\Support\Facades\Route::has('app.codes.edit'))
+            ? route('app.codes.edit', ['table_name' => $table, 'id' => $id], false)
+            : route('codes.edit', ['table_name' => $table, 'id' => $id], false);
+    }
+}
+
 if (!function_exists('person_create_url')) {
     /** 新增人物頁 flag-aware URL：編輯器 flag=new 時導向 React 建立頁，否則 legacy。 */
     function person_create_url(): string {

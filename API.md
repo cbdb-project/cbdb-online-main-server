@@ -26,6 +26,7 @@ v2 分成兩類端點：
 | 十一、提案重新提交 | `POST /api/v2/proposals/{id}/resubmit` | 修改自己已送出的提案（站內限定） |
 | 十二、社會關係與親屬的互逆鏡像 | `POST /api/v2/relationship/opposite-edges` | 雙向關係的連帶寫入、衝突與復原 |
 | 十三、代碼表與複合實體寫入 | — | 代碼表更新／新增、office 與 social-institution 聚合 |
+| 十四、其他開放端點 | 見該章 | 著作查詢、帳號與 token、代碼選單、AI 輔助、MCP、人物頁 API |
 
 ---
 
@@ -1411,12 +1412,156 @@ Authorization: Bearer <token>
 
 ---
 
+## 十四、其他開放端點
+
+本章收錄前面章節之外、目前仍開放的端點。多數是站內介面在用的輔助接口，一併記錄以便外部整合時知道有什麼可用、以及哪些不該用。
+
+### 14.1 著作／文獻查詢（公開）
+
+`GET /api/v2/texts?ids=...` — 批次依 `c_textid` 取 `TEXT_CODES`，用於把出處 id 換成書名。**不需認證。**
+
+| 參數名 | 參數類型 | 必填 | 說明 |
+| ------ | ------ | ------ | ------ |
+| ids | 字串或陣列 | ✔ | 以逗號或空白分隔的 id 清單（也可用 `ids[]=` 陣列形式）。非數字片段會被忽略、重複值會去重。解析後為空即 422 `ids: required` |
+
+回應：
+
+```json
+{
+  "ok": true,
+  "data": [
+    { "c_textid": 7596, "c_title_chn": "宋史", "c_title": "Song shi", "c_source": 0, "c_source_title_chn": null, "c_source_title": null, "c_url_api": null, "c_url_api_coda": null, "c_url_homepage": null }
+  ],
+  "meta": { "requested_ids": [7596, 99999999], "found_count": 1, "missing_ids": [99999999] }
+}
+```
+
+- `data` 依 `ids` 的順序回傳（查無的 id 不佔位，改列在 `meta.missing_ids`）。
+- 每筆除 `TEXT_CODES` 全欄外，另附該文獻之來源書目資訊（`c_source_title_chn`／`c_source_title`／`c_source_url_*`，來自 `c_source` 自關聯）。
+
+`GET /api/v2/texts/{textId}` — 單筆版本，回 `{ "ok": true, "data": {...} }`；查無回 **404** `TEXT_CODES 記錄不存在`。
+
+### 14.2 帳號與 API Token
+
+| 方法 | 路徑 | 認證 | 說明 |
+| ------ | ------ | ------ | ------ |
+| GET | `/api/user` | Bearer（`auth:sanctum`） | 回傳目前 token 對應的使用者資料。追蹤提案時 `GET /api/v2/operations?editor=` 要用的就是這裡的 `id`。帳號未啟用時回 403 |
+| GET | `/api-tokens` | Session | 列出自己的 token（不含明文） |
+| POST | `/api-tokens` | Session | 簽發新 token。可帶 `name`（必填）、`abilities`（預設 `["mcp:read"]`，通配 `*` 已停用）、`expires_in`（1～3650 天，未帶＝永不過期）。**明文只在此回傳一次** |
+| DELETE | `/api-tokens/{tokenId}` | Session | 撤銷指定 token |
+| DELETE | `/api-tokens` | Session | 撤銷自己全部 token |
+
+`/api-tokens` 系列掛在 `web` 群組且需要登入 session，**無法只憑既有 token 換發新 token**；請在網站個人資料頁操作。
+
+⚠️ **`/api/user` 回傳的是使用者資料列的全部欄位**（只隱藏 `password` 與 `remember_token`），因此除了 `id`／`name`／`email`／`is_admin`／`is_active` 之外，也包含 `institution`／`settings`／`avatar`／時間欄，**以及 `confirmation_token`**——那正是 14.3 舊通道使用的長期憑證。呼叫端請只取需要的欄位，不要把整包回應記錄到日誌或轉發給第三方。
+
+**`POST /api/v1/user/login` 已無實際用途**：它是 OAuth 時代的遺留，帳密驗證通過後會轉發到早已不存在的 `oauth/token` 路由，因此最終回 **404**、拿不到任何憑證。要注意兩個副作用：它實際用的是 session guard（不是 token guard），所以在 session 有被啟動的情境下，**驗證成功會先留下一個已登入的 session cookie 再回 404**；且此路由掛「訪客專用」中間件（見舊版章節的說明）。要程式化存取請改用上表簽發的 Bearer token。
+
+### 14.3 眾包舊通道（不建議使用）
+
+v2 提案流程上線前的舊機制，仍在線但**建議一律改用 `/api/v2/*` 的 `mode=proposal`**：
+
+| 方法 | 路徑 | 參數 | 說明 |
+| ------ | ------ | ------ | ------ |
+| GET/POST | `/api/operations/token` | `q`＝email、`p`＝密碼 | 換取長期 token（成功時回傳的 body 就是 token 字串）。**僅眾包身分且帳號啟用者可取得**；其他情形回傳中文說明字串而非 token |
+| POST | `/api/operations/add` | `token`、`resource`（表名）、`json`（整包資料） | 新增一筆待處理記錄（`op_type=1`） |
+| POST | `/api/operations/update` | `token`、`resource`、`json`，另依表別帶 `c_personid`（`BIOG_MAIN`）或 `pId`（`OFFICE_CODES`／`OFFICE_TYPE_TREE`；`OFFICE_CODE_TYPE_REL` 的 `pId` 格式是 `c_office_id-c_office_tree_id`） | 修改（`op_type=3`） |
+| POST | `/api/operations/delete` | `token`、`resource`，另依表別帶 `c_personid` 或 `pId`；**不讀 `json`** | 刪除（`op_type=4`） |
+
+差異與風險：
+
+- 這條通道寫入的是 `operations` 表且 `crowdsourcing_status = 2`，**與 v2 的提案（`op_type` 8／9／10、`__review_status`）是兩套不同的機制**，也不會出現在 `GET /api/v2/operations`（該端點只回 `crowdsourcing_status = 0`）。此處的 `op_type` 1／3／4 與第三章「一般操作」的編碼相同，但語義是「待處理的眾包投稿」，不是已落庫的操作。
+- 它不做欄位白名單、不驗證複合主鍵，寫入 `add`／`update`／`delete` 時也不寫 `audit_log`（只有 `token` 端點會記安全審計）；`json` 是整包字串。
+- token 是**長期有效且無到期機制**的憑證（帳號的 `confirmation_token`），與 14.2 的 Sanctum token 不同，請勿外流。
+- 回應形狀不一致且**狀態碼不可靠**：`add` 成功回 JSON `{"status_code":200,"message":"..."}`，`update`／`delete` 成功回裸字串 `'200'`；權限不足回 `'403'`（HTTP 403），但**參數缺漏回裸字串 `'500'` 而 HTTP 狀態碼其實是 200**——只看狀態碼會把失敗當成功。
+
+### 14.4 代碼選單與自動完成（公開）
+
+站內編輯介面的下拉選單與自動完成資料來源，目前**都不需認證**。
+
+- 整表取回（`GET`，回傳**裸資料列陣列**）：`/api/select/{dynasty,nianhao,ganzhi,ethnicity,choronym,household,appttype,assumeoffice,officecate,parentstatus,measure,possact,birole,topic,occasion,role,range,altcode,biogaddr}`
+- 關鍵字查詢（`GET`，多接受 `q` 或 `search` 等查詢參數，逐端點略有差異）：`/api/select/search/{addr,assoccode,assocpair,biog,entry,event,kincode,kinpair,office,officetype,pinyin,socialinst,socialinstaddr,socialinstcode,status,text,textauthor,textperson}`
+- 其他：`/api/code/addr`（地址代碼查詢，`GET`）、`/api/name`（依條件查人名，接受 `GET` 或 `POST`）
+
+**回應形狀不統一**，接前請先確認：
+
+| 類型 | 回應 |
+| ------ | ------ |
+| 整表取回、`search/kinpair`、`search/assocpair` | 裸資料列陣列 |
+| 其餘 `search/*`、`/api/code/addr`、`/api/name` | **Laravel 分頁物件**（`{current_page, data: [...], total, ...}`）——它也有 `data` 鍵，但不是 v2 的 `ok`／`data`／`pagination` 信封 |
+| `search/pinyin` | **純文字**（拼音字串；查無親屬對應時另帶 `X-Pinyin-Kinship-Unmatched` 標頭） |
+
+**`/api/select/codes` 這條路由雖然註冊了，但對應的控制器方法不存在，呼叫必然 500——請勿使用。**
+
+權威定義：`app/Http/Controllers/ApiController.php`（`/api/select/*`、`/api/code/addr`）與 `app/Http/Controllers/Api/NameController.php`。這些端點主要為站內 UI 服務，**回應格式不保證穩定**，外部整合請優先用 v2 端點。
+
+### 14.5 AI 輔助（需登入）
+
+| 方法 | 路徑 | 說明 |
+| ------ | ------ | ------ |
+| POST | `/api/ai/code-lookup/suggest` | 由自然語言描述推薦代碼。參數：`query`（必填，≤500 字）、`table`（必填，只允許 `ASSOC_CODES` 或 `STATUS_CODES`）、`person_id`／`route_name`／`route_url`（選填） |
+| POST | `/api/ai/posting/extract` | 從史料文字抽取任官資訊。參數：`source_text`（必填，≤5000 字）、`person_id`（必填）、`route_name`／`route_url`（選填） |
+
+兩者都掛 `web` + `auth`（Session），且會再檢查帳號啟用（未啟用回 403，body 為 `{"success": false, "error": "..."}`）。因為在 `web` 群組且**不在 CSRF 豁免清單內**，實務上只有站內前端能呼叫。
+
+### 14.6 MCP（Model Context Protocol）
+
+`POST /api/mcp` — 供 AI 客戶端以 MCP 協定唯讀查詢 CBDB。需要 **Bearer token 且具備 `mcp:read` 能力**（見 14.2），另有獨立限流 120 次／分鐘。這是全站唯一會檢查 token abilities 的端點。
+
+同一路徑的 `GET` 只是協定要求的佔位，**恆回 405 且不做任何認證**，不要拿它當健康檢查。
+
+### 14.7 人物頁 API
+
+`GET /cbdbapi/person`（等同舊路徑 `/cbdbapi/person.php`）——依 `id` 或 `name` 取單一人物資料。**完全公開，不需認證，也沒有額外限流。**
+
+| 參數名 | 說明 |
+| ------ | ------ |
+| id | 人物 ID，1～7 位數字且 ≥ 1 |
+| name | 人名（≤255 字） |
+| mode（或 `o`） | 輸出格式：`json` 或 `xml` 走 API 分支；**其他任何值（含省略或拼錯）都會得到 HTML 頁面** |
+
+`id` 與 `name` 至少要給一個，否則 422（`json`／`xml` 模式回 `{"error": {"code": 422, "message": "Validation failed.", "details": [...]}}`，`html` 模式回錯誤頁）。
+
+### 14.8 機器可讀規格
+
+`GET /openapi.yaml` — 回傳 `docs/openapi/openapi.yaml`（`Content-Type: application/yaml; charset=UTF-8`）。**注意該檔目前只涵蓋四個端點**（`/api/v2/create`、`/api/v2/mutate`、`/api/v2/delete`、`/api/v2/get`），缺 `batch_mutate`、`proposals/{id}/resubmit`、`relationship/opposite-edges`，以及所有讀取端點（`persons`／`operations`／`texts`）。有衝突時**以本文件為準**。
+
+### 14.9 其他公開的 JSON／檔案端點
+
+這些不是「API」設計出來的對外介面，而是站內頁面用的資料來源，但目前**都不需認證**，一併記錄以免誤以為受保護：
+
+| 方法 | 路徑 | 說明 |
+| ------ | ------ | ------ |
+| GET | `/app/codes/text-title/{textId}` | 依 `c_textid` 取書名（限流 60 次／分）。功能與 14.1 的 `/api/v2/texts` 重疊，外部整合請優先用 14.1 |
+| GET | `/codes/{table_name}/export` | 代碼表全量 CSV 匯出（限流 6 次／分） |
+| GET | `/app/basicinformation/{id}/summary` | 人物摘要 JSON |
+| GET | `/app/basicinformation/{id}/tabs/{tabKey}` | 人物詳情分頁資料 JSON |
+| GET | `/basicinformation/{id}/map-points` | 人物地點座標 JSON |
+| GET | `/chgis-map/status`、`/chgis-map/tiles/{z}/{x}/{y}` | CHGIS 底圖狀態與圖磚 |
+| GET | `/metrics` | Prometheus 指標 |
+| GET | `/sanctum/csrf-cookie` | 取得 CSRF cookie。**只有 cookie-based（session）客戶端需要**；用 Bearer token 呼叫 `/api/v2/*` 不需要它 |
+
+這些端點的回應格式隨頁面需求調整，**不提供穩定性保證**。另外 Query Playground 的 JSON／SSE 端點（`/query-playground/*`）雖然也是 JSON 介面，但需要登入 session、且設計上專供站內頁面使用，不在本文件的對外 API 範圍內。
+
+---
+
 # 舊版 API 文檔
 
 ## 使用方法
 將下文輸入示例中 /api... 前接 input.cbdb.fas.harvard.edu
 
 形如: [https://input.cbdb.fas.harvard.edu/api/post_list?id=06&start=0&list=100](https://input.cbdb.fas.harvard.edu/api/post_list?id=06&start=0&list=100)
+
+### 現況與注意事項（2026-08 校對）
+
+下文記錄的 14 個查詢端點目前**全部仍然可用**，但有幾件事必須先知道：
+
+- **這些端點掛的是「訪客專用」中間件**：已登入且帳號啟用者會被 302 轉向 `/home` 而不是拿到資料。實際會不會踩到，取決於 session 有沒有被啟動——`api` 群組本身不啟動 session，只有當請求帶著命中站內網域的 `Origin`／`Referer` 標頭時（Sanctum 判定為「來自前端」）才會。因此**瀏覽器或同源 fetch 帶著 cookie 呼叫會被導開**，而伺服器端不帶這兩個標頭的呼叫即使帶了 cookie 也照樣拿到資料。最省事的做法是別帶站內 cookie。Bearer token 對它們沒有作用，也不需要。
+- 限流與其他 `api` 群組端點相同：600 次／分鐘，超過回 429。
+- 回應是舊格式（`total`／`start`／`end`／`data`），與 v2 的 `ok`／`data`／`pagination` 不同。
+- 仍存在但**未收錄於本文件**的舊端點：`/api/query_relatives` 與 `/api/query_relatives_1`（第九節 `query_relatives_2` 的早期版本，請優先用 `_2`）、`/api/OFFICE_CODES`、`/api/OFFICE_CODE_TYPE_REL`、`/api/OFFICE_TYPE_TREE`。
+- `/api/v1/` 底下的舊 CRUD 端點（`searchC_presonid`／`addC_presonid`／`updateC_presonid`／`deleteC_presonid`／`userC_presonid`）**已整組下架**（下架前它們全部已是回 500 的死碼），寫入請改用 v2（第四～十三章）；`POST /api/v1/user/login` 雖仍在路由表上，但已無實際用途（見 14.2）。
+- 新的整合工作請優先使用 v2；舊端點只維持相容、不再擴充。
 
 ## 一、根據官職類別代碼獲取其下屬官職列表
 ### 輸入參數:

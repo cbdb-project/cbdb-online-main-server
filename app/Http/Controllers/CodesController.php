@@ -1113,6 +1113,15 @@ class CodesController extends Controller {
                         'kind' => 'person',
                         'endpoint' => self::PERSON_SEARCH_ENDPOINT,
                         'label' => $label,
+                        // 這個值是否真的對應一位存在的人物。前端據此決定要不要給「前往人物基本資料」
+                        // 連結，以及能不能把 label 當姓名用：查不到人時 label 是退回的原始 ID
+                        // （見上方），拿去當姓名會讓 ID 假扮成人名，連結也會開到 404。
+                        // 提案調整頁尤其會遇到——resource_data 裡的人物可能在送審後被合併掉。
+                        'exists' => is_numeric($raw) ? isset($labels[(int) $raw]) : null,
+                        // 人物編輯頁 URL 由後端組（flag-aware，見 person_page_url()），前端只換 __ID__；
+                        // 不在元件裡寫死 /app/... 路徑，否則 basicinformation.editor flag 翻回 old 時
+                        // 只有這裡還指著 React 版。
+                        'edit_url_template' => person_page_url('__ID__', 'edit'),
                     ],
                 ];
             }

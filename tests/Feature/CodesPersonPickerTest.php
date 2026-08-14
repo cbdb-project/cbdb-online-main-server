@@ -238,6 +238,63 @@ class CodesPersonPickerTest extends TestCase {
             });
     }
 
+    // ───────── 「前往人物基本資料」連結（picker.exists／edit_url_template） ─────────
+
+    #[Test]
+    public function picker_reports_whether_the_referenced_person_exists(): void {
+        // 前端據此決定要不要給跳轉連結、能不能把 label 當姓名用。查不到人物時 label 是退回的
+        // 原始 ID，若照樣當姓名顯示就是 ID 假扮人名，連結也會開到 404。
+        DB::table('ASSOC_DATA')->where('c_personid', 11)->update(['c_assoc_kin_id' => 999111]);
+
+        $this->editAssoc()
+            ->assertOk()
+            ->assertInertia(function (Assert $page) {
+                $b = $page->toArray()['props']['column_behaviour'];
+                $this->assertTrue($b['c_personid']['picker']['exists'], '真實人物 → 可跳轉');
+                $this->assertFalse($b['c_assoc_kin_id']['picker']['exists'], '查不到的殘留 ID → 不可跳轉');
+            });
+    }
+
+    #[Test]
+    public function picker_exists_is_null_when_the_column_has_no_value(): void {
+        // 沒有值就沒有「存在與否」可談；不可回 false 讓它讀起來像「這個人不存在」。
+        $this->actingAs($this->activeUser())
+            ->get(route('app.codes.create', ['table_name' => 'ASSOC_DATA']))
+            ->assertOk()
+            ->assertInertia(function (Assert $page) {
+                $b = $page->toArray()['props']['column_behaviour'];
+                $this->assertNull($b['c_assoc_id']['picker']['exists']);
+            });
+    }
+
+    #[Test]
+    public function picker_ships_a_person_edit_url_template(): void {
+        // URL 由後端產生、前端只換 __ID__；元件不寫死 /app/ 路徑。
+        // 斷言字面值而非再呼叫 person_page_url()——拿同一個 helper 比對自己等於什麼都沒鎖。
+        config(['migration_flags.pages.basicinformation.editor' => 'new']);
+
+        $this->editAssoc()
+            ->assertOk()
+            ->assertInertia(function (Assert $page) {
+                $template = $page->toArray()['props']['column_behaviour']['c_personid']['picker']['edit_url_template'];
+                $this->assertSame('/app/basicinformation/__ID__/edit', $template);
+            });
+    }
+
+    #[Test]
+    public function person_edit_url_template_follows_the_editor_migration_flag(): void {
+        // flag 翻回 old 時，碼表的人物連結必須跟著回到 legacy 編輯頁，
+        // 不能只有這裡還指著 React 版（這正是不在元件裡寫死路徑的原因）。
+        config(['migration_flags.pages.basicinformation.editor' => 'old']);
+
+        $this->editAssoc()
+            ->assertOk()
+            ->assertInertia(function (Assert $page) {
+                $template = $page->toArray()['props']['column_behaviour']['c_personid']['picker']['edit_url_template'];
+                $this->assertSame('/basicinformation/__ID__/edit', $template);
+            });
+    }
+
     #[Test]
     public function create_page_does_not_prefill_a_person_primary_key_with_a_guessed_id(): void {
         // guessNextKeyValue 對人物欄毫無意義（max(c_personid)+1），而 CBDB 人物 ID 很密集，

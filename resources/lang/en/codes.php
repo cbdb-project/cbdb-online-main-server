@@ -132,6 +132,13 @@ return [
     // :link is replaced by a real <a> in the frontend (keeps the legacy in-sentence link without HTML in the string)
     'hint_text_codes_copy' => 'Make sure the book\'s c_textid exists in the :link table, then copy the ID here.',
     'hint_addr_copy' => 'Copy c_addr_id from the :link table.',
+    // Person columns (FK to BIOG_MAIN) → jump straight to that person's basic-information editor.
+    // Both PersonJumpLink variants are defined here so the component never falls back to its
+    // hardcoded Chinese strings when translated from this group.
+    'goto_person_edit_page' => "Open person's basic info",
+    'goto_person_edit_page_title' => "Open this person's basic information editor in a new tab",
+    'goto_person_page' => 'Open person page',
+    'goto_person_page_title' => "Open this person's page in a new tab",
     // TEXT_INSTANCE_DATA "Load Data" (fill the titles from c_textid)
     'load_text_title_btn' => 'Load title',
     'load_text_title_filled' => 'Filled: :fields',

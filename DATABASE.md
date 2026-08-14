@@ -177,15 +177,18 @@ $user->update(['name' => 'New Name']);
 $user->delete();
 
 // ✅ 好：複合主鍵的表使用 Query Builder
-// 例如：ALTNAME_DATA 有複合主鍵 (c_personid, c_sequence, c_alt_name_chn, c_alt_name_type_code)
+// 例如：ALTNAME_DATA 的主鍵是 3-key (c_personid, c_alt_name_chn, c_alt_name_type_code)
+//       c_sequence 只是排序欄位，不參與定位
 DB::table('ALTNAME_DATA')
     ->where('c_personid', $personId)
-    ->where('c_sequence', $sequence)
-    ->update(['c_alt_name_chn' => $name]);
+    ->where('c_alt_name_chn', $altNameChn)
+    ->where('c_alt_name_type_code', $typeCode)
+    ->update(['c_notes' => $notes]);
 
 DB::table('ALTNAME_DATA')
     ->where('c_personid', $personId)
-    ->where('c_sequence', $sequence)
+    ->where('c_alt_name_chn', $altNameChn)
+    ->where('c_alt_name_type_code', $typeCode)
     ->delete();
 
 // ❌ 避免：為複合主鍵表建立 Eloquent 模型
@@ -196,9 +199,9 @@ DB::table('ALTNAME_DATA')
 // 雖然有第三方套件，但會增加維護負擔和不確定性
 ```
 
-**本專案複合主鍵表示例**：
-- `ALTNAME_DATA`：`c_personid + c_sequence + c_alt_name_chn + c_alt_name_type_code`
-- `POSTED_TO_ADDR_DATA`：`c_personid + c_posting_id + c_office_id`
+**本專案複合主鍵表示例**（權威來源：[app/Support/CompositePrimaryKey.php](./app/Support/CompositePrimaryKey.php) 的 `SCHEMAS`）：
+- `ALTNAME_DATA`：`c_personid + c_alt_name_chn + c_alt_name_type_code`（3-key；`c_sequence` 不在主鍵內）
+- `POSTED_TO_ADDR_DATA`：`c_addr_id + c_office_id + c_posting_id`
 
 **處理副作用（如索引更新）**：
 - 不要依賴 Eloquent Observer（Query Builder 不會觸發）

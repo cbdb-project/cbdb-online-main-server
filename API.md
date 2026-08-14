@@ -18,6 +18,10 @@ v2 分成兩類端點：
 | 三、操作記錄清單 | `GET /api/v2/operations` | 查詢操作記錄與提案（含審核狀態） |
 | 四、寫入 API 總覽 | — | direct／proposal 兩種模式、請求信封、資源一覽、錯誤碼 |
 | 五、讀取單列 | `GET|POST /api/v2/get` | 依複合主鍵讀回單列，供編輯前取原值 |
+| 六、新增記錄 | `POST /api/v2/create` | 新增一列 |
+| 七、修改記錄 | `POST /api/v2/mutate` | 修改一列（PATCH 語義） |
+| 八、刪除記錄 | `POST /api/v2/delete` | 刪除一列 |
+| 九、各資源欄位參考 | — | 逐資源的主鍵、可寫欄位白名單與特殊規則 |
 
 ---
 
@@ -98,7 +102,7 @@ Token 有效期：建立時可指定 `expires_in`（1～3650 天），未指定�
 }
 ```
 
-部分寫入（別名、人物主檔）在伺服器對送出的值做過異體字或拼音正規化時，會多一個頂層 `notices` 陣列說明替換內容；其餘欄位不變。
+部分寫入（別名、人物主檔）在伺服器做過**異體字替換**時，會多一個頂層 `notices` 陣列說明替換內容。注意其他靜默改寫（拼音 `v→ü`、括號正規化、哨兵值正規化）**不會**產生 `notices`，只能從回應的 `result.pk` / `result.row` 看出來。
 
 由控制器／handler 判定的失敗（多數 4xx 與 5xx）：
 
@@ -299,10 +303,14 @@ Token 有效期：建立時可指定 `expires_in`（1～3650 天），未指定�
 
 **眾包（crowdsourcing）帳號只能送 `mode=proposal`**；送 `mode=direct` 會得到 403 `該使用者沒有權限，請聯繫管理員`。外部協作者的帳號通常屬於此類，請一律帶 `"mode": "proposal"`。
 
+**注意：`mode` 省略就是 `direct`**。有直接寫入權限的帳號若漏帶 `mode`，資料會**立即寫入正式資料庫**而不是進入待審佇列。要提交提案請每一筆都顯式帶 `"mode": "proposal"`（`batch_mutate` 可在頂層設一次預設，見〈批次寫入〉）。
+
 提案送出後：
 
-- 回應的 `result.operation_id` 就是該提案在 `operations` 表的 id，請保存下來以便追蹤。
-- 提案內容存於該筆 operation 的 `resource_data`，其中系統欄位包括 `__review_status`（`pending` / `approved` / `rejected` / `cancelled`）、`__proposal_meta`（提案人、時間、`comment`）、`__key_columns`。
+- 回應的 `result.operation_id` 就是該提案在 `operations` 表的 id，請保存下來以便追蹤。（注意：`resource_data` 內另有一個 `__operation_id`，那是 direct 寫入用的 ULID，**與 `result.operation_id` 不是同一個東西**。）
+- 提案內容存於該筆 operation 的 `resource_data`，其中系統欄位包括 `__review_status`（`pending` / `approved` / `rejected` / `cancelled`）、`__proposal_meta`（提案人、時間、`comment`、`resource_type`）、`__key_columns`，副表／鏡像資料則在 `__proposal_aux`。
+- `resource_data` 存的是**套用後的完整列**（原列 merge 你送的 `changes`），不是只有差異；套用前的原列存在同一筆 operation 的 `resource_original`。
+- `__proposal_meta.resource_type` 的值不完全等於你送的 `resource`：人物主檔是 `biogmain`，任官的**新增**提案是 `offices`（修改／刪除提案則是 `postings`）。若要依此篩選提案，請把這些別名都算進去。
 - 追蹤自己的提案：`GET /api/v2/operations?proposals_only=true&editor=<user_id 或名稱>&status[]=pending`（見第三章）。自己的 `user_id` 可用 `GET /api/user`（帶 Bearer）取得。提案的 `op_type` 為 8（新增）、9（修改）、10（刪除）；**刪除提案（10）不會被 `proposals_only=true` 涵蓋**，追蹤方式見第三章的注意事項。
 
 提案的「占位」規則（送出前務必理解，否則會被 409 卡住）：
@@ -314,6 +322,8 @@ Token 有效期：建立時可指定 `expires_in`（1～3650 天），未指定�
 | delete（op_type 10） | 同一資料表 + 同一 `resource_id` | 僅 `pending` |
 
 - 占位**不分提案人**：別人針對同一列送出的待審提案，也會讓你收到 409 `pending_proposal_exists`。
+- 占位是**逐動作獨立**的：待審的新增提案不會擋修改提案，反之亦然（三種動作各自只掃自己的 `op_type`）。
+- 占位的比對鍵 `resource_id` 是主鍵的 `http_build_query()` 編碼（欄位順序＝主鍵定義順序、值經 URL 編碼、`null` 編成字串 `NULL`、空字串保留成 `c_pages=`），例如 `c_personid=1762&c_alt_name_chn=%E5%8D%8A%E5%B1%B1&c_alt_name_type_code=4`。**修改提案用的是「改鍵後」的新主鍵**，所以改鍵提案佔的是新主鍵的位子。
 - **新增提案被駁回（`rejected`）後仍然占位**，重送同主鍵的 `create` 一律 409。因為撤回／修改提案沒有對外 API（見 1.2），此時只能請站內審核人處理。
 - `possessions` 的新增提案沒有任何重複防呆（主鍵是系統配發的流水號），重複送出會產生多筆提案、核准多次就產生多列，請自行避免重送。
 - `postings` 的新增提案只按 `c_office_id` 防呆（同一官職上任何人的待審提案會互擋），且錯誤鍵是 `changes: ["pending_proposal_exists"]` 而非 `target.pk`。
@@ -344,6 +354,9 @@ Token 有效期：建立時可指定 `expires_in`（1～3650 天），未指定�
 | changes | 物件 | **update 必填** | 要寫入的欄位。`update` 缺 `changes` 回 422 `changes: required`、空物件回 422 `changes: empty`；**`create` 的 `changes` 非必填**（只帶完整 `target.pk` 也可能成功）。`delete`：走 `/api/v2/delete` 或 `batch_mutate` 時可省略，但**走 `/api/v2/mutate` 並帶 `operation: "delete"` 時仍必須帶 `changes` 鍵**（可為空物件），否則 422 `changes: required`；內容會被忽略 |
 | meta.comment | 字串 | — | 提案說明；`direct` 模式則寫入該筆 operation 的 `__note` |
 | meta.force | 布林 | — | 對「鏡像衝突／對面多筆反向列」的二次確認（見〈社會關係與親屬的互逆鏡像〉）。首次提交請勿帶；只有在收到 409 `mirror_conflict` / `mirror_suspected` / `mirror_delete_multiple` 並確認過影響範圍後才帶 |
+| meta.ai_fill_log_id | 數字 | — | 內部用：標記這筆寫入來自 AI 自動填表的某筆日誌。外部提交者不需要送 |
+
+`meta` 內以雙下底線開頭的鍵（例如 `__approving_operation_id`）是**系統核准流程保留鍵，外部呼叫不得送**。
 
 `update` 是 **PATCH 語義，不是整頁表單覆寫**：
 
@@ -362,7 +375,9 @@ CBDB 子資源表幾乎都是複合主鍵，且不使用 Eloquent 主鍵行為�
 要點：
 
 - 主鍵欄位定義的權威來源是 `app/Support/CompositePrimaryKey.php` 的 `SCHEMAS`；各資源的主鍵欄位見〈讀取單列〉一章的資源表，以及〈各資源欄位參考〉。
+- **`target.pk` 只檢查「該有的欄位有沒有到」，多送的欄位一律靜默忽略**。欄名打錯（或照舊文件多送了一個已不屬於主鍵的欄，例如 `ALTNAME_DATA` 的 `c_sequence`）不會報錯，但那個值也不會生效。
 - `update` 時如果 `changes` 內含主鍵欄位，等於「改鍵」。後端會檢查新主鍵是否已被其他列占用，衝突則回 409 `target.pk: conflict`。
+- **例外：`c_personid` 永遠不能改鍵。** 它不在任何子資源的 `update` 白名單內，送進 `changes` 會讓整筆請求 422 `disallowed_fields: c_personid`（`sources` 例外，回的是 `changes.c_personid: mismatch` 或 `immutable`）。要把記錄換到別的人物，只能刪除後在新人物下重建。
 - 唯一允許主鍵欄為空的例外是**寫入端**的 `BIOG_SOURCE_DATA.c_pages`（`sources` 的 create／update／delete 會把它視為可空並正規化為空字串）；`/api/v2/get` **不**套用這個例外，詳見〈讀取單列〉一章的注意事項。
 - 想先確認某列現值再送修改，可先呼叫 `/api/v2/get`（見〈讀取單列〉）。
 
@@ -420,7 +435,16 @@ CBDB 子資源表幾乎都是複合主鍵，且不使用 Eloquent 主鍵行為�
 | 422 | 參數校驗失敗 | `target.pk: required`、`person_id: required`、`pk`（主鍵缺欄位）、`person_id: mismatch`、`changes: required` / `empty` / `no_supported_fields` / `no_effective_changes` / `disallowed_fields: <欄位清單>`、各欄位級規則、`mirror_integrity: fail_closed` |
 | 429 | 讀取端點超過限流（600 次／分鐘） | — |
 | 500 | 未預期的伺服器錯誤 | — |
-| 501 | `resource` / `mode` / `operation` 組合不支援 | `resource`、`mode`、`operation` |
+| 501 | `resource` / `mode` / `operation` 組合不支援 | `resource`、`mode`、`operation`（此處的值是**字串**，不是字串陣列） |
+
+**`errors` 值的型別不統一**，請寬鬆解析：多數是「欄位 → 錯誤代號字串陣列」，但
+
+- `mirror_conflict` → 物件 `{ table, pk, fields }`（`pk` 是**對面那一列**的主鍵）
+- `mirror_suspected` → 物件 `{ table, candidates, authoritative_code, count }`
+- `mirror_delete_multiple` → 物件 `{ table, candidates, count }`
+- 501 的 `resource` / `mode` / `operation` → 字串
+
+其中 `pk` 與 `candidates` 是處理鏡像衝突時唯一能定位對面資料的資訊，請務必保留，詳見〈社會關係與親屬的互逆鏡像〉。另有少數 422（例如不合法的 `c_kinship_pair`）**只有 `message`、沒有 `errors`**。
 
 較常踩到的 422 情境：
 
@@ -452,10 +476,13 @@ CBDB 子資源表幾乎都是複合主鍵，且不使用 Eloquent 主鍵行為�
 
 失敗時整筆交易回滾，不會留下半套資料。
 
+（唯一已知例外：`events` 的「只改地點副表」direct 路徑不寫 `operations`／`audit_log`，見第七章的回應例外表。）
+
 提案（proposal）路徑的落地與署名：
 
 - 提案送出時**不動**資料表，只寫一筆 operation；核准是站內流程（沒有對外 API）。
 - 核准時後端會以 `mode=direct` **重放同一個 handler 並重新驗證**。因此提案在送出當下合法、核准當下卻不合法（例如目標列已被他人改鍵或刪除、主鍵已被占用），核准會失敗並整筆回滾，提案維持待審。這也是提案送出後不宜久放的原因。
+- **提案階段不做互逆鏡像偵測**：`direct` 會因對面分歧而 409 的情況，`proposal` 一律照收（200）。分歧要等核准重放時才會浮現，屆時核准會失敗。
 - 核准後 `c_modified_by` 記的是雙人名——形如「審核人 (Proposed by: 提案人)」；若提案人名稱缺失或與審核人相同，則只記審核人單名。提案人不會單獨署名。
 - `c_modified_date` 記的是**核准落庫的時間**，不是提案送出時間。
 
@@ -567,6 +594,437 @@ GET /api/v2/get?resource=kinship&person_id=1762&target[pk][c_personid]=1762&targ
 | 404 | 該主鍵沒有對應的列（`<表名> 記錄不存在`） |
 | 422 | `target.pk` 缺欄位、缺 `person_id`、或 `person_id` 與該列不符 |
 | 501 | `resource` 不在上表（`目前尚未支援此取得模式`） |
+
+---
+
+## 六、新增記錄
+
+### `POST /api/v2/create`
+
+新增一列。`operation` 固定為 `create`（帶了別的值也會被忽略）。
+
+### 輸入參數
+
+| 參數名 | 參數類型 | 必填 | 說明 |
+| ------ | ------ | ------ | ------ |
+| resource | 字串 | ✔ | 見 4.5 |
+| mode | 字串 | — | `direct`（預設）或 `proposal`；眾包帳號只能 `proposal` |
+| person_id | 數字 | ✔ | 新列所屬人物 ID |
+| target.pk | 物件 | ✔ | 新列的**完整**複合主鍵。主鍵由系統配發的資源（`postings`、`possessions`）送空物件 `{}` |
+| changes | 物件 | — | 主鍵以外的欄位。可省略（此時只寫入主鍵欄） |
+| meta.comment | 字串 | — | 提案說明／操作備註 |
+
+行為要點：
+
+- 後端會把 `target.pk` 與 `changes` 合併成完整一列，再以白名單過濾。**主鍵欄要放在 `target.pk`**；放在 `changes` 裡雖然多數資源也接受（白名單通常含主鍵欄），但 `target.pk` 才是主鍵完整性檢查的依據。
+- 主鍵已存在 → 409 `target.pk: conflict`（訊息 `目標主鍵已存在`）；`sources` 例外，回的是 `target.pk: duplicate`。
+- `direct` 模式會由系統蓋上 `c_created_by` / `c_created_date`。
+- 未詳的主鍵欄必須送哨兵值，見 4.4。
+- `associations`／`kinship` 的新增會同時建立對面的互逆鏡像列，因此也可能回 409 `mirror_conflict` / `mirror_suspected` 或 422 `mirror_integrity`，見〈社會關係與親屬的互逆鏡像〉。
+
+### 輸入示例（眾包帳號提交新增提案：為王安石加一個別名）
+
+```json
+POST /api/v2/create
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer <token>
+
+{
+  "resource": "altnames",
+  "mode": "proposal",
+  "person_id": 1762,
+  "target": {
+    "pk": {
+      "c_personid": 1762,
+      "c_alt_name_chn": "半山",
+      "c_alt_name_type_code": 4
+    }
+  },
+  "changes": {
+    "c_alt_name": "Ban shan",
+    "c_source": 7596,
+    "c_pages": "31",
+    "c_notes": "據宋史列傳"
+  },
+  "meta": { "comment": "補王安石別號，出處：宋史列傳卷 327" }
+}
+```
+
+### 輸出格式（proposal）
+
+```json
+{
+  "ok": true,
+  "resource": "altnames",
+  "mode": "proposal",
+  "operation": "create",
+  "result": {
+    "pk": { "c_personid": 1762, "c_alt_name_chn": "半山", "c_alt_name_type_code": 4 },
+    "status": "proposal_created",
+    "operation_id": 351902
+  }
+}
+```
+
+### 輸出格式（direct）
+
+```json
+{
+  "ok": true,
+  "resource": "altnames",
+  "mode": "direct",
+  "operation": "create",
+  "result": {
+    "pk": { "c_personid": 1762, "c_alt_name_chn": "半山", "c_alt_name_type_code": 4 },
+    "operation_id": 351903,
+    "row": { "c_personid": 1762, "c_alt_name_chn": "半山", "c_alt_name_type_code": 4, "c_source": 7596, "c_pages": "31", "c_notes": "據宋史列傳", "c_created_by": "王小明", "c_created_date": "2026-08-14 11:02:35" }
+  }
+}
+```
+
+| 屬性名 | 屬性類型 | 說明 |
+| ------ | ------ | ------ |
+| result.pk | 物件 | **實際落庫的主鍵**（可能與送出的值不同，例如異體字被替換、或主鍵由系統配發），請以此為準 |
+| result.status | 字串 | 只在 proposal 出現，值為 `proposal_created` |
+| result.operation_id | 數字 | `operations` 表 id；proposal 模式即提案編號 |
+| result.row | 物件 | 只在 direct 出現，為寫入後從資料庫回讀的完整列 |
+| notices | 陣列 | 只在伺服器做過**異體字替換**時出現（拼音 `v→ü`、括號正規化等改寫是靜默的，不會有 `notices`） |
+
+**回應欄位的例外（請以「可能不存在」的方式讀取）**：
+
+| 資源 | 例外 |
+| ------ | ------ |
+| `possessions`、`postings`、`basicinformation` | direct 的 `result` **沒有 `operation_id`**（只有 `pk` 與 `row`） |
+| `possessions`、`postings` | proposal 的 `result` **沒有 `pk`**（主鍵尚未配發，要等核准），只有 `status` 與 `operation_id` |
+| `sources` | direct 也有 `result.status`，值為 `created`（不是 `proposal_created`） |
+
+---
+
+## 七、修改記錄
+
+### `POST /api/v2/mutate`
+
+修改一列，**PATCH 語義**：只送要改的欄位，未送的欄位保持原值（詳見 4.3）。`operation` 預設 `update`；也可帶 `create` 或 `delete` 走對應流程（此時行為與第六、八章相同，但 `changes` 鍵仍必須存在）。
+
+### 輸入參數
+
+| 參數名 | 參數類型 | 必填 | 說明 |
+| ------ | ------ | ------ | ------ |
+| resource | 字串 | ✔ | 見 4.5 |
+| mode | 字串 | — | `direct`（預設）或 `proposal` |
+| operation | 字串 | — | 預設 `update` |
+| person_id | 數字 | ✔ | 該列所屬人物 ID |
+| target.pk | 物件 | ✔ | 目標列**現有**的完整複合主鍵 |
+| changes | 物件 | ✔ | 要改的欄位；空物件回 422 `changes: empty` |
+| meta.comment | 字串 | — | 提案說明／操作備註 |
+| meta.force | 布林 | — | 僅用於鏡像衝突的二次確認（見〈社會關係與親屬的互逆鏡像〉） |
+
+行為要點：
+
+- **改鍵**：`changes` 內含主鍵欄位即為改鍵。後端會先檢查新主鍵是否已被占用（409 `target.pk: conflict`），`proposal` 模式則回 `目標主鍵已存在，無法建立提案`。
+- **無變更即拒**：送出的值與現值完全相同（以字串比對）會回 422 `changes: no_effective_changes`，不會產生空操作記錄。
+- **白名單**：多數資源對白名單外欄位整筆 422；少數靜默丟棄（見 4.6 的警告）。
+- `direct` 模式會由系統蓋 `c_modified_by` / `c_modified_date`；回應的 `result.updated_fields` 只列使用者實際變更的欄位，不含這兩個稽核欄。
+
+### 輸入示例（眾包帳號提交修改提案：補一筆地址的備註與出處頁碼）
+
+```json
+POST /api/v2/mutate
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer <token>
+
+{
+  "resource": "addresses",
+  "mode": "proposal",
+  "operation": "update",
+  "person_id": 1762,
+  "target": {
+    "pk": { "c_personid": 1762, "c_addr_id": 100513, "c_addr_type": 1, "c_sequence": 1 }
+  },
+  "changes": {
+    "c_pages": "31-32",
+    "c_notes": "據宋史列傳補正"
+  },
+  "meta": { "comment": "補出處頁碼" }
+}
+```
+
+### 輸出格式（proposal）
+
+```json
+{
+  "ok": true,
+  "resource": "addresses",
+  "mode": "proposal",
+  "operation": "update",
+  "result": {
+    "pk": { "c_personid": 1762, "c_addr_id": 100513, "c_addr_type": 1, "c_sequence": 1 },
+    "updated_fields": ["c_pages", "c_notes"],
+    "status": "proposal_updated",
+    "operation_id": 351904
+  }
+}
+```
+
+### 輸出格式（direct）
+
+```json
+{
+  "ok": true,
+  "resource": "addresses",
+  "mode": "direct",
+  "operation": "update",
+  "result": {
+    "pk": { "c_personid": 1762, "c_addr_id": 100513, "c_addr_type": 1, "c_sequence": 1 },
+    "updated_fields": ["c_pages", "c_notes"],
+    "operation_id": 351905,
+    "row": { "c_personid": 1762, "c_addr_id": 100513, "c_addr_type": 1, "c_sequence": 1, "c_pages": "31-32", "c_notes": "據宋史列傳補正", "c_modified_by": "王小明", "c_modified_date": "2026-08-14 11:10:02" }
+  }
+}
+```
+
+| 屬性名 | 屬性類型 | 說明 |
+| ------ | ------ | ------ |
+| result.pk | 物件 | **改鍵後的新主鍵**（未改鍵時與送出的相同） |
+| result.updated_fields | 陣列 | 本次變更的欄位名；direct 模式已排除自動蓋的 `c_modified_*`。**可能包含非資料表欄位**（`c_addr`、`c_addr_id`、`c_kinship_pair`、`c_assocship_pair`、`c_assoc_kinship_pair`），不要無條件當成資料表欄位處理 |
+| result.status | 字串 | 只在 proposal 出現，值為 `proposal_updated` |
+| result.row | 物件 | 只在 direct 出現，為更新後從資料庫回讀的完整列 |
+
+**回應欄位的例外**：
+
+| 情況 | 例外 |
+| ------ | ------ |
+| `sources` 的 update | direct 也有 `result.status`（值 `updated`），且**沒有 `updated_fields`** |
+| 只改副表或只改互逆配對碼的 update（`changes` 內只有 `c_addr` / `c_addr_id` / `c_addr_cleared` / `c_assocship_pair` / `c_kinship_pair` / `c_assoc_kinship_pair`） | 走旁路，direct 的 `result` 只有 `pk` 與 `updated_fields`，**沒有 `operation_id`、沒有 `row`**。適用 `events`、`postings`、`possessions`、`associations`、`kinship` |
+| `events` 的「只改地點」direct | 除了回應較精簡，這條路徑**不寫 `operations` 也不寫 `audit_log`**（是既有行為，與 4.7 的通則不同） |
+
+---
+
+## 八、刪除記錄
+
+### `POST /api/v2/delete`
+
+刪除一列。`operation` 固定為 `delete`。
+
+### 輸入參數
+
+| 參數名 | 參數類型 | 必填 | 說明 |
+| ------ | ------ | ------ | ------ |
+| resource | 字串 | ✔ | 見 4.5 |
+| mode | 字串 | — | `direct`（預設）或 `proposal` |
+| person_id | 數字 | ✔ | 該列所屬人物 ID |
+| target.pk | 物件 | ✔ | 目標列的完整複合主鍵 |
+| meta.comment | 字串 | — | 提案說明／操作備註 |
+| meta.force | 布林 | — | 確認一併刪除對面多筆反向鏡像列；**只有 `kinship` 會讀這個旗標**（見〈社會關係與親屬的互逆鏡像〉） |
+| changes | — | — | 不需要；帶了會被忽略 |
+
+行為要點：
+
+- 目標列不存在 → 404。
+- **人物主檔（`basicinformation`）的刪除是軟刪除**：改名為 `<待删除>`，資料列仍在（見 4.5）。
+- 資料庫層外鍵一律 `RESTRICT`（沒有 `ON DELETE CASCADE`），**不會由資料庫連鎖刪除**。若該列仍被其他資料引用，資料庫會擋下來（此時可能收到 500，請視為「不可刪除」而不是重試）。
+- 但**應用層會顯式刪除該列自己的附屬子表**，且會逐列寫 operations／audit：
+  - `possessions` → 一併刪 `POSSESSION_ADDR`
+  - `postings` → 一併刪 `POSTED_TO_ADDR_DATA` 與 `POSTING_DATA`
+  - `associations`／`kinship` → 一併處理對面的互逆鏡像列（見〈社會關係與親屬的互逆鏡像〉）
+  刪除前請把這些連帶影響算進去。
+- `associations`／`kinship` 的刪除會同時處理對面的互逆鏡像列，但兩者行為**不同**：
+  - `kinship`：對面命中多筆時回 409 `mirror_delete_multiple`，須確認後帶 `meta.force` 重送；配對碼缺失時 fail-closed 回 422 `mirror_integrity`。
+  - `associations`：不使用 `meta.force`；若無法定位對面鏡像列會**靜默跳過**（不報錯），有可能留下孤兒鏡像列。刪完社會關係建議另外確認對方人物那一側。
+  詳見〈社會關係與親屬的互逆鏡像〉。
+
+### 輸入示例
+
+（注意：本例假設該別名列**已存在於資料表**。若第六章的新增是走 `proposal`，那筆資料在核准前並不存在，此時刪除會回 404。）
+
+```json
+POST /api/v2/delete
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer <token>
+
+{
+  "resource": "altnames",
+  "mode": "proposal",
+  "person_id": 1762,
+  "target": {
+    "pk": { "c_personid": 1762, "c_alt_name_chn": "半山", "c_alt_name_type_code": 4 }
+  },
+  "meta": { "comment": "重複別名，建議刪除" }
+}
+```
+
+### 輸出格式
+
+```json
+{
+  "ok": true,
+  "resource": "altnames",
+  "mode": "proposal",
+  "operation": "delete",
+  "result": {
+    "pk": { "c_personid": 1762, "c_alt_name_chn": "半山", "c_alt_name_type_code": 4 },
+    "status": "proposal_deleted",
+    "operation_id": 351906
+  }
+}
+```
+
+`direct` 模式的回應沒有 `status`，只有 `pk` 與 `operation_id`（刪除後無列可回讀，故無 `row`）。**例外**：`possessions` 與 `postings` 的 direct 刪除回應只有 `pk`，沒有 `operation_id`。
+
+---
+
+## 九、各資源欄位參考
+
+本章逐資源列出 `target.pk` 欄位與可寫欄位白名單。**白名單以外的欄位不要送**（多數會整筆 422）。
+
+通用約定：
+
+- 「create 白名單」是 `target.pk` + `changes` 合併後允許保留的欄位；「update 白名單」是 `changes` 允許的欄位。
+- 稽核欄（`c_created_by`／`c_created_date`／`c_modified_by`／`c_modified_date`）一律**不可送**，由系統蓋章。
+- 標記為「哨兵欄」的碼／外鍵欄位，送 `null`／空字串／`-999` 都會被正規化為 `"0"`（未詳），不會寫入 null。**`create` 更進一步：連「不送這個欄位」也會落 `"0"`**（對齊舊表單「空欄送 0」的語義），所以不要期待省略就會留 `null`。
+- 有三個資源另有「地點副表」，用 `changes` 內的專用鍵表達（不是普通純量欄位）：`events` 與 `possessions` 用 `c_addr_id`（陣列）、`postings` 用 `c_addr`（陣列）。`update` 時可用 `c_addr_cleared: "1"` 表示清空該副表。`proposal` 模式下這些內容存在提案的 `__proposal_aux`，核准時才寫入副表。
+
+### 9.1 basicinformation（BIOG_MAIN，人物主檔）
+
+- `target.pk`：`c_personid`
+- **create**（只支援 `direct`）可寫欄位：`c_personid`、`c_name_chn`、`c_name`、`c_name_proper`、`c_name_rm`、`c_surname_chn`、`c_mingzi_chn`、`c_surname`、`c_mingzi`、`c_surname_proper`、`c_mingzi_proper`、`c_surname_rm`、`c_mingzi_rm`、`c_female`、`c_index_year`、`c_index_year_type_code`、`c_index_year_source_id`、`c_index_addr_id`、`c_index_addr_type_code`、`c_dy`、`c_by_intercalary`、`c_by_nh_code`、`c_by_nh_year`、`c_by_range`、`c_by_yymm`、`c_by_yymm_day`、`c_by_day_gz`、`c_dy_intercalary`、`c_dy_nh_code`、`c_dy_nh_year`、`c_dy_range`、`c_dy_yymm`、`c_dy_yymm_day`、`c_dy_day_gz`、`c_death_age`、`c_death_age_range`、`c_fl_earliest_year`、`c_fl_ey_nh_code`、`c_fl_ey_nh_year`、`c_fl_ey_notes`、`c_fl_latest_year`、`c_fl_ly_nh_code`、`c_fl_ly_nh_year`、`c_fl_ly_notes`、`c_ethnicity_code`、`c_household_status_code`、`c_tribe`、`c_choronym_code`、`c_notes`、`c_self_bio`
+- create 的 `c_personid` 由呼叫方指定（不是自動配發），且必須：非 0、尚未存在、且 `c_personid - 目前最大 c_personid ≤ 10000`，否則 422（`c_personid: required` / `exists` / `too_large`）。
+- **update** 可寫欄位：BIOG_MAIN 除下列黑名單外的所有欄位。黑名單＝`c_personid`、`c_name_chn`、`c_name`、`c_name_proper`、`c_name_rm` 與四個稽核欄。
+  - 姓名不能直接改：`c_name_chn` 等合併欄由 `c_surname_chn` + `c_mingzi_chn`（及對應拼音分欄）自動組出，請改分欄。
+  - `c_mingzi_chn`／`c_mingzi` 若原值非空，**不可清空**（會 422）；原本為空者可維持為空。
+  - 部分外鍵欄（`c_dy`、`c_by_nh_code`、`c_dy_nh_code`、`c_ethnicity_code`、`c_choronym_code`、`c_household_status_code` 等，共 13 欄）在收到空字串時會被寫成 `null`（不是 `0`）；其餘外鍵欄不在此清單內。
+  - 另有兩條範圍驗證（direct 與 proposal 皆套用）：`c_index_year` 限 -3000～3000、`c_death_age` 限 0～200，超出即 422。
+  - 未知欄位與黑名單欄位都會被靜默丟棄（見 4.6 警告）；但若 `changes` **只**含這類欄位、過濾後什麼都不剩，則回 422 `changes: no_supported_fields`。
+  - `direct` 的 `update` 若送出的值與現值完全相同，回 422 `changes: no_effective_changes`（不會寫入、不會記 operation）；但 `proposal` 沒有這道守衛，同值也會成立一筆提案。
+  - `result.updated_fields` 列的是「你送出且通過白名單的欄位」，不是「值真的變了的欄位」。
+- **delete**（只支援 `direct`）：軟刪除，`c_name_chn` 改為 `<待删除>`。
+- proposal：只有 `update` 支援；`create`／`delete` 回 501。
+
+### 9.2 altnames（ALTNAME_DATA，別名）
+
+- `target.pk`：`c_personid`、`c_alt_name_chn`、`c_alt_name_type_code`（3-key，**不含** `c_sequence`）
+- **update** 白名單：`c_alt_name_chn`、`c_alt_name`、`c_alt_name_type_code`、`c_source`、`c_pages`、`c_notes`、`c_sequence`、`c_alt_name_pinyin`、`c_alt_name_pinyin2`、`c_alt_name_pinyin3`、`c_alt_name_role`
+- **create** 白名單：同上再加 `c_personid`
+- 哨兵欄：`c_source`（另 `c_alt_name_type_code` 的 `-999` 會轉 `0`）
+- 特殊行為（都會靜默改寫送出的值）：
+  - `c_alt_name_chn` 與 `c_alt_name` 都會做括號正規化（全角轉半角、括號前後補空格）。
+  - `c_alt_name_chn` 另會做**異體字嚴格替換**；因為它同時是主鍵欄，替換後的值才是落庫主鍵——**請以回應的 `result.pk` 為準**。只有這一項會產生 `notices`。
+  - `c_alt_name_pinyin`／`2`／`3` 的 `v` 會轉成 `ü`（靜默，無 `notices`）。
+  - 若正規化後與同類型的既有別名撞主鍵，回 409（訊息會說明需先手動整理）。
+  - 寫入成功後會同步重建姓名全文檢索索引（`CBDB__NAME_FTS`），這是預期的副作用。
+
+### 9.3 addresses（BIOG_ADDR_DATA，地址）
+
+- `target.pk`：`c_personid`、`c_addr_id`、`c_addr_type`、`c_sequence`
+- **update** 白名單：`c_addr_id`、`c_addr_type`、`c_firstyear`、`c_lastyear`、`c_sequence`、`c_notes`、`c_source`、`c_pages`、`c_natal`、`c_fy_nh_code`、`c_fy_nh_year`、`c_fy_range`、`c_fy_intercalary`、`c_fy_month`、`c_fy_day`、`c_fy_day_gz`、`c_ly_nh_code`、`c_ly_nh_year`、`c_ly_range`、`c_ly_intercalary`、`c_ly_month`、`c_ly_day`、`c_ly_day_gz`
+- **create** 白名單：同上再加 `c_personid`
+- 哨兵欄：`c_addr_id`、`c_source`
+
+### 9.4 entries（ENTRY_DATA，入仕）
+
+- `target.pk`（10-key）：`c_personid`、`c_entry_code`、`c_sequence`、`c_kin_code`、`c_assoc_code`、`c_kin_id`、`c_year`、`c_assoc_id`、`c_inst_code`、`c_inst_name_code`
+- **未詳的主鍵欄一律送 `0`**（10 個欄位都必須出現在 `target.pk`）。
+- **update** 白名單：`c_entry_code`、`c_sequence`、`c_kin_code`、`c_assoc_code`、`c_kin_id`、`c_year`、`c_assoc_id`、`c_inst_code`、`c_inst_name_code`、`c_entry_addr_id`、`c_source`、`c_pages`、`c_notes`、`c_entry_nh_id`、`c_entry_nh_year`、`c_entry_range`、`c_exam_rank`、`c_attempt_count`、`c_exam_field`、`c_parental_status_code`、`c_age`、`c_posting_notes`
+- **create** 白名單：同上再加 `c_personid`
+- 哨兵欄：`c_source`、`c_entry_addr_id`
+
+### 9.5 statuses（STATUS_DATA，社會區分）
+
+- `target.pk`：`c_personid`、`c_sequence`、`c_status_code`
+- **update** 白名單：`c_status_code`、`c_sequence`、`c_source`、`c_pages`、`c_notes`、`c_supplement`、`c_firstyear`、`c_fy_nh_code`、`c_fy_nh_year`、`c_fy_range`、`c_lastyear`、`c_ly_nh_code`、`c_ly_nh_year`、`c_ly_range`
+- **create** 白名單：同上再加 `c_personid`
+- 哨兵欄：`c_source`
+
+### 9.6 events（EVENTS_DATA，事件）
+
+- `target.pk`：`c_personid`、`c_sequence`、`c_event_code`
+- **update** 白名單：`c_event_code`、`c_sequence`、`c_source`、`c_pages`、`c_notes`、`c_year`、`c_month`、`c_day`、`c_day_ganzhi`、`c_nh_code`、`c_nh_year`、`c_yr_range`、`c_intercalary`、`c_role`、`c_event`
+- **create** 白名單：同上再加 `c_personid`
+- 哨兵欄：`c_source`
+- **地點副表**：`changes.c_addr_id` 可送**陣列**（事件地點 ID 列表），寫入 `EVENTS_ADDR`；`update` 可用 `c_addr_cleared: "1"` 清空。它刻意不在純量白名單內，但**送出不會 422**，會被當副表處理。`proposal` 模式存於 `__proposal_aux`，核准時才寫入。
+- 注意：`changes` 內**只有**地點副表鍵的 direct 更新走旁路，不寫 `operations` 也不寫 `audit_log`（見第七章的回應例外表）。
+
+### 9.7 associations（ASSOC_DATA，社會關係）
+
+- `target.pk`（9-key）：`c_personid`、`c_assoc_code`、`c_assoc_id`、`c_kin_code`、`c_kin_id`、`c_assoc_kin_code`、`c_assoc_kin_id`、`c_text_title`、`c_assoc_first_year`
+- **主鍵哨兵值**：數值欄未詳送 `0`；`c_text_title` 未詳送 `[n/a]`；`c_assoc_first_year` 未詳送 `-9999`。
+- **update** 白名單：`c_assoc_code`、`c_assoc_id`、`c_kin_code`、`c_kin_id`、`c_assoc_kin_code`、`c_assoc_kin_id`、`c_text_title`、`c_assoc_first_year`、`c_assoc_last_year`、`c_assoc_fy_nh_code`、`c_assoc_fy_nh_year`、`c_assoc_fy_range`、`c_assoc_fy_intercalary`、`c_assoc_fy_month`、`c_assoc_fy_day`、`c_assoc_fy_day_gz`、`c_assoc_ly_nh_code`、`c_assoc_ly_nh_year`、`c_assoc_ly_range`、`c_assoc_ly_intercalary`、`c_assoc_ly_month`、`c_assoc_ly_day`、`c_assoc_ly_day_gz`、`c_source`、`c_pages`、`c_notes`、`c_sequence`、`c_assoc_count`、`c_topic_code`、`c_occasion_code`、`c_tertiary_personid`、`c_tertiary_type_notes`、`c_assoc_claimer_id`、`c_addr_id`、`c_inst_code`、`c_inst_name_code`
+- **create** 白名單：同上再加 `c_personid`
+- 哨兵欄：`c_source`
+- **額外可送的非資料表欄位**（互逆鏡像用，見〈社會關係與親屬的互逆鏡像〉）：`c_assocship_pair`、`c_kinship_pair`、`c_assoc_kinship_pair`。未送時後端會以代碼表的權威反向碼（`ASSOC_CODES.c_assoc_pair`／`KINSHIP_CODES.c_kin_pair1`）自動補齊。**這三個欄位不做有效性驗證**（送不存在的碼會被靜默接受並寫進鏡像列），與 `kinship` 的 `c_kinship_pair` 會驗證的行為不同——請自行確認送的是合法配對碼。
+- **這個資源的寫入會同時動到對方人物的那一列**（互逆鏡像），詳見〈社會關係與親屬的互逆鏡像〉。`update` 的「補建缺失鏡像」只在**顯式送了任一 pair 欄位**時才啟用；只改備註等欄位不會臆造鏡像。
+- 兩個哨兵主鍵欄的 `update` 例外：送 `c_text_title: null` 或 `c_assoc_first_year: null` **不會清空**，會被還原成 `[n/a]`／`-9999`。
+
+### 9.8 kinship（KIN_DATA，親屬關係）
+
+- `target.pk`：`c_personid`、`c_kin_id`、`c_kin_code`
+- **update** 白名單：`c_kin_code`、`c_kin_id`、`c_source`、`c_pages`、`c_notes`、`c_autogen_notes`
+- **create** 白名單：同上再加 `c_personid`
+- 哨兵欄：`c_source`
+- **額外可送的非資料表欄位**：`c_kinship_pair`（指定反向親屬碼）。未送時以 `KINSHIP_CODES.c_kin_pair1` 推導；送了不合法的配對碼會回 422（此回應**只有 `message`、沒有 `errors`**），且因為檢查發生在寫入之前，資料完全未動。
+- **這個資源的寫入會同時動到對方人物的那一列**（互逆鏡像），詳見〈社會關係與親屬的互逆鏡像〉。與 `associations` 不同，`kinship` 的 `update` **不會**補建缺失的鏡像列（只同步已存在的那一列）。
+
+### 9.9 possessions（POSSESSION_DATA，財產）
+
+- `target.pk`：`c_possession_record_id`（單一流水號主鍵）
+- **create**：`c_possession_record_id` 由系統配發，`target.pk` 送空物件 `{}`；`person_id` 不可為 `0`（422 `person_id: invalid`）。
+- **create／update** 白名單：`c_sequence`、`c_possession_act_code`、`c_possession_desc`、`c_possession_desc_chn`、`c_quantity`、`c_measure_code`、`c_possession_yr`、`c_possession_nh_code`、`c_possession_nh_yr`、`c_possession_yr_range`、`c_source`、`c_pages`、`c_notes`
+- 哨兵欄：`c_source`、`c_measure_code`、`c_possession_act_code`
+- **地址副表**：`changes.c_addr_id` 可送**陣列**（地點 ID 列表），寫入 `POSSESSION_ADDR`；`update` 可用 `c_addr_cleared: "1"` 清空；proposal 模式存於提案的 `__proposal_aux`，核准時才寫入。
+- create 對白名單外欄位是**靜默丟棄**（不報錯）；`target.pk` 也**完全被忽略**——就算送了 `c_possession_record_id`，系統仍會配發新的 id。
+- 新增提案沒有重複防呆，重送會產生多筆提案（見 4.2）。
+
+### 9.10 texts（BIOG_TEXT_DATA，著述）
+
+- `target.pk`：`c_personid`、`c_textid`、`c_role_id`
+- **update** 白名單：`c_textid`、`c_role_id`、`c_source`、`c_pages`、`c_notes`、`c_supplement`、`c_text_year`
+- **create** 白名單：同上再加 `c_personid`
+- 哨兵欄：`c_textid`、`c_source`
+- `c_textid` 對應 `TEXT_CODES`，可用 `GET /api/v2/texts?ids=...` 查詢（見〈其他開放端點〉）。
+
+### 9.11 postings（POSTED_TO_OFFICE_DATA，任官）
+
+- `target.pk`：`c_office_id`、`c_posting_id`（**不含** `c_personid`）
+- **create**：`c_posting_id` 由系統配發，`target.pk` 送空物件 `{}`，但**必須在 `changes` 內帶 `c_office_id`**（否則 422 `changes: c_office_id required`）；`person_id` 不可為 `0`。
+- **create／update** 白名單：`c_office_id`、`c_sequence`、`c_source`、`c_pages`、`c_notes`、`c_firstyear`、`c_fy_nh_code`、`c_fy_nh_year`、`c_fy_range`、`c_fy_intercalary`、`c_fy_month`、`c_fy_day`、`c_fy_day_gz`、`c_lastyear`、`c_ly_nh_code`、`c_ly_nh_year`、`c_ly_range`、`c_ly_intercalary`、`c_ly_month`、`c_ly_day`、`c_ly_day_gz`、`c_appt_code`、`c_assume_office_code`、`c_dy`、`c_inst_code`、`c_inst_name_code`、`c_office_category_id`
+- 哨兵欄：`c_source`、`c_appt_code`
+- **任官地址副表**：`changes.c_addr` 可送**陣列**（任官地點），寫入 `POSTED_TO_ADDR_DATA`；`update` 可用 `c_addr_cleared: "1"` 清空；proposal 模式存於 `__proposal_aux`，核准時才寫入。
+- create 對白名單外欄位是**靜默丟棄**；`target.pk` 也**完全被忽略**（`c_posting_id` 一律由系統配發）。
+- 新增提案的重複防呆只看 `c_office_id`：同一官職上任何人的待審新增提案都會互擋，錯誤鍵是 `changes: pending_proposal_exists`。
+
+### 9.12 social_institutions（BIOG_INST_DATA，社會機構）
+
+- `target.pk`：`c_personid`、`c_inst_code`、`c_inst_name_code`、`c_bi_role_code`
+- **update** 白名單：`c_inst_code`、`c_inst_name_code`、`c_bi_role_code`、`c_source`、`c_pages`、`c_notes`、`c_bi_begin_year`、`c_bi_by_nh_code`、`c_bi_by_nh_year`、`c_bi_by_range`、`c_bi_end_year`、`c_bi_ey_nh_code`、`c_bi_ey_nh_year`、`c_bi_ey_range`
+- **create** 白名單：同上再加 `c_personid`
+- 哨兵欄：`c_source`
+- 別名注意：`socialinst` 只有 `create`／`delete` 接受；`update` 請用 `social_institutions`、`social_institution` 或 `biog_inst_data`。
+
+### 9.13 sources（BIOG_SOURCE_DATA，出處）
+
+- `target.pk`：`c_personid`、`c_textid`、`c_pages`
+- `c_pages` 是唯一允許為空的主鍵欄（寫入端會正規化為空字串）；但 `/api/v2/get` 不接受空值（見第五章注 2）。
+- **可寫欄位**：`c_notes`、`c_main_source`、`c_self_bio`（後兩者是 0／1 布林旗標，`create` 未送時預設 `0`），另 `c_textid` 與 `c_pages` 可改鍵。
+- `c_personid` **不可改鍵**（不能把出處搬到別的人物），送了不同值回 422 `changes.c_personid: immutable`。
+- `update` 時 `target.pk` 必須含全部三個主鍵鍵名（缺少回 422 `target.pk.<欄名>: required`），且必須有實質變更（改鍵或可寫欄位之一），否則 422 `changes: no_supported_fields`；若送出的值與現值相同則回 422 `changes: no_effective_changes`。
+- `c_textid` 必須存在於 `TEXT_CODES`，否則 422 `c_textid: invalid`。
+- `resource` 別名不對稱：**`create`／`update` 只接受 `sources`**；`delete` 另接受 `source`、`biog_source_data`。
+- `create` 時 `changes` 內的 `c_textid`／`c_pages` **優先於 `target.pk`**，兩者不一致會以 `changes` 落庫（與其他資源相反，請只在一處給值）。
+- `c_pages` 會被 `trim()`；`c_main_source`／`c_self_bio` 以整數轉型收下，非數字字串會靜默變成 `0`。
+- 人物不符的錯誤鍵是 `target.pk.c_personid: mismatch` 或 `changes.c_personid: mismatch`（不是其他資源的 `person_id: mismatch`）。
+- 待審提案檢查在 `mode` 分支之前，因此「同主鍵已有待審新增提案」時連 `mode=direct` 的 `create` 也會 409；`update` 沒有這道檢查。
+- 白名單外欄位是**靜默丟棄**。
+- 回應形狀與其他資源不同：direct 也帶 `result.status`（`created`／`updated`），且 update 的 direct 回應**沒有 `updated_fields`**。
+
+### 9.14 merged-person（MERGED_PERSON_DATA，合併人物記錄）
+
+- `target.pk`：`c_personid`、`c_merged_from_personid`
+- 只支援 `create` 與 `delete`（沒有 `update`），`direct`／`proposal` 皆可。
+- **create** 白名單：`c_personid`、`c_merged_from_personid`、`c_notes`、`c_source`、`c_pages`
+- `/api/v2/get` **不支援**此資源（寫得進去、讀不回來）。
 
 ---
 

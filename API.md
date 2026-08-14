@@ -1519,8 +1519,6 @@ v2 提案流程上線前的舊機制，仍在線但**建議一律改用 `/api/v2
 | 其餘 `search/*`、`/api/code/addr`、`/api/name` | **Laravel 分頁物件**（`{current_page, data: [...], total, ...}`）——它也有 `data` 鍵，但不是 v2 的 `ok`／`data`／`pagination` 信封 |
 | `search/pinyin` | **純文字**（拼音字串；查無親屬對應時另帶 `X-Pinyin-Kinship-Unmatched` 標頭） |
 
-**`/api/select/codes` 這條路由雖然註冊了，但對應的控制器方法不存在，呼叫必然 500——請勿使用。**
-
 權威定義：`app/Http/Controllers/ApiController.php`（`/api/select/*`、`/api/code/addr`）與 `app/Http/Controllers/Api/NameController.php`。這些端點主要為站內 UI 服務，**回應格式不保證穩定**，外部整合請優先用 v2 端點。
 
 ### 14.5 AI 輔助（需登入）

@@ -27,9 +27,9 @@ class CrowdsourcingController extends Controller {
         $this->biogMainRepository = $biogMainRepository;
     }
 
-    public function store() {
-        //        Operation::all();
-    }
+    // 空的 store() 已隨 `Route::resource('crowdsourcing', ...)` 一併移除（#1250）——
+    // 該 resource 生出五條指向不存在方法的路由，而 store 本身是空實作、無呼叫端。
+    // 眾包投稿的寫入端是 /api/operations/*（見 API.md §14.3），不從這裡進來。
 
     /**
      * 建立眾包記錄列表（含每列 resource_diff），供 Blade index() 與 Inertia appIndex() 共用。

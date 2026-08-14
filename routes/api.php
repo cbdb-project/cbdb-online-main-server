@@ -37,7 +37,9 @@ Route::group([
     Route::get('choronym', 'ApiController@choronym');
     Route::get('dynasty', 'ApiController@dynasty');
     Route::get('nianhao', 'ApiController@nianhao');
-    Route::get('codes', 'ApiController@codes');
+    // `select/codes` 已移除（#1250）：ApiController 從來沒有 codes() 方法，這條路由
+    // 命中時只會由基底 Controller::__call 拋 BadMethodCallException（HTTP 500）。
+    // 全庫沒有呼叫端，僅是外部掃描打進來時的錯誤日誌噪音來源。
     Route::get('biogaddr', 'ApiController@biogaddr');
     Route::get('altcode', 'ApiController@altcode');
     Route::get('role', 'ApiController@role');

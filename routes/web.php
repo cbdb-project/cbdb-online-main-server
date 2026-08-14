@@ -381,12 +381,10 @@ Route::match(['put', 'patch'], 'app/manage/{manage}', 'ManagementController@appU
 Route::match(['get', 'post'], 'merge-preview', 'MergePreviewController@index')->name('merge-preview.index');
 Route::get('app/merge-preview', 'MergePreviewController@appIndex')->name('app.merge-preview.index')->middleware('inertia');
 
-Route::resource('operations', 'OperationsController', ['name' => [
-    'show' => 'operations.show',
-    'create' => 'operations.create',
-    'edit' => 'operations.edit',
-    'update' => 'operations.update',
-]]);
+// 原本這裡是 `Route::resource('operations', ...)`，但 OperationsController 只實作 index()
+// 與一個空的 store()；resource 因此生出 create／show／edit／update／destroy 五條指向不存在
+// 方法的路由，命中即 500（#1250）。index 已在本檔開頭以顯式路由宣告（operations.index），
+// 空的 store 沒有任何呼叫端，故整段移除；確認過全庫沒有引用被拿掉的那些路由名稱。
 Route::post('operations/{operation}/restore', 'OperationsController@restore')->name('operations.restore');
 
 Route::middleware('auth')->group(function () {
@@ -419,12 +417,10 @@ Route::middleware('auth')->group(function () {
         // 最近眾包錄入記錄
         Route::get('crowdsourcing', ['as' => 'crowdsourcing.index', 'uses' => 'CrowdsourcingController@index']);
         Route::get('app/crowdsourcing', ['as' => 'app.crowdsourcing.index', 'uses' => 'CrowdsourcingController@appIndex'])->middleware('inertia');
-        Route::resource('crowdsourcing', 'CrowdsourcingController', ['name' => [
-            'show' => 'crowdsourcing.show',
-            'create' => 'crowdsourcing.create',
-            'edit' => 'crowdsourcing.edit',
-            'update' => 'crowdsourcing.update',
-        ]]);
+        // 同 operations（#1250）：CrowdsourcingController 只有 index()／appIndex()／
+        // confirm()／reject() 與一個空的 store()，resource 生出的 create／show／edit／
+        // update／destroy 全是 500。index 已於上方顯式宣告（同在 superadmin 群組內），
+        // 空的 store 無呼叫端，整段移除。
         Route::get('crowdsourcing/{id}/confirm', 'CrowdsourcingController@confirm');
         Route::get('crowdsourcing/{id}/reject', 'CrowdsourcingController@reject');
 

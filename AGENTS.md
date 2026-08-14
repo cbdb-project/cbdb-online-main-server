@@ -114,6 +114,7 @@ php artisan cbdb:fetch-chgis-map        # 下載 CHGIS 底圖（缺檔才下載�
 - PHP 代碼已格式化：`./vendor/bin/php-cs-fixer fix`
 - 跑過受影響測試；若改動面大，跑 `./vendor/bin/phpunit`
 - 改了前端資源時，跑 `npm run build`
+- **改了 API（路由／請求回應欄位／授權／錯誤碼／resource 別名或白名單）時，同步更新 `API.md`**（見「文檔維護原則」）
 - commit message 使用繁體中文
 
 ## 高風險區域備忘
@@ -127,10 +128,20 @@ php artisan cbdb:fetch-chgis-map        # 下載 CHGIS 底圖（缺檔才下載�
 - `AGENTS.md` 只保留目前有效的規則與入口，不記錄已淘汰的歷史流程。
 - `CHANGELOG.md` 只記錄近階段高價值變更與方向，不再維護超長流水帳。
 - 重大 UI / 流程變更時，同步更新 `README.md`、`CHANGELOG.md`。
+- **API 改動必須同步 [API.md](./API.md)**：`API.md` 是唯一對外的 API 文檔（外部協作者／眾包提交者照它實作）。
+  只要動到下列任一項，就必須在同一個 commit／PR 內更新 `API.md`，不得延後：
+  - 路由（新增／改名／下架端點，或改變 HTTP 方法、middleware、CSRF 豁免、限流）
+  - 請求或回應的欄位、結構、預設值（含 `mode` / `operation` / `target.pk` / `changes` / `meta` 語義）
+  - 授權與角色行為（`canWriteDirectly` / `canPropose` / 帳號啟用檢查、token abilities）
+  - 錯誤碼、`errors` 鍵值、訊息語義
+  - `resource` 別名、支援的 operation 組合、欄位白名單、必填與哨兵值規則
+  - 提案（proposal）流程與審核狀態語義
+  若同時影響機器可讀規格，`docs/openapi/openapi.yaml` 也要一起更新。
 
 ## 相關文檔
 - [README.md](./README.md)
 - [CHANGELOG.md](./CHANGELOG.md)
+- [API.md](./API.md)（對外 API 文檔：v2 讀取／寫入端與舊版 v1；改 API 必須同步）
 - [DATABASE.md](./DATABASE.md)
 - [docs/APPROVAL_FLOWS.md](./docs/APPROVAL_FLOWS.md)
 - [docs/PERSON_PROPOSAL_PATHS.md](./docs/PERSON_PROPOSAL_PATHS.md)（人物提案：三條核准路徑與逐資源現況；改動核准行為前必讀）

@@ -200,7 +200,9 @@ $item->resource_data = unionPKDef($item->resource_data);
                                 // 对于代码表资源（无论是否涉及人物），如果没有特定资源链接，则使用 codes 路由
                                 elseif ($isCodeResource && $item->op_type != 4) {
                                     $codeRouteId = CompositePrimaryKey::normalizeSingleKeyResourceIdForCodeRoute($item->resource, $originalResourceId);
-                                    $resourceLink = route('codes.edit', ['table_name' => $item->resource, 'id' => $codeRouteId], false);
+                                    // flag-aware（與上方 person_page_url／buildResourceEditUrl 一致）：
+                                    // 同一段程式碼把人物子資源送去 React 編輯器，代碼表卻寫死舊 Blade 頁並不一致。
+                                    $resourceLink = code_table_edit_url($item->resource, $codeRouteId);
                                 }
                                 $showPerPersonResourceButtons = in_array(strtoupper($item->resource), ['KIN_DATA', 'ASSOC_DATA'], true) && $personRowspan > 1;
                             @endphp

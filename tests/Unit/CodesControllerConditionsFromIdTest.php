@@ -122,15 +122,85 @@ class CodesControllerConditionsFromIdTest extends TestCase {
     }
 
     #[Test]
-    public function testUnknownExtraColumnsAreIgnored(): void {
-        // 有些寫入路徑會把整個 payload 當 pk 傳（如 OFFICE_CODE_TYPE_REL 的匯入），
-        // 多出來的欄位不該讓解析失敗，也不該進 WHERE。
+    public function testExtraColumnsMakeTheIdAmbiguousAndAreRejected(): void {
+        // 多出來的欄位可能是「值裡的 & 被 URL 解碼後擠出來的假參數」（見下一個測試），
+        // 字串層面分不出兩者，故一律不採用具名解析。
+        $id = 'c_personid=108625&c_merged_from_personid=404794&c_notes=x';
         $this->assertSame(
-            ['c_personid' => '108625', 'c_merged_from_personid' => '404794'],
-            $this->invoke(
-                ['c_personid', 'c_merged_from_personid'],
-                'c_personid=108625&c_merged_from_personid=404794&c_notes=x'
-            )
+            ['c_personid' => $id],
+            $this->invoke(['c_personid', 'c_merged_from_personid'], $id)
+        );
+    }
+
+    #[Test]
+    public function testValueContainingAnAmpersandCannotHijackAnotherRow(): void {
+        // 這是解碼後的樣子：某列 c_alt_name_chn 的值字面上是 `A&c_alt_name_type_code=99`。
+        // 若照收，會被讀成 c_alt_name_chn='A' + type_code=99，於是開到（並存到）別人那一列。
+        // 期望：拒絕具名解析 → 退回舊行為（查不到），而不是誤開別列。
+        $id = 'c_personid=7&c_alt_name_chn=A&c_alt_name_type_code=99';
+        $conditions = $this->invoke(['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code'], $id);
+        $this->assertSame(['c_personid' => $id], $conditions);
+    }
+
+    #[Test]
+    public function testNonIntegerValuesAreRejected(): void {
+        // 文字主鍵欄不在支援範圍：文字值可能含 '&'、'='、'+'、'%'，解碼後就無法回推原意。
+        $id = 'c_textid=68942&c_pages=12-15';
+        $this->assertSame(
+            ['c_textid' => $id],
+            $this->invoke(['c_textid', 'c_pages'], $id)
+        );
+
+        // OFFICE_CODE_TYPE_REL 的 c_office_tree_id 是文字代碼樹 id（如 'x01'）→ 同樣維持既有行為。
+        // 這條釘住「已知未涵蓋」而非期望行為，改動支援範圍時應一併更新（見函式 docblock）。
+        $treeId = 'c_office_id=101&c_office_tree_id=x01';
+        $this->assertSame(
+            ['c_office_id' => $treeId],
+            $this->invoke(['c_office_id', 'c_office_tree_id'], $treeId)
+        );
+    }
+
+    #[Test]
+    public function testInjectedDuplicateKeyCannotOverrideAValue(): void {
+        // parse_str 同名參數後者覆蓋前者，所以注入一組「已存在的欄名=數字」不會讓欄位**數**變多，
+        // 單靠比對欄位集合抓不到；分隔符數量檢查才擋得住。
+        // 這串是某列 c_alt_name_chn 值字面為 `5&c_alt_name_type_code=9` 時解碼後的樣子。
+        $id = 'c_personid=7&c_alt_name_chn=5&c_alt_name_type_code=9&c_alt_name_type_code=4';
+        $this->assertSame(
+            ['c_personid' => $id],
+            $this->invoke(['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code'], $id)
+        );
+    }
+
+    #[Test]
+    public function testNegativeValuesAreRejected(): void {
+        // 不收負號：值裡帶 '-' 會讓 edit() 的「'-' 舊分隔符」相容回退在查不到時再切一次，
+        // 切出來的碎片經 MySQL 型別轉換又可能命中別的列。CBDB 的複合主鍵欄實務上沒有負值。
+        $id = 'c_personid=-1&c_merged_from_personid=404794';
+        $this->assertSame(
+            ['c_personid' => $id],
+            $this->invoke(['c_personid', 'c_merged_from_personid'], $id)
+        );
+    }
+
+    #[Test]
+    public function testPercentEncodedValueCannotSlipThroughTheDigitCheck(): void {
+        // parse_str 會再解一次碼：字面值為 '%39' 的資料存成 '%2539'、route 解碼成 '%39'，
+        // 若照收會被 parse_str 解成 '9' → 通過數字檢查卻指向另一列。含 '%' 一律拒絕。
+        $id = 'c_personid=108625&c_merged_from_personid=%39';
+        $this->assertSame(
+            ['c_personid' => $id],
+            $this->invoke(['c_personid', 'c_merged_from_personid'], $id)
+        );
+    }
+
+    #[Test]
+    public function testTrailingNewlineIsRejected(): void {
+        // '$' 會放過尾端換行，故用 \z 收尾。
+        $id = "c_personid=108625\n&c_merged_from_personid=404794";
+        $this->assertSame(
+            ['c_personid' => $id],
+            $this->invoke(['c_personid', 'c_merged_from_personid'], $id)
         );
     }
 

@@ -2598,23 +2598,49 @@ class CodesController extends Controller {
      * 值為字面 'NULL'（buildStoredResourceId 對 null 的編碼）同樣放棄：主鍵欄不可為 null，而
      * MySQL 拿字串 'NULL' 比對 int 欄會轉成 0、可能誤中 id 為 0 的列。
      *
-     * 已知未涵蓋（皆刻意）：
-     *  - 值為空字串的主鍵欄。BIOG_SOURCE_DATA.c_pages 等字串主鍵確實存在「空字串」的資料慣例，
-     *    但空字串比對 int 欄同樣會被 MySQL 轉成 0，在此無法只憑 id 分辨兩者。
+     * 只在「不可能有第二種讀法」的形狀下啟用，因為 $id 是**已被 URL 解碼**的 path 參數：
+     * buildStoredResourceId 用 http_build_query 編碼過的 '&'／'=' 在這裡已還原成字面字元，
+     * 於是「值裡含 &」與「多個參數」在字串層面無法分辨。若照收，一筆 c_alt_name_chn 值為
+     * `A&c_notes=x` 的資料，其 id 會被讀成 c_alt_name_chn='A' 外加一個 c_notes 參數，
+     * 進而開到（並存到）**別人那一列**——正是本函式想避免的後果。故四道限制：
+     *  1. 只有複合主鍵（單主鍵見下方說明）。
+     *  2. 分隔符數量必須恰好對得上主鍵欄數：'&' 有 n-1 個、'=' 有 n 個。這條專門擋
+     *     parse_str 的「同名參數後者覆蓋前者」——注入一組 `&已存在的欄名=數字` 不會讓欄位**數**變多
+     *     （只是把值換掉），單靠比對欄位集合抓不到。
+     *  3. 解析出的欄位必須**恰好**是主鍵欄集合，多一個、少一個都不行。
+     *  4. 整串 id 不得含 '%'。parse_str 會再解一次碼，等於在 route 解碼之後多一層：字面值為
+     *     `%39` 的資料會被存成 `%2539`、解碼成 `%39`、再被 parse_str 解成 `9`，於是通過其餘檢查
+     *     卻指向另一列。純數字主鍵的正規 id 本來就不含 '%'，直接整串拒絕最乾脆。
+     *  5. 每個值必須是純數字（`\A\d+\z`；刻意不收負號與尾端換行）。數字值不可能含
+     *     '&'、'='、'+'、'%'，也不會觸發下游 `edit()` 的「'-' 舊分隔符」相容回退。
+     * 五條同時成立時，「值裡藏分隔符／藏編碼」的第二種讀法必然會在其中一關被擋下。
+     *
+     * 已知未涵蓋（皆刻意，行為與修改前相同＝查不到，不會誤開別列）：
+     *  - 主鍵含**文字欄**的表（OFFICE_CODE_TYPE_REL.c_office_tree_id 這類代碼樹 id，以及
+     *    ALTNAME_DATA.c_alt_name_chn、ASSOC_DATA.c_text_title、BIOG_SOURCE_DATA.c_pages 等）。
+     *    這些表的查閱連結維持既有行為（查不到），不是本次修正造成的；要一併支援，得改成解析
+     *    「尚未解碼」的原始 path 片段（route 參數到手時已解過一次碼），另案處理。
+     *  - 值為空字串或字面 'NULL' 的主鍵欄（空字串／'NULL' 比對 int 欄會被 MySQL 轉成 0，
+     *    可能誤中 id 為 0 的列）。限制 3 已一併涵蓋。
+     *  - 帶多餘欄位的 id（部分匯入路徑會把整個 payload 當 pk 存）。限制 2 一併排除。
      *  - **單一主鍵的表**。單主鍵的 query-string id 早就由
      *    CompositePrimaryKey::normalizeSingleKeyResourceIdForCodeRoute() 在產生連結時就抽成純值，
      *    這裡不需要再兜一次；而若在這裡也接受，`c_textid=a=b` 這種「值本身以 `欄名=` 開頭」的
-     *    舊 id 就會從『查值為 c_textid=a=b 的列』改成『查值為 a=b 的列』——同一個字串有兩種讀法，
-     *    且沒有任何線索能分辨哪個才是原意。只在複合主鍵時啟用，該歧義就不存在
-     *    （複合主鍵要湊出誤判，得讓多個欄名同時以 `欄名=` 形式出現在值裡）。
+     *    舊 id 就會從『查值為 c_textid=a=b 的列』改成『查值為 a=b 的列』。
      */
     protected function buildNamedConditionsFromId(array $keyColumns, string $id): ?array {
-        if (count($keyColumns) < 2 || !str_contains($id, '=') || str_contains($id, '_._')) {
+        $arity = count($keyColumns);
+        if ($arity < 2 || str_contains($id, '_._') || str_contains($id, '%')) {
+            return null;
+        }
+
+        // 分隔符數量須與欄數完全相符（擋 parse_str 的同名參數覆蓋，見 docblock 第 2 條）。
+        if (substr_count($id, '&') !== $arity - 1 || substr_count($id, '=') !== $arity) {
             return null;
         }
 
         parse_str($id, $parsed);
-        if (!is_array($parsed) || $parsed === []) {
+        if (!is_array($parsed) || count($parsed) !== $arity || array_diff(array_keys($parsed), $keyColumns) !== []) {
             return null;
         }
 
@@ -2624,7 +2650,7 @@ class CodesController extends Controller {
                 return null;
             }
             $value = $parsed[$column];
-            if (!is_scalar($value) || $value === '' || $value === 'NULL') {
+            if (!is_scalar($value) || !preg_match('/\A\d+\z/', (string) $value)) {
                 return null;
             }
             $conditions[$column] = (string) $value;

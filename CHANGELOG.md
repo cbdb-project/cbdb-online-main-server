@@ -4,6 +4,13 @@
 
 ## 2026-08
 
+### API.md 補完所有現行對外 API（v2 寫入端＋其餘開放端點）
+- 起因：有外部協作者要以眾包帳號向 `/api/v2` 提交提案，但 `API.md` 原本只有讀取端（`persons`／`operations`），寫入端一字未提；寫入端的實用說明散在 `.claude/skills/mutation-api-record-editing.md`（內部技能檔、且通篇以 `mode=direct` 為前提）與不完整的 `docs/openapi/openapi.yaml`，沒有一份能直接交付給外部的文件。
+- 新增 v2 第一～十四章：通用約定（認證、`Origin`/`Referer` 會讓 Bearer 失效、CORS 不含 `Authorization`、CSRF 豁免清單、限流、空字串一律轉 null）、寫入 API 總覽（direct／proposal 權限矩陣、提案占位規則、`target.pk` 與主鍵哨兵值、錯誤碼總表）、`get`／`create`／`mutate`／`delete`／`batch_mutate`／`resubmit`／`opposite-edges` 逐端點規格、14 個資源的欄位白名單、互逆鏡像的衝突與復原、代碼表與複合實體聚合、以及其餘開放端點（`texts`、`api/user`、api-tokens、`select/*`、AI 輔助、MCP、`cbdbapi/person`）。
+- 舊版章節補上「現況與注意事項」：14 個查詢端點全掛訪客中間件，**帶著登入 session 呼叫會 302 到 `/home`**；並列出仍存在但未收錄的端點、以及已下架的 `/api/v1` 舊 CRUD。
+- 過程中以三輪 review agent ＋ codex 對照原始碼與 `tests/Feature/ApiV2*Test.php` 逐條查證，修掉多處會誤導呼叫者的敘述（例如 `proposals_only=true` 不涵蓋 op_type 10 的刪除提案、`batch_mutate` 非原子模式即使全數失敗 HTTP 仍是 200、部分資源的回應沒有 `operation_id`／`pk`、`basicinformation` create 會靜默丟棄未知欄位）。
+- 連帶：`AGENTS.md` 立下「API 改動必須同步 `API.md`」的規則（並進「提交前最低檢查」清單）；`DATABASE.md` 修正 `ALTNAME_DATA`（3-key，不含 `c_sequence`）與 `POSTED_TO_ADDR_DATA` 的主鍵敘述。
+
 ### 補回 React 殼的 SQL 查詢明細，並把收集成本收斂到看得到的人身上；刪除使用者恢復兩段確認
 - 起因：`AppServiceProvider` 的 `DB::listen` **無條件**把每筆查詢的 SQL 與 bindings 累進記憶體，而 React layout 從來沒有渲染這份資料——舊版 `layouts/dashboard-v3.blade.php` 底部的「本次查詢共 N 筆，耗時 X ms」＋管理員可開的明細 modal 在遷移時漏移植。等於每個 request（含 artisan 匯入、訪客瀏覽）都照樣收集、卻沒人看得到。
 - **權限分界完全對齊舊版**，而不是順手改掉：舊版那條摘要行 **沒有任何權限閘**（`dashboard-v3.blade.php:346`，訪客也看得到），只有「查看詳細」連結與 modal 限管理員（同檔 `:348`／`:369`）。因此閘的是「**保留明細**」而不是「整個收集」：筆數與耗時一律累計，每筆 SQL／bindings 只在使用者已解析為 `isAdmin()` 時保留。若連筆數都不收，flag 回退到 Blade 的頁面也會少一行，那不在本次範圍。

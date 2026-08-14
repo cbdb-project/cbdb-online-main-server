@@ -93,11 +93,19 @@ class CodesPersonPickerTest extends TestCase {
 
         // MERGED_PERSON_DATA：欄名叫 c_personid 但**沒有外鍵**（被合併的人可能已不存在）。
         // 依規則 B 刻意不給選擇器。
+        // 主鍵照實建成 (c_personid, c_merged_from_personid)：正式 schema 就是這兩欄
+        // （import_cbdb_schema + c_merged_to→from 改名），而 CodesController::getKeyColumns()
+        // 帶 process 級 static 快取，同名表在同一次 phpunit 程序內只會反射一次——這裡若簡化成
+        // 單主鍵，會把錯的主鍵形狀留給後面跑到同名表的測試類。
         Schema::create('MERGED_PERSON_DATA', function ($table) {
-            $table->integer('c_personid')->primary();
+            $table->integer('c_personid');
+            $table->integer('c_merged_from_personid')->default(0);
             $table->string('c_note')->nullable();
+            $table->primary(['c_personid', 'c_merged_from_personid']);
         });
-        DB::table('MERGED_PERSON_DATA')->insert(['c_personid' => 11, 'c_note' => 'merged']);
+        DB::table('MERGED_PERSON_DATA')->insert([
+            'c_personid' => 11, 'c_merged_from_personid' => 404794, 'c_note' => 'merged',
+        ]);
 
         Schema::create('TEST_PLAIN_CODES', function ($table) {
             $table->integer('code_id')->primary();

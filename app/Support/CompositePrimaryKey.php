@@ -725,6 +725,11 @@ class CompositePrimaryKey {
      * 某些全域代碼表歷史上曾把單主鍵也存成 query-string 格式
      * （如 c_nianhao_id=464）。codes.edit 需要的是純 path segment，
      * 因此這裡在可安全判定為單一主鍵時抽出其值，其餘情況保持原值。
+     *
+     * 複合主鍵**刻意**原樣傳出，由 CodesController::buildConditionsFromId() 以欄名解析。
+     * 不要改成在這裡重組 '_._' 位置式 id：SCHEMAS 的欄序與資料庫 PRIMARY KEY 欄序在
+     * ALTNAME_DATA、ASSOC_DATA、KIN_DATA 等表並不一致，重組會靜默查到錯誤的資料列；
+     * '_._' 也無法表達「空字串主鍵值」（buildCompositeId 會把空段濾掉）。
      */
     public static function normalizeSingleKeyResourceIdForCodeRoute(string $resource, string $resourceId): string {
         $pk = self::parseStoredResourceId($resourceId, $resource);

@@ -69,6 +69,17 @@ class OperationsIndexLinksTest extends TestCase {
             $table->string('c_nianhao_chn')->nullable();
         });
 
+        // 複合主鍵的代碼表：resource_id 以 query-string 格式儲存，而 codes 編輯頁的 path id
+        // 只認 '_._'。用來釘住「操作紀錄的查閱連結必須真的打得開」。
+        Schema::create('MERGED_PERSON_DATA', function ($table) {
+            $table->integer('c_personid');
+            $table->integer('c_merged_from_personid');
+            $table->text('c_notes')->nullable();
+            $table->integer('c_source')->nullable();
+            $table->string('c_pages')->nullable();
+            $table->primary(['c_personid', 'c_merged_from_personid']);
+        });
+
         Schema::create('KIN_DATA', function ($table) {
             $table->integer('c_personid');
             $table->integer('c_kin_id');
@@ -197,6 +208,70 @@ class OperationsIndexLinksTest extends TestCase {
         $response->assertStatus(200);
         $response->assertSee('/codes/NIAN_HAO/464/edit', false);
         $response->assertDontSee('/codes/NIAN_HAO/c_nianhao_id=464/edit', false);
+    }
+
+    /**
+     * 複合主鍵代碼表（MERGED_PERSON_DATA）的查閱連結必須真的打得開。
+     *
+     * mutation handler 一律把 resource_id 存成 query-string 格式
+     * （c_personid=108625&c_merged_from_personid=404794，見 CompositePrimaryKey::buildStoredResourceId），
+     * 而 codes 編輯頁的 path id 歷來只認 '_._'。單主鍵的表已有
+     * normalizeSingleKeyResourceIdForCodeRoute() 兜住，複合主鍵則整段字串被當成第一個主鍵欄的值，
+     * 於是點「查閱」只會得到「找不到該筆資料」。
+     */
+    #[Test]
+    public function test_composite_key_code_resource_view_link_actually_opens_the_row(): void {
+        $user = User::forceCreate([
+            'name' => 'Hongsu Wang',
+            'email' => 'merged-person-link@example.com',
+            'password' => bcrypt('password'),
+            'confirmation_token' => 'test-token',
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        \DB::table('BIOG_MAIN')->insert([
+            'c_personid' => 108625, 'c_name_chn' => '曾源友', 'c_name' => 'Zeng Yuanyou',
+        ]);
+        // 兩列共用同一個 c_personid，且「不是目標」的那一列先插入：只有真的用上第二段主鍵才會
+        // 開出 404794。否則（例如只以 c_personid 查詢）會撈到 500001，測試就會當場失敗而不是
+        // 靜默地變成一個什麼都沒驗到的 200。
+        \DB::table('MERGED_PERSON_DATA')->insert([
+            ['c_personid' => 108625, 'c_merged_from_personid' => 500001],
+            ['c_personid' => 108625, 'c_merged_from_personid' => 404794],
+        ]);
+
+        Operation::create([
+            'user_id' => $user->id,
+            'c_personid' => 108625,
+            'op_type' => Operation::TYPE_CREATE,
+            'resource' => 'MERGED_PERSON_DATA',
+            'resource_id' => 'c_personid=108625&c_merged_from_personid=404794',
+            'resource_data' => json_encode(['c_personid' => 108625, 'c_merged_from_personid' => 404794]),
+            'crowdsourcing_status' => 0,
+        ]);
+
+        $link = null;
+        $this->actingAs($user)
+            ->get('/app/operations')
+            ->assertOk()
+            ->assertInertia(function ($page) use (&$link) {
+                $link = $page->toArray()['props']['lists'][0]['resource_link'];
+            });
+
+        // 連結本身就是 bug 的一半：resource_id 原樣進了 path（單主鍵才會被正規化）。
+        $this->assertSame(
+            '/codes/MERGED_PERSON_DATA/c_personid=108625&c_merged_from_personid=404794/edit',
+            $link
+        );
+
+        // 另一半：那個 path id 必須真的能開出對應的列，而不是被重導回上一頁並
+        // flash「找不到該筆資料」。同時確認用上了第二段主鍵（開出 404794、不是 500001）。
+        $this->actingAs($user)->get($link)
+            ->assertOk()
+            ->assertSessionMissing('flash_notification')
+            ->assertSee('404794')
+            ->assertDontSee('500001');
     }
 
     #[Test]

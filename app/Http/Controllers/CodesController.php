@@ -499,6 +499,12 @@ class CodesController extends Controller {
             'boolean_filter_available' => $payload['booleanFilterAvailable'] ?? false,
             'filter_errors' => (object) ($payload['filterErrors'] ?? []),
             'filter_descriptions' => (object) ($payload['filterDescriptions'] ?? []),
+            // 人物欄（外鍵指向 BIOG_MAIN，判準見 personFkColumns()）→ 列表格內把 ID 本身做成
+            // 可跳轉的連結，否則瀏覽 KIN_DATA 這類表只看到一整欄數字、要查人得先點「編輯」。
+            // 只給實際出現在表頭的欄；URL 模板與表單頁同樣走 flag-aware 的 person_page_url()。
+            // 以 thead 為基準取交集，順序才與畫面欄序一致（外鍵反射的順序依 driver 而異）。
+            'person_fk_columns' => array_values(array_intersect($payload['thead'], $this->personFkColumns($table))),
+            'person_edit_url_template' => person_page_url('__ID__', 'edit'),
             // 操作連結（建立/編輯/刪除）依 codes flag 解析（新版就緒前回退 Blade）。
             'can_edit' => \Illuminate\Support\Facades\Auth::check() && !($payload['isReadOnly'] ?? false),
             'urls' => [

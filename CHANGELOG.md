@@ -4,6 +4,15 @@
 
 ## 2026-08
 
+### MCP 端點的限流補上 GET，並改用具名 limiter（#1249）
+- 起因：`Mcp::web()` 會註冊**兩條**路由，但它只回傳 POST，所以 `routes/ai.php` 的 `->middleware(['auth:sanctum', 'mcp.ability:…', 'throttle:120,1'])` 只套到 POST。套件的 GET 是 MCP 規範要求的 SSE 佔位（恆回 405），**沒有任何路由層 middleware**，僅靠 `api` 群組寬鬆的 600/分把關——同一個 URI 一半有閘一半沒有，成了便宜的請求放大面。
+- 修法改為**用群組套限流**（`Route::middleware('throttle:mcp')->group(...)`），一次涵蓋 `Mcp::web()` 內部註冊的兩條路由，不必依賴「同 URI 後註冊者會逐出前者」這種 `RouteCollection` 實作細節。
+- **同時改用具名 limiter `mcp`**（原本的 `throttle:120,1` 是數值型）。這一點是 review 實測抓出來的真缺陷：數值型 throttle 的 key 是 `sha1(domain|ip)`，**不含路由、方法與上限值**，所以路由上的 `120,1` 會與 `api` 群組的 `600,1` 共用同一個計數器——每個請求被 `hit()` 兩次，實測 120 的上限實際只有約 60/分，而且該 IP 打其他 `/api/*` 端點也會吃掉 MCP 的額度（同一個 NAT 後面的機構共用這個桶，合法客戶端可能在探測階段就 429）。具名 limiter 的 key 有命名空間隔離，上限才是真正的 config 值。**另以 `withoutMiddleware('throttle:600,1')` 拿掉 api 群組繼承來的那條**——這是 codex 覆核指出的：只換具名 limiter 還不夠，600 仍會套用，於是同 IP 的其他 `/api` 流量把 600 桶打滿時，MCP 自己的 120 還有額度卻照樣 429。拿掉之後才真的是獨立預算（120 本來就比 600 嚴格，不放寬任何東西）；該字串與 `app/Http/Kernel.php` 的耦合由測試斷言 resolved middleware 守住。
+- **刻意只補限流、不在 GET 加 `auth:sanctum`**：回應是固定的 405、不碰資料庫、不含任何資料，加認證沒保護到東西，卻會讓未認證的 MCP 客戶端在探測階段拿到 401 而不是規範所期待的「不支援 SSE」405。
+- 設定值加上範圍防護：`MCP_RATE_LIMIT_PER_MINUTE` 為 0／負數時退回預設（`Limit::perMinute(0)` 實測會放行第一個請求，等於幾乎不設限，那種值只可能是設定錯誤），上限夾在 600——因為已排除 api 群組那條，若不夾住，一個過大的設定值就會把全站上限放寬。
+- 回歸測試 `McpEndpointMiddlewareTest`（7 tests）：GET 與 POST 都掛具名 limiter、**解析後只剩那一條 throttle**（守住與 Kernel 的字串耦合）、**限流真的會擋**（把上限調小後打過頭確認 429，同時證明 limiter 在請求時才讀 config）、GET 仍回 405、POST 的閘門未被動到、POST 無 token 仍被擋。守衛刻意不用 `markTestSkipped`（那會讓「誤關 `MCP_ENABLED`」變成全綠），並斷言路由恰好一條以偵測殘影。已驗證還原改動後測試會紅。
+- 已知且不在本次範圍：**未認證的 POST 在 401 時完全繞過限流**——框架的 `$middlewarePriority` 把 `AuthenticatesRequests` 排在 `ThrottleRequests` 之前，這是全站 auth 路由的共同行為（每個 401 仍會查一次 `personal_access_tokens`），已另開 #1254 追。
+
 ### 清掉 13 條無用路由（其中 11 條指向不存在的控制器方法），並加測試防復發（#1250）
 - 起因：`/api/select/codes` 指向從未存在的 `ApiController@codes`，命中時由基底 `Controller::__call` 拋 `BadMethodCallException`＝HTTP 500。這類路由不會在啟動時報錯（Laravel 只在請求進來才解析 action），所以能長期潛伏，只在被外部掃描或誤點時變成錯誤日誌噪音。
 - 掃完全站後發現不只一條：`Route::resource('operations', ...)` 與 `Route::resource('crowdsourcing', ...)` 各生 7 條路由，但兩個控制器只實作 `index()` 與一個**空的 `store()`**，於是 `create`／`show`／`edit`／`update`／`destroy` 共 10 條全是 500。兩者的 `index` 早已在上方以顯式路由宣告（`crowdsourcing` 那條同在 superadmin 群組內，保護不變），空 `store` 無呼叫端，因此整段移除；已確認全庫沒有引用被拿掉的路由名稱（grep 命中的都是 SQL 欄名 `operations.created_at` 與翻譯鍵 `operations.edit_proposal` 之類的假陽性）。

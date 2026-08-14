@@ -4,6 +4,12 @@
 
 ## 2026-08
 
+### 清掉 13 條無用路由（其中 11 條指向不存在的控制器方法），並加測試防復發（#1250）
+- 起因：`/api/select/codes` 指向從未存在的 `ApiController@codes`，命中時由基底 `Controller::__call` 拋 `BadMethodCallException`＝HTTP 500。這類路由不會在啟動時報錯（Laravel 只在請求進來才解析 action），所以能長期潛伏，只在被外部掃描或誤點時變成錯誤日誌噪音。
+- 掃完全站後發現不只一條：`Route::resource('operations', ...)` 與 `Route::resource('crowdsourcing', ...)` 各生 7 條路由，但兩個控制器只實作 `index()` 與一個**空的 `store()`**，於是 `create`／`show`／`edit`／`update`／`destroy` 共 10 條全是 500。兩者的 `index` 早已在上方以顯式路由宣告（`crowdsourcing` 那條同在 superadmin 群組內，保護不變），空 `store` 無呼叫端，因此整段移除；已確認全庫沒有引用被拿掉的路由名稱（grep 命中的都是 SQL 欄名 `operations.created_at` 與翻譯鍵 `operations.edit_proposal` 之類的假陽性）。
+- 兩個空的 `store()` 失去唯一入口後一併刪除（`OperationsController`／`CrowdsourcingController`），避免留著讓人誤以為還有寫入端點。
+- **防復發是重點**：新增 `RouteActionsExistTest`，遍歷所有註冊路由斷言 action 真的可被 dispatch，失敗訊息直接列出死路由並提示用 `->only()` 收窄。判定刻意不用 `is_callable`（基底 `Controller` 有 `__call`，對任何方法名都回 true，正是這個 bug 能潛伏的原因），也不只用 `method_exists`——後者不看可見性，而 `private` 方法在 dispatch 時同樣會落到 `__call` 變 500。因此改以 Reflection 擋掉 private、abstract 與「指向框架基底 Controller 方法」三種情形。**刻意允許 `protected`**（`callAction()` 在同一繼承鏈內呼得到，本庫 `Api\ApiController*` 底下十多條路由正是這個形狀）**與 `static`**（PHP 允許以實例語法呼叫 static 方法，擋它會對合法 action 誤報——這點是 codex 覆核時實測糾正的）。已驗證還原路由檔後測試會紅。
+
 ### `/api/user` 不再外洩 `confirmation_token`（#1248）
 - 起因：`Api\UserController@show` 是 `return $request->user()`，序列化範圍全靠 `User::$hidden` 的黑名單，而 `confirmation_token` 不在其中。它不是普通欄位，而是**第二套長期憑證**——`/api/operations/token` 直接把它當眾包 API token 發出去，`/api/operations/{add,update,delete}` 只憑它認證，且**無到期、無撤銷、不驗欄位白名單**。因此一個只被授予唯讀能力的 Sanctum token，可以換到一個能繞過 v2 全部白名單／主鍵校驗、直接往 `operations` 寫入的憑證：這是提權路徑，不只是欄位過度曝露。
 - 端點改為**顯式白名單**（id／name／email／institution／avatar／is_admin／is_active／時間欄），而不是繼續維護黑名單——根因是「`users` 加一欄就默默對外」，白名單才治得住。順帶不再回傳 `settings`，它內含 `registration_ip`／`last_login_ip`。

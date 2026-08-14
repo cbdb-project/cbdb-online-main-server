@@ -25,9 +25,10 @@ class OperationsController extends Controller {
         $this->operationRepository = $operationRepository;
     }
 
-    public function store() {
-        //        Operation::all();
-    }
+    // 原本這裡有一個空的 store()（body 整段被註解掉），唯一入口是
+    // `Route::resource('operations', ...)` 生出的 POST /operations。該 resource 已於 #1250
+    // 移除（它同時生出五條指向不存在方法的路由），空 store 因此完全無入口，一併刪除。
+    // 操作紀錄的寫入一律經 v2 mutation handler 或 OperationRepository，不從這裡進來。
 
     protected function buildOperationsListing(Request $request): array {
         $proposalsOnly = filter_var($request->input('proposals_only', false), FILTER_VALIDATE_BOOLEAN);

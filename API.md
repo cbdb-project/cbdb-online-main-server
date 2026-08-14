@@ -22,6 +22,10 @@ v2 分成兩類端點：
 | 七、修改記錄 | `POST /api/v2/mutate` | 修改一列（PATCH 語義） |
 | 八、刪除記錄 | `POST /api/v2/delete` | 刪除一列 |
 | 九、各資源欄位參考 | — | 逐資源的主鍵、可寫欄位白名單與特殊規則 |
+| 十、批次寫入 | `POST /api/v2/batch_mutate` | 一個請求送多筆變更 |
+| 十一、提案重新提交 | `POST /api/v2/proposals/{id}/resubmit` | 修改自己已送出的提案（站內限定） |
+| 十二、社會關係與親屬的互逆鏡像 | `POST /api/v2/relationship/opposite-edges` | 雙向關係的連帶寫入、衝突與復原 |
+| 十三、代碼表與複合實體寫入 | — | 代碼表更新／新增、office 與 social-institution 聚合 |
 
 ---
 
@@ -1025,6 +1029,385 @@ Authorization: Bearer <token>
 - 只支援 `create` 與 `delete`（沒有 `update`），`direct`／`proposal` 皆可。
 - **create** 白名單：`c_personid`、`c_merged_from_personid`、`c_notes`、`c_source`、`c_pages`
 - `/api/v2/get` **不支援**此資源（寫得進去、讀不回來）。
+
+---
+
+## 十、批次寫入
+
+### `POST /api/v2/batch_mutate`
+
+一個請求送多筆變更，逐筆分派到與單筆端點相同的 handler（同樣的校驗、授權、`operations`／`audit_log`）。用途是減少 HTTP 往返，不是繞過任何檢查。
+
+**與單筆端點的唯一差異**：批次對 `operation` 不是 `delete` 的每一筆都要求 `changes` 鍵存在，而單筆 `POST /api/v2/create` 允許省略 `changes`。把可用的 create 請求搬進 `items` 時，記得補上 `"changes": {}`。
+
+### 輸入參數
+
+| 參數名 | 參數類型 | 必填 | 說明 |
+| ------ | ------ | ------ | ------ |
+| items | 陣列 | ✔ | 每個元素是一筆變更，欄位與單筆端點相同（`resource`／`mode`／`operation`／`person_id`／`target.pk`／`changes`／`meta`）。空陣列回 422 `items: required`；**上限 500 筆**，超過回 422 `items: ["too_many", "max:500", "count:N"]` |
+| atomic | 布林 | — | 預設 `false`。`true` 表示整批放在同一個交易，任一筆失敗即整批回滾 |
+| resource | 字串 | — | 頂層預設值，逐筆可覆寫 |
+| mode | 字串 | — | 同上（外部提交者建議在頂層設 `"proposal"`，避免漏帶而變成 direct） |
+| operation | 字串 | — | 同上，未指定時逐筆預設 `update` |
+| meta | 物件 | — | 同上 |
+
+各筆的 `changes`：`operation` 不是 `delete` 時必填（該筆回 422 `changes: required`）；`delete` 可省略。
+
+### 輸入示例（一次送兩筆提案）
+
+```json
+POST /api/v2/batch_mutate
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer <token>
+
+{
+  "mode": "proposal",
+  "meta": { "comment": "批次補正出處" },
+  "items": [
+    {
+      "resource": "altnames",
+      "operation": "update",
+      "person_id": 1762,
+      "target": { "pk": { "c_personid": 1762, "c_alt_name_chn": "半山", "c_alt_name_type_code": 4 } },
+      "changes": { "c_pages": "31" }
+    },
+    {
+      "resource": "addresses",
+      "operation": "update",
+      "person_id": 1762,
+      "target": { "pk": { "c_personid": 1762, "c_addr_id": 100513, "c_addr_type": 1, "c_sequence": 1 } },
+      "changes": { "c_notes": "據宋史列傳補正" }
+    }
+  ]
+}
+```
+
+注意兩件事：
+
+- 頂層的 `person_id` **不會**被當成逐筆預設（只有 `resource`／`mode`／`operation`／`meta` 會），每一筆都必須自己帶 `person_id`。
+- 頂層 `meta` 與逐筆 `meta` 是**取代關係、不會合併**：某一筆自帶 `meta` 時，頂層 `meta` 對那一筆整包失效。
+
+### 輸出格式（非原子模式）
+
+```json
+{
+  "ok": true,
+  "atomic": false,
+  "summary": { "total": 2, "ok": 2, "failed": 0 },
+  "results": [
+    { "index": 0, "http_status": 200, "ok": true, "resource": "altnames", "mode": "proposal", "operation": "update", "result": { "...": "同單筆端點" } },
+    { "index": 1, "http_status": 200, "ok": true, "resource": "addresses", "mode": "proposal", "operation": "update", "result": { "...": "同單筆端點" } }
+  ]
+}
+```
+
+| 屬性名 | 屬性類型 | 說明 |
+| ------ | ------ | ------ |
+| ok | 布林 | **是否全部成功**；有任一筆失敗即為 `false` |
+| atomic | 布林 | 回填本次是否為原子模式 |
+| summary.total / ok / failed | 數字 | 總筆數／成功數／失敗數 |
+| results | 陣列 | 逐筆結果，順序與 `items` 相同 |
+| results[i].index | 數字 | 對應 `items` 的索引 |
+| results[i].http_status | 數字 | 該筆若單獨呼叫時的 HTTP 狀態碼 |
+| results[i].ok | 布林 | 該筆是否成功；其餘欄位即單筆端點的回應內容（失敗時為 `message` 與 `errors`） |
+
+> **⚠️ 非原子模式的 HTTP 狀態碼永遠是 200**，即使每一筆都失敗。**必須檢查 body 的 `ok`／`summary.failed`／逐筆 `results[i].ok`**，只看狀態碼會把整批失敗當成成功。例如眾包帳號漏帶 `mode` 時，每一筆都會是 403，但整體仍回 200。
+
+「永遠 200」只適用於**逐筆**結果。下列是**整批層級**的失敗，會直接回非 200 且沒有 `results`：未登入 401、帳號未啟用 403、缺 `items` 或超過 500 筆的 422。
+
+### 輸出格式（原子模式失敗）
+
+任一筆失敗時整批回滾，回 **409**：
+
+```json
+{
+  "ok": false,
+  "atomic": true,
+  "message": "批次原子模式：某筆失敗，整批已回滾",
+  "failed_index": 1,
+  "failed": { "index": 1, "http_status": 422, "ok": false, "message": "...", "errors": {} },
+  "results": [ "已執行（但已回滾）的逐筆結果" ]
+}
+```
+
+原子模式失敗的回應**沒有 `summary`**，且 `results` 只包含「執行到失敗那一筆為止」的結果（後面的筆根本沒跑）。全部成功時，回應與非原子模式相同（`atomic` 為 `true`）。
+
+### 其他注意事項
+
+- 逐筆可能出現的其他狀態：
+  - `http_status: 501` — 該筆的 `resource`／`mode`／`operation` 組合不支援；此時 `errors` 是**扁平字串映射** `{"resource":"...","mode":"...","operation":"..."}`，不是字串陣列。
+  - `http_status: 422`、`errors.item = ["invalid"]` — 該筆不是物件。
+  - `http_status: 500`、`errors.exception` — 該筆拋出未預期例外；非原子模式下不影響其他筆，原子模式下觸發整批回滾。
+- 非原子模式下**成功的筆會即時落庫**，不會因為後面有筆失敗而回滾。
+- 逐筆的提案占位檢查仍然生效：同一批次內若有兩筆針對同一主鍵的同種提案，第二筆會 409。
+- 批次沒有降低授權要求：眾包帳號的每一筆都必須是 `mode=proposal`。
+
+---
+
+## 十一、提案重新提交
+
+### `POST /api/v2/proposals/{operation}/resubmit`
+
+修改一筆已送出的提案。實作方式是「撤回舊提案 ＋ 用完全相同的提交流程重發」，兩者在單一交易內完成。
+
+> **外部 Bearer 客戶端無法呼叫此端點**（不在 CSRF 豁免清單內，會收到 419，見 1.2）。這裡記錄它是為了說明站內「修改提案」的語義，以及為什麼被駁回的新增提案需要站內協助才能解除占位。
+
+### 路徑參數
+
+| 參數名 | 說明 |
+| ------ | ------ |
+| operation | 舊提案在 `operations` 表的 id（即當初回應的 `result.operation_id`） |
+
+### 請求主體
+
+與 `/api/v2/mutate`／`/api/v2/create` 相同的信封（`resource`、`operation`、`person_id`、`target.pk`、`changes`、`meta`），但 **`mode` 一律被強制為 `proposal`**（送 `direct` 也不會生效）。
+
+`target.pk`、`changes`、`person_id` **三者都必填**，缺一即 422——`changes` 在此是**無條件必填**，即使重發的是刪除提案也要帶（可為空物件）。
+
+### 權限與狀態限制
+
+| 條件 | 不符時 |
+| ------ | ------ |
+| 路徑上的提案 id 存在 | 404 |
+| 已登入且帳號啟用 | 401／403 |
+| 是提案人本人**或**具審核權者（啟用且非眾包帳號） | 403 `只有提案人或審核人可以修改提案` |
+| 舊提案的 `op_type` 是 8（提案新增）或 9（提案修改） | 422 `operation: not_editable_proposal`（**刪除提案 op_type=10 不可重發**） |
+| 舊提案的 `__review_status` 是 `pending` 或 `rejected` | 422 `operation: not_editable_status` |
+| 送出的 `resource`／`operation` 有對應的 proposal handler | 501 `目前尚未支援此變更模式` |
+
+### 行為
+
+1. 舊提案標記為 `cancelled`，並在 `__proposal_meta` 記 `cancelled_at`／`cancelled_by`／`cancelled_by_id`／`cancel_reason`（固定為「已重新提交（修改提案）」，外部端可據此辨識這類 cancelled）。
+2. 以 `mode=proposal` 重放對應 handler——與新提交走完全相同的驗證，因此「同主鍵已有待審提案」的護欄不會誤擋（舊提案已撤回）。
+3. 新舊提案互相回鏈：舊提案記 `superseded_by`，新提案記 `resubmit_of`。
+4. **任何一步失敗即整筆回滾**（舊提案回到原狀態），並把 handler 的欄位級錯誤原樣回傳。若新提案的資料表與舊提案不一致，也會整筆回滾並回 422（此回應只有 `message`、沒有 `errors`）。
+
+兩個契約保證：
+
+- 重發**新增**提案時，payload 不會帶稽核欄（`c_created_by`／`c_created_date`／`c_modified_by`／`c_modified_date`）——舊介面曾整包回寫 payload 而把系統欄位灌成 null，這條就是治本點。重發**修改**提案時，payload 是「原資料列 merge 你的 `changes`」，因此仍會含原列的稽核欄；那是審計快照，核准落庫前會由系統重新蓋章，不會原樣回寫。
+- 新提案的 `comment` 取**本次** `meta.comment`，不繼承舊提案的說明。
+
+成功時的回應就是重發那筆提案的回應（形狀同第六／七章的 proposal 回應）。回鏈只在 handler 有回傳 `result.operation_id` 時建立。
+
+---
+
+## 十二、社會關係與親屬的互逆鏡像
+
+`ASSOC_DATA`（社會關係）與 `KIN_DATA`（親屬關係）在 CBDB 是**雙向**資料：A 對 B 有一條關係，B 對 A 就該有一條互逆關係。因此**寫這兩個資源時，後端會在同一交易內連帶建立／更新／刪除「對方人物那一列」**。這是外部提交者最容易誤解、也最容易踩到 409 的地方。
+
+### 12.1 鏡像列是怎麼組出來的
+
+以 `associations` 的新增為例（**這張表是 `associations` 的行為，不可外推到 `kinship`**——親屬的鏡像列不寫 `c_kin_id`，由後端在補建時填回本人），鏡像列在原列基礎上做這些改寫：
+
+| 欄位 | 鏡像列的值 |
+| ------ | ------ |
+| `c_personid` | 原列的 `c_assoc_id`（對方） |
+| `c_assoc_id` | 原列的 `c_personid`（本人） |
+| `c_assoc_code` | **反向關係碼** |
+| `c_kin_code`／`c_assoc_kin_code` | 對應的反向親屬配對碼 |
+| `c_kin_id`／`c_assoc_kin_id` | 一律被寫成本人的 `person_id` |
+
+反向碼的來源：
+
+1. 你在 `changes` 顯式送的 `c_assocship_pair`（社會關係）／`c_kinship_pair`（親屬）／`c_assoc_kinship_pair`；
+2. 未送時，以代碼表的權威反向碼推導（`ASSOC_CODES.c_assoc_pair`、`KINSHIP_CODES.c_kin_pair1`）。
+
+驗證行為**不對稱**：`kinship` 的 `c_kinship_pair` 會驗證是否為合法配對，不合法即 422 並整筆回滾（該回應只有 `message`，沒有 `errors`）；`associations` 的三個 pair 欄位**不驗證**，送錯會被寫進鏡像列。
+
+### 12.2 何時會補建、何時只同步
+
+| 操作 | 行為 |
+| ------ | ------ |
+| `associations` create | 對面沒有互逆列時**補建**；有則同步 |
+| `associations` update | **只有顯式送了任一 pair 欄位時才補建**缺失的鏡像；只改備註等欄位則不臆造鏡像 |
+| `kinship` create | 對面沒有互逆列時**補建** |
+| `kinship` update | 一般情況**不補建**，只同步已存在的那一列；例外是「只送 `c_kinship_pair`、沒有任何 `KIN_DATA` 欄變更」的修復路徑，那條會補建 |
+| `kinship` delete | 一併刪除對面的互逆列；命中多筆需確認（`meta.force`） |
+| `associations` delete | 一併刪除對面的互逆列；**定位不到、命中多筆、或代碼表無配對映射時都靜默跳過**（只留伺服器日誌，可能留下孤兒列） |
+
+另有一個容易忽略的分支：若正向關係碼在代碼表中查不到權威反向碼，鏡像列仍會被建立，但**反向碼寫成哨兵 `0`（未詳）**且不做任何分歧偵測。也就是說對方名下會出現一條關係碼為「未詳」的列。送出前請確認關係碼有正確的配對定義。
+
+### 12.3 三種 409 與一種 422，以及怎麼復原
+
+| HTTP | `errors` 鍵 | 意義 | 復原方式 |
+| ------ | ------ | ------ | ------ |
+| 409 | `mirror_conflict` = `{ table, pk, fields }` | 對面已有對應的互逆列，但內容與本次寫入不一致（真分歧） | 先用 `pk`（**對面那一列**的主鍵）確認對面現況；確定要以本次內容覆寫，就帶 `meta.force: true` 重送 |
+| 409 | `mirror_suspected` = `{ table, candidates, authoritative_code, count }` | 嚴格定位落空，但放寬後在對面找到 N 條「疑似同一關係、但關係碼已漂移」的列 | 檢視 `candidates`（**只含主鍵欄**，需要細節請自行回查）與 `authoritative_code`（權威反向碼）；確認要把它們收斂到權威碼，帶 `meta.force: true` 重送 |
+| 409 | `mirror_delete_multiple` = `{ table, candidates, count }` | 刪除時對面命中多筆互逆列（只有 `kinship` 會回這個） | 檢視 `candidates`（含主鍵、`c_source` 與建立資訊），確認要一併刪除全部，帶 `meta.force: true` 重送 |
+| 422 | `mirror_integrity: fail_closed` | 資料完整性不足以安全同步（代碼表缺配對碼、沒有可用的權威反向碼） | **不要用 `force` 硬推**；這代表代碼表資料有問題，請回報維護者 |
+
+要點：
+
+- 上述任一情況發生時，**整筆交易已回滾**——包含你原本要寫的那一列。不會出現「本人這側寫了、對方那側沒寫」的半套狀態。
+- `meta.force` 只是「我已看過影響範圍並確認」的確認旗標，**不要預設帶上**。它會讓後端跳過分歧偵測直接覆寫／收斂／刪除對方人物的資料。
+- `meta.force` 在 `associations` 與 `kinship` 的 **create／update** 都有效（用來解除 `mirror_conflict`／`mirror_suspected`）。**刪除時的「一併刪除多筆」確認旗標只有 `kinship` 會讀**；`associations` 的刪除不讀它。
+- `meta.force` **不能**解除 `mirror_integrity`（422）：該檢查在偵測分歧之前就 fail-closed，硬帶 force 也繞不過。
+- **`mode=proposal` 完全不做鏡像偵測**：direct 會 409 的情況，提案階段一律照收 200。之後分兩種結果：
+  - 多數情況（create／update 的分歧、`kinship` update 對面缺鏡像）在核准重放時失敗，提案維持待審。**外部提交者送出的關係類提案遲遲未被核准，這是常見成因。**
+  - **例外：親屬「刪除」提案的核准不會擋。** 核准端對刪除鏡像採用「一併刪除全部對應反向列」的語義，也就是 direct 會回 409 `mirror_delete_multiple` 要你確認的情況，**核准時會直接把對面所有候選列刪掉**。送刪除提案前請自行確認對面只有一條互逆列。
+
+### 12.4 只修配對碼（pair-only）
+
+`associations` 與 `kinship` 的 `update` 支援一種特殊請求：`changes` 內**只**送互逆配對碼（`c_assocship_pair`／`c_kinship_pair`／`c_assoc_kinship_pair`），不動任何真實資料表欄位。這種請求不會被「`changes` 為空」擋下，而是走專門的鏡像修復路徑：
+
+- 用途是修正既有鏡像列的反向碼、或補建單邊缺失的鏡像（`kinship` 的這條路徑會補建，一般 update 不會）。
+- 回應的 `result.updated_fields` 就是你送的那些 pair 欄位名，且**沒有 `operation_id` 也沒有 `row`**（見第七章的回應例外表）。
+- 這是外部端修正單邊關係資料最乾淨的入口。
+
+另外兩點對「多筆漂移」的處理限制：
+
+- 帶 `meta.force` 收斂時，**只收斂第一條**候選，其餘仍留待人工處理。
+- 對面那條列的關係碼若本身是合法代碼（代表它是「另一段真實關係」而不是漂移），**永不覆寫**——連 `meta.force` 也不會動它。
+
+### 12.5 鏡像寫入的稽核足跡
+
+外部端在比對稽核紀錄時要知道：
+
+- 一次關係寫入只產生 **一筆 `operations`**（正向那一筆）；鏡像列不會有自己的 operation。
+- `audit_log` 則是「每一列實際變更各一筆」，且**都掛在同一個 operation id 上**。典型情況是正向＋鏡像共兩筆，但也可能只有一筆（對面沒有鏡像且本次不補建）或更多筆（同步／收斂命中多列）。
+- 鏡像列的稽核欄由系統蓋章：更新時蓋 `c_modified_by`／`c_modified_date`，補建時另蓋 `c_created_by`／`c_created_date`。
+- 因此**對方人物那一列的最後修改者會變成你**（或核准提案時的「審核人 (Proposed by: 提案人)」雙人名）。這是預期行為，不是資料被誤改。
+
+### 12.6 `POST /api/v2/relationship/opposite-edges`（偵測對面現況）
+
+純讀取端點，供編輯介面在載入某一列關係時先看看對面長什麼樣。**不在 CSRF 豁免清單內，外部 Bearer 客戶端無法呼叫**（419）。
+
+請求：
+
+| 參數名 | 參數類型 | 必填 | 說明 |
+| ------ | ------ | ------ | ------ |
+| resource | 字串 | ✔ | `kinship`／`kin`／`kin_data`，或 `associations`／`association`／`assoc`／`assoc_data`；其他值回 422 |
+| person_id | 數字 | ✔ | 本人 |
+| forward.opposite_id | 數字 | ✔ | 對方人物 ID（非數字回 422） |
+| forward.forward_code | 數字 | ✔ | 正向關係碼／親屬碼（非數字回 422） |
+| forward.text_title | 字串 | — | 僅社會關係用，預設空字串。**這是精確比對條件**，漏送等於用 `''` 去比，對面會被判成 `missing` |
+| forward.first_year | 數字 | — | 僅社會關係用，預設 `-9999`。同樣是精確比對條件 |
+| forward.autogen_notes | 字串 | — | 僅親屬用（實際定位不採用此欄，見下） |
+
+回應：
+
+```json
+{
+  "ok": true,
+  "detection": true,
+  "resource": "kinship",
+  "count": 1,
+  "status": "single",
+  "edges": [
+    { "c_personid": 1760, "c_kin_id": 1762, "c_kin_code": 181, "c_source": 7596, "c_created_by": null, "c_created_date": null }
+  ]
+}
+```
+
+| 屬性名 | 說明 |
+| ------ | ------ |
+| detection | 是否實際執行偵測。**沒有直接寫入權限者（例如眾包帳號）一律回 `{"ok":true,"detection":false}`**，不做偵測 |
+| count / status | 命中數與判定：`0`／`missing`（對面缺邊）、`1`／`single`（正常）、`>1`／`multiple`（一對多，需人工裁決） |
+| edges | 命中的對面列摘要。兩種資源的欄位組**不同**：親屬為 `c_personid`／`c_kin_id`／`c_kin_code`／`c_source`／建立資訊；社會關係為 `c_personid`／`c_assoc_id`／`c_assoc_code`／`c_text_title`／`c_source`／建立資訊（沒有 `c_kin_id`） |
+
+其他行為：
+
+- 回應的 `resource` 是正規化後的值：親屬為 `kinship`，社會關係為 **`association`（單數）**。
+- 未登入 401、帳號未啟用 403。
+- 定位邏輯：以 `(對面 = 對方人物, 指向 = 本人, 關係碼 ∈ 定位碼集)` 判定。親屬的定位碼集是「指向我」∪「我指向」的**聯集**（涵蓋排行碼與非對稱配對），不只是單一反向碼；`c_autogen_notes` **不列入**比對條件（它在鏡像兩側天生不對稱，納入會誤判成缺邊）。
+
+---
+
+## 十三、代碼表與複合實體寫入
+
+除人物資料外，`/api/v2` 也開放少量代碼表與兩個「複合實體聚合」的寫入。這些資源同樣走第四章的請求信封，**`person_id` 仍為必填**（代碼表是全域資料，慣例填 `0`）。
+
+### 13.1 可修改的代碼表（只支援 `update`）
+
+`direct` 與 `proposal` 皆可。每張表只開放少數欄位（多為拼音／羅馬字或名稱欄）：
+
+| resource | 別名 | 資料表 | 主鍵 | 可寫欄位 |
+| ------ | ------ | ------ | ------ | ------ |
+| nianhao | nian_hao | NIAN_HAO | c_nianhao_id | c_nianhao_pin |
+| office_codes | office_code | OFFICE_CODES | c_office_id | c_office_pinyin, c_office_pinyin_alt |
+| dynasties | dynasty | DYNASTIES | c_dy | c_dynasty |
+| choronym_codes | choronym_code, choronym | CHORONYM_CODES | c_choronym_code | c_choronym_desc |
+| ethnicity_tribe_codes | ethnicity, ethnicity_tribe | ETHNICITY_TRIBE_CODES | c_ethnicity_code | c_name, c_romanized, c_surname |
+| text_codes | — | TEXT_CODES | c_textid | c_title |
+| text_instance_data | text_instance | TEXT_INSTANCE_DATA | c_textid, c_text_edition_id, c_text_instance_id | c_instance_title, c_pub_year, c_publisher |
+| text_biblcat_codes | text_biblcat | TEXT_BIBLCAT_CODES | c_text_cat_code | c_text_cat_pinyin |
+| ganzhi_codes | ganzhi | GANZHI_CODES | c_ganzhi_code | c_ganzhi_py |
+| social_institution_name_codes | — | SOCIAL_INSTITUTION_NAME_CODES | c_inst_name_code | c_inst_name_py |
+| social_institution_types | — | SOCIAL_INSTITUTION_TYPES | c_inst_type_code | c_inst_type_py |
+| admin_cat_codes | admin_cat | ADMIN_CAT_CODES | c_admin_cat_code | c_admin_cat_py |
+| addr_codes | — | ADDR_CODES | c_addr_id | c_name |
+| char_variant_map | char-variant-map, charvariantmap | char_variant_map | id | c_variant_char, c_reference_char, c_strict_excluded, c_notes |
+
+規則：
+
+- 值必須是**字串或 `null`**，且長度 ≤ 255 字元，否則 422（訊息形如 `<欄名> 必須為字串或 null`／`<欄名> 長度不可超過 255 字元`）。唯二可送整數的欄位是 `TEXT_INSTANCE_DATA.c_pub_year` 與 `char_variant_map.c_strict_excluded`。
+- 純拼音欄位在保存時會**靜默**把 `v` 正規化為 `ü`（只轉「`l`／`n` 之後、且後面不接 `a`／`i`／`o`／`u`」的 `v`，例如 `lv`→`lü`、`nv`→`nü`）。可能含西文的混合欄不做這個轉換——注意這是**逐表逐欄**登記的，同一個欄名在不同表可能不同：`ETHNICITY_TRIBE_CODES.c_name` 與 `TEXT_CODES.c_title` 會轉，`ADDR_CODES.c_name`、`DYNASTIES.c_dynasty`、`CHORONYM_CODES.c_choronym_desc`、`ETHNICITY_TRIBE_CODES.c_romanized` 不轉。
+- **`v→ü` 正規化發生在「有沒有變更」的判斷之前**：若庫內已是 `lü` 而你送 `lv`，兩者正規化後相同，會得到 422 `changes: no_effective_changes`。這不是 bug。
+- 改後的值與其他列的唯一鍵衝突 → 409 `changes: conflict`。
+- 其餘錯誤與人物子資源一致：白名單外欄位 422 `disallowed_fields`、`changes` 整包為空 422 `changes: empty`、有送但值相同 422 `changes: no_effective_changes`、找不到列 404。
+- 回應 `result` 含 `pk`／`updated_fields`／`operation_id`／`row`；proposal 的 payload 另含 `__key_columns` 與 `__proposal_meta`。
+- **代碼表 `update` 寫入 `operations` 時，`c_personid` 一律被記成 `0`**（不論你送什麼 `person_id`）。13.2 的 `create` 則是原樣記錄你送的 `person_id`——兩者不一致，追蹤時請注意。
+
+### 13.2 可新增的代碼表（只支援 `create`、只支援 `direct`）
+
+只有兩張表開放新增：
+
+| resource | 別名 | 資料表 | 主鍵 | 可寫欄位 |
+| ------ | ------ | ------ | ------ | ------ |
+| text-codes | text_codes, textcodes | TEXT_CODES | c_textid（可自動配發） | c_title_chn, c_title, c_title_trans, c_text_type_id, c_text_year, c_text_nh_code, c_text_nh_year, c_text_range_code, c_bibl_cat_code, c_extant, c_text_country, c_text_dy, c_source, c_pages, c_url_api, c_url_api_coda, c_url_homepage, c_notes, c_title_alt_chn |
+| char-variant-map | char_variant_map, charvariantmap | char_variant_map | id（可自動配發） | c_variant_char, c_reference_char, c_strict_excluded, c_notes |
+
+- 主鍵可放在 `target.pk` 或 `changes`；**兩處都沒給值時由伺服器以 `max(主鍵)+1` 自動配發**。但 `target` 這個鍵本身仍必須存在——請送 `"target": {"pk": {}}`，完全省略會被控制器層 422 擋下。
+- 顯式指定且已存在 → 409 `target.pk: conflict`；並發撞號 → 409（訊息會提示重試）。**非主鍵的唯一鍵撞值時也回 409**，而 `errors` 仍是 `target.pk: conflict`（例如 `char_variant_map.c_variant_char` 重複）。
+- 白名單外欄位 → 422，`errors.changes` 是單一字串 `"disallowed_fields: c_xxx"`。
+- 只支援 `mode=direct`；送 `mode=proposal` 會得到 **501**（找不到 handler），不是 403。
+- 回應：`result.pk`、`result.status: "created"`、`result.operation_id`、`result.row`；系統會蓋 `c_created_by`／`c_created_date`。
+- 可以放進 `batch_mutate` 一起送。
+- `TEXT_CODES` 的新增與修改是**兩份不同的定義**，別名清單不對稱：`create` 接受 `text-codes`／`text_codes`／`textcodes`，而 `update` **只接受 `text_codes`**（送 `text-codes` 做 update 會 501）。最保險是 create 用 `text-codes`、update 用 `text_codes`。
+
+### 13.3 代碼表刪除：一律不開放
+
+代碼表被大量人物資料以外鍵引用，刪一列可能影響數萬筆記錄且難以乾淨復原，因此刪除**已停用**：
+
+- 上述兩張支援寫入的表、且 `mode=direct` → **403**（`代碼表刪除已停用（防止級聯刪除人物資料）`）
+- 其他代碼表，或 `mode=proposal` → **501**（找不到對應 handler）
+
+### 13.4 複合實體聚合：office 與 social-institution
+
+這兩個「實體」各自跨多張表（官職涵蓋 `OFFICE_CODES` + `OFFICE_CODE_TYPE_REL`；社會機構涵蓋 `SOCIAL_INSTITUTION_CODES` + `SOCIAL_INSTITUTION_NAME_CODES` + `SOCIAL_INSTITUTION_ADDR`），由聚合服務統一寫入。**新增、刪除，以及會牽動多表一致性的結構性欄位，一律要走這裡的聚合資源**，不要自己拼底層表。（13.1 開放的那幾個底層代碼表欄位——例如 `OFFICE_CODES.c_office_pinyin`、`SOCIAL_INSTITUTION_NAME_CODES.c_inst_name_py`——是單欄拼音修正，走 13.1 的 `update` 是可以的。）
+
+| resource | 別名 | 主鍵欄 | 支援操作 |
+| ------ | ------ | ------ | ------ |
+| office | offices, office-load | c_office_id | create／update／delete |
+| social-institution | social-institutions, social-institution-load, socialinst-load | c_inst_code | create／update／delete |
+
+- `direct` 與 `proposal` **都支援**（眾包帳號可以送這兩個聚合的提案）。
+- `target.pk` 接受帶前綴或不帶前綴的鍵名：`{"c_office_id": 123}` 或 `{"office_id": 123}` 皆可。負數或非數字視為未提供（422）；`0` 會被當成合法 id 去查，因此得到的是 404（找不到官職／社會機構）而不是 422。
+- **`offices` 這個別名同時是任官子資源（`POSTED_TO_OFFICE_DATA`）的別名，且任官會先被匹配到。**要寫官職實體請用 `office`。
+- **`target.pk` 這個鍵必填**（新增時送空物件 `{}`），與 13.2 同理。
+- 輸入欄位用**語義短名**，也接受對應的資料表欄名：
+  - 官職（create／update 共用）**必填**：`name`（或 `c_office_chn`）、`type_ids`（陣列；也接受 `type_id`／`c_office_tree_id` 單值）、`source_id`（或 `c_source`，須存在於 `TEXT_CODES`）、`dynasty_code`（或 `c_dy`；也可送 `dynasty_label` 由後端查碼）。選填：`translation`、`name_alt`、`translation_alt`、`pinyin`、`pinyin_alt`、`pages`、`notes`。未給 `pinyin` 時會依名稱自動派生。
+  - 社會機構 **create** 必填：`name`（或 `c_inst_name_hz`）、`type_code`（或 `c_inst_type_code`／`type_label`）、`dynasty_code`（或 `c_inst_begin_dy`／`dynasty_label`）、`addr_id`（或 `c_inst_addr_id`）、`source_id`（或 `c_source`）。
+  - 社會機構 **update** 的地址改用 **`addresses` 陣列**（不是 `addr_id`），且**至少要有一列**，每列需含 `addr_id`。缺少即 422 `addresses: required`／`addresses.N.addr_id: required_integer`。
+- **聚合的 `update` 是「全欄覆寫」，不是第七章的 PATCH 語義**：沒帶到的選填欄會被寫成 `null`（例如漏帶 `name_alt`／`pages` 就會清掉既有值）。更新前請先讀出現值、補齊整份 payload。
+- 校驗錯誤是語義鍵而非資料表欄名，例如 `name: required`、`type_ids: required` / `not_found_in_office_type_tree`、`type: invalid`、`type_label: not_found`、`source_id: required_integer` / `not_found_in_text_codes`、`dynasty: invalid`、`dynasty_label: not_found`、`addr_id: required_integer` / `not_found_in_addr_codes`、`addresses: required`、`addresses.N.addr_id: required_integer`，以及各選填整數欄的 `integer`、`floruit_dy`／`end_dy: invalid`、`by_nianhao_code`／`ey_nianhao_code: not_found_in_nian_hao`、`by_year_range`／`ey_year_range: not_found_in_year_range_codes`。
+- 引用護欄：
+  - 官職 `delete`：仍被人物任官引用時回 **409** `c_office_id: referenced_by_postings`，並附 `reference_count`。
+  - 社會機構 `delete`：仍被人物資料引用時回 **409** `c_inst_code: referenced_by_person_data`。
+  - 社會機構 `update`：機構名稱仍被引用時不得改名，回 **409** `name: rename_blocked_while_referenced`。
+- 回應 `result` 除了 `pk`／`status`（`created`／`updated`／`deleted`）／`operation_id` 外，還有實體專屬欄位：
+  - 官職：create／update 帶 `row`（含 `type_ids`），update 另帶 `types_added`／`types_removed`，delete 帶 `rel_deleted`。
+  - 社會機構：create 帶 `name_created`，update 帶 `name_changed`／`addr_added`／`addr_removed`，delete 帶 `addr_deleted`。
+- 社會機構的 `create` 回應 `result.pk` 有**兩個鍵**（`c_inst_code` + `c_inst_name_code`），與表格所列的單一主鍵欄不同——請以回應為準。
+- `proposal` 模式存的是「聚合意圖」（`__entity_aggregate`、`__entity_resource`、`__entity_operation`、`__entity_pk` 與原始 `changes`），核准時以 `direct` 重放；因此 create 提案的 `result.pk` 為 `null`（主鍵尚未配發）。
+- 聚合提案的 `operations.resource` 存的是**聚合名**（`office`／`social-institution`），不是資料表名——用 `GET /api/v2/operations` 追蹤時要以此篩選。
+- `delete` 的引用護欄在**提案提交當下**就會擋（回 409，不會留下提案），不是等到核准才發現。
+- 稽核足跡：聚合寫入會對**每一個實際變更的下層資料列各寫一筆 `operations` 與 `audit_log`**（官職的每一筆類型關聯、社會機構的每一筆地址增刪都各算一筆，筆數隨關聯列數增加），但回應只回主表那一筆的 `operation_id`。
+- 社會機構改名時，若目標名稱已存在於名稱代碼表，會**複用既有名碼**而不新增；舊名碼不會回收。
+- 眾包帳號在這裡與代碼表不同：**聚合的 `proposal` 是真的支援**（`direct` 403、`proposal` 200）；而代碼表的 `create`／`delete` 只有 `direct`，送 `proposal` 會 501。
+
+權威定義：`config/entity_aggregates.php` 與 `app/Services/Mutations/EntityAggregate/*AggregateDefinition.php`。
 
 ---
 

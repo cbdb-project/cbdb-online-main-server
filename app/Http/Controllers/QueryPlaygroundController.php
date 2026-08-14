@@ -589,9 +589,16 @@ class QueryPlaygroundController extends Controller {
         return $query->orderBy('nl_query_logs.created_at', 'desc');
     }
 
-    /** 有日誌記錄的使用者清單（篩選用）。 */
+    /**
+     * 有日誌記錄的使用者清單（篩選用，只需 id 與名稱）。
+     *
+     * **必須顯式 select**：query builder 回傳 stdClass 全欄列，`User::$hidden` 不生效，
+     * 不收窄就會把 password hash、`confirmation_token`、`remember_token`、`settings`
+     * （內含 IP）帶進視圖作用域。見 issue #1248 與 `AiFillLogController::logUsers()`。
+     */
     protected function nlQueryLogUsers() {
         return DB::table('users')
+            ->select('id', 'name')
             ->whereIn('id', function ($query) {
                 $query->select('user_id')->from('nl_query_logs')->whereNotNull('user_id')->distinct();
             })

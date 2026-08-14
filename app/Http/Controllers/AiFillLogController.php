@@ -57,9 +57,18 @@ class AiFillLogController extends Controller {
         }
     }
 
-    /** 有日誌記錄的用戶清單。 */
+    /**
+     * 有日誌記錄的用戶清單（篩選下拉用，只需 id 與名稱）。
+     *
+     * **必須顯式 select。** 這是 query builder，回傳 stdClass 全欄列，`User::$hidden`
+     * 對它完全不生效——不收窄就會把 password hash、`confirmation_token`（舊眾包通道的
+     * 長期憑證）、`remember_token`、`settings`（內含註冊／登入 IP）整包帶進視圖作用域。
+     * 目前消費端只取 id/name，但一旦有人把它丟進 `@json()` 或 Inertia props 就會外洩
+     * 全部有日誌記錄帳號（含系統管理員）的憑證。見 issue #1248。
+     */
     protected function logUsers() {
         return DB::table('users')
+            ->select('id', 'name')
             ->whereIn('id', function ($query) {
                 $query->select('user_id')->from('ai_fill_logs')->whereNotNull('user_id')->distinct();
             })

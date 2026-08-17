@@ -195,11 +195,11 @@ axios.get(`${API_BASE_URL}/select/search/addr`, {
 
 ### 速率限制
 
-為了保護系統穩定性，API 請求仍保留全局速率限制：
+為了保護系統穩定性，`api` 群組的端點保留速率限制：
 
-- **總體限制**：600 請求/分鐘（全局）
-
-超過全局限制時，服務器會返回 `429 Too Many Requests` 錯誤。
+- **`api` 群組**（`/api/v2/persons`、`/api/v2/operations`、`/api/v2/texts`、`/api/select/*`、`POST /api/v1/user/login`、舊版 `/api/...` 等，**`/api/mcp` 除外**）：600 請求/分鐘，超過會返回 `429 Too Many Requests`。
+- **`/api/mcp`**：雖然也在 `api` 群組，但已排除上面那條 600，改用專屬額度（預設 120 請求/分鐘），兩者互不排擠。
+- **`web` 群組的 `/api/v2` 端點**（`create`／`mutate`／`delete`／`batch_mutate`／`get`／`proposals/{id}/resubmit`／`relationship/opposite-edges`）：**應用程式路由層未配置限流**，不會由應用程式回 429（反向代理／WAF 仍可能）——節流責任在呼叫方，建議值與每批筆數見 [API.md](../API.md) §1.3。
 
 ## 錯誤處理
 

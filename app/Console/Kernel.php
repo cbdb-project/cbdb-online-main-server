@@ -15,6 +15,7 @@ class Kernel extends ConsoleKernel {
         \App\Console\Commands\SyncOpenccTradSimpSource::class,
         \App\Console\Commands\RebuildNameSearchIndex::class,
         \App\Console\Commands\ExportMysqlToSqlite::class,
+        \App\Console\Commands\AssertSqliteReleaseScope::class,
         \App\Console\Commands\RegenerateAddresses::class,
         \App\Console\Commands\ManageUser::class,
         \App\Console\Commands\GenerateSchemaDocs::class,

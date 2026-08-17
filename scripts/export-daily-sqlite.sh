@@ -211,6 +211,19 @@ if [ -f "$OUTPUT_FILE" ]; then
     echo "文件大小: $FILE_SIZE"
 fi
 
+# 產物自檢（#1251）：直接讀輸出檔的表清單，確認內容就是釋出契約允許的範圍。
+#
+# 為什麼要有這一步：上面的 allowlist 是「靜態意圖」，而 SqliteReleaseAllowlistTest 檢查的也只是
+# 這份腳本的文字——任何一層間接（TABLES+= / 換個變數名餵 for 迴圈 / source 外部檔 / eval）都可能
+# 讓實際匯出範圍與清單不一致，靜態檢查追不完。這一步檢查的是**真正要上傳的那個檔案**。
+#
+# 刻意寫成「裸呼叫 + set -e」而不是 `if ! php artisan ...; then ... exit 1; fi`：後者的結束碼可以
+# 被 pipeline（`| tee`）、`&& false`、`|| true` 或漏掉的 exit 1 靜默吞掉，而那些都只能用字串比對來守。
+# 裸呼叫沒有可以吞結束碼的位置，非零就直接中止整個腳本。
+echo ""
+echo "🔒 產物自檢：確認輸出檔只含公開 CBDB 資料表..."
+php artisan cbdb:assert-sqlite-release-scope "$OUTPUT_FILE" --min-tables="${#TABLES[@]}" --no-interaction
+
 echo "================================================"
 
 # 如果有失敗，返回非零退出碼

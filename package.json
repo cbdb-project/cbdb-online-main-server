@@ -38,7 +38,7 @@
     "clsx": "^2.1.1",
     "cn-era": "^0.4.1",
     "datatables.net": "^2.3.8",
-    "datatables.net-bs4": "^2.3.5",
+    "datatables.net-bs4": "^3.0.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.31.0",
     "react": "^19.2.8",

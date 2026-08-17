@@ -88,8 +88,13 @@ FrankenPHP 是新一代 PHP 應用伺服器，將 PHP 與現代 Web 伺服器（
 如果你想手動準備數據，可以從 CBDB 伺服器的 MySQL 資料庫導出數據到 SQLite：
 
 ```bash
-php artisan db:export-to-sqlite --output=database/database.sqlite3 --tables=(comma-separated list of 77 tables)
+# 在宿主機（.env 指向你的 MySQL）匯出成容器的初始化模板：
+php artisan db:export-to-sqlite --output=database/database.sqlite3
 ```
+
+只有在 `db-data/database.sqlite3`（named volume）還不存在時，這個模板才會被複製進去；詳見下方「從 MySQL 重新導出」。
+
+匯出範圍的兩點說明：帳號／憑證表只會匯出**結構**、不含資料列（見「從 MySQL 重新導出」的第 1 點）；`--tables` 可以只挑部分表，但**對外釋出**用的 77 張表 allowlist 請以 `scripts/export-daily-sqlite.sh` 為準（契約見 [docs/SQLITE_DATA_RELEASE.md](docs/SQLITE_DATA_RELEASE.md)），不要在這裡另抄一份會過期的清單。
 
 ### 2. 配置環境變量
 
@@ -145,11 +150,19 @@ http://localhost:8000
 獲取包含 77 個表格的 CBDB 官方最新 SQLite 資料庫（例如 `cbdb_20251223.db`）。將其重命名為 `database/database.sqlite3`。
 
 ### 2. 補足 Schema
-官方資料庫缺少 Laravel 運行所需的管理表和搜索優化表。在容器啟動後（或在宿主機通過 `sqlite3`），運行以下腳本補足這 9 個表的 schema：
-`CBDB__NAME_FTS`, `CBDB__TRAD_SIMP_MAP`, `migrations`, `operations`, `password_resets`, `personal_access_tokens`, `pinyin`, `users`
+官方資料庫缺少 Laravel 運行所需的管理表和搜索優化表。運行以下腳本補足這 9 個表的 schema：
+`CBDB__NAME_FTS`, `CBDB__TRAD_SIMP_MAP`, `migrations`, `nl_query_logs`, `operations`, `password_resets`, `personal_access_tokens`, `pinyin`, `users`
+
+> ⚠️ **補 schema 要在容器第一次啟動之前完成**（在宿主機用 `sqlite3` 對 `database/database.sqlite3` 跑這個腳本）。原因是 `docker/entrypoint.sh` 在啟動服務前就會查詢／建立 `admin@example.com`——官方檔沒有 `users` 表時那一步會失敗，容器會停在除錯模式（`tail -f`）而不對外服務。
+>
+> 另外：只要 named volume 裡已經有 `db-data/database.sqlite3`，新放進 `database/` 的檔案就不會被採用；換檔前請先 `docker compose exec app rm /app/db-data/database.sqlite3`（或整個移除該 volume）。
 
 ```bash
-# 在容器內執行
+# 在宿主機執行（推薦，於容器首次啟動前）：對 entrypoint 會複製進 volume 的那份模板動手。
+# 腳本預設目標是 db-data/database.sqlite3（容器內的 SoT），所以這裡要顯式指定模板路徑。
+bash scripts/patch_sqlite_db_for_dev.sh database/database.sqlite3
+
+# 若容器已經在跑（且已能啟動），也可以直接補容器內的 SoT（不帶參數即為預設路徑）
 docker compose exec app bash scripts/patch_sqlite_db_for_dev.sh
 ```
 
@@ -296,13 +309,37 @@ cp db-data/database.sqlite3 db-data/database.sqlite3.backup
 ```
 
 ### 從 MySQL 重新導出
-```bash
-# 確保 .env 配置為 MySQL
-php artisan db:export-to-sqlite --output=database/database.sqlite3
 
-# 然後切換回 SQLite 配置並重啟容器
+這條路徑產出的是**你自己 MySQL 的快照**（與上面「官方發布檔 ＋ 補 schema」是兩條互斥的流程，詳見下方第 3 點）。
+
+**這條指令要在宿主機（能連到 MySQL 的環境）執行，不要在容器內跑。** 容器的 `DB_CONNECTION`／`DB_DATABASE` 是由 `docker-compose.yml` 以**真實環境變數**寫死成 SQLite 的，改 `.env` 不會生效（環境變數優先於 dotenv），而且 compose 裡也沒有 MySQL service。
+
+```bash
+# 在宿主機：.env 指向你的 MySQL，然後導出
+php artisan db:export-to-sqlite --output=database/database.sqlite3
+```
+
+導出後要讓容器真的用到新檔，**必須先刪掉容器裡的舊檔**：
+
+```bash
+# db-data 是 named volume（docker-compose.yml 的 db_data），
+# 宿主機的 ./db-data 與容器內的 /app/db-data 無關——在宿主機刪檔是無效的。
+docker compose exec app rm /app/db-data/database.sqlite3
 docker compose restart
 ```
+
+原因見 `docker/entrypoint.sh`：`/app/db-data/database.sqlite3` 是 SoT，**只有在它不存在時**才會從 `/app/database/` 複製過去；否則重啟只會沿用舊檔。（`docker compose restart` 會重跑依賴安裝與前端建置，是分鐘級而非秒級，不是卡住。）
+
+三件要注意的事：
+
+1. **已列名的憑證表預設只匯出結構、不匯出資料列。** `db:export-to-sqlite` 對 `users`／`personal_access_tokens`／`password_resets`／`sessions`／`oauth_*` 等 14 張表（完整清單見 `App\Console\Commands\ExportMysqlToSqlite::CREDENTIAL_TABLES`）只複製結構，密碼雜湊、API token、`confirmation_token` 不會被帶到本機（見 issue #1251）。
+   兩個範圍限制要知道：比對是**精確表名**，所以備份還原留下的 `users_bak`／`users_20260101` 這類副本**仍會連資料一起匯出**；而且這只擋憑證，**不代表**檔案裡沒有個人資料——`audit_log` 含 email 與登入 IP／User-Agent，`operations`／`nl_query_logs`／`ai_fill_logs` 含使用者輸入與 user_id。
+   帳號方面不需要手動處理——容器啟動時若找不到 `admin@example.com` 會自動建一個超級管理員（`admin@example.com` / `password`，見上文第 6 節）。**那是弱密碼超管，請立刻改密碼**，或改用 `docker compose exec app php artisan cbdb:manage-user` 建自己的帳號。
+   真的需要連帳號資料一起導出時顯式加 `--with-credentials`（命令會印警告）——那等於把生產環境的密碼雜湊與長期憑證複製到本機磁碟。
+
+2. **導出檔不含 `CBDB__` 開頭的內部表**（`CBDB__NAME_FTS`、`CBDB__TRAD_SIMP_MAP`）。**部分中文姓名查詢會直接 500**（`no such table: CBDB__NAME_FTS`，例如人物瀏覽工作台的搜尋）——寫入／重建索引路徑與少數讀取端有 `Schema::hasTable()` 護欄，但主要的姓名搜尋讀取路徑沒有。要嘛導出時加 `--with-internal`，要嘛事後重建索引。
+
+3. 這條流程與上文「官方發布檔 ＋ 補 schema」是**兩條互斥的流程，不要混用**：這裡產出的檔案已自帶 `users`／`password_resets`／`operations`／`pinyin`／`migrations` 等表，再去跑 `patch_sqlite_db_for_dev.sh` 會如設計般 abort（該腳本在目標表已存在時會停止）。
 
 ## 啟用 Worker 模式（高性能）
 

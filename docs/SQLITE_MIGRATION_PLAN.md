@@ -67,6 +67,19 @@
 - 显示进度和统计信息
 
 **使用方式：**
+
+> **已列名的帳號／憑證表預設只匯出結構、不匯出資料列**（`users`、`personal_access_tokens`、`password_resets` 等 14 張，
+> 完整清單見 `App\Console\Commands\ExportMysqlToSqlite::CREDENTIAL_TABLES`；背景見 issue #1251）。因此下面任何一條指令
+> 產出的檔案都不會帶著這些表的密碼雜湊、API token 或 `confirmation_token`；表本身仍存在，所以應用跑得起來，用
+> `php artisan cbdb:manage-user` 建一個本機帳號即可（Docker 環境會自動建 `admin@example.com`）。需要連資料一起匯出時
+> 顯式加 `--with-credentials`。
+>
+> 範圍限制：比對是**精確表名**，備份還原留下的 `users_bak` 這類副本不在保護範圍內；而且擋的是憑證，
+> 不是個資（`audit_log` 仍含 email 與登入 IP／User-Agent）。
+>
+> 另注意：對外釋出用的 SQLite **不是**用下面這些裸指令產生的，而是 `scripts/export-daily-sqlite.sh` 的 77 表
+> allowlist（見 [SQLITE_DATA_RELEASE.md](./SQLITE_DATA_RELEASE.md)）。
+
 ```bash
 # 基本用法
 php artisan db:export-to-sqlite --limit-records=5000
@@ -342,6 +355,9 @@ echo "   1. 从 MySQL 导出数据: php artisan db:export-to-sqlite --limit-reco
 echo "   2. 或者运行全新迁移: php artisan migrate:fresh"
 echo "   3. 启动服务: php artisan serve"
 ```
+
+> 這段是當初的規劃草稿快照，實際腳本已另有輸出（現行版本會提示「帳號／憑證表只匯結構、
+> 不匯資料列」以及用 `cbdb:manage-user` 建本機帳號）。以 `scripts/use-sqlite.sh` 為準。
 
 **文件：** `scripts/use-mysql.sh` (新建)
 

@@ -9,6 +9,61 @@ use PDO;
 
 class ExportMysqlToSqlite extends Command {
     /**
+     * 帳號／憑證表：**匯出結構但預設不匯出資料列**（#1251）。鍵為表名（小寫比對），值為理由。
+     *
+     * 為什麼是「跳過資料」而不是「跳過整張表」——這點很重要，別改回去：
+     *
+     * 這個命令原本只排除 `CBDB__` 前綴的內部表，所以不帶 `--tables` 時會把整張 `users`
+     * （password 雜湊、`confirmation_token`、`remember_token`、`settings` 內的 IP）與
+     * `personal_access_tokens` 一起寫進輸出檔。對外釋出流程（`scripts/export-daily-sqlite.sh`）
+     * 一向是逐表帶 `--tables` 的 allowlist，所以線上釋出檔沒有受影響；真正的風險是**開發者
+     * 照文檔裸跑這個命令**（指向 prod／staging）時，本機會多出一份含密碼雜湊與長期憑證的檔案。
+     *
+     * 但這些表**不能整張消失**：`README-Docker.md` 那條裸指令產出的 SQLite 就是本機開發要用的
+     * 資料庫，應用需要 `users`／`password_resets`／`personal_access_tokens` **存在**才跑得起來
+     * （否則登入頁會在執行期炸 no such table，而匯出當下只印一行警告就成功結束）；
+     * `scripts/patch_sqlite_db_for_dev.sh` 的補表清單裡也正是這幾張。
+     * 開發要的是「表在」，不是「prod 的帳號列」——所以正確的切法是只跳過資料列。
+     *
+     * 需要連資料一起匯出時顯式帶 `--with-credentials`，命令會印警告說明匯出了什麼。
+     *
+     * 表名以小寫比對，涵蓋 `lower_case_table_names=1`（全部存成小寫；**裸跑匯出在這種環境下完全
+     * 正常，而裸跑正是本 issue 的風險路徑**，只有帶 `--tables` 的呼叫會因 `getTablesToExport()`
+     * 的大小寫敏感查找落空）、`=2`（macOS：照原樣存、比對不分大小寫），以及手工建成 `Users`。
+     *
+     * 範圍誠實說明：這是**精確表名**比對。備份還原常見的 `users_bak`／`users_20260101` 這類
+     * 改名副本**不在保護範圍內**，會連資料一起匯出。對外釋出的第一道防線始終是釋出腳本自己的
+     * allowlist（見 docs/SQLITE_DATA_RELEASE.md），這份 blocklist 只是降低裸跑的傷害。
+     *
+     * 另外注意：跳過這些表的資料列**不等於**輸出檔沒有個人資料——`audit_log` 含 email 與登入
+     * IP／User-Agent，`nl_query_logs`／`ai_fill_logs` 含使用者輸入。這份清單擋的是**憑證**
+     * （密碼雜湊與 token），不是個資。
+     */
+    public const CREDENTIAL_TABLES = [
+        'users' => 'password bcrypt 雜湊、confirmation_token（舊眾包通道的長期憑證，無到期亦無撤銷機制，見 #1248）、remember_token、settings 內的註冊／登入 IP',
+        'personal_access_tokens' => 'Sanctum API token 的 SHA-256 雜湊',
+        'password_resets' => '密碼重設用的 email 與 token（本專案實際使用的表名，見 config/auth.php）',
+        // Laravel 11/12 的預設表名。本專案用 password_resets，但任何一次跟上框架預設的 migration
+        // 或新裝環境都會產生這個名字，屆時 blocklist 會靜默失效——兩個都收，成本為零。
+        'password_reset_tokens' => '密碼重設 token（Laravel 11/12 預設表名）',
+        // 佇列／快取表：payload 是序列化內容，可能夾帶 token 或憑證；本專案 driver 預設不是
+        // database（config/queue.php、config/cache.php），屬防禦性條目。
+        'failed_jobs' => '失敗任務的序列化 payload 與例外堆疊，可能夾帶憑證',
+        'jobs' => '待處理任務的序列化 payload，可能夾帶憑證',
+        'cache' => '快取值，可能含 token',
+        'cache_locks' => '快取鎖（與 cache 同組）',
+        'sessions' => '登入 session 的 payload（session driver 設為 database 時才存在）',
+        // 以下 5 張已由 2025_12_18_050122_remove_passport_oauth_tables 移除，完整 migrate 過的庫
+        // 不會有它們（其中 oauth_clients.secret 是明文 client secret）。留在清單裡是因為這份
+        // blocklist 的用途正是保護「--source 指向任意／陳舊／從備份還原的 MySQL」那種情境。
+        'oauth_access_tokens' => 'Passport access token（舊表，已於 migration 移除）',
+        'oauth_refresh_tokens' => 'Passport refresh token（舊表，已於 migration 移除）',
+        'oauth_auth_codes' => 'Passport 授權碼（舊表，已於 migration 移除）',
+        'oauth_clients' => 'Passport client 的**明文** secret（舊表，已於 migration 移除）',
+        'oauth_personal_access_clients' => 'Passport personal access client（舊表，已於 migration 移除）',
+    ];
+
+    /**
      * The name and signature of the console command.
      *
      * @var string
@@ -21,6 +76,7 @@ class ExportMysqlToSqlite extends Command {
                             {--source=mysql : 源数据库连接名称}
                             {--with-indexes : 包含索引定义（默认跳过）}
                             {--with-internal : 包含 CBDB__ 开头的内部表（默认跳过）}
+                            {--with-credentials : 包含帐号／凭证表（users、personal_access_tokens 等；默认排除，见 CREDENTIAL_TABLES）}
                             {--limit-records= : 限制每张表导出的最大记录数}
                             {--chunk-size=5000 : 分块查询的大小（减少内存使用）}
                             {--skip-row-count : 跳过每张表的 COUNT(*) 统计}
@@ -321,22 +377,7 @@ class ExportMysqlToSqlite extends Command {
      */
     protected function getTablesToExport() {
         $specifiedTables = $this->option('tables');
-
-        $tables = DB::connection($this->sourceConnection)
-            ->select('SHOW FULL TABLES');
-
-        $databaseName = DB::connection($this->sourceConnection)->getDatabaseName();
-        $tableKey = 'Tables_in_' . $databaseName;
-
-        $result = [];
-
-        foreach ($tables as $table) {
-            $name = $table->$tableKey;
-            $result[$name] = [
-                'name' => $name,
-                'type' => isset($table->Table_type) ? strtoupper($table->Table_type) : 'BASE TABLE',
-            ];
-        }
+        $result = $this->fetchAllTables();
 
         if ($specifiedTables) {
             $names = array_map('trim', explode(',', $specifiedTables));
@@ -364,6 +405,86 @@ class ExportMysqlToSqlite extends Command {
     }
 
     /**
+     * 取來源資料庫的全部表（表名 => ['name','type']）。
+     *
+     * 從 getTablesToExport() 抽出成獨立方法，讓「要匯出哪些表」的決策邏輯可以在測試中
+     * 不連 MySQL 就驗證（`SHOW FULL TABLES` 是 MySQL 專屬語法，SQLite 測試庫跑不了）。
+     *
+     * @return array<string,array{name:string,type:string}>
+     */
+    protected function fetchAllTables() {
+        $connection = DB::connection($this->sourceConnection);
+        $tables = $connection->select('SHOW FULL TABLES');
+        $tableKey = 'Tables_in_' . $connection->getDatabaseName();
+
+        $result = [];
+
+        foreach ($tables as $table) {
+            $name = $table->$tableKey;
+            $result[$name] = [
+                'name' => $name,
+                'type' => isset($table->Table_type) ? strtoupper($table->Table_type) : 'BASE TABLE',
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * 這張表是否為帳號／憑證表（見 CREDENTIAL_TABLES）。
+     */
+    protected function isCredentialTable($tableName) {
+        return isset(self::CREDENTIAL_TABLES[strtolower((string) $tableName)]);
+    }
+
+    /**
+     * 是否該跳過這張表的**資料列**（結構一律照匯，理由見 CREDENTIAL_TABLES 的 docblock）。
+     */
+    protected function shouldSkipTableData($tableName) {
+        return $this->isCredentialTable($tableName) && !$this->option('with-credentials');
+    }
+
+    /**
+     * 憑證表的提示訊息（跳過資料 / 連資料一起匯出兩種）。
+     *
+     * 三條訊息：`--schema-only`（本來就不匯資料）／跳過資料／連資料一起匯。抽成獨立方法是為了
+     * 讓訊息用字可以單獨斷言——後兩條都含 `--with-credentials`，光看有沒有那個字串分不出
+     * 「跳過了」與「匯出了」。
+     *
+     * 注意：`exportTable()` 本身**是可測的**——測試以匿名子類別覆寫 `exportTableSchema()`／
+     * `exportTableData()` 即可在 SQLite 環境下驗證「結構有匯、資料沒匯」，見
+     * ExportMysqlToSqliteExcludesCredentialTablesTest::export_table_writes_schema_but_skips_rows()。
+     * 別把這個 helper 當成「不必測 exportTable」的理由：真正會被誤刪的是 exportTable 裡那段分支。
+     *
+     * @return string|null 非憑證表回 null
+     */
+    protected function credentialDataNotice($tableName) {
+        if (!$this->isCredentialTable($tableName)) {
+            return null;
+        }
+
+        $reason = self::CREDENTIAL_TABLES[strtolower((string) $tableName)];
+
+        // --schema-only 本來就不匯任何資料列，此時無論有沒有 --with-credentials 都不該說
+        // 「数据列将被导出」——那與事實相反。
+        if ($this->option('schema-only')) {
+            return sprintf('⚠ %s：--schema-only，只导出结构（%s）', $tableName, $reason);
+        }
+
+        if ($this->shouldSkipTableData($tableName)) {
+            return sprintf(
+                '⚠ %s：已导出结构、跳过数据列（%s）。需要连数据一起导出请加 --with-credentials',
+                $tableName,
+                $reason
+            );
+        }
+
+        // 帶了 --with-credentials：不擋，但要讓操作者知道自己正在把什麼寫進檔案
+        //（這個檔案通常會被複製、上傳或留在磁碟上）。
+        return sprintf('⚠ --with-credentials：%s 的数据列将被导出（%s）', $tableName, $reason);
+    }
+
+    /**
      * 导出单个表
      *
      * @param string $tableName
@@ -375,6 +496,26 @@ class ExportMysqlToSqlite extends Command {
 
         // 1. 导出表结构
         $this->exportTableSchema($tableName, $isView);
+
+        // 1.5 帐号／凭证表：结构已导出（本机开发需要这些表存在），但默认不复制数据列。
+        //     见 CREDENTIAL_TABLES 的 docblock（#1251）。
+        //
+        //     注意条件的形状：跳不跳数据列**只**看 shouldSkipTableData()，提示讯息纯粹是输出。
+        //     早期版本写成 `if (($notice = credentialDataNotice(...)) !== null)` 再在里面判断跳过，
+        //     等于把安全决策挂在讯息产生器的回传值上——在 credentialDataNotice() 开头加一句
+        //     `if ($this->option('quiet')) return null;`（看起来只是别洗讯息）就会让 `-q` 把
+        //     users 的资料列照汇出去。
+        if (!$isView && $this->isCredentialTable($tableName)) {
+            if (($notice = $this->credentialDataNotice($tableName)) !== null) {
+                $this->warn($notice);
+            }
+
+            if ($this->shouldSkipTableData($tableName)) {
+                $this->stats['tables']++;
+
+                return;
+            }
+        }
 
         // 2. 导出数据（如果不是 schema-only 模式且不是视图）
         if (!$isView && !$this->option('schema-only')) {

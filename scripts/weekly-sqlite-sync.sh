@@ -173,6 +173,14 @@ echo "[2/4] 準備打包來源..."
 # Step 3: 壓縮為 zip（含 metadata）
 echo ""
 echo "[3/4] 壓縮為 ${ZIP_NAME}..."
+
+# 上傳邊界再驗一次（#1251）：export-daily-sqlite.sh 已經自檢過，但那裡到 hf upload 之間隔了
+# 一整個腳本。這裡對真正要打包的那個檔案再跑一次，成本一行；裸呼叫 + set -e，非零即中止。
+#
+# 不帶 --min-tables：這個腳本沒有 allowlist，預設值就是完整的 allowlist 長度（見
+# AssertSqliteReleaseScope），所以「產物被換成只含一張表的檔案」在這裡也擋得住。
+php artisan cbdb:assert-sqlite-release-scope "$SQLITE_FILE" --no-interaction
+
 rm -f "$ZIP_FILE"
 META_FILE="${WORK_DIR}/cbdb_${DATE_SUFFIX}.json"
 if [ -f "$META_FILE" ]; then

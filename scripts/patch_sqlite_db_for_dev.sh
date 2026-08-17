@@ -6,8 +6,14 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# 容器內或專案根目錄下的路徑
-DB_FILE="$PROJECT_ROOT/db-data/database.sqlite3"
+# 目標資料庫檔。預設是容器／專案根目錄下的 SoT；可用第一個參數指定別的檔案。
+#
+# 為什麼要能指定：Docker 環境的 SoT（db-data/database.sqlite3）是 named volume，宿主機同名目錄
+# 與容器內的檔案無關。若要在**容器首次啟動前**先把官方 77 表檔補成可用的初始化模板，就得對
+# database/database.sqlite3 動手——那是 entrypoint 會複製進 volume 的模板。
+# 這一步必須在首次啟動前做完：entrypoint 在對外服務之前就會查詢／建立 admin 帳號，
+# 官方檔缺 users 表時那一步會失敗，容器會停在除錯模式。
+DB_FILE="${1:-$PROJECT_ROOT/db-data/database.sqlite3}"
 MIGRATIONS_DIR="$PROJECT_ROOT/database/migrations"
 
 if [ ! -f "$DB_FILE" ]; then

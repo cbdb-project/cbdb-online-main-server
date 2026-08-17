@@ -21,7 +21,7 @@
     "lodash": "^4.17.23",
     "sass": "^1.102.0",
     "tailwindcss": "^4.3.1",
-    "typescript": "^6.0.2",
+    "typescript": "^7.0.2",
     "vite": "^8.2.1",
     "vitest": "^4.1.10",
     "vue": "^3.5.41"

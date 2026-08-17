@@ -74,8 +74,34 @@ Token 有效期：建立時可指定 `expires_in`（1～3650 天），未指定�
 
 | 端點群組 | 限流 |
 | ------ | ------ |
-| `api` 群組（`/api/v2/persons`、`/api/v2/operations`、`/api/v2/texts`、`POST /api/v1/user/login`、舊版 `/api/...`） | 600 次／分鐘，超過回 **429** |
-| `web` 群組（`/api/v2/mutate`、`create`、`delete`、`batch_mutate`、`get` 等寫入端點） | 無應用層限流；請自行節流，大量寫入建議改用 `batch_mutate` |
+| `api` 群組（`/api/v2/persons`、`/api/v2/operations`、`/api/v2/texts`、`/api/select/*`、`POST /api/v1/user/login`、舊版 `/api/...`）——**`/api/mcp` 除外** | 600 次／分鐘，超過回 **429** |
+| `/api/mcp` | 自己的專屬額度（預設 120 次／分鐘），不受上面那條 600 約束，見 14.6 |
+| `web` 群組（`/api/v2` 的 `mutate`、`create`、`delete`、`batch_mutate`、`get`、`proposals/{id}/resubmit`、`relationship/opposite-edges`） | **應用程式路由層未配置限流**；節流責任在呼叫方，見下方建議 |
+
+`web` 群組這幾條在**應用程式路由層沒有任何 throttle**，所以不會由應用程式回 429——但反向代理、WAF 或日後的部署設定仍可能回，客戶端**還是要處理 429 並做指數退避**。節流責任在呼叫方，請照下列方式自律：
+
+- **寫入請求（`create`／`mutate`／`delete`／`batch_mutate`，以及站內限定的 `proposals/{id}/resubmit`）：每秒不超過 1 次，且務必序列化。** 「序列化」是重點——**等上一個請求回應之後再發下一個**，不要按固定節拍發送、也不要並發。批次請求本身可能跑好幾秒，照秒錶發送會讓請求在伺服器上堆疊。
+- 這是**整支客戶端的總速率**：不是每個端點各 1 次、不是每個資源各 1 次、不是每個執行緒各 1 次。多執行緒或多台機器共用同一個帳號時，總和仍須在每秒 1 次以內。
+- **`/api/v2/get` 是唯讀端點**，不受上述寫入速率約束（它也不在 `api` 群組，所以 §4.6 提到的 600 次／分鐘同樣不適用）；但它的應用程式路由層一樣沒有 throttle，請合理使用。
+
+要寫入大量資料時，正確做法是**加大每個請求的筆數**而不是提高頻率——把多筆變更包進一個 `batch_mutate`（見〈批次寫入〉）。但有兩個必須知道的前提：
+
+**一、500 筆是硬上限，不是建議值。** `batch_mutate` 內部是逐筆呼叫與單筆端點相同的處理流程，沒有任何批次化，因此每批該放多少取決於**每一筆的實際成本**——而成本主要由 `mode` 決定：
+
+| 情境 | 每筆的伺服器成本 | 建議每批筆數 |
+| ------ | ------ | ------ |
+| `mode=proposal`（任何資源） | 只寫一筆提案 `operations`；不動資料表、不寫 `audit_log`、不寫鏡像列 | 可用較大批次，仍建議 ≤ 150 |
+| `mode=direct`，一般子資源（別名、地址、著述、事件…） | 目標列的讀寫 ＋ 一筆 `operations` ＋ 一筆 `audit_log` | 50～150 |
+| `mode=direct`，親屬／社會關係 | 上述再加對面的鏡像列與其 `audit_log`（可能還要查代碼表） | 20～50 |
+| `mode=direct`，複合實體聚合（office／social-institution） | 主表 ＋ **下層資料列的增刪會逐列各記一筆 `operations` ＋ `audit_log`**（官職的類型關聯、社會機構的地址增刪；筆數隨關聯列數增加。少數欄位是整批更新、不逐列記） | 20～50 |
+
+上表的筆數是**保守的起始值，不是壓測結論**——請以自己的資料實測後再調整，遇到逾時或明顯變慢就往下調。
+
+外部協作者通常只能用 `mode=proposal`（見 4.2），成本落在第一列——真正的寫入成本要等站內核准重放時才付。
+
+**二、請求可能被部署環境的執行時間上限中斷**，不要依賴任何固定秒數（2026-08 曾觀測到生產環境的 PHP `max_execution_time` 為 30 秒，那是當時的觀測值、不是保證值，且實際終止條件還可能來自 fpm 或反向代理）。非原子模式下（`atomic` 預設為 `false`）**已處理的筆數仍會落庫**，但你拿不到 `results`。此時**不要直接重送整批**——請先用 `/api/v2/get` 或 `GET /api/v2/operations` 對帳，確認哪幾筆已經寫入。要避免這種局面，就把每批的筆數壓小。
+
+至於改用批次省下的是什麼：省的是 HTTP 往返與每次請求的認證開銷，也避免製造大量並發連線；**資料庫端的工作量並不會變少**。它不是「可以推更大總量」的許可。
 
 ### 1.4 請求格式與輸入正規化
 
@@ -438,7 +464,7 @@ CBDB 子資源表幾乎都是複合主鍵，且不使用 Eloquent 主鍵行為�
 | 409 | 主鍵衝突或狀態衝突 | `target.pk: conflict` / `duplicate` / `pending_proposal_exists`、`changes: conflict`、`mirror_conflict`、`mirror_suspected`、`mirror_delete_multiple`、`mirror: conflict` |
 | 419 | CSRF token 不符（只會發生在 `resubmit`、`opposite-edges`） | — |
 | 422 | 參數校驗失敗 | `target.pk: required`、`person_id: required`、`pk`（主鍵缺欄位）、`person_id: mismatch`、`changes: required` / `empty` / `no_supported_fields` / `no_effective_changes` / `disallowed_fields: <欄位清單>`、各欄位級規則、`mirror_integrity: fail_closed` |
-| 429 | 讀取端點超過限流（600 次／分鐘） | — |
+| 429 | 超過限流。**本章的 `/api/v2` 寫入端點在應用程式層沒有限流，不會由應用程式回 429**（見 1.3）；會回 429 的是 `api` 群組端點（600 次／分鐘）、`/api/mcp`（預設 120 次／分鐘）與少數自帶額度的端點（見 14.9） | — |
 | 500 | 未預期的伺服器錯誤 | — |
 | 501 | `resource` / `mode` / `operation` 組合不支援 | `resource`、`mode`、`operation`（此處的值是**字串**，不是字串陣列） |
 
@@ -1037,7 +1063,9 @@ Authorization: Bearer <token>
 
 ### `POST /api/v2/batch_mutate`
 
-一個請求送多筆變更，逐筆分派到與單筆端點相同的 handler（同樣的校驗、授權、`operations`／`audit_log`）。用途是減少 HTTP 往返，不是繞過任何檢查。
+一個請求送多筆變更，逐筆分派到與單筆端點相同的 handler——校驗、授權與稽核行為都與單筆端點**完全一致**（因此 `mode=direct` 才寫資料列＋`operations`＋`audit_log`，`mode=proposal` 只寫一筆提案 `operations`）。用途是減少 HTTP 往返，不是繞過任何檢查。
+
+這也是大量寫入的**正確做法**，但請先讀 1.3 的節流建議：本端點的應用程式路由層同樣沒有 throttle，**送出後要等回應再發下一個**（不要按固定節拍或並發送出）；`items` 的 500 筆是硬上限而非建議值，每批該放多少取決於 `mode` 與資源型別（1.3 有分級建議，`mode=direct` 的關係類與聚合類最貴）。單一請求若撞上部署環境的執行時間上限而被中斷，非原子模式下已處理的筆數仍會落庫，屆時必須先對帳而不是重送整批。
 
 **與單筆端點的唯一差異**：批次對 `operation` 不是 `delete` 的每一筆都要求 `changes` 鍵存在，而單筆 `POST /api/v2/create` 允許省略 `changes`。把可用的 create 請求搬進 `items` 時，記得補上 `"changes": {}`。
 
@@ -1404,7 +1432,7 @@ Authorization: Bearer <token>
 - `proposal` 模式存的是「聚合意圖」（`__entity_aggregate`、`__entity_resource`、`__entity_operation`、`__entity_pk` 與原始 `changes`），核准時以 `direct` 重放；因此 create 提案的 `result.pk` 為 `null`（主鍵尚未配發）。
 - 聚合提案的 `operations.resource` 存的是**聚合名**（`office`／`social-institution`），不是資料表名——用 `GET /api/v2/operations` 追蹤時要以此篩選。
 - `delete` 的引用護欄在**提案提交當下**就會擋（回 409，不會留下提案），不是等到核准才發現。
-- 稽核足跡：聚合寫入會對**每一個實際變更的下層資料列各寫一筆 `operations` 與 `audit_log`**（官職的每一筆類型關聯、社會機構的每一筆地址增刪都各算一筆，筆數隨關聯列數增加），但回應只回主表那一筆的 `operation_id`。
+- 稽核足跡：`direct` 的聚合寫入除主表外，**下層資料列的增刪會逐列各寫一筆 `operations` 與 `audit_log`**（官職的每一筆類型關聯、社會機構的每一筆地址增刪都各算一筆，筆數隨關聯列數增加），但回應只回主表那一筆的 `operation_id`。少數欄位是整批更新（例如社會機構改名時同步 `SOCIAL_INSTITUTION_ADDR` 的名碼），那類更新不逐列記。
 - 社會機構改名時，若目標名稱已存在於名稱代碼表，會**複用既有名碼**而不新增；舊名碼不會回收。
 - 眾包帳號在這裡與代碼表不同：**聚合的 `proposal` 是真的支援**（`direct` 403、`proposal` 200）；而代碼表的 `create`／`delete` 只有 `direct`，送 `proposal` 會 501。
 
@@ -1542,7 +1570,7 @@ v2 提案流程上線前的舊機制，仍在線但**建議一律改用 `/api/v2
 
 ### 14.7 人物頁 API
 
-`GET /cbdbapi/person`（等同舊路徑 `/cbdbapi/person.php`）——依 `id` 或 `name` 取單一人物資料。**完全公開，不需認證，也沒有額外限流。**
+`GET /cbdbapi/person`（等同舊路徑 `/cbdbapi/person.php`）——依 `id` 或 `name` 取單一人物資料。**完全公開，不需認證；它在 `web` 群組，應用程式路由層也未配置限流**（同 1.3：不代表永遠不會遇到 429，反向代理／WAF 仍可能回，客戶端請照樣處理）。
 
 | 參數名 | 說明 |
 | ------ | ------ |
@@ -1587,7 +1615,7 @@ v2 提案流程上線前的舊機制，仍在線但**建議一律改用 `/api/v2
 下文記錄的 14 個查詢端點目前**全部仍然可用**，但有幾件事必須先知道：
 
 - **這些端點掛的是「訪客專用」中間件**：已登入且帳號啟用者會被 302 轉向 `/home` 而不是拿到資料。實際會不會踩到，取決於 session 有沒有被啟動——`api` 群組本身不啟動 session，只有當請求帶著命中站內網域的 `Origin`／`Referer` 標頭時（Sanctum 判定為「來自前端」）才會。因此**瀏覽器或同源 fetch 帶著 cookie 呼叫會被導開**，而伺服器端不帶這兩個標頭的呼叫即使帶了 cookie 也照樣拿到資料。最省事的做法是別帶站內 cookie。Bearer token 對它們沒有作用，也不需要。
-- 限流與其他 `api` 群組端點相同：600 次／分鐘，超過回 429。
+- 限流：本節這 14 個端點都繼承 `api` 群組的 600 次／分鐘，超過回 429。
 - 回應是舊格式（`total`／`start`／`end`／`data`），與 v2 的 `ok`／`data`／`pagination` 不同。
 - 仍存在但**未收錄於本文件**的舊端點：`/api/query_relatives` 與 `/api/query_relatives_1`（第九節 `query_relatives_2` 的早期版本，請優先用 `_2`）、`/api/OFFICE_CODES`、`/api/OFFICE_CODE_TYPE_REL`、`/api/OFFICE_TYPE_TREE`。
 - `/api/v1/` 底下的舊 CRUD 端點（`searchC_presonid`／`addC_presonid`／`updateC_presonid`／`deleteC_presonid`／`userC_presonid`）**已整組下架**（下架前它們全部已是回 500 的死碼），寫入請改用 v2（第四～十三章）；`POST /api/v1/user/login` 雖仍在路由表上，但已無實際用途（見 14.2）。

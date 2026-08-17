@@ -25,12 +25,12 @@ description: 使用 /api/v2 mutation 端點對 CBDB 人物子資源與 code 表�
 | 刪除 | `POST /api/v2/delete` | `operation` 固定 `delete` |
 | **批次** | **`POST /api/v2/batch_mutate`** | **一個請求多筆——大批量首選**（見下節） |
 
-> **大批量（幾十筆以上）一律優先用 `/api/v2/batch_mutate`**：一次請求多筆，大幅減少 HTTP 往返與限流（429）壓力，且每筆仍走同一套 handler／校驗／`operations`＋AuditLog。單筆端點僅用於零星改動或需逐筆即時回應的場景。
+> **大批量（幾十筆以上）一律優先用 `/api/v2/batch_mutate`**：一次請求多筆，大幅減少 HTTP 往返與每次請求的認證開銷、也避免製造並發連線，且每筆仍走同一套 handler／校驗，稽核行為與單筆端點一致（`direct` 寫資料列＋`operations`＋AuditLog；`proposal` 只寫一筆提案 `operations`）。**注意 DB 端的工作量並不會因為改用批次而變少**（內部就是逐筆呼叫同一套 handler），所以它不是「可以推更大總量」的許可；每批筆數建議見 [API.md](../../API.md) §1.3。單筆端點僅用於零星改動或需逐筆即時回應的場景。
 
 ### 批次端點 `/api/v2/batch_mutate`（大批量首選，已上線 #1156）
 
 - Payload：`{ items: [ {resource, mode, operation, person_id, target:{pk}, changes, meta}, … ], atomic?, 頂層 resource/mode/operation/meta 預設（逐項可覆寫） }`；上限 `BATCH_MAX_ITEMS=500`（超過回 422，缺 items 回 422）。
-- **逐筆分發到既有 `*MutationHandler`**：校驗／改鍵碰撞偵測／授權／`operations`＋AuditLog 與單筆端點**完全一致**，無平行寫入路徑。
+- **逐筆分發到既有 `*MutationHandler`**：校驗／改鍵碰撞偵測／授權，以及各 `mode` 既有的 `operations`／AuditLog 行為，與單筆端點**完全一致**（`direct` 才寫 AuditLog，`proposal` 只寫提案 operation），無平行寫入路徑。
 - `atomic=false`（**預設**）：逐筆獨立結算，回 200 + `results[]`（各含 `index/http_status/ok/result.operation_id`）+ `summary{total,ok,failed}`；`body.ok`＝是否全數成功。單筆失敗不影響其餘（例：create 撞 409 只該筆 failed）。
 - `atomic=true`：整批單一交易，任一筆失敗整批回滾，回 409 + `failed_index`（handler 內層交易降為 savepoint）。
 - 授權同單筆（Bearer PAT；direct 需 `canWriteDirectly()`）；已列入 CSRF 豁免。單筆未預期例外隔離為該筆 500，不拖垮整批。
@@ -113,7 +113,7 @@ CBDB prod 的維基／維基數據關聯存在 **`BIOG_SOURCE_DATA`**（不是 `
 2. **Dry-run**：腳本先跑 `--dry-run`（預設），只印「將對哪個 PK 做什麼、舊值→新值」與 `c_notes`，不連網、不寫 DB。人工抽查。
 3. **小批寫入**：先寫 5~10 筆（`direct`），到 prod 覆核（用 `/api/v2/get` 或 MCP 讀回），確認連結正確、`c_notes` batch id 有寫、`operation_id` 有記錄。
 4. **逐步擴大**：確認無誤後逐步加大批次，直到清單全數處理。
-5. **限流與網路**：`/api/v2/*` 會回 `429`（限流）；批次腳本要對 429／暫時性錯誤做**指數退避重試**，並在每筆間 `sleep`（0.2s 起）。
+5. **限流與網路**：`/api/v2` 的 create／mutate／delete／batch_mutate／get／resubmit／relationship/opposite-edges 都在 `web` 群組，**應用程式路由層沒有配置任何 throttle**（600 次／分鐘只套用在 `api` 群組，例如 `persons`／`operations`／`texts`／`select/*`／`POST /api/v1/user/login` 與舊版 `/api/...`；`/api/mcp` 雖在該群組但已排除那條、改用專屬的 120 次／分鐘）。因此節流責任全在腳本：**送出後等回應再發下一個（序列化、不並發），寫入請求每秒不超過 1 次**。仍要對 429（反向代理／WAF 等應用層以外的來源仍可能回）與暫時性錯誤、5xx 做**指數退避重試**。對外契約與每批筆數建議見 [API.md](../../API.md) §1.3。
 6. **生產負載**：每筆 `create` 會對 `operations` 表做 pending 提案預檢。此查詢**曾因缺索引拖垮過 prod**（大批寫入全表掃描 → 飽和 DB／php-fpm）；已補 `(resource, resource_id, op_type)` 索引修復（migration `2026_07_12_000000_add_resource_index_to_operations_table`，已入 develop）。**歷史教訓**：任何走 mutation 的大批寫入，先確認該類慢查詢已有索引，否則放慢節奏。優先用 **batch 端點**（一次請求、不製造並發掃描風暴）進一步降載。註：`409 already` 於 create 在 `findByPk` 命中即短路、不觸發該掃描，故廉價。
 7. **可回滾／可追溯**：每筆都有 `operation_id` + `c_notes` batch id；出錯用 Operations／Restore（`OperationRepository`）回退。
 8. 授權用 **Bearer PAT**（可直接用 MCP token；寫入靠 `canWriteDirectly()` 而非 token ability），**不寫成跑在 prod 的 artisan**（操作員未必有後台），全程**不改 Cloudflare（D1）**。

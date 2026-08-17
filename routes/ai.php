@@ -34,9 +34,15 @@ if (
      * 保護到東西，卻會讓未認證的 MCP 客戶端在探測階段拿到 401 而非規範所期待的「本伺服器
      * 不支援 SSE」405。
      *
-     * 已知且不在本次範圍：未認證的 POST 會在 401 時完全繞過限流——框架的
-     * $middlewarePriority 把 AuthenticatesRequests 排在 ThrottleRequests 之前，這是全站
-     * auth 路由的共同行為，不是此處的設定問題。
+     * 未認證的 POST 仍然不會進到這條 throttle:mcp——框架的 $middlewarePriority 把
+     * AuthenticatesRequests 排在 ThrottleRequests 之前，這是全站 auth 路由的共同行為，不是
+     * 此處的設定問題。**帶錯 token** 的那種改由全域 middleware ThrottleFailedAuthentication
+     * 按 IP 封頂（見 #1254）；**完全不帶憑證**的探測請求刻意不算——MCP 規範就是要客戶端先發
+     * 一發未認證請求來換 WWW-Authenticate（AddWwwAuthenticateHeader 正是為此存在）。
+     *
+     * 刻意不動框架排序：若把 throttle 移到 auth 之前，具名 limiter 裡的 $request->user() 會走
+     * 預設 guard（把預設 guard 切成 sanctum 的正是 auth middleware），於是這裡的「按帳號計數」
+     * 會退成按 IP，同一個 NAT 後面的機構就會共用額度。
      */
     Route::middleware('throttle:mcp')->withoutMiddleware('throttle:600,1')->group(function () use ($requiredAbility) {
         Mcp::web('/api/mcp', CbdbReadOnlyServer::class)

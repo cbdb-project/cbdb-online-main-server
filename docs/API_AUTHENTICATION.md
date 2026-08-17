@@ -200,6 +200,11 @@ axios.get(`${API_BASE_URL}/select/search/addr`, {
 - **`api` 群組**（`/api/v2/persons`、`/api/v2/operations`、`/api/v2/texts`、`/api/select/*`、`POST /api/v1/user/login`、舊版 `/api/...` 等，**`/api/mcp` 除外**）：600 請求/分鐘，超過會返回 `429 Too Many Requests`。
 - **`/api/mcp`**：雖然也在 `api` 群組，但已排除上面那條 600，改用專屬額度（預設 120 請求/分鐘），兩者互不排擠。
 - **`web` 群組的 `/api/v2` 端點**（`create`／`mutate`／`delete`／`batch_mutate`／`get`／`proposals/{id}/resubmit`／`relationship/opposite-edges`）：**應用程式路由層未配置限流**，不會由應用程式回 429（反向代理／WAF 仍可能）——節流責任在呼叫方，建議值與每批筆數見 [API.md](../API.md) §1.3。
+- **帶 Bearer token 但認證失敗的請求**：不分端點，每個來源 IP 每分鐘 60 次（`FAILED_AUTH_THROTTLE_PER_MINUTE` 可調），超過後**在認證之前**就回 429 並帶 `Retry-After`、`X-RateLimit-*`（#1254）。實作在全域 middleware `App\Http\Middleware\ThrottleFailedAuthentication`；它必須留在 `Kernel::$middleware`（全域）才會跑在 `auth` 之前，因為框架的 `$middlewarePriority` 把認證排在限流之前。
+  - **範圍刻意收窄到「帶 Bearer token 的認證嘗試」**：累加與擋下都要求請求帶了 `Authorization: Bearer …`。沒帶憑證的請求（未登入的瀏覽器、公開端點、MCP 規範要求的未認證握手、session 過期的站內 XHR）既不累加也不會被擋——所以**被擋期間該 IP 仍然可以開登入頁、可以登入**。認證成功的請求也不累加。
+  - 「認證失敗」＝ 401，**或**「帶著 Bearer token 卻被導向登入頁」（`Accept` 不是 JSON 時未認證會 302 而不是 401，那是同一件事的另一種形狀）。403／404／422／419 都不算。
+  - 代價：額度是 per-IP，所以同一個出口 IP 後面壞掉的客戶端會**連帶擋住其他 Bearer 客戶端**（要判斷 token 有效與否就得先查一次資料庫，而那正是要封頂的成本）。
+  - 對客戶端的意義：**token 失效時不要無限重試**。連續失敗就停下來換 token，否則會從 401 變成 429。
 
 ## 錯誤處理
 

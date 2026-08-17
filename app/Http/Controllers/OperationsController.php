@@ -20,6 +20,8 @@ use Illuminate\Support\Facades\Schema;
 class OperationsController extends Controller {
     protected $operationRepository;
     protected array $auditCurrentRowCache = [];
+    /** @var array<string, true> 已記過的現況查詢降級警告，同一次請求內去重。 */
+    protected array $loggedDegradations = [];
 
     public function __construct(OperationRepository $operationRepository) {
         $this->operationRepository = $operationRepository;
@@ -117,7 +119,10 @@ class OperationsController extends Controller {
             );
             //20191225實時比對的程式判斷
             if (!empty($c_personid = $dataRows[$x]['c_personid']) && $dataRows[$x]['resource'] == "BIOG_MAIN") {
-                $arr3 = BiogMain::find($c_personid)->toArray();
+                // 提案尚未核准（人物還沒建出來）或人物已被合併／刪除時 find() 會是 null，
+                // 直接 ->toArray() 會炸掉整頁；查不到就當「沒有現況」。
+                $biogMain = BiogMain::find($c_personid);
+                $arr3 = $biogMain ? $biogMain->toArray() : null;
             } elseif (!empty($resource_id = $dataRows[$x]['resource_id']) && !empty($resource = $dataRows[$x]['resource'])) {
                 // 新格式：query-string 格式的 resource_id（由 buildStoredResourceId() 產生）
                 // 若 schema key 驗證失敗（舊格式值恰好含 '='），自動回退到舊格式 switch/case
@@ -125,41 +130,58 @@ class OperationsController extends Controller {
                 if (str_contains($resource_id, '=') && !str_contains($resource_id, '_._')) {
                     $parsedPk = CompositePrimaryKey::parseStoredResourceId($resource_id, $resource);
                     if ($parsedPk !== null) {
+                        // id 已確認是新格式，即使下面查不了也不能回退舊格式 switch——
+                        // 那會拿同一串去按 '-' 亂切，切出來的欄值是錯的。
                         $usedNewFormat = true;
                         // BIOG_TEXT_DATA 在 SCHEMAS 中有別名 TEXT_DATA，但資料表名為 BIOG_TEXT_DATA
                         $tableName = ($resource === 'TEXT_DATA') ? 'BIOG_TEXT_DATA' : $resource;
-                        $query = DB::table($tableName);
-                        foreach ($parsedPk as $col => $val) {
-                            if ($val === 'NULL' || $val === null) {
-                                $query->whereNull($col);
-                            } else {
-                                $query->where($col, '=', $val);
-                            }
-                        }
+                        // resource 對不到實體表、或主鍵欄名已被 migration 改掉時別硬查，
+                        // 否則 SQL 例外會把整頁打成 500（現況欄降級為「未取得」即可）。
+                        // 表不存在時 getColumnListing() 回空陣列，等於「每個欄位都缺」，不需另外 hasTable。
+                        $missingPkColumns = $this->missingColumnsForTable($tableName, array_keys($parsedPk));
 
-                        if ($resource === 'POSTED_TO_ADDR_DATA') {
-                            // POSTED_TO_ADDR_DATA 使用 rows 格式
-                            $personId = $dataRows[$x]['c_personid'] ?? null;
-                            if ($personId === null) {
-                                $decoded = json_decode($arr1, true);
-                                if (is_array($decoded) && isset($decoded['rows'][0]['c_personid'])) {
-                                    $personId = (int) $decoded['rows'][0]['c_personid'];
+                        if (!empty($missingPkColumns)) {
+                            $tableExists = !empty($this->getColumnListing($tableName));
+                            $this->logCurrentRowDegradationOnce(
+                                $tableExists
+                                    ? '操作紀錄現況比對：主鍵欄名在現行 schema 已不存在，略過現況查詢'
+                                    : '操作紀錄現況比對：resource 對不到實體表，略過現況查詢',
+                                [
+                                    'resource' => $resource,
+                                    'resource_id' => $resource_id,
+                                    'table_name' => $tableName,
+                                    // 表不存在時這裡會是整組主鍵欄，屬預期（沒有任何欄位對得上）。
+                                    'missing_columns' => $missingPkColumns,
+                                    'operation_id' => $dataRows[$x]['id'] ?? null,
+                                ]
+                            );
+                            $arr3 = null;
+                        } else {
+                            $currentRowQuery = DB::table($tableName);
+                            foreach ($parsedPk as $col => $val) {
+                                if ($val === 'NULL' || $val === null) {
+                                    $currentRowQuery->whereNull($col);
+                                } else {
+                                    $currentRowQuery->where($col, '=', $val);
                                 }
                             }
-                            if ($personId !== null) {
-                                $query->where('c_personid', $personId);
+
+                            if ($resource === 'POSTED_TO_ADDR_DATA') {
+                                // POSTED_TO_ADDR_DATA 使用 rows 格式
+                                $personId = $dataRows[$x]['c_personid'] ?? null;
+                                if ($personId === null) {
+                                    $decoded = json_decode($arr1, true);
+                                    if (is_array($decoded) && isset($decoded['rows'][0]['c_personid'])) {
+                                        $personId = (int) $decoded['rows'][0]['c_personid'];
+                                    }
+                                }
+                                if ($personId !== null) {
+                                    $currentRowQuery->where('c_personid', $personId);
+                                }
+                                $arr3 = $this->mapPostedToAddrRows($currentRowQuery, $resource_id, $dataRows[$x]['id'] ?? null);
+                            } else {
+                                $arr3 = json_decode(json_encode($currentRowQuery->first()), true);
                             }
-                            $rows = $query->get()->map(function ($row) {
-                                return [
-                                    'c_personid' => (int) $row->c_personid,
-                                    'c_posting_id' => (int) $row->c_posting_id,
-                                    'c_office_id' => (int) $row->c_office_id,
-                                    'c_addr_id' => (int) $row->c_addr_id,
-                                ];
-                            })->values()->all();
-                            $arr3 = ['rows' => $rows];
-                        } else {
-                            $arr3 = json_decode(json_encode($query->first()), true);
                         }
                     }
                 }
@@ -177,13 +199,16 @@ class OperationsController extends Controller {
                             } else {
                                 $temp_l = explode('-', $resource_id);
                             }
-                            if (count($temp_l) >= 2) {
-                                $relation = OfficeCodeTypeRel::where('c_office_id', $temp_l[0])
-                                    ->where('c_office_tree_id', $temp_l[1])
-                                    ->first();
-                                if ($relation) {
-                                    $arr3 = $relation->toArray();
-                                }
+                            if (!$this->hasEnoughIdSegments($temp_l, 2, $resource, $resource_id, $dataRows[$x]['id'] ?? null)) {
+                                $arr3 = null;
+
+                                break;
+                            }
+                            $relation = OfficeCodeTypeRel::where('c_office_id', $temp_l[0])
+                                ->where('c_office_tree_id', $temp_l[1])
+                                ->first();
+                            if ($relation) {
+                                $arr3 = $relation->toArray();
                             }
 
                             break;
@@ -196,6 +221,11 @@ class OperationsController extends Controller {
                             //20251213新增差異比對紀錄
                         case "BIOG_ADDR_DATA":
                             $addr_l = explode("-", $resource_id);
+                            if (!$this->hasEnoughIdSegments($addr_l, 4, $resource, $resource_id, $dataRows[$x]['id'] ?? null)) {
+                                $arr3 = null;
+
+                                break;
+                            }
                             $arr3 = DB::table('BIOG_ADDR_DATA')->where([
                                 ['c_personid', '=', $addr_l[0]],
                                 ['c_addr_id', '=', $addr_l[1]],
@@ -209,7 +239,10 @@ class OperationsController extends Controller {
                         case "ALTNAME_DATA":
                             // 使用 CompositePrimaryKey 解析 resource_id（支援歷史 4-key 與新 3-key），返回 3-key 查詢
                             $parsedAlt = CompositePrimaryKey::parseStoredResourceId($resource_id, 'ALTNAME_DATA');
-                            if ($parsedAlt !== null) {
+                            // 與上方新格式路徑同一道把關：ALTNAME_DATA 的主鍵組合本身就變動過
+                            // （4-key → 3-key，#834），欄名對不上就別硬查，免得 SQL 例外打掛整頁。
+                            if ($parsedAlt !== null
+                                && empty($this->missingColumnsForTable('ALTNAME_DATA', array_keys($parsedAlt)))) {
                                 $altQuery = DB::table('ALTNAME_DATA');
                                 foreach ($parsedAlt as $col => $val) {
                                     if ($val === 'NULL' || $val === null) {
@@ -220,8 +253,10 @@ class OperationsController extends Controller {
                                 }
                                 $arr3 = $altQuery->first();
                             } else {
-                                \Log::warning("ALTNAME_DATA resource_id 格式不正確: {$resource_id}", [
-                                    'operation_id' => $listsArr['data'][$x]['id'] ?? null,
+                                $this->logCurrentRowDegradationOnce('操作紀錄現況比對：ALTNAME_DATA resource_id 無法解析或欄名對不上，略過現況查詢', [
+                                    'resource' => $resource,
+                                    'resource_id' => $resource_id,
+                                    'operation_id' => $dataRows[$x]['id'] ?? null,
                                 ]);
                                 $arr3 = null;
                             }
@@ -232,6 +267,11 @@ class OperationsController extends Controller {
                             //20251214新增差異比對紀錄
                         case "BIOG_TEXT_DATA":
                             $temp_l = explode("-", $resource_id);
+                            if (!$this->hasEnoughIdSegments($temp_l, 3, $resource, $resource_id, $dataRows[$x]['id'] ?? null)) {
+                                $arr3 = null;
+
+                                break;
+                            }
                             $arr3 = DB::table('BIOG_TEXT_DATA')->where([
                                 ['c_personid', '=', $temp_l[0]],
                                 ['c_textid', '=', $temp_l[1]],
@@ -242,7 +282,18 @@ class OperationsController extends Controller {
 
                             break;
                         case "POSTED_TO_OFFICE_DATA":
-                            $temp_l = explode("-", $resource_id);
+                            // 檢測分隔符類型：支持兩種格式 '_._'（代碼表／複合主鍵提案）或 '-'（舊版人物提案）。
+                            // 兩種格式的欄位順序都與 CompositePrimaryKey::SCHEMAS 一致（c_office_id、c_posting_id）。
+                            if (strpos($resource_id, '_._') !== false) {
+                                $temp_l = explode('_._', $resource_id);
+                            } else {
+                                $temp_l = explode('-', $resource_id);
+                            }
+                            if (!$this->hasEnoughIdSegments($temp_l, 2, $resource, $resource_id, $dataRows[$x]['id'] ?? null)) {
+                                $arr3 = null;
+
+                                break;
+                            }
                             $_officeid = $temp_l[0];
                             $_postingid = $temp_l[1];
                             $arr3 = DB::table('POSTED_TO_OFFICE_DATA')->where([['c_office_id' , '=', $_officeid], ['c_posting_id' , '=', $_postingid]])->first();
@@ -251,7 +302,10 @@ class OperationsController extends Controller {
 
                             break;
                         case "POSTED_TO_ADDR_DATA":
-                            $addrParts = explode('-', $resource_id);
+                            // resource_id 沿用 POSTED_TO_OFFICE_DATA 格式，同樣有 '_._'／'-' 兩種分隔符。
+                            $addrParts = strpos($resource_id, '_._') !== false
+                                ? explode('_._', $resource_id)
+                                : explode('-', $resource_id);
                             $postingOfficeId = $addrParts[0] ?? null;
                             $postingId = $addrParts[1] ?? null;
                             $personId = $dataRows[$x]['c_personid'] ?? null;
@@ -262,21 +316,13 @@ class OperationsController extends Controller {
                                 }
                             }
                             if ($personId !== null && $postingId !== null) {
-                                $query = DB::table('POSTED_TO_ADDR_DATA')
+                                $currentRowQuery = DB::table('POSTED_TO_ADDR_DATA')
                                     ->where('c_personid', $personId)
                                     ->where('c_posting_id', $postingId);
                                 if ($postingOfficeId !== null && $postingOfficeId !== '') {
-                                    $query->where('c_office_id', $postingOfficeId);
+                                    $currentRowQuery->where('c_office_id', $postingOfficeId);
                                 }
-                                $rows = $query->get()->map(function ($row) {
-                                    return [
-                                        'c_personid' => (int) $row->c_personid,
-                                        'c_posting_id' => (int) $row->c_posting_id,
-                                        'c_office_id' => (int) $row->c_office_id,
-                                        'c_addr_id' => (int) $row->c_addr_id,
-                                    ];
-                                })->values()->all();
-                                $arr3 = ['rows' => $rows];
+                                $arr3 = $this->mapPostedToAddrRows($currentRowQuery, $resource_id, $dataRows[$x]['id'] ?? null);
                             } else {
                                 $arr3 = [];
                             }
@@ -299,6 +345,11 @@ class OperationsController extends Controller {
                                     $value = str_replace("(minus)", "-", $value);
                                     $entry_1[$key] = str_replace("minus", "-", $value);
                                 }
+                            }
+                            if (!$this->hasEnoughIdSegments($entry_1, 10, $resource, $resource_id, $dataRows[$x]['id'] ?? null)) {
+                                $arr3 = null;
+
+                                break;
                             }
                             $arr3 = DB::table('ENTRY_DATA')->where([
                                             ['c_personid', '=', $entry_1[0]],
@@ -353,6 +404,11 @@ class OperationsController extends Controller {
                                     $status_1[$key] = str_replace("minus", "-", $value);
                                 }
                             }
+                            if (!$this->hasEnoughIdSegments($status_1, 3, $resource, $resource_id, $dataRows[$x]['id'] ?? null)) {
+                                $arr3 = null;
+
+                                break;
+                            }
                             $arr3 = DB::table('STATUS_DATA')->where([
                                 ['c_personid', '=', $status_1[0]],
                                 ['c_sequence', '=', $status_1[1]],
@@ -380,6 +436,11 @@ class OperationsController extends Controller {
                                     $kin_1[$key] = str_replace("minus", "-", $value);
                                 }
                             }
+                            if (!$this->hasEnoughIdSegments($kin_1, 3, $resource, $resource_id, $dataRows[$x]['id'] ?? null)) {
+                                $arr3 = null;
+
+                                break;
+                            }
                             $arr3 = DB::table('KIN_DATA')->where([
                                 ['c_personid', '=', $kin_1[0]],
                                 ['c_kin_id', '=', $kin_1[1]],
@@ -394,7 +455,14 @@ class OperationsController extends Controller {
                             // 檢測分隔符類型：支持兩種格式 '_._' (CodesController) 或 '-' (BasicInformationProposalController)
                             if (strpos($resource_id, '_._') !== false) {
                                 // 使用 _._格式
+                                // 分隔符是照原始 id 嗅探的，而 c_text_title 是自由文字——標題本身含
+                                // '_._' 時，dash 格式的 id 會誤走這條分支而切不出 9 段，故先擋片段數。
                                 $assoc_1 = explode('_._', $resource_id);
+                                if (!$this->hasEnoughIdSegments($assoc_1, 7, $resource, $resource_id, $dataRows[$x]['id'] ?? null)) {
+                                    $arr3 = null;
+
+                                    break;
+                                }
                                 $arr3 = DB::table('ASSOC_DATA')->where([
                                     ['c_personid', '=', $assoc_1[0]],
                                     ['c_assoc_code', '=', $assoc_1[1]],
@@ -543,12 +611,17 @@ class OperationsController extends Controller {
                                     $value = str_replace("(minus)", "-", $value);
                                     $inst_1[$key] = str_replace("minus", "-", $value);
                                 }
-                                if ($inst_1[1] == '') {
+                                if (($inst_1[1] ?? null) === '') {
                                     $inst_1[1] = null;
                                 }
-                                if ($inst_1[2] == '') {
+                                if (($inst_1[2] ?? null) === '') {
                                     $inst_1[2] = null;
                                 }
+                            }
+                            if (!$this->hasEnoughIdSegments($inst_1, 4, $resource, $resource_id, $dataRows[$x]['id'] ?? null)) {
+                                $arr3 = null;
+
+                                break;
                             }
                             $arr3 = DB::table('BIOG_INST_DATA')->where([
                                 ['c_personid', '=', $inst_1[0]],
@@ -593,14 +666,7 @@ class OperationsController extends Controller {
                             }
 
                             // 檢查陣列長度是否足夠（BIOG_SOURCE_DATA 需要 3 個欄位）
-                            if (count($source_1) < 3) {
-                                // 記錄錯誤並跳過此筆資料
-                                \Log::warning("BIOG_SOURCE_DATA resource_id 格式不正確: {$resource_id}", [
-                                    'parsed' => $source_1,
-                                    'expected_count' => 3,
-                                    'actual_count' => count($source_1),
-                                    'operation_id' => $listsArr['data'][$x]['id'] ?? null,
-                                ]);
+                            if (!$this->hasEnoughIdSegments($source_1, 3, $resource, $resource_id, $dataRows[$x]['id'] ?? null)) {
                                 $arr3 = null;
 
                                 break;
@@ -631,11 +697,13 @@ class OperationsController extends Controller {
             $arr2Decoded = is_array($arr2Decoded) ? $arr2Decoded : [];
 
             if ($resource === 'POSTED_TO_ADDR_DATA') {
-                $currentRows = is_array($arr3) ? ($arr3['rows'] ?? []) : [];
+                // buildPostedToAddrDiff() 的參數宣告為 array，`?? []` 只擋 missing／null，
+                // 擋不到「存在但不是陣列」（例如 payload 為 {"rows":""}）——那會是 TypeError → 500。
+                $rowsOrEmpty = static fn ($value) => is_array($value) ? $value : [];
                 $diffPayload = $this->operationRepository->buildPostedToAddrDiff(
-                    $arr1Decoded['rows'] ?? [],
-                    $arr2Decoded['rows'] ?? [],
-                    $currentRows
+                    $rowsOrEmpty($arr1Decoded['rows'] ?? null),
+                    $rowsOrEmpty($arr2Decoded['rows'] ?? null),
+                    $rowsOrEmpty(is_array($arr3) ? ($arr3['rows'] ?? null) : null)
                 );
                 $lists[$x]->setAttribute('resource_diff', $diffPayload);
             } elseif (!empty($arr2)) {
@@ -1999,6 +2067,21 @@ class OperationsController extends Controller {
             return $this->auditCurrentRowCache[$cacheKey];
         }
 
+        // audit_log.row_pk 是寫入當下的快照，欄名可能已被後續 migration 改名或移除
+        // （例：pinyin.lastname_chn 於 2026_07_10 改名為 c_chn）。直接拿去組 WHERE 會噴
+        // SQLSTATE[42S22] 讓整頁 500，故先比對現行 schema；欄位對不上就當「取不到現況」降級。
+        $missingColumns = $this->missingColumnsForTable($tableName, array_keys($rowPk));
+        if (!empty($missingColumns)) {
+            $this->logCurrentRowDegradationOnce('操作紀錄現況比對：audit_log.row_pk 含現行 schema 已不存在的欄位，略過現況查詢', [
+                'table_name' => $tableName,
+                'row_pk' => $rowPk,
+                'missing_columns' => $missingColumns,
+            ]);
+            $this->auditCurrentRowCache[$cacheKey] = null;
+
+            return null;
+        }
+
         $query = DB::table($tableName);
         foreach ($rowPk as $column => $value) {
             if ($value === null || $value === 'NULL') {
@@ -2013,5 +2096,93 @@ class OperationsController extends Controller {
         $this->auditCurrentRowCache[$cacheKey] = $normalized;
 
         return $normalized;
+    }
+
+    /**
+     * 回傳 $columns 中在 $tableName 現行 schema 找不到的欄名（表不存在時＝全部都缺）。
+     * 欄名比對不分大小寫（MariaDB 欄名本身不分大小寫，SQLite 亦然）。
+     * 沿用本類別既有的 getColumnListing()，共用同一份快取與 try/catch。
+     */
+    protected function missingColumnsForTable(string $tableName, array $columns): array {
+        $existing = array_map('strtolower', $this->getColumnListing($tableName));
+
+        $missing = [];
+        foreach ($columns as $column) {
+            if (!in_array(strtolower((string) $column), $existing, true)) {
+                $missing[] = (string) $column;
+            }
+        }
+
+        return $missing;
+    }
+
+    /**
+     * 舊式（'-' 或 '_._' 分隔）resource_id 拆出的片段數是否足夠組出完整主鍵條件。
+     * 不足時記警告並回傳 false，呼叫端一律降級成「查不到現況」，
+     * 而不是讓 undefined array key 在 Laravel 的錯誤處理下變成 ErrorException 把整頁打成 500。
+     */
+    protected function hasEnoughIdSegments(array $segments, int $expected, string $resource, string $resourceId, $operationId): bool {
+        if (count($segments) >= $expected) {
+            return true;
+        }
+
+        $this->logCurrentRowDegradationOnce('操作紀錄現況比對：resource_id 片段不足，略過現況查詢', [
+            'resource' => $resource,
+            'resource_id' => $resourceId,
+            'expected_count' => $expected,
+            'actual_count' => count($segments),
+            'operation_id' => $operationId,
+        ]);
+
+        return false;
+    }
+
+    /**
+     * POSTED_TO_ADDR_DATA 的現況以 rows 格式回傳。
+     *
+     * 這裡讀的 4 個欄位不在 resource_id 的主鍵組合裡（該表的 resource_id 沿用
+     * POSTED_TO_OFFICE_DATA 的 2-key 別名），所以主鍵欄的檢查蓋不到它們；
+     * 任一欄被改名或移除，`$row->c_addr_id` 就會變成 undefined property →
+     * ErrorException → 整頁 500（與本次修的成因一模一樣）。故落庫前先確認欄位都在。
+     */
+    protected function mapPostedToAddrRows($query, string $resourceId, $operationId): array {
+        $columns = ['c_personid', 'c_posting_id', 'c_office_id', 'c_addr_id'];
+        $missing = $this->missingColumnsForTable('POSTED_TO_ADDR_DATA', $columns);
+        if (!empty($missing)) {
+            $this->logCurrentRowDegradationOnce('操作紀錄現況比對：POSTED_TO_ADDR_DATA 欄位對不上現行 schema，略過現況查詢', [
+                'resource' => 'POSTED_TO_ADDR_DATA',
+                'resource_id' => $resourceId,
+                'missing_columns' => $missing,
+                'operation_id' => $operationId,
+            ]);
+
+            return [];
+        }
+
+        $rows = $query->get()->map(function ($row) {
+            return [
+                'c_personid' => (int) $row->c_personid,
+                'c_posting_id' => (int) $row->c_posting_id,
+                'c_office_id' => (int) $row->c_office_id,
+                'c_addr_id' => (int) $row->c_addr_id,
+            ];
+        })->values()->all();
+
+        return ['rows' => $rows];
+    }
+
+    /**
+     * 現況查詢降級的警告：同一次請求內同訊息＋同 context 只記一次。
+     * 這些是「歷史資料長得不合現行 schema」的常駐狀況，每次翻頁都重複記整批
+     * 只會把 laravel.log 灌滿而淹掉真正的新訊號。
+     */
+    protected function logCurrentRowDegradationOnce(string $message, array $context): void {
+        $key = md5($message . '|' . json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        if (isset($this->loggedDegradations[$key])) {
+            return;
+        }
+        $this->loggedDegradations[$key] = true;
+
+        Log::warning($message, $context);
     }
 }

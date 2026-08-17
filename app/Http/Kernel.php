@@ -23,6 +23,13 @@ class Kernel extends HttpKernel {
         \App\Http\Middleware\Cors::class,
         // Prometheus metrics 收集
         \App\Http\Middleware\PrometheusMetrics::class,
+        // 「帶 Bearer token 卻認證失敗」的次數封頂（#1254）。**必須留在全域 stack**：
+        // 全域 middleware 不受 $middlewarePriority 排序影響，所以它一定在路由的 auth 之前執行
+        //（框架把 AuthenticatesRequests 排在 ThrottleRequests 之前，未認證請求本來會在認證階段
+        // 就返回、完全繞過路由自己的限流），而且路由的 withoutMiddleware() 也排除不掉它。
+        // 排在 Cors 與 PrometheusMetrics 之後，讓它們包住這一層：429 一樣帶 CORS 標頭、
+        // 一樣會被指標記到（不過短路發生在路由 dispatch 之前，指標的 path label 會是 __unknown__）。
+        \App\Http\Middleware\ThrottleFailedAuthentication::class,
     ];
 
     /**

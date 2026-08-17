@@ -4,6 +4,15 @@
 
 ## 2026-08
 
+### 帶錯 Bearer token 的認證失敗次數封頂（#1254）
+- 起因：框架的 `$middlewarePriority` 把 `AuthenticatesRequests` 排在 `ThrottleRequests` 之前，所以掛 `auth`／`auth:sanctum` 的路由上，未認證請求會在認證階段就返回，路由自己的限流一條都不會執行。實測：把 MCP 上限調成 3、不帶 token 連打 8 次 → 8 個失敗、**0 個 429**。每一次帶 token 的失敗都會付一次 `personal_access_tokens` 查詢，所以那是「無限次、每次一個索引查詢」的路徑。
+- **調查先把 issue 的判斷改小了**：全站約 96 條 `auth` 路由裡，只有 4 條**真的失去**一道原本存在的限額（`GET /api/user` 的 600/分、`POST /api/mcp` 的 120/分、2 條 `throttle:qa-answer`）；其餘都在 `web` 群組，那裡本來就沒有任何路由層 throttle——不是被繞過，是從來沒有。單次失敗的成本也比原文低：session driver 是 file，不帶 token 時 Sanctum 走完整條 guard 是 **0 次 DB 查詢**，只有「不含 `|` 的 token」才真的查一次。
+- **刻意不覆寫 `$middlewarePriority`**（原 issue 的提案）：限流若跑在 auth 之前，limiter callback 裡的 `$request->user()` 會走預設 guard（把預設 guard 切成 sanctum 的正是 auth middleware），bearer 請求恆為 null，於是 `qa-answer`／`mcp` 的按帳號計數全退成按 IP。`HistoricalQaTest` 現有測試就斷言「同 IP 換使用者額度必須獨立」會被打破，MCP 也會讓同一個 NAT 後面的機構共用額度（那正是 #1249 改用具名 limiter 要避免的）。加上專案沒有 TrustProxies、限流計數器落在 file store，全站排序調整的代價遠大於收益。
+- 改為新增全域 middleware `ThrottleFailedAuthentication`：在 auth 之前短路，**只管「帶 `Authorization: Bearer` 卻認證失敗」的請求**，按來源 IP 每分鐘封頂（預設 60，config 可調並夾範圍：0／負數／髒值退回預設、不得超過 600）。註冊在 `Kernel::$middleware` 是保護的一部分——全域 stack 不受 `$middlewarePriority` 排序影響，也排除不掉。
+- **範圍是 review 實測後收窄的，兩個方向都是真問題**：第一版無條件短路，額度用完後該 IP 的**所有**請求都 429，包含 `GET /`、`GET /login`、`POST /login` 與帶著**有效** token 的請求——機構 NAT 後面一個 token 過期的腳本就能讓整個機構斷線且**無法自救**；同時第一版只認 401，而未認證請求只有 `expectsJson()` 為真才回 401，否則是 302 到登入頁，於是攻擊者**只要不帶 `Accept: application/json`** 就能無限試 token（方向還是反的：守規矩的客戶端才被計數）。現在「帶 token 卻被導向登入頁」也算失敗，而沒帶憑證的請求既不累加也不會被擋——`/metrics` 的 Basic Auth challenge、MCP 規範要求的未認證握手、session 過期的站內 XHR 因此都不會誤傷。
+- 回歸測試 `FailedAuthenticationThrottleTest`（20 tests）分兩半：閘門真的會關（超額 429、封頂**不再查 `personal_access_tokens`**、跨端點共用額度、非 JSON 的導向登入頁也計、窗口會過期）與閘門不會誤傷（沒帶 token 的請求永不被擋、被擋期間仍可開登入頁與登入、未帶憑證的 401 不計、403／404／422 不計、成功請求不歸零計數、每個來源 IP 各自一份額度、輪替 `X-Forwarded-For`／`User-Agent` 拿不到新額度）。另釘住出貨設定值就是 60 與 env 鍵名——其餘測試都用 `config([...])` 覆寫上限，`config/auth.php` 與 `.env` 的接線本來完全沒被測到。把 middleware 從 Kernel 拿掉會讓多數測試變紅。
+- 附帶記下兩個**優先度更高、不受本次改動影響**的缺口（已寫進 #1254 待另開 issue）：`POST /register`、`POST /password/email`、`POST /password/reset` 完全沒有限流，其中忘記密碼連框架內建的 password-reset token 節流都因 `config/auth.php` 的 `passwords.users` 缺 `throttle` 鍵而永久停用（`$config['throttle'] ?? 0` → `recentlyCreatedToken()` 恆 false），等於無上限的信件與寫庫放大器；以及 `web` 群組那 7 條 `/api/v2` 寫入端點零 throttle。
+
 ### 修好操作紀錄提案列表的 500：現況比對不再被歷史資料打掛
 - 起因：核准一筆 `POSTED_TO_OFFICE_DATA` 提案後，`/app/operations?proposals_only=1`（與 Blade 版 `/operations?proposals_only=1`）整頁 500。以 `editor`／`status` 參數二分定位到具體列，再核對生產 `laravel.log` 與 `audit_log`，確認是**兩個各自獨立**的成因，都落在「查現行資料列以顯示前值／後值／現況」這段共用邏輯（`buildOperationsListing()`）：
   1. `ErrorException: Undefined array key 1`：`POSTED_TO_OFFICE_DATA` 的 switch/case 只認 `-` 分隔符，但該筆的 `resource_id` 是 `_._` 格式（`61211_._2108722`，與同檔其他 case 一致的格式），`explode('-')` 只切出一段，`$temp_l[1]` 未定義。Laravel 會把 PHP warning 轉成 ErrorException，於是**一列壞資料打掛整頁**。

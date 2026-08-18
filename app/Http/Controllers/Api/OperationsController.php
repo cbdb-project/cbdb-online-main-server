@@ -253,8 +253,9 @@ class OperationsController extends Controller {
             ? User::where('email', $user_id)->first()
             : null;
 
-        // 這是唯一剩下的長期憑證簽發路徑（confirmation_token），而且是無 throttle 的密碼驗證
-        // 端點，所以成功與被拒都要留紀錄——否則連暴力破解都看不見。一律不記 token 值。
+        // 這是唯一剩下的長期憑證簽發路徑（confirmation_token），所以成功與被拒都要留紀錄
+        // ——否則連暴力破解都看不見。一律不記 token 值。
+        // 限流見 routes/api.php 的 throttle:crowdsourcing-token（#1264 之前這裡完全沒有節流）。
         $audit = app(SecurityAuditLogger::class);
 
         if (!$user || !is_string($user_password) || !Hash::check($user_password, $user->password)) {
@@ -275,7 +276,10 @@ class OperationsController extends Controller {
                 ]
             );
 
-            return "您的帳號與密碼輸入錯誤";
+            // #1264：改用 401。原本三條失敗路徑都回 200，於是「把 200 的 body 當 token 用」的
+            // 客戶端會拿著「您的帳號與密碼輸入錯誤」這串字去當憑證，而監控也看不出這裡有沒有
+            // 被暴力破解。body 文字刻意不變（既有客戶端可能在比對字串），只補上狀態碼。
+            return response("您的帳號與密碼輸入錯誤", 401);
         }
 
         // 停用（含從未啟用）帳號不得換到 token：resolveActiveUserByToken() 已擋住用它寫入，
@@ -289,7 +293,8 @@ class OperationsController extends Controller {
                 after: ['reason' => 'account_inactive']
             );
 
-            return __('auth.account_inactive');
+            // 憑證正確但帳號狀態不允許 → 403（與站內 Authenticate middleware 的語義一致）。
+            return response(__('auth.account_inactive'), 403);
         }
 
         if (!$user->isCrowdsourcingUser()) {
@@ -301,7 +306,7 @@ class OperationsController extends Controller {
                 after: ['reason' => 'not_crowdsourcing_role']
             );
 
-            return "帳號須為眾包身分，才可以取得token。";
+            return response("帳號須為眾包身分，才可以取得token。", 403);
         }
 
         $audit->record(

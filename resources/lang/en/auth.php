@@ -15,6 +15,9 @@ return [
 
     'failed' => 'These credentials do not match our records.',
     'throttle' => 'Too many login attempts. Please try again in :seconds seconds.',
+    // Throttle message for register / forgot-password / reset-password (#1264).
+    // Kept separate from `throttle` above, whose wording is login-specific.
+    'throttle_requests' => 'Too many attempts. Please try again in :seconds seconds.',
     'account_inactive' => 'This account is not activated or has been deactivated. Please contact an administrator.',
 
 ];

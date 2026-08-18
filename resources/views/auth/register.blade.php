@@ -66,7 +66,7 @@
                         </div>
                         <div class="form-group mb-3">
                             <label for="institution" class="form-label small text-muted">{{ __('common.institution') }}</label>
-                            <input id="institution" type="text" class="form-control{{ $errors->has('institution') ? ' is-invalid' : '' }}" name="institution" value="{{ old('institution') }}" placeholder="{{ __('common.institution_placeholder') }}" required>
+                            <input id="institution" type="text" class="form-control{{ $errors->has('institution') ? ' is-invalid' : '' }}" name="institution" value="{{ old('institution') }}" placeholder="{{ __('common.institution_placeholder') }}">
                             @if ($errors->has('institution'))
                                 <div class="invalid-feedback">
                                     {{ $errors->first('institution') }}

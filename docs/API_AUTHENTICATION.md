@@ -197,9 +197,18 @@ axios.get(`${API_BASE_URL}/select/search/addr`, {
 
 為了保護系統穩定性，`api` 群組的端點保留速率限制：
 
-- **`api` 群組**（`/api/v2/persons`、`/api/v2/operations`、`/api/v2/texts`、`/api/select/*`、`POST /api/v1/user/login`、舊版 `/api/...` 等，**`/api/mcp` 除外**）：600 請求/分鐘，超過會返回 `429 Too Many Requests`。
+- **`api` 群組**（`/api/v2/persons`、`/api/v2/operations`、`/api/v2/texts`、`/api/select/*`、舊版 `/api/...` 等，**`/api/mcp` 除外**）：600 請求/分鐘，超過會返回 `429 Too Many Requests`。
 - **`/api/mcp`**：雖然也在 `api` 群組，但已排除上面那條 600，改用專屬額度（預設 120 請求/分鐘），兩者互不排擠。
 - **`web` 群組的 `/api/v2` 端點**（`create`／`mutate`／`delete`／`batch_mutate`／`get`／`proposals/{id}/resubmit`／`relationship/opposite-edges`）：**應用程式路由層未配置限流**，不會由應用程式回 429（反向代理／WAF 仍可能）——節流責任在呼叫方，建議值與每批筆數見 [API.md](../API.md) §1.3。
+- **未認證的表單端點**（#1264）：`POST /register` 30 次/分鐘、`POST /password/email` 5 次/分鐘、`POST /password/reset` 10 次/分鐘，都是**每個來源 IP 各自一份額度**（`AUTH_THROTTLE_*_PER_MINUTE` 可調，實作在 `App\Http\Middleware\ThrottleGuestAuthRequests`）。三條端點各有獨立的桶，互不排擠。
+  - 超額回應**依客戶端而定**：瀏覽器／Inertia 表單得到 302 + `email` 欄位的錯誤訊息（與登入被鎖定時同一種形狀）；JSON 客戶端得到 `429` + `Retry-After`。刻意不對表單回 HTML 429——Inertia 收到非 Inertia 回應會彈全螢幕錯誤 modal，使用者看不到任何有意義的訊息。
+  - `POST /password/email` 另有一道**按 email** 的節流：同一個 email 60 秒內不會重發重設信（`config/auth.php` 的 `passwords.users.throttle`，錯誤訊息 `passwords.throttled`）。換 IP 繞不過這一條，換 email 繞不過上面那條。
+  - **並發**：「檢查 ＋ 計數」包在 cache lock 裡（file store 上是真的 flock），因為 `FileStore::increment()` 是沒上鎖的 read-modify-write——不處理的話並發請求會讀到同一個計數再各自寫回同一個較小值，計數可以被持續壓在上限以下＝這道閘被大量繞過。拿不到鎖時一律視為超額（鎖名含 IP 與端點，會競爭的只有同一個來源的並發突發本身）。
+  - **殘留限制**：`file` cache store 是每個節點一份目錄，多節點部署時每個節點各有自己的桶（要跨節點共享得改用 redis store，`config/cache.php` 已備好但未啟用）；`passwords.users.throttle` 的 per-email 節流在框架內部仍不是原子的，不過上游已有這道 per-IP 閘壓住並發量。
+  - **部署條件**：這道閘按 `$request->ip()` 分桶，而專案沒有 TrustProxies。若前置 CDN／LB，**必須同時設定 TrustProxies**，否則所有使用者會塌進同一個桶（`/password/email` 只有 5 次/分鐘＝全站無法重設密碼）。應用層偵測到 `X-Forwarded-For` 而沒有受信任代理時會記一行 `Log::warning`，讓這個設定漏洞不至於靜默存在。
+  - `POST /login` 不在此列——它本來就有 `ThrottlesLogins` 的 5 次/分鐘（key 為 email+IP，只在失敗時累加）。
+- **`GET|POST /api/operations/token`**（眾包舊通道拿密碼換長期 token，#1264）：每個 email+IP 5 次/分鐘、每個 IP 20 次/分鐘（`AUTH_THROTTLE_CROWDSOURCING_TOKEN_*` 可調），超過回 429。**成功的請求也計數**，所以客戶端要「取一次 token 後快取重用」，不要每寫一筆就重取（token 長期有效）。與 `ThrottleGuestAuthRequests` 同樣按 `$request->ip()` 分桶，因此前置 CDN／LB 時必須設定 TrustProxies，否則 per-IP 那道會塌成全站一個桶。兩個維度都要：per-email 擋「針對某帳號猜密碼」，per-IP 擋「換帳號繼續猜」。同一次改動也把三條失敗路徑從 200 改成 401／403——原本回 200 會讓「把 200 的 body 當 token 用」的客戶端拿錯誤訊息當憑證。
+- **`POST /api/v1/user/login` 已下架**（回 410，不再驗證任何密碼）：它從來不可能成功（轉發到早已不存在的 `oauth/token`），失敗路徑還會 500，而且是一條沒有節流的密碼驗證端點。
 - **帶 Bearer token 但認證失敗的請求**：不分端點，每個來源 IP 每分鐘 60 次（`FAILED_AUTH_THROTTLE_PER_MINUTE` 可調），超過後**在認證之前**就回 429 並帶 `Retry-After`、`X-RateLimit-*`（#1254）。實作在全域 middleware `App\Http\Middleware\ThrottleFailedAuthentication`；它必須留在 `Kernel::$middleware`（全域）才會跑在 `auth` 之前，因為框架的 `$middlewarePriority` 把認證排在限流之前。
   - **範圍刻意收窄到「帶 Bearer token 的認證嘗試」**：累加與擋下都要求請求帶了 `Authorization: Bearer …`。沒帶憑證的請求（未登入的瀏覽器、公開端點、MCP 規範要求的未認證握手、session 過期的站內 XHR）既不累加也不會被擋——所以**被擋期間該 IP 仍然可以開登入頁、可以登入**。認證成功的請求也不累加。
   - 「認證失敗」＝ 401，**或**「帶著 Bearer token 卻被導向登入頁」（`Accept` 不是 JSON 時未認證會 302 而不是 401，那是同一件事的另一種形狀）。403／404／422／419 都不算。

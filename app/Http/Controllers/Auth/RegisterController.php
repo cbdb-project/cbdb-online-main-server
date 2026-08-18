@@ -41,6 +41,11 @@ class RegisterController extends Controller {
         // Phase 6：註冊頁 React/Inertia 變體需 HandleInertiaRequests（共用 props/根模板）。
         // 僅作用於顯示表單的 GET 動作；POST 處理（register）不掛，授權仍由 guest middleware 控制。
         $this->middleware('inertia')->only('showRegistrationForm');
+        // #1264：註冊端點原本完全沒有限流（web 群組沒有 throttle，Auth::routes() 也不在任何群組裡），
+        // 每次請求至少一次 unique:users 查詢、成功還會建一列待管理員啟用的帳號。
+        // 掛在建構子而非覆寫 Auth::routes() 生出的路由：POST /register 沒有路由名稱，而「同 URI 後
+        // 註冊覆蓋」的寫法會留下殘影路由（McpEndpointMiddlewareTest 已把它列為壞味道）。
+        $this->middleware('throttle.guest:register')->only('register');
     }
 
     /**
@@ -92,6 +97,12 @@ class RegisterController extends Controller {
         return Validator::make($data, [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
+            // #1264 順手修：institution 原本完全不在規則裡，但 create() 直接讀 $data['institution']，
+            // 於是任何沒帶這個欄位的 POST（例如腳本或 curl）都會炸 ErrorException「Undefined array key」
+            // ＝HTTP 500，而不是一個驗證錯誤。用 nullable 而非 required 是刻意的：users.institution
+            // 本來就可為 null，React 註冊頁（目前的上線路徑）也沒把它標成必填——改成 required 會讓
+            // 原本能註冊的人突然被擋。（Blade 版表單有 HTML required，兩個版本本來就不一致。）
+            'institution' => 'nullable|string|max:255',
             'password' => 'required|string|min:6|confirmed',
         ]);
     }
@@ -108,7 +119,8 @@ class RegisterController extends Controller {
         $user = User::create([
             'name' => $data['name'],
             'email' => $data['email'],
-            'institution' => $data['institution'],
+            // nullable 規則不會補上缺少的鍵，所以這裡仍要 ?? null（欄位本身可為 null）。
+            'institution' => $data['institution'] ?? null,
             'avatar' => 'avatar0.png',
             'confirmation_token' => Str::random(40),
             'settings' => [

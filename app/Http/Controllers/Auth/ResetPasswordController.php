@@ -43,6 +43,9 @@ class ResetPasswordController extends Controller {
         // Phase 6：重設密碼頁 React/Inertia 變體需 HandleInertiaRequests（共用 props/根模板）。
         // 僅作用於顯示表單的 GET 動作；POST 處理（reset）不掛，授權仍由 guest middleware 控制。
         $this->middleware('inertia')->only('showResetForm');
+        // #1264：重設密碼端點原本也沒有限流。token 本身有足夠熵，所以這道閘不是為了擋猜 token，
+        // 而是封頂「每次請求的 token 查詢與密碼雜湊比對」成本。
+        $this->middleware('throttle.guest:password-reset')->only('reset');
     }
 
     /**

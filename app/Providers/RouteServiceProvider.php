@@ -64,6 +64,67 @@ class RouteServiceProvider extends ServiceProvider {
         RateLimiter::for('mcp', function (Request $request) {
             return Limit::perMinute(self::mcpRateLimit())->by($request->user()?->id ?: $request->ip());
         });
+
+        /*
+         * 眾包舊通道的憑證簽發端點（#1264）：`GET|POST /api/operations/token` 拿 email＋密碼換
+         * 長期有效的 confirmation_token。原本只有 api 群組共用的 600／分鐘，等於每分鐘 600 次
+         * 密碼嘗試、每次一發 bcrypt。
+         *
+         * 兩個維度一起套（RateLimiter 支援回傳多個 Limit）：
+         *   - 按 email+IP：擋「針對某個帳號猜密碼」，數字比照 ThrottlesLogins 的 5 次／分鐘；
+         *   - 按 IP：擋「換帳號繼續猜」（換 email 會換掉上面那個桶，只有 IP 維度攔得住）。
+         * 同樣不能用數值型 throttle：它的 key 是 sha1(domain|ip)、不含路由與上限值，會與全站
+         * 其他數值型 throttle 共用計數器（見上面 mcp 的註解）。
+         *
+         * IP 的前提同 #1254／#1264 的 ThrottleGuestAuthRequests：專案沒有 TrustProxies，
+         * `$request->ip()` 是直連 peer。**日後若前置 CDN／LB，設定 TrustProxies 是部署的必要條件**
+         * ——否則所有請求的 IP 會塌成 proxy 的位址，per-IP 那道會變成「全站每分鐘 20 次」，
+         * per-(email+IP) 也退化成純 per-email（＝任何人都能把某個眾包帳號鎖到拿不到 token）。
+         */
+        RateLimiter::for('crowdsourcing-token', function (Request $request) {
+            // email 參數是 `q`（見 Api\OperationsController@token）。
+            //
+            // **必須先確認是字串**：`(string) []` 在 PHP 8 是 E_WARNING，而 Laravel 的
+            // HandleExceptions 會把它轉成 ErrorException＝HTTP 500——而且這個 closure 跑在
+            // limiter 解析 limits 的階段、**在 hit() 之前**，所以 `?q[]=a` 可以無限量產 500
+            // 與 stack trace 進 log 而完全不消耗額度（review 實測；controller 自己有 is_string
+            // 守衛，反而是這道閘比它保護的程式碼脆弱）。
+            //
+            // 正規化只做小寫：全域的 TrimStrings middleware 已經把 q 去過空白了，這裡的 trim()
+            // 只是縱深防禦（測試碰不到它，別把它讀成有效的釘子）。
+            $rawEmail = $request->input('q');
+            $email = is_string($rawEmail) ? mb_strtolower(trim($rawEmail)) : '';
+
+            return [
+                Limit::perMinute(self::crowdsourcingTokenLimit('per_email'))
+                    ->by('cst-email:' . $email . '|' . $request->ip()),
+                Limit::perMinute(self::crowdsourcingTokenLimit('per_ip'))
+                    ->by('cst-ip:' . $request->ip()),
+            ];
+        });
+    }
+
+    /** 眾包憑證端點在設定值不合理時退回的預設上限（每分鐘）。 */
+    public const CROWDSOURCING_TOKEN_LIMIT_DEFAULTS = [
+        'per_email' => 5,
+        'per_ip' => 20,
+    ];
+
+    /**
+     * 眾包憑證端點的上限，並夾範圍。
+     *
+     * 理由與 mcpRateLimit() 相同：0／負數／髒值（`(int) 'abc'` = 0）幾乎一定是設定錯誤，
+     * 照字面解讀會讓整個端點形同關閉；上限夾在 600（api 群組的既有上限），這道閘只用來封頂。
+     */
+    public static function crowdsourcingTokenLimit(string $dimension): int {
+        $default = self::CROWDSOURCING_TOKEN_LIMIT_DEFAULTS[$dimension] ?? 1;
+        $configured = (int) config("auth.api_endpoint_throttle.crowdsourcing_token.{$dimension}", $default);
+
+        if ($configured < 1) {
+            $configured = $default;
+        }
+
+        return min($configured, 600);
     }
 
     /** MCP 端點在設定值不合理時退回的預設上限（與 config/mcp.php 的預設一致）。 */

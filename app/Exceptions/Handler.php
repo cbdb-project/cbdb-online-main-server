@@ -22,6 +22,24 @@ class Handler extends ExceptionHandler {
     ];
 
     /**
+     * 驗證失敗回填表單時**不得**寫回 session 的欄位。
+     *
+     * 覆寫框架預設（`current_password`／`password`／`password_confirmation`）只為了補上 `token`：
+     * 重設密碼表單的 token 是一次性憑證，而 `SESSION_DRIVER=file` 的 session 是明文落盤的。
+     * 任何一次驗證失敗（密碼太短、confirmed 不符、或 #1264 的限流）都會走 `invalid()` 的
+     * `withInput(Arr::except($request->input(), $this->dontFlash))`，所以清單漏了就會外流。
+     * 前端不需要它：Blade 版的 token 來自 route 參數、React 版來自 props，兩邊都不讀 old input。
+     *
+     * @var array<int,string>
+     */
+    protected $dontFlash = [
+        'current_password',
+        'password',
+        'password_confirmation',
+        'token',
+    ];
+
+    /**
      * Report or log an exception.
      *
      * This is a great spot to send exceptions to Sentry, Bugsnag, etc.

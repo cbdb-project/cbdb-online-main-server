@@ -74,10 +74,12 @@ Token 有效期：建立時可指定 `expires_in`（1～3650 天），未指定�
 
 | 端點群組 | 限流 |
 | ------ | ------ |
-| `api` 群組（`/api/v2/persons`、`/api/v2/operations`、`/api/v2/texts`、`/api/select/*`、`POST /api/v1/user/login`、舊版 `/api/...`）——**`/api/mcp` 除外** | 600 次／分鐘，超過回 **429** |
+| `api` 群組（`/api/v2/persons`、`/api/v2/operations`、`/api/v2/texts`、`/api/select/*`、舊版 `/api/...`）——**`/api/mcp` 除外** | 600 次／分鐘，超過回 **429** |
 | `/api/mcp` | 自己的專屬額度（預設 120 次／分鐘），不受上面那條 600 約束，見 14.6 |
 | `web` 群組（`/api/v2` 的 `mutate`、`create`、`delete`、`batch_mutate`、`get`、`proposals/{id}/resubmit`、`relationship/opposite-edges`） | **應用程式路由層未配置限流**；節流責任在呼叫方，見下方建議 |
 | **所有端點**：帶了 `Authorization: Bearer …` 但**認證失敗**的請求 | 每個來源 IP 每分鐘 **60 次**（部署可調），超過後**在認證之前**就回 **429** |
+| 未認證的表單端點：`POST /register`、`POST /password/email`、`POST /password/reset` | 每個來源 IP 每分鐘 **30／5／10 次**（部署可調），三條各有獨立額度 |
+| `GET\|POST /api/operations/token`（拿密碼換長期 token） | 每個 email+IP **5 次／分鐘**、每個 IP **20 次／分鐘**（部署可調），超過回 **429** |
 
 最後那一條是獨立的一道閘，語義與其他幾條不同，值得單獨說清楚：
 
@@ -88,6 +90,13 @@ Token 有效期：建立時可指定 `expires_in`（1～3650 天），未指定�
 - **超額後在認證之前就被擋下**，所以你會拿到 429 而不是 401，且伺服器不會再去查你的 token。回應帶 `Retry-After`、`X-RateLimit-Limit`、`X-RateLimit-Remaining`，訊息是 `Too Many Attempts.`。
 - **按來源 IP 計數**，與帳號無關。這代表同一個出口 IP（例如機構的 NAT）後面若有多個 API 客戶端，**壞掉的那個會連帶擋住其他 Bearer 客戶端**——擋的是「帶 token 的請求」，不是那個 IP 的全部流量，所以瀏覽與登入不會受影響。要知道 token 有效與否就得先查一次資料庫，而那正是這道閘要封頂的成本，因此無法只擋無效 token。
 - 對正常客戶端的意義：**token 失效時不要無限重試**。連續失敗就停下來換 token，否則會從 401 變成 429，且退避時間更長。
+
+未認證表單端點那一條（#1264）也需要說明——它們原本完全沒有限流，而每次請求都有成本（寫庫、`POST /password/email` 還會同步連 SMTP 寄一封信）：
+
+- **每一次請求都計數**，包含被驗證打回的（密碼太短、email 已存在）。上限因此按成本與「真人會重試幾次」分別定：`register` 30、`password/email` 5、`password/reset` 10。
+- **超額回應依客戶端而定**：要求 JSON 的客戶端拿到 `429` ＋ `Retry-After`／`X-RateLimit-*`；瀏覽器與 Inertia 表單拿到 **302 導回表單頁 ＋ `email` 欄位的錯誤訊息**（與登入被鎖定時同一形狀）。刻意不對表單回 HTML 429——Inertia 收到非 Inertia 回應會彈全螢幕錯誤 modal，使用者看不到任何有意義的訊息。
+- `POST /password/email` 另有一道**按 email** 的節流：同一個 email 60 秒內不會重發重設信。換 IP 繞不過這一條，換 email 繞不過上面那條。（per-email 那道在框架內部是「先檢查再寫入」、本身不是原子的；per-IP 那道已用 cache lock 把「檢查 ＋ 計數」串列化，因此並發突發的量會先被它壓住。）
+- `POST /login` 不在此列——它本來就有 5 次／分鐘（key 為 email+IP，只在失敗時累加）。
 
 `web` 群組這幾條在**應用程式路由層沒有任何 throttle**，所以不會由應用程式回 429——但反向代理、WAF 或日後的部署設定仍可能回，客戶端**還是要處理 429 並做指數退避**。節流責任在呼叫方，請照下列方式自律：
 
@@ -1522,15 +1531,26 @@ Authorization: Bearer <token>
 
 **不回傳**任何憑證欄位（`password`、`remember_token`、`confirmation_token`），也不回傳使用者偏好 `settings`。若日後需要新欄位，請在 `Api\UserController::show()` 顯式加入並同步本節。
 
-**`POST /api/v1/user/login` 已無實際用途**：它是 OAuth 時代的遺留，帳密驗證通過後會轉發到早已不存在的 `oauth/token` 路由，因此最終回 **404**、拿不到任何憑證。要注意兩個副作用：它實際用的是 session guard（不是 token guard），所以在 session 有被啟動的情境下，**驗證成功會先留下一個已登入的 session cookie 再回 404**；且此路由掛「訪客專用」中間件（見舊版章節的說明）。要程式化存取請改用上表簽發的 Bearer token。
+**`POST /api/v1/user/login` 已下架（回 `410 Gone`）**：它是 OAuth 時代的遺留，**從來不可能成功**——帳密驗證通過後會轉發到早已不存在的 `oauth/token` 路由（回 404、拿不到任何憑證，且驗證成功時還會先留下一個已登入的 session cookie），而帳密錯誤時會呼叫一個不存在的方法、回 **500**。它同時是一條沒有節流的密碼驗證端點。因此 2026-08（#1264）起改為固定回 410 並附說明，**不再驗證任何密碼**。要程式化存取請改用上表簽發的 Bearer token。
+
+```json
+{
+  "message": "This endpoint has been retired. Use a personal access token (Bearer) instead; create one on the /profile page."
+}
+```
 
 ### 14.3 眾包舊通道（不建議使用）
 
-v2 提案流程上線前的舊機制，仍在線但**建議一律改用 `/api/v2/*` 的 `mode=proposal`**：
+v2 提案流程上線前的舊機制，仍在線但**建議一律改用 `/api/v2/*` 的 `mode=proposal`**。
+
+使用 `token` 端點前先看兩件事：
+
+- **取一次就好、快取重用**：`confirmation_token` 長期有效，而這條端點有專屬限流且**成功的請求也計數**（每個 email+IP 5 次／分鐘）。每寫一筆記錄就重取一次 token 會很快撞上 429。
+- **用 POST，不要用 GET**：兩種方法都支援，但 GET 會把密碼放進 query string（存取日誌、`Referer`、瀏覽器歷史、中間 proxy 都會留下明文）。
 
 | 方法 | 路徑 | 參數 | 說明 |
 | ------ | ------ | ------ | ------ |
-| GET/POST | `/api/operations/token` | `q`＝email、`p`＝密碼 | 換取長期 token（成功時回傳的 body 就是 token 字串）。**僅眾包身分且帳號啟用者可取得**；其他情形回傳中文說明字串而非 token |
+| GET/POST | `/api/operations/token` | `q`＝email、`p`＝密碼 | 換取長期 token（成功時 **200**，body 就是 token 字串）。**僅眾包身分且帳號啟用者可取得**；帳密錯誤回 **401**、帳號未啟用或非眾包身分回 **403**（body 仍是中文說明字串，不是 token）。有專屬限流：每個 email+IP 5 次／分鐘、每個 IP 20 次／分鐘，超過回 **429** |
 | POST | `/api/operations/add` | `token`、`resource`（表名）、`json`（整包資料） | 新增一筆待處理記錄（`op_type=1`） |
 | POST | `/api/operations/update` | `token`、`resource`、`json`，另依表別帶 `c_personid`（`BIOG_MAIN`）或 `pId`（`OFFICE_CODES`／`OFFICE_TYPE_TREE`；`OFFICE_CODE_TYPE_REL` 的 `pId` 格式是 `c_office_id-c_office_tree_id`） | 修改（`op_type=3`） |
 | POST | `/api/operations/delete` | `token`、`resource`，另依表別帶 `c_personid` 或 `pId`；**不讀 `json`** | 刪除（`op_type=4`） |
@@ -1629,7 +1649,7 @@ v2 提案流程上線前的舊機制，仍在線但**建議一律改用 `/api/v2
 - 限流：本節這 14 個端點都繼承 `api` 群組的 600 次／分鐘，超過回 429。
 - 回應是舊格式（`total`／`start`／`end`／`data`），與 v2 的 `ok`／`data`／`pagination` 不同。
 - 仍存在但**未收錄於本文件**的舊端點：`/api/query_relatives` 與 `/api/query_relatives_1`（第九節 `query_relatives_2` 的早期版本，請優先用 `_2`）、`/api/OFFICE_CODES`、`/api/OFFICE_CODE_TYPE_REL`、`/api/OFFICE_TYPE_TREE`。
-- `/api/v1/` 底下的舊 CRUD 端點（`searchC_presonid`／`addC_presonid`／`updateC_presonid`／`deleteC_presonid`／`userC_presonid`）**已整組下架**（下架前它們全部已是回 500 的死碼），寫入請改用 v2（第四～十三章）；`POST /api/v1/user/login` 雖仍在路由表上，但已無實際用途（見 14.2）。
+- `/api/v1/` 底下的舊 CRUD 端點（`searchC_presonid`／`addC_presonid`／`updateC_presonid`／`deleteC_presonid`／`userC_presonid`）**已整組下架**（下架前它們全部已是回 500 的死碼），寫入請改用 v2（第四～十三章）；`POST /api/v1/user/login` 已改為固定回 `410 Gone`（見 14.2）。
 - 新的整合工作請優先使用 v2；舊端點只維持相容、不再擴充。
 
 ## 一、根據官職類別代碼獲取其下屬官職列表

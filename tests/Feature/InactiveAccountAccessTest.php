@@ -287,7 +287,9 @@ class InactiveAccountAccessTest extends TestCase {
 
         $response = $this->get('/api/operations/token?q=crowd@example.com&p=secret');
 
-        $response->assertOk();
+        // #1264 起改回 403（原本三條失敗路徑都回 200，會讓「把 200 的 body 當 token 用」的
+        // 客戶端拿錯誤字串當憑證）。body 文字不變。
+        $response->assertStatus(403);
         $this->assertSame(__('auth.account_inactive'), $response->getContent());
     }
 
@@ -303,7 +305,8 @@ class InactiveAccountAccessTest extends TestCase {
 
         $this->makeUser(User::STATUS_INACTIVE, User::ROLE_CROWDSOURCING, 'off@example.com');
 
-        $this->get('/api/operations/token?q=off@example.com&p=secret')->assertOk();
+        // 停用帳號在 #1264 之後是 403（不是 200），重點不變：不得留下 session。
+        $this->get('/api/operations/token?q=off@example.com&p=secret')->assertStatus(403);
         $this->assertGuest();
     }
 

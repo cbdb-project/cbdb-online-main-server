@@ -81,7 +81,9 @@ Route::group(['prefix' => 'code'], function () {
     Route::get('addr', 'ApiController@codeAddr');
 });
 
-Route::middleware('guest')->post('v1/user/login', 'Api\LoginController@login');
+// #1264：已下架，固定回 410（不再驗證任何密碼）。刻意不掛 guest——410 對已登入者也一樣正確，
+// 掛了反而會讓帶 session 的請求被導向 /home 而看不到下架訊息。
+Route::post('v1/user/login', 'Api\LoginController@login');
 
 // 遺留 /api/v1 群組（biog／add／update／delete／user）與其實作 App\v1 已整組刪除。
 //
@@ -102,7 +104,12 @@ Route::middleware('guest')->post('v1/user/login', 'Api\LoginController@login');
 //    是 Api\OperationsController@token 那道閘門的直通後門（已於 P0-2 先行下架）。
 
 Route::group(['prefix' => 'operations'], function () {
-    Route::match(['get', 'post'], 'token', 'Api\OperationsController@token');
+    // #1264：`token` 是拿 email＋密碼換長期憑證（confirmation_token）的端點，原本只有 api 群組
+    // 共用的 600／分鐘＝每分鐘 600 次密碼嘗試，每次一發 bcrypt。改掛具名 limiter（同時按 IP 與
+    // 按 email+IP 兩個維度），數值型 throttle 不行——它的 key 是 sha1(domain|ip)、不含路由，
+    // 會與全站其他數值型 throttle 共用計數器（見 RouteServiceProvider 對 #1249 的註解）。
+    Route::match(['get', 'post'], 'token', 'Api\OperationsController@token')
+        ->middleware('throttle:crowdsourcing-token');
     Route::post('add', 'Api\OperationsController@add');
     Route::post('update', 'Api\OperationsController@update');
     Route::post('delete', 'Api\OperationsController@del');

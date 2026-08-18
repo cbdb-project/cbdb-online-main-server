@@ -296,7 +296,7 @@ class SecurityAuditLogTest extends TestCase {
 
     #[Test]
     public function issuing_a_crowdsourcing_token_is_audited_and_denials_too(): void {
-        // 這是唯一剩下的長期憑證簽發路徑，且是無 throttle 的密碼驗證端點。
+        // 這是唯一剩下的長期憑證簽發路徑，而它有專屬限流（#1264）。
         User::unguarded(fn () => User::create([
             'name' => '眾包',
             'email' => 'crowd@example.com',
@@ -309,7 +309,8 @@ class SecurityAuditLogTest extends TestCase {
         $this->get('/api/operations/token?q=crowd@example.com&p=secret123')->assertOk();
         $this->assertNotNull($this->securityContextFor('crowdsourcing_token_issued'));
 
-        $this->get('/api/operations/token?q=crowd@example.com&p=wrong')->assertOk();
+        // #1264 起帳密錯誤回 401（body 文字不變）；這裡關心的是仍然留下審計。
+        $this->get('/api/operations/token?q=crowd@example.com&p=wrong')->assertStatus(401);
         $this->assertNotNull($this->securityContextFor('crowdsourcing_token_denied'));
 
         // 憑證本身絕不入庫。
@@ -324,7 +325,7 @@ class SecurityAuditLogTest extends TestCase {
         // 這個端點沒有 throttle。
         $longEmail = str_repeat('a', 5000).'@example.com';
 
-        $this->get('/api/operations/token?q='.urlencode($longEmail).'&p=whatever')->assertOk();
+        $this->get('/api/operations/token?q='.urlencode($longEmail).'&p=whatever')->assertStatus(401);
 
         $context = $this->securityContextFor(
             'crowdsourcing_token_denied',

@@ -565,38 +565,10 @@ class ApiController extends Controller {
         return $biog;
     }
 
-    protected function authenticateClient(Request $request) {
-        $credentials = $this->credentials($request);
-
-        $request->request->add([
-            'grant_type' => $request->grant_type,
-            'client_id' => $request->client_id,
-            'client_secret' => $request->client_secret,
-            'username' => $credentials['email'],
-            'password' => $credentials['password'],
-        ]);
-
-        $proxy = Request::create('oauth/token', 'POST');
-
-        $reponse = \Route::dispatch($proxy);
-
-        return $reponse;
-    }
-
-    protected function authenticated(Request $request) {
-        return $this->authenticateClient($request);
-    }
-
-    protected function sendLoginResponse(Request $request) {
-        $this->clearLoginAttempts($request);
-
-        return $this->authenticated($request);
-    }
-
-    protected function sendFailedLoginResponse(Request $request) {
-        $msg = $request['errors'];
-        $code = $request['code'];
-
-        return $this->failed($msg, $code);
-    }
+    // #1264：這裡原本有 authenticateClient()／authenticated()／sendLoginResponse()／
+    // sendFailedLoginResponse() 四個方法，只服務 `POST /api/v1/user/login` 那條 OAuth 遺留流程。
+    // 它們是死碼且會製造 5xx：前者轉發到早已不存在的 `oauth/token`（回 404，且驗證成功時還會留下
+    // 一個已登入的 session cookie），後者呼叫**不存在**的 `$this->failed()` → BadMethodCallException
+    // ＝HTTP 500。該端點已改為明確回 410（見 Api\LoginController），所以這四個方法一併移除，
+    // 免得日後有人以為它們還是可用的登入基礎設施。
 }

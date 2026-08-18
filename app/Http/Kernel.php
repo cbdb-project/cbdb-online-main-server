@@ -81,6 +81,9 @@ class Kernel extends HttpKernel {
         'can' => \Illuminate\Auth\Middleware\Authorize::class,
         'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
+        // 未認證表單端點（註冊／忘記密碼／重設密碼）的限流，超額回應是 302 + 欄位錯誤而非 HTML 429
+        //（Inertia 收到非 Inertia 回應會彈黑底 modal），見 #1264。
+        'throttle.guest' => \App\Http\Middleware\ThrottleGuestAuthRequests::class,
         // 20200909建安新增
         'cors' => \App\Http\Middleware\Cors::class,
         'inertia' => \App\Http\Middleware\HandleInertiaRequests::class,

@@ -1492,6 +1492,11 @@ class OperationsController extends Controller {
             'SOCIAL_INSTITUTION_ADDR' => ['c_inst_addr_id','c_inst_addr_type_code','c_inst_code','c_inst_name_code','inst_xcoord','inst_ycoord'],
             'ADMIN_CAT_CODES' => ['c_admin_cat_code'],
             'ADDR_CODES' => ['c_addr_id'],
+            // 親屬關係化簡規則表：可經泛用 /codes 介面寫入，所以會產生 operations 列，
+            // 而「還原」按鈕的顯示條件（admin ＋ opType 3/4 ＋ can_compare）不看這份 map——
+            // 漏登錄的症狀是按鈕出現、按下去卻 restore_no_pk。順序須與 migration 的
+            // primary(['c_kinrel_target', 'c_sex']) 一致。
+            'KINREL_REDUCTION' => ['c_kinrel_target', 'c_sex'],
             // char_variant_map 的實際資料表名是小寫，AbstractCodeTableMutationHandler::handleDirect()/
             // handleProposal() 傳給 OperationRepository::store() 的 $resource 參數就是 tableName()
             // 回傳的原始表名字串（此處即小寫 'char_variant_map'），resourceKeyColumns() 這裡是直接依

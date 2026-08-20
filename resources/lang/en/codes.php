@@ -60,6 +60,7 @@ return [
         'GANZHI_CODES' => 'Ganzhi (Sexagenary Cycle) Codes',
         'HOUSEHOLD_STATUS_CODES' => 'Household Registration Status Codes',
         'INDEXYEAR_TYPE_CODES' => 'Index Year Type Codes',
+        'KINREL_REDUCTION' => 'Kinship Relation Reduction Rules',
         'KINSHIP_CODES' => 'Kinship Codes',
         'KIN_DATA' => 'Person Kinship Data',
         'KIN_MOURNING' => 'Kinship Mourning Relations',

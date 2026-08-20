@@ -185,6 +185,16 @@ class CompositePrimaryKey {
         'CHAR_VARIANT_MAP' => [
             'id',
         ],
+        // 親屬關係化簡規則表。登在這裡是為了 operations 還原的 resource_id 解析：
+        // `OperationsController::buildKeyConditions()` 在稽核快照缺主鍵欄時會回退去解 resource_id，
+        // 而 CodesController 寫的是 `_._` 格式（例如 `BB_._B`）——只有 `parseStoredResourceId()`
+        // 認得那個格式，且它在表沒登記 SCHEMAS 時直接回 null，接著退到按 `-` 切的舊格式解析，
+        // 於是 `BB_._B` 會被當成單一段、主鍵永遠湊不齊。順序須與 migration 的
+        // primary(['c_kinrel_target', 'c_sex']) 及 OperationsController::resourceKeyColumns() 一致。
+        'KINREL_REDUCTION' => [
+            'c_kinrel_target',
+            'c_sex',
+        ],
     ];
 
     /**

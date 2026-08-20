@@ -58,6 +58,7 @@ return [
         'GANZHI_CODES' => '干支紀年代碼表',
         'HOUSEHOLD_STATUS_CODES' => '戶籍身份代碼表',
         'INDEXYEAR_TYPE_CODES' => '索引年類型代碼表',
+        'KINREL_REDUCTION' => '親屬關係化簡規則表',
         'KINSHIP_CODES' => '親屬關係代碼表',
         'KIN_DATA' => '人物親屬關係資料表',
         'KIN_MOURNING' => '親屬服喪關係',

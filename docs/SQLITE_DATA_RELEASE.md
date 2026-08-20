@@ -60,7 +60,7 @@ Metadata 內容包含：
 
 ## 釋出範圍契約：只匯出 allowlist 內的 CBDB 資料表
 
-**釋出檔的內容由 `scripts/export-daily-sqlite.sh` 的 `TABLES=(...)` allowlist 決定**（目前 77 張 CBDB 資料表與代碼表），腳本逐表呼叫 `php artisan db:export-to-sqlite --tables="$TABLE"`（第二張起帶 `--append`）。這是釋出範圍的**第一道也是最重要的防線**：
+**釋出檔的內容由 `scripts/export-daily-sqlite.sh` 的 `TABLES=(...)` allowlist 決定**（目前 78 張 CBDB 資料表與代碼表），腳本逐表呼叫 `php artisan db:export-to-sqlite --tables="$TABLE"`（第二張起帶 `--append`）。這是釋出範圍的**第一道也是最重要的防線**：
 
 - **allowlist 內不得出現任何帳號／憑證表**（`users`、`personal_access_tokens`、`password_resets`、`sessions`、`oauth_*` 等，完整清單見 `App\Console\Commands\ExportMysqlToSqlite::CREDENTIAL_TABLES`）。
 - 也不含 Laravel／應用自己的營運表（`migrations`、`operations`、`audit_log`、`nl_query_logs`、`ai_fill_logs`、`person_change_index`、`char_variant_map`、`pinyin` 等）。其中 `audit_log` 含 email 與登入 IP／User-Agent、`operations`／`nl_query_logs`／`ai_fill_logs` 含使用者輸入與 user_id，屬個人資料；其餘（如 `migrations`）只是與公開資料集無關的營運資料。因此下游若要用釋出檔跑本機開發，必須自己補 Laravel 需要的表：見 [scripts/patch_sqlite_db_for_dev.sh](../scripts/patch_sqlite_db_for_dev.sh) 與 [README-Docker.md](../README-Docker.md)。
@@ -70,8 +70,8 @@ Metadata 內容包含：
 1. **產物自檢（繞不過去的那道）**：`scripts/export-daily-sqlite.sh` 在匯出完成後、產生 metadata 之前，對輸出檔跑 `php artisan cbdb:assert-sqlite-release-scope "$OUTPUT_FILE" --min-tables="${#TABLES[@]}"`（實作於 [app/Console/Commands/AssertSqliteReleaseScope.php](../app/Console/Commands/AssertSqliteReleaseScope.php)），`scripts/weekly-sqlite-sync.sh` 在打包上傳前再跑一次。它直接讀產物的 `sqlite_master`（表與檢視都算）並檢查三件事：
    - 不含 `ExportMysqlToSqlite::CREDENTIAL_TABLES` 內的帳號／憑證表（單獨列出只為了給出明確的錯誤訊息，它們本來也不在下面那份 allowlist 裡）；
    - 每個名稱都必須出現在 [`App\Support\SqliteReleaseTables::PUBLIC_TABLES`](../app/Support/SqliteReleaseTables.php) 這份**精確集合**裡——**這一條才是守住上面第二點的東西**，`audit_log`、`operations`、`nl_query_logs` 都不在憑證名單裡，只比對憑證名會整批漏掉。刻意不用「全大寫就算公開 CBDB 表」的形狀判準：那會放行任何日後新增的大寫表，而 `AUDIT_LOG_ARCHIVE`、`USER_LOGIN_EVENTS` 這種名字一樣全大寫、卻是個資；
-   - 不含檢視（view）。檢視也會被下面的表數算進去，若不擋掉，77 個「與 allowlist 同名的空檢視」就能冒充一份完整產物；
-   - 表數不得少於 `--min-tables`（**預設就是 allowlist 的長度**；釋出腳本另外顯式傳 `${#TABLES[@]}`，把產物表數與那份 shell 清單綁在一起）。空檔與被截斷的產物都是合法的 SQLite，只看「有沒有壞表名」會直接放行。子集 ＋ 拒絕檢視 ＋ 下界 ＋ 表名不重複，合起來等於「產物的表集合恰好是那 77 張」。
+   - 不含檢視（view）。檢視也會被下面的表數算進去，若不擋掉，78 個「與 allowlist 同名的空檢視」就能冒充一份完整產物；
+   - 表數不得少於 `--min-tables`（**預設就是 allowlist 的長度**；釋出腳本另外顯式傳 `${#TABLES[@]}`，把產物表數與那份 shell 清單綁在一起）。空檔與被截斷的產物都是合法的 SQLite，只看「有沒有壞表名」會直接放行。子集 ＋ 拒絕檢視 ＋ 下界 ＋ 表名不重複，合起來等於「產物的表集合恰好是那 78 張」。
 
    一律 fail-closed：檔案不存在／不是普通檔案／開不起來／`--min-tables` 不是數字都算失敗。特別是「不存在」——`new PDO("sqlite:missing")` 會建出空白資料庫並回「0 張表、沒問題」，那是最危險的假通過。行為由 [tests/Feature/AssertSqliteReleaseScopeTest.php](../tests/Feature/AssertSqliteReleaseScopeTest.php) 實際執行驗證。
 2. **釋出腳本的閘門測試（會真的跑 bash）**：[tests/Feature/ReleaseScriptSelfCheckGateTest.php](../tests/Feature/ReleaseScriptSelfCheckGateTest.php) 把假的 `php` 放到 `PATH` 最前面驅動整份 `export-daily-sqlite.sh`，斷言自檢失敗時腳本以非零結束碼收尾、且沒有產生 metadata；並斷言自檢拿到的路徑就是實際產出的那個檔案。這條測試不能用文字比對取代：`| tee`、`&& false`、漏掉的 `exit 1`、甚至一句 `set +e`，都能讓「自檢呼叫還在」而結束碼被吞掉。自檢因此寫成**裸呼叫 + `set -e`**，沒有可以吞結束碼的位置。

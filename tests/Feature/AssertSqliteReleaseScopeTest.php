@@ -18,7 +18,7 @@ use Tests\TestCase;
  *  - `missing_file_fails_closed()`：`new PDO("sqlite:/no/such/file")` 會**建立**一個空資料庫，
  *    接著 `sqlite_master` 回空清單、自檢「通過」——最危險的假通過。
  *  - `an_empty_artifact_fails()`：0 byte 的真實檔案是合法的空 SQLite，`is_file()` 擋不住。
- *  - fixture 直接用**真實的 77 張釋出表**且把壞表放在最後：小 fixture（2、3 張表）碰不到任何
+ *  - fixture 直接用**真實的全部釋出表**且把壞表放在最後：小 fixture（2、3 張表）碰不到任何
  *    截斷邊界，`LIMIT 50` / `array_slice($tables, 0, 50)` 這類弱化會存活。
  */
 class AssertSqliteReleaseScopeTest extends TestCase {
@@ -65,7 +65,7 @@ class AssertSqliteReleaseScopeTest extends TestCase {
     }
 
     /**
-     * 真實釋出範圍（77 張）＋ `$extra`；`$extra` 放在**最後**，那是截斷式弱化最容易漏掉的位置。
+     * 真實釋出範圍（全部釋出表）＋ `$extra`；`$extra` 放在**最後**，那是截斷式弱化最容易漏掉的位置。
      *
      * @param array<int,string> $extra
      * @return array<int,string>
@@ -166,7 +166,7 @@ class AssertSqliteReleaseScopeTest extends TestCase {
 
     #[Test]
     public function a_view_is_rejected_even_when_its_name_is_allowlisted(): void {
-        // codex 覆核時指出的洞：檢視也會被 --min-tables 算進去，所以「77 個與 allowlist 同名的空檢視」
+        // codex 覆核時指出的洞：檢視也會被 --min-tables 算進去，所以「與 allowlist 同名、數量足夠的空檢視」
         // 可以冒充一份完整產物。釋出檔只該有資料表。
         $path = $this->makeSqlite('viewnamed', ['BIOG_MAIN'], ['ALTNAME_DATA']);
 
@@ -224,7 +224,7 @@ class AssertSqliteReleaseScopeTest extends TestCase {
 
     #[Test]
     public function the_allowlist_plus_min_tables_pins_the_exact_table_set(): void {
-        // allowlist（子集）＋ --min-tables（下界）＋ 表名不重複 ⟹ 產物的表集合恰好等於那 77 張。
+        // allowlist（子集）＋ --min-tables（下界）＋ 表名不重複 ⟹ 產物的表集合恰好等於 allowlist 那一份。
         // 這條把那個推論釘住：少一張就會因表數不足而失敗。
         $tables = SqliteReleaseTables::PUBLIC_TABLES;
         $this->assertSame(array_values(array_unique($tables)), array_values($tables), 'allowlist 不得有重複表名');
@@ -246,7 +246,7 @@ class AssertSqliteReleaseScopeTest extends TestCase {
 
         $this->artisan('cbdb:assert-sqlite-release-scope', [
             'file' => $path,
-            '--min-tables' => 77,
+            '--min-tables' => count(SqliteReleaseTables::PUBLIC_TABLES),
         ])->assertExitCode(1);
     }
 

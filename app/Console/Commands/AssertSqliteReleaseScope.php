@@ -22,11 +22,11 @@ use PDO;
  *     ——它們不在憑證名單裡，只靠第 1 條會整批漏掉。
  *     刻意用**精確集合**而不是「全大寫就算公開」的形狀判準：形狀判準會放行任何日後新增的大寫表，
  *     而 `AUDIT_LOG_ARCHIVE`、`USER_LOGIN_EVENTS` 這種名字一樣全大寫、卻是個資。
- *  3. 不含檢視（view）。檢視也會被下面的表數算進去，若不擋掉，77 個「與 allowlist 同名的空檢視」
+ *  3. 不含檢視（view）。檢視也會被下面的表數算進去，若不擋掉，78 個「與 allowlist 同名的空檢視」
  *     就能冒充一份完整產物。
  *  4. 表數不得少於 `--min-tables`（預設就是 allowlist 的長度）。空檔與被截斷的產物都是**真實存在
  *     的合法 SQLite**（0 張表），光看「有沒有壞表名」會直接放行。2＋3＋4 合起來等於
- *     「產物的表集合恰好是那 77 張」。
+ *     「產物的表集合恰好是那 78 張」。
  *
  * 一律 fail-closed：檔案不存在、不是普通檔案、開不起來、讀不到表清單、`--min-tables` 不是數字，
  * 全部視為失敗。特別注意「檔案不存在」——`new PDO("sqlite:/no/such/file")` 會**建立**一個空資料庫
@@ -45,7 +45,7 @@ class AssertSqliteReleaseScope extends Command {
     public function handle(): int {
         $file = (string) $this->argument('file');
 
-        // 預設就是「完整的 77 張」：漏傳這個選項不該讓下界掉到 1。上傳邊界那次呼叫（
+        // 預設就是「完整的 78 張」：漏傳這個選項不該讓下界掉到 1。上傳邊界那次呼叫（
         // weekly-sqlite-sync.sh）就沒傳，若預設是 1，把產物換成只含一張表的檔案也會通過。
         $minTables = $this->option('min-tables');
         if ($minTables === null) {
@@ -116,7 +116,7 @@ class AssertSqliteReleaseScope extends Command {
             return self::FAILURE;
         }
 
-        // 釋出檔只該有資料表。檢視同樣會被 --min-tables 算進去，若不擋掉，77 個「與 allowlist 同名
+        // 釋出檔只該有資料表。檢視同樣會被 --min-tables 算進去，若不擋掉，78 個「與 allowlist 同名
         // 的空檢視」就能冒充一份完整產物（codex 覆核時指出）。
         $views = array_values(array_map(
             fn ($object) => $object['name'],

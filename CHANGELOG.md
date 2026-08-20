@@ -4,6 +4,27 @@
 
 ## 2026-08
 
+### 新增 `KINREL_REDUCTION`（親屬關係化簡規則表）
+- 需求：把 CBDB 團隊維護的親屬關係化簡規則（來源試算表 `KINREL_REDUCTION.xlsx`，8 筆）落進資料庫，並接上全站既有的「代碼表」機制。規則語義是把複合親屬關係字串（`KINSHIP_CODES.c_kinrel`，如 `BB`＝兄弟之兄弟）逐步化簡到等價最簡關係（`B`），同時調整四個親屬距離步數；它是 `KINSHIP_CODES.c_kinrel_simplified` 的規則來源。
+- **Schema 沿用 CBDB 慣例而非 Laravel 預設**：全大寫表名、`c_` 前綴欄名、MySQL 端顯式指定 `utf8mb4_general_ci`（`config/database.php` 的預設是 `utf8mb4_unicode_ci`，但 CBDB 全庫是 general_ci，見 `2025_11_20_100000_alter_admin_cat_tables_collation`）、`ENGINE=InnoDB ROW_FORMAT=DYNAMIC`，與同族的 `KINSHIP_CODES`／`KIN_MOURNING`／`KIN_MOURNING_STEPS` 對齊。
+- **主鍵是 (`c_kinrel_target`, `c_sex`) 而不是單欄**：同一個待化簡關係在不同 ego 性別下可以有不同替換結果（現行 8 筆全是 `B`＝不分性別，但規則表本身要能承載 M／F 分歧）。`CodesController` 的主鍵是從 live schema 反射的，所以不需要在 `CompositePrimaryKey::SCHEMAS` 另行登錄；有測試釘住反射結果就是這兩欄——若主鍵沒建起來，controller 會靜默退化成「拿前兩欄當 key」。
+- **四個步數欄用有號 `smallInteger`**：化簡的語義就是減步數，現行資料 `c_col_change = -1`。若寫成 unsigned，`-1` 在 MariaDB 上會 out of range 報錯或被截成 0。**這條的測試方式被 review 改掉了**：原本寫「在 SQLite 插一筆 -1 再讀回來」，但 `SQLiteGrammar::$modifiers` **沒有 `Unsigned`**，所以把欄位改成 `unsignedSmallInteger()` 之後那條測試照樣全綠——它剛好在唯一要防的缺陷上失效。改成把 migration 的欄位定義抽成 `defineTable(Blueprint)`，測試用 **MySQL 的 schema grammar** 編譯**同一份定義**（`DB::connection('mysql')` 是 lazy 的，`Blueprint::toSql()` 全程不需要 PDO，CI 的純 SQLite 環境照樣能跑）並斷言 DDL 裡是 `smallint not null`、整段不含 `unsigned`。實測把欄位改成 unsigned：新斷言紅、舊的 SQLite 來回測試綠——正是 `feedback_sqlite_hides_missing_column` 那類坑。同一條路徑也順便釘住 `utf8mb4_general_ci` 與複合主鍵真的有進 DDL（COMMENT／COLLATE 在 SQLite 上同樣隱形）。
+- **`up()` 刻意**不加** `Schema::hasTable()` 守衛**：`up()` 是「CREATE ＋ ALTER ＋ INSERT」三段而 MySQL 的 DDL 不進交易，中途失敗會留下「表存在、`migrations` 沒那一列」的半套用狀態，之後每次 `migrate` 都撞「Table already exists」。中間版本曾加過守衛讓重跑安全，**codex 覆核後移除**：它把「大聲失敗」換成了更糟的「靜默成功」——表若已存在（例如 DBA 先照試算表建了一張 schema 不同的表），migration 會被記成已套用，卻既沒驗證 schema 也沒寫入那 8 筆種子，而 `down()` 仍然會去 DROP 那張不是它建的表。半套用的 migration 應該要有人處理（`DROP TABLE` 後重跑），處置方式寫在 `up()` 的註解裡。種子也維持 `insert()` 而非 `insertOrIgnore()`：沒有守衛之後，`insertOrIgnore` 只剩遮蔽作用。
+- **還原路徑要登錄在兩個地方**：這張表在泛用 `/codes` 介面是可寫的，所以編輯／刪除會產生 operations 列；而「還原」按鈕的顯示條件（admin ＋ opType 3/4 ＋ `can_compare`）**不看**主鍵登錄，漏登錄的症狀是按鈕出現、按下去卻 `restore_no_pk`。
+  - `OperationsController::resourceKeyColumns()`：`buildKeyConditions()` 的主路徑（從稽核快照取主鍵欄）靠它。
+  - `CompositePrimaryKey::SCHEMAS`：快照湊不齊主鍵欄時的**回退路徑**靠它。CodesController 寫的 `resource_id` 是 `_._` 格式（例如 `BB_._B`），而只有 `parseStoredResourceId()` 認得那個格式、且它在表沒登記 SCHEMAS 時直接回 `null`，接著退到按 `-` 切的舊格式解析——`BB_._B` 會被當成單一段，主鍵永遠湊不齊。實測拿掉這筆登錄，`parseStoredResourceId('BB_._B', 'KINREL_REDUCTION')` 回 `null`，新測試立刻紅。
+  - （同族的 `KIN_MOURNING`／`EXTANT_CODES` 等兩處目前也都缺，那是既有問題，這次只補新表。另注意 opType 2＝直接更新本來就不在可還原範圍內，這不是這次的改動造成的。）
+- **不加稽核欄／`timestamps`**：與同族代碼表一致；經 `/codes` 介面的寫入仍會留 operations ＋ `audit_log`。
+- 註冊點（漏改任一處的症狀都是「靜默少一張表」，因此逐項寫了斷言）：
+  - `config/codes.php` 的 `tables`——一鍵三用，同時決定 All Tables 列表頁、Query Playground 的 SQL 白名單（`QueryPlaygroundService` 直接 `array_keys(config('codes.tables'))`）與 MCP 在 `MCP_ALLOWED_TABLES` 未設定時的 fallback。
+  - `resources/lang/{zh-TW,en}/codes.php` 的 `table_desc`（兩份必須同步）。
+  - `app/Support/SqliteReleaseTables::PUBLIC_TABLES`（77 → 78 張）與 `scripts/export-daily-sqlite.sh` 的 `TABLES`——這兩份是「意圖」與「產物自檢」兩份清單，`SqliteReleaseAllowlistTest` 會逐項比對，漏改任一邊就紅。
+  - `.env.example` 的 `MCP_ALLOWED_TABLES`。**部署備忘**：prod 若把這個變數顯式釘死在 `.env`（現行就是），config fallback 不生效，必須手動把新表加進去並 `php artisan config:clear && php artisan config:cache`，否則 MCP 讀不到這張表。
+- **API.md 未動**，因為沒有 API 面的改變：沒有新路由、沒有改任何請求／回應欄位，也沒有把這張表登錄進 `config/code_table_writes.php`／`code_table_mutations.php`（前者只支援單欄主鍵，後者是拼音欄專用），所以 `/api/v2/mutate` 的可寫資源集合不變。
+- `docs/DATABASE_SCHEMA.md` 是 `php artisan cbdb:generate-schema-docs` 從連線中的資料庫產出的，本次沒有重跑（需要 prod 連線）；下次重新生成時會自動含這張表。
+- 回歸測試 `KinrelReductionTableTest`（18 tests）：直接 `require` migration 檔跑 `up()`／`down()`（不是在測試裡手搓同名表——手搓會讓「migration 在 SQLite 跑不起來」這類錯誤完全測不到）、欄位順序、複合主鍵、NOT NULL／nullable 分佈、8 筆種子資料逐格比對、MySQL DDL 的 signedness／collation／主鍵、同 target 不同 `c_sex` 可並存、operations 還原的主鍵欄，以及上述每一個註冊點。兩條刻意避開「斷言等於環境」的陷阱：MCP 那條斷言 `.env.example` 而不是 `config('mcp.cbdb.allowed_tables')`（後者取決於執行機器的 `.env`，會隨環境紅綠不定）；Query Playground 那條**真的送一次 `SELECT`** 到 `query-playground.run` 而不是再斷言一次 config（後者在「controller 改成讀別的清單」時仍會綠）。匯出腳本那條只比對 `TABLES=( ... )` 區塊，整檔比對會被註解裡的表名蒙過去。
+- 順手把既有測試裡寫死的 `77` 去掉（`AssertSqliteReleaseScopeTest` 的 `--min-tables => 77` 改成 `count(SqliteReleaseTables::PUBLIC_TABLES)`，其餘敘述改成不綁具體數字），這樣下次再加表就不會留下一個「還是綠、但已經不代表完整清單」的字面值。
+
 ### 註冊／忘記密碼／重設密碼補上限流，並修好停用中的 password-reset 節流（#1264）
 - 起因：`POST /register`、`POST /password/email`、`POST /password/reset` 三條未認證端點**完全沒有限流**（`web` 群組沒有 throttle，`Auth::routes()` 也不在任何群組裡），而每次請求都有成本：register 至少一次 `unique:users` 查詢、成功還會建一列待管理員啟用的帳號；`password/email` 會寫 `password_resets` 並**在請求執行緒內同步連 SMTP 寄一封信**（`QUEUE_CONNECTION=sync`）；`password/reset` 有 token 查詢與一次 bcrypt。對照組 `POST /login` 早就有 `ThrottlesLogins` 的 5 次／分鐘——缺的不是「登入相關端點的防護」，而是**只有登入那條有**。
 - **最嚴重的一項是設定漏鍵**：`config/auth.php` 的 `passwords.users` 沒有 `throttle` 鍵，而框架取 `$config['throttle'] ?? 0`、`DatabaseTokenRepository` 又寫 `if ($this->throttle <= 0) return false;`，於是 `recentlyCreatedToken()` **永遠回 false**——同一個 email 可以被無限次觸發「查 users ＋ 重寫 password_resets ＋ 寄一封信」。補上 `throttle => 60` 後，第二次會由 broker 擋下（`passwords.throttled`），不再寄信也不再動 `password_resets`。（broker 這道在框架內部仍是「先查再寫」、不是原子的，不過上游的 per-IP 閘已把並發量壓住。）這條與新的 per-IP 閘是兩個維度：換 IP 繞不過它，換 email 繞不過 per-IP 那道。

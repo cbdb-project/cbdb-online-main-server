@@ -22,7 +22,7 @@ namespace App\Support;
  */
 final class SqliteReleaseTables {
     /**
-     * 允許釋出的 CBDB 資料表與代碼表（目前 77 張）。
+     * 允許釋出的 CBDB 資料表與代碼表（目前 78 張）。
      *
      * @var array<int,string>
      */
@@ -64,6 +64,7 @@ final class SqliteReleaseTables {
         'GANZHI_CODES',
         'HOUSEHOLD_STATUS_CODES',
         'INDEXYEAR_TYPE_CODES',
+        'KINREL_REDUCTION',
         'KINSHIP_CODES',
         'KIN_DATA',
         'KIN_MOURNING',

@@ -215,7 +215,7 @@ class ExportMysqlToSqliteExcludesCredentialTablesTest extends TestCase {
     public function no_option_other_than_with_credentials_can_turn_the_skip_off(): void {
         // 這條守的是「跳過條件的形狀」。review 實測過幾種很像優化的弱化：
         //   `&& !$this->option('tables')`  → 帶 --tables 時失效，而 docs 就是教人帶 --tables
-        //   `&& !$this->option('append')`  → 釋出腳本第 2~77 張表全走 --append
+        //   `&& !$this->option('append')`  → 釋出腳本第 2 張起全走 --append
         //   `&& !$this->option('quiet')`   → cron 用 -q 就把 users 的資料列照匯
         // 上面的測試全部只傳自己關心的 option，所以這些條件恆真、mutation 存活。
         // 這裡反過來窮舉命令**真正宣告**的每一個 option（外加 Symfony 的全域旗標），

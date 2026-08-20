@@ -347,6 +347,15 @@ Route::get('app/social-institution/create', 'SocialInstitutionEntityController@a
     ->middleware('inertia')->name('app.social-institution.create');
 Route::get('app/social-institution/{id}/edit', 'SocialInstitutionEntityController@appEdit')
     ->middleware('inertia')->name('app.social-institution.edit')->whereNumber('id');
+
+// 文獻實體聚合 CRUD（/app/text/*）——上層聚合入口（TEXT_CODES ＋ TEXT_INSTANCE_DATA 版本層級），
+// 寫入走 mutation API（resource=text-entity）。同官職：create 先於 {id}/edit。
+Route::get('app/text', 'TextEntityController@appIndex')
+    ->middleware('inertia')->name('app.text.index');
+Route::get('app/text/create', 'TextEntityController@appCreate')
+    ->middleware('inertia')->name('app.text.create');
+Route::get('app/text/{id}/edit', 'TextEntityController@appEdit')
+    ->middleware('inertia')->name('app.text.edit')->whereNumber('id');
 Route::get('codes/{table_name}/create', 'CodesController@create')->name('codes.create');
 Route::post('codes/{table_name}/proposal', 'CodesController@proposalStore')->name('codes.propose.store');
 Route::get('codes/{table_name}/proposals/{operation}/edit', 'CodesController@proposalEdit')->name('codes.proposals.edit');

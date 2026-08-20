@@ -464,7 +464,7 @@ CBDB 子資源表幾乎都是複合主鍵，且不使用 Eloquent 主鍵行為�
 | merged-person | merged_person, merged_person_data, mergedperson | MERGED_PERSON_DATA | ✔ | ✘ | ✔ |
 | 可修改的代碼表（nianhao、office_codes、dynasties…） | 見〈代碼表與複合實體寫入〉 | 各代碼表 | ✘（501） | ✔ | ✘（501） |
 | 可新增的代碼表（text-codes、char-variant-map） | 逐操作不同，見〈代碼表與複合實體寫入〉 | TEXT_CODES、char_variant_map | 僅 direct | ✔ | ✘（403，已停用） |
-| office、social-institution（複合實體聚合） | 見〈代碼表與複合實體寫入〉 | 多表聚合 | ✔ | ✔ | ✔ |
+| office、social-institution、text-entity（複合實體聚合） | 見〈代碼表與複合實體寫入〉 | 多表聚合 | ✔ | ✔ | ✔ |
 
 - 表中 `✔` 表示 `direct` 與 `proposal` 兩種模式都支援。
 - 人物主檔（basicinformation）的 `create` 與 `delete` **不支援 proposal**，會回 501 `mode: ["proposal_not_supported"]`；`update` 則兩種模式都支援。
@@ -1403,6 +1403,8 @@ Authorization: Bearer <token>
 
 只有兩張表開放新增：
 
+> **與 13.4 的 `text-entity` 聚合並存**：`TEXT_CODES` 兩條寫入路徑都在役——本節的裸表 create 是「就這一列、就這些欄」的機器化寫入（S5 起同樣會做異體字落地替換）；聚合資源另外處理拼音派生、書名字形／標點正規化與 `TEXT_INSTANCE_DATA` 版本列。要建立一筆語義完整的文獻，用 13.4；只補一列原始資料，用本節。
+
 | resource | 別名 | 資料表 | 主鍵 | 可寫欄位 |
 | ------ | ------ | ------ | ------ | ------ |
 | text-codes | text_codes, textcodes | TEXT_CODES | c_textid（可自動配發） | c_title_chn, c_title, c_title_trans, c_text_type_id, c_text_year, c_text_nh_code, c_text_nh_year, c_text_range_code, c_bibl_cat_code, c_extant, c_text_country, c_text_dy, c_source, c_pages, c_url_api, c_url_api_coda, c_url_homepage, c_notes, c_title_alt_chn |
@@ -1423,32 +1425,39 @@ Authorization: Bearer <token>
 - 上述兩張支援寫入的表、且 `mode=direct` → **403**（`代碼表刪除已停用（防止級聯刪除人物資料）`）
 - 其他代碼表，或 `mode=proposal` → **501**（找不到對應 handler）
 
-### 13.4 複合實體聚合：office 與 social-institution
+### 13.4 複合實體聚合：office、social-institution 與 text-entity
 
-這兩個「實體」各自跨多張表（官職涵蓋 `OFFICE_CODES` + `OFFICE_CODE_TYPE_REL`；社會機構涵蓋 `SOCIAL_INSTITUTION_CODES` + `SOCIAL_INSTITUTION_NAME_CODES` + `SOCIAL_INSTITUTION_ADDR`），由聚合服務統一寫入。**新增、刪除，以及會牽動多表一致性的結構性欄位，一律要走這裡的聚合資源**，不要自己拼底層表。（13.1 開放的那幾個底層代碼表欄位——例如 `OFFICE_CODES.c_office_pinyin`、`SOCIAL_INSTITUTION_NAME_CODES.c_inst_name_py`——是單欄拼音修正，走 13.1 的 `update` 是可以的。）
+這三個「實體」各自跨多張表（官職涵蓋 `OFFICE_CODES` + `OFFICE_CODE_TYPE_REL`；社會機構涵蓋 `SOCIAL_INSTITUTION_CODES` + `SOCIAL_INSTITUTION_NAME_CODES` + `SOCIAL_INSTITUTION_ADDR`；文獻涵蓋 `TEXT_CODES` + `TEXT_INSTANCE_DATA` 版本列），由聚合服務統一寫入。**新增、刪除，以及會牽動多表一致性的結構性欄位，一律要走這裡的聚合資源**，不要自己拼底層表。（13.1 開放的那幾個底層代碼表欄位——例如 `OFFICE_CODES.c_office_pinyin`、`SOCIAL_INSTITUTION_NAME_CODES.c_inst_name_py`——是單欄拼音修正，走 13.1 的 `update` 是可以的。）
 
 | resource | 別名 | 主鍵欄 | 支援操作 |
 | ------ | ------ | ------ | ------ |
 | office | offices, office-load | c_office_id | create／update／delete |
 | social-institution | social-institutions, social-institution-load, socialinst-load | c_inst_code | create／update／delete |
+| text-entity | text-entities, book, books | c_textid | create／update／delete |
 
 - `direct` 與 `proposal` **都支援**（眾包帳號可以送這兩個聚合的提案）。
 - `target.pk` 接受帶前綴或不帶前綴的鍵名：`{"c_office_id": 123}` 或 `{"office_id": 123}` 皆可。負數或非數字視為未提供（422）；`0` 會被當成合法 id 去查，因此得到的是 404（找不到官職／社會機構）而不是 422。
 - **`offices` 這個別名同時是任官子資源（`POSTED_TO_OFFICE_DATA`）的別名，且任官會先被匹配到。**要寫官職實體請用 `office`。
+- **`text`／`texts` 是人物著述子資源（`BIOG_TEXT_DATA`）的既有別名，不屬於文獻實體。**要寫文獻實體請用 `text-entity`（或 `book`／`books`）。
 - **`target.pk` 這個鍵必填**（新增時送空物件 `{}`），與 13.2 同理。
 - 輸入欄位用**語義短名**，也接受對應的資料表欄名：
   - 官職（create／update 共用）**必填**：`name`（或 `c_office_chn`）、`type_ids`（陣列；也接受 `type_id`／`c_office_tree_id` 單值）、`source_id`（或 `c_source`，須存在於 `TEXT_CODES`）、`dynasty_code`（或 `c_dy`；也可送 `dynasty_label` 由後端查碼）。選填：`translation`、`name_alt`、`translation_alt`、`pinyin`、`pinyin_alt`、`pages`、`notes`。未給 `pinyin` 時會依名稱自動派生。
   - 社會機構 **create** 必填：`name`（或 `c_inst_name_hz`）、`type_code`（或 `c_inst_type_code`／`type_label`）、`dynasty_code`（或 `c_inst_begin_dy`／`dynasty_label`）、`addr_id`（或 `c_inst_addr_id`）、`source_id`（或 `c_source`）。
   - 社會機構 **update** 的地址改用 **`addresses` 陣列**（不是 `addr_id`），且**至少要有一列**，每列需含 `addr_id`。缺少即 422 `addresses: required`／`addresses.N.addr_id: required_integer`。
+  - 文獻（create／update 共用同一形狀）**必填只有 `title`**（或 `c_title_chn`）。選填：`title_pinyin`（或 `c_title`；留空由伺服器派生——去卷冊註記＋異體字歸一化逐字轉拼音，給值則僅做空白／大小寫與 v→ü 正規化）、`title_trans`、`title_alt_chn`、`type_id`（`c_text_type_id`，須存在於 `TEXT_TYPE`）、`year`、`nh_code`（須存在於 `NIAN_HAO`）、`nh_year`、`range_code`（`YEAR_RANGE_CODES`）、`bibl_cat_code`（`TEXT_BIBLCAT_CODES`）、`extant`（`EXTANT_CODES`）、`country`（`COUNTRY_CODES`）、`dynasty_code`（`c_text_dy`）、`source_id`（`c_source`，著錄來源樹的上層節點，須存在於 `TEXT_CODES`；**可為 null**——樹需要根節點）、`pages`、`url_api`、`url_api_coda`、`url_homepage`、`notes`。書名落庫前一律經 `char_variant_map` 寬鬆字形標準化與空白／括號／冒號正規化（與批量匯入同語義），回應 `result.variant_replacements` 列出被替換的字。
+  - 文獻的**版本列**用 `instances` 陣列（選填、可空；update 為集合對賬——同鍵改值、僅增刪差異）。每列**必填 `edition_id` 與 `instance_id`**（正整數，於文獻內定位版本；同一請求內不可重複，違者 422 `instances.N.key: duplicate`），選填 `title_chn`、`title_pinyin`（留空且有 `title_chn` 時派生）、`publisher`、`pub_loc`、`pub_year`、`pub_dy`、`pub_nh_code`、`pub_nh_year`、`source_id`、`pages`、`extant`、`notes`。**對賬只認上述欄位**：同鍵保留的列，其未列入的實體欄位（如 `c_part_of_instance`、`c_print`）不受影響；但整列被移除再重加會丟失那些欄位。
 - **聚合的 `update` 是「全欄覆寫」，不是第七章的 PATCH 語義**：沒帶到的選填欄會被寫成 `null`（例如漏帶 `name_alt`／`pages` 就會清掉既有值）。更新前請先讀出現值、補齊整份 payload。
 - 校驗錯誤是語義鍵而非資料表欄名，例如 `name: required`、`type_ids: required` / `not_found_in_office_type_tree`、`type: invalid`、`type_label: not_found`、`source_id: required_integer` / `not_found_in_text_codes`、`dynasty: invalid`、`dynasty_label: not_found`、`addr_id: required_integer` / `not_found_in_addr_codes`、`addresses: required`、`addresses.N.addr_id: required_integer`，以及各選填整數欄的 `integer`、`floruit_dy`／`end_dy: invalid`、`by_nianhao_code`／`ey_nianhao_code: not_found_in_nian_hao`、`by_year_range`／`ey_year_range: not_found_in_year_range_codes`。
 - 引用護欄：
   - 官職 `delete`：仍被人物任官引用時回 **409** `c_office_id: referenced_by_postings`，並附 `reference_count`。
   - 社會機構 `delete`：仍被人物資料引用時回 **409** `c_inst_code: referenced_by_person_data`。
   - 社會機構 `update`：機構名稱仍被引用時不得改名，回 **409** `name: rename_blocked_while_referenced`。
+  - 文獻 `delete`：仍被任何資料引用時回 **409** `c_textid: referenced_by_other_records`，並附 `reference_count`。計數涵蓋人物出處（`BIOG_SOURCE_DATA`）／著述（`BIOG_TEXT_DATA`）、各人物與實體表的 `c_source` 出處欄、**以此文獻為來源的子文獻**（`TEXT_CODES.c_source` 自引用樹）與其他文獻的版本列；自己的版本列隨聚合一併刪除、不計入。
+  - 文獻 `update`：`source_id` 指向自己或自己的後代（會使著錄來源樹成環）時回 **422** `source_id: source_cycle`。
 - 回應 `result` 除了 `pk`／`status`（`created`／`updated`／`deleted`）／`operation_id` 外，還有實體專屬欄位：
   - 官職：create／update 帶 `row`（含 `type_ids`），update 另帶 `types_added`／`types_removed`，delete 帶 `rel_deleted`。
   - 社會機構：create 帶 `name_created`，update 帶 `name_changed`／`addr_added`／`addr_removed`，delete 帶 `addr_deleted`。
+  - 文獻：create 帶 `instances_added`／`variant_replacements`／`row`，update 帶 `instances_added`／`instances_removed`／`instances_updated`／`row`，delete 帶 `instances_deleted`。
 - 社會機構的 `create` 回應 `result.pk` 有**兩個鍵**（`c_inst_code` + `c_inst_name_code`），與表格所列的單一主鍵欄不同——請以回應為準。
 - `proposal` 模式存的是「聚合意圖」（`__entity_aggregate`、`__entity_resource`、`__entity_operation`、`__entity_pk` 與原始 `changes`），核准時以 `direct` 重放；因此 create 提案的 `result.pk` 為 `null`（主鍵尚未配發）。
 - 聚合提案的 `operations.resource` 存的是**聚合名**（`office`／`social-institution`），不是資料表名——用 `GET /api/v2/operations` 追蹤時要以此篩選。

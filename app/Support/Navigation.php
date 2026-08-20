@@ -257,7 +257,7 @@ class Navigation {
             // 設定來自 config/entity_aggregates.php（§6.5 單一真源）；裸表已封寫、僅供讀取回退。
             self::entityNavItem('OFFICE_CODES', 'office-codes', 'codes.office_codes', 'fas fa-id-badge'),
             self::entityNavItem('SOCIAL_INSTITUTION_CODES', 'social-institution-codes', 'codes.social_institution_codes', 'fas fa-university'),
-            self::codeItem('text-codes', 'codes.text_codes', 'fas fa-book', 'TEXT_CODES'),
+            self::entityNavItem('TEXT_CODES', 'text-codes', 'codes.text_codes', 'fas fa-book'),
             self::codeItem('text-instance-data', 'codes.text_instance_data', 'fas fa-book-open', 'TEXT_INSTANCE_DATA'),
         ];
     }

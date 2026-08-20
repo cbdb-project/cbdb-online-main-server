@@ -50,5 +50,31 @@ return [
                 'pattern' => 'app.social-institution.*',
             ],
         ],
+        [
+            // 文獻實體（含 TEXT_INSTANCE_DATA 版本層級）。resource 不叫 text——那是人物
+            // 子資源 BIOG_TEXT_DATA 的既有 mutation 別名（見 TextAggregateDefinition 類註）。
+            'resource' => 'text-entity',
+            'service' => \App\Services\Import\TextImportService::class,
+            'definition' => \App\Services\Mutations\EntityAggregate\TextAggregateDefinition::class,
+            'pk' => 'c_textid',
+            'tables' => ['TEXT_CODES', 'TEXT_INSTANCE_DATA'],
+            // step 4（下層直寫封閉）整體暫緩，兩條裸表路徑都仍在役：
+            //  - codes UI：裸表編輯頁尚有實體頁未對齊的功能（TEXT_CODES 編輯頁的作者列表
+            //    面板、TEXT_INSTANCE_DATA 的 textid 提示／載入動作與部分版本欄位）；
+            //  - 機器面的 text-codes 裸表 create（config/code_table_writes.php）：異體字
+            //    S5 才剛把落地替換接進這條路徑，是「就這一列、就這些欄」的機器化寫入，
+            //    與聚合的完整語義並存（比照 OFFICE_CODES 拼音欄與 office 聚合並存）。
+            // §4.4「封閉是終態、不是起手式」——parity 補齊且確認無外部依賴後，
+            // 把兩表加進此清單即自動封寫 codes UI，裸表 create 另行評估。
+            'closed_code_tables' => [],
+            'nav' => [
+                'key' => 'text-codes',
+                'label' => 'codes.text_codes',
+                'icon' => 'fas fa-book',
+                'route' => 'app.text.index',
+                'table' => 'TEXT_CODES',
+                'pattern' => 'app.text.*',
+            ],
+        ],
     ],
 ];

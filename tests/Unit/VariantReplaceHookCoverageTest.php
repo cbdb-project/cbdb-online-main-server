@@ -172,8 +172,8 @@ class VariantReplaceHookCoverageTest extends TestCase {
         'app/Services/PostingAutofillService.php' => [
             'hooks' => 2, 'why' => 'S4：年號與官名的兩形查表',
         ],
-        'app/Http/Controllers/AdminBatchLoadBookTitlesController.php' => [
-            'hooks' => 1, 'why' => '前階段：書名批次匯入（TEXT_CODES.c_title 派生拼音）',
+        'app/Services/Import/TextImportService.php' => [
+            'hooks' => 3, 'why' => '文獻聚合：書名（早於拼音派生）、主列其餘文本欄、TEXT_INSTANCE_DATA 版本列整列',
         ],
         'app/Http/Controllers/BasicInformationProposalController.php' => [
             'hooks' => 3, 'why' => '前階段既有：提案 payload 的姓名／別名 strict 替換（不經 repository，本階段未改動但仍是落地點）',

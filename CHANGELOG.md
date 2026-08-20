@@ -4,6 +4,16 @@
 
 ## 2026-08
 
+### 文獻（Text）收斂為第三個實體聚合：TEXT_CODES ＋ TEXT_INSTANCE_DATA 版本層級
+- 依 `docs/ENTITY_AGGREGATE_ARCHITECTURE.md` §6 的四步路線把文獻做到 step 3（聚合根＋實體級 API＋專屬前端頁），office／social-institution 之後的第三個聚合。**resource＝`text-entity`**（別名 `book`／`books`；不叫 `text`——那是人物著述子資源 BIOG_TEXT_DATA 的既有 mutation 別名，不可重載）。
+- 聚合根 `TextImportService`：把散在 `AdminBatchLoadBookTitlesController::store()` 的存儲過程（`c_textid` max+1 配號、書名空白／括號／冒號正規化、字形標準化、去卷冊註記＋異體字歸一化的拼音派生、稽核）抽成單一真源，批量匯入表單與 mutation API 共用；批次控制器只剩解析／批前校驗／batch 標記／撤回。TEXT_CODES 主列稽核欄經 AuditActor 蓋章（create 蓋 created、update 只蓋 modified）；operations 的 resource_id 沿用既有「純數字 c_textid」慣例，批次撤回與 /operations 還原鏈路不受影響。
+- **異體字落地替換（AGENTS.md §1.3）掛在聚合根的三個落點**：書名（`replaceFor`，早於拼音派生——`pinyin.c_chn` 被排除在替換範圍外、異體字保有自己讀音，先替換才拿得到參考字的讀音）、主列其餘文本欄（`c_title_trans`／`c_title_alt_chn`／`c_pages`／`c_notes`），以及 **`TEXT_INSTANCE_DATA` 版本列整列**（`replaceRow`；`c_publisher` 是不帶 `_chn` 後綴的中文欄，送「淸華書局」會落庫「清華書局」）。模式與範圍一律由 `VariantReplaceScope` 決定，呼叫端不自選模式、不維護欄位清單。替換結果經 `__variant_replaced` 帶進回應的 `notices`；累積器在每次 `create()`／`update()` 進入時重置（批次匯入用同一個 service 實例逐列呼叫）。`VariantReplaceHookCoverageTest` 的清冊同步登記（掛鉤從批次控制器移進聚合根）。
+- **文獻的兩重層級分開處理**：(1) collection→instance——`TEXT_INSTANCE_DATA` 屬聚合內部，update 以 `(edition_id, instance_id)` 為列鍵做集合對賬（同鍵改值、僅增刪差異、逐筆記 op），delete 先刪版本列再刪主列；(2) `c_source` 自引用（著錄來源樹）——**跨實體**引用，update 有成環護欄（指向自己或後代回 422 `source_cycle`，上溯 200 層 fail-closed），delete 的引用計數把子文獻與其他文獻的版本列也計入（樹中間節點不可刪），另涵蓋 19 個入邊 FK 表（含 SET NULL 的 `MERGED_PERSON_DATA`——靜默清空出處也是資料損失）。
+- 專屬頁面 `/app/text`（Index／Create／Edit，寫入走 mutation API）：列表由 `EntityTableBrowser` 描述子驅動（與 office／social parity），計算欄為版本數 `instance_count` 與子文獻數 `child_count`；編輯頁含版本列編輯器與刪除護欄預提示。側欄「文獻代碼表」節點改指此頁（`config/entity_aggregates.php` 單一真源）。
+- **step 4（封閉下層直寫）整體暫緩，兩條裸表路徑都仍在役**：codes UI 的裸表編輯頁尚有實體頁未對齊的功能（TEXT_CODES 編輯頁的作者列表面板、TEXT_INSTANCE_DATA 的 textid 提示／載入動作與部分版本欄位）；機器面的 `text-codes` 裸表 create 則因異體字 S5 剛把落地替換接上而維持在役，與聚合並存（比照 `OFFICE_CODES` 拼音欄與 office 聚合並存）——聚合負責「語義完整的一筆文獻」，裸表 create 負責「就這一列、就這些欄」的機器化寫入。
+- **版本鍵 0 值的處理**：`ctype_digit()` 會放行 `"0"`，但版本鍵語義上是正整數。生產庫存在一列歷史資料 `(c_textid=40354, 0, 0)`，無條件拒絕會讓那筆文獻連編輯頁都送不出去（編輯頁把既有版本列原樣回送），故 create 一律擋、update 只擋「資料庫裡不存在的」0 值鍵。
+- 回歸測試：`ApiV2MutateTextEntityTest`（create 派生與稽核、版本列對賬、成環護欄、刪除護欄含子文獻、別名 book、落地替換涵蓋主列與版本列、拼音由替換後書名派生、0 值鍵雙向把關）、`TextEntityIndexTest`（列表 parity、計算欄、側欄改指、「暫不封寫」決策釘住）；`AdminBatchLoadBookTitlesTest`／`ApiV2MutateCodeTableTextCodesTest` 全數維持通過（operations 快照的 `c_source` 由字串轉為整數是唯一語義差異）。`API.md` §4／§13 已同步。
+
 ### 異體字落地替換擴張到「所有文本型別欄位」（行為擴張，非修 bug）
 
 - **這是行為擴張**：先前只有 BIOG_MAIN 姓名、ALTNAME_DATA 別名、書名批次匯入三處會做落地替換；現在**所有經應用層寫入的文本欄**（含 `c_notes` 這類自由文字）落庫前都會依 `char_variant_map` 把變體字改寫成參考字。使用者送 `淸` 存進去會變成 `清`。

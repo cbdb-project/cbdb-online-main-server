@@ -28,12 +28,24 @@ CBDB 目前**只有「人物」做到了這一點**，其餘實體都停在「�
 - 子資源：`ALTNAME_DATA`、`BIOG_ADDR_DATA`、`BIOG_TEXT_DATA`、`BIOG_SOURCE_DATA`、`ENTRY_DATA`、`STATUS_DATA`、`EVENTS_DATA`、`ASSOC_DATA`、`KIN_DATA`、`POSSESSION_DATA`、`BIOG_INST_DATA`、`POSTED_TO_OFFICE_DATA`（＋`POSTED_TO_ADDR_DATA`）
 - 抽象狀態：**聚合根已建立**。13 個 React 編輯器與 `/api/v2/*` 都走 person-scoped handler（`AbstractPersonSubresource*Handler` 等），統一做 `person_id ↔ PK` 一致性校驗、雙向鏡像同步、sentinel 幂等、`operations` ＋ `audit_log`。使用者操作的是「人物的某個子資源」，而非裸表。
 
-### 2.2 書籍／文本（Text，含 collection／instance）— ⚠ 洩漏
-- 文本本體：`TEXT_CODES`
-- 版本／實例：`TEXT_INSTANCE_DATA`（一個 text 可有多個 edition／instance）
-- 書目分類：`TEXT_BIBLCAT_CODES`、`TEXT_BIBLCAT_TYPES`、`TEXT_BIBLCAT_CODE_TYPE_REL`
-- 角色／類型：`TEXT_ROLE_CODES`、`TEXT_TYPE`
-- 聚合語義：新增一本書不只是寫一列 `TEXT_CODES`——書目導入工具還派生**拼音、朝代、`c_text_type_id`、作者關聯**；完整的「書」還牽涉 collection→instance 的層級。
+### 2.2 書籍／文本（Text，含 collection／instance）— ✅ 聚合已收斂（2026-08，step 4 封閉暫緩）
+- 文本本體：`TEXT_CODES`（識別＝`c_textid` 單鍵）
+- 版本／實例：`TEXT_INSTANCE_DATA`（一個 text 可有多個 edition／instance；聚合內以
+  `(c_text_edition_id, c_text_instance_id)` 為列鍵做集合對賬）
+- 書目分類／類型：`TEXT_BIBLCAT_CODES`、`TEXT_TYPE` 等為扁平字典（§4.1），聚合僅校驗引用。
+- 聚合語義（已落地於 `TextImportService`）：書名標準化（char_variant_map 寬鬆替換＋空白／
+  括號／冒號正規化）、拼音派生（去卷冊註記＋異體字歸一化）、`c_textid` max+1 配號、
+  稽核欄蓋章（TEXT_CODES 有 c_created_*／c_modified_*，經 AuditActor）。
+- **兩重層級**的處理：collection→instance（`TEXT_INSTANCE_DATA`）屬聚合內部、隨聚合增刪對賬；
+  `c_source` 自引用（著錄來源樹）屬**跨實體**引用——update 有成環護欄（自己／後代 422），
+  delete 的引用計數把子文獻與其他文獻版本也計入（樹中間節點不可刪）。
+- mutation resource＝`text-entity`（`text`／`texts` 是人物子資源 BIOG_TEXT_DATA 的既有別名，
+  不可重載）；專屬頁面 `/app/text`；批量匯入（AdminBatchLoadBookTitlesController）已遷至同一
+  聚合根。**step 4（封閉下層直寫）整體暫緩**：codes UI 的裸表編輯頁仍有實體頁未對齊的功能
+  （作者列表面板、instance 載入動作與部分版本欄位）；機器面的 `text-codes` 裸表 create
+  （code_table_writes）則因異體字 S5 剛把落地替換接上而維持在役，與聚合並存（比照
+  `OFFICE_CODES` 拼音欄與 office 聚合並存）。parity 補齊後把兩表加入 `closed_code_tables`
+  即自動封寫 codes UI。
 
 ### 2.3 地點（Place）— ⚠ 洩漏
 - 地名本體：`ADDRESSES`（gazetteer，帶經緯度）
@@ -125,7 +137,7 @@ CBDB 目前**只有「人物」做到了這一點**，其餘實體都停在「�
 | 實體 | 下層表 | 聚合根 | 實體級 API | 專屬前端編輯頁 | 下層直寫已封閉 | 實體級提案 |
 |---|---|---|---|---|---|---|
 | 人物 | BIOG_MAIN ＋ 12 子資源 | ✅ | ✅ CRUD | ✅（13 編輯器）| N/A（子資源即實體單位）| ✅ |
-| 書籍／文本 | TEXT_CODES ＋ INSTANCE ＋ BIBLCAT… | ❌ | 僅裸 TEXT_CODES CRUD | ❌ | ❌ | ❌（退化下層）|
+| 書籍／文本 | TEXT_CODES ＋ TEXT_INSTANCE_DATA | ✅ | ✅ CRUD（text-entity，含版本列對賬、成環護欄）| ✅（/app/text；側欄「文獻代碼表」已改指此頁）| ❌（暫緩：codes UI 待 parity——作者面板、instance 專屬欄位；`text-codes` 裸表 create 因 S5 接上落地替換而維持在役）| ❌（同 office／social，走通用 handler 的聚合意圖提案）|
 | 地點 | ADDRESSES ＋ ADDR_CODES ＋ … | ❌ | ❌ | ❌ | ❌ | ❌ |
 | 官職 | OFFICE_CODES ＋ TYPE_REL | ✅ | ✅ CRUD | ✅（/app/office，與裸表頁 feature parity 的超集；側欄「任官編碼表」已改指此頁）| ✅（codes 寫入封閉，讀取／匯出開放）| ❌（裸表提案一併封閉、標示未支援，待實體級提案）|
 | 社交機構 | NAME_CODES ＋ CODES ＋ ADDR | ✅ | ✅ CRUD | ✅（/app/social-institution，識別＝c_inst_code；側欄「社會機構編碼表」已改指此頁）| ✅（NAME_CODES／CODES／ADDR 三表 codes 寫入封閉，讀取開放）| ❌（裸表提案一併封閉、標示未支援，待實體級提案）|
@@ -143,7 +155,7 @@ CBDB 目前**只有「人物」做到了這一點**，其餘實體都停在「�
 3. **補齊實體級 update／delete**（複合資源的改／刪必須連帶配套表），並建立**專屬前端實體編輯頁**。
 4. **封閉下層 `codes` CRUD 的寫入**（改只讀或路由到聚合根），並**升級 proposal 為實體級**。
 
-橫向優先級建議：先收斂 **office → social institution**（已有明確存儲過程、批量工具現成），再處理 **text（含 instance）**與 **place（含座標）**這兩個層級更深的實體。
+橫向優先級建議：先收斂 **office → social institution**（已有明確存儲過程、批量工具現成），再處理 **text（含 instance，✅ 2026-08 已收斂至 step 3；step 4 封閉暫緩）**與 **place（含座標）**這兩個層級更深的實體。
 
 ### 6.5 橫向複用架構（entity aggregate framework，2026-07 落地）
 

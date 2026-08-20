@@ -3,10 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Operation;
-use App\Models\TextCode;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
-use App\Services\CharVariantMapService;
+use App\Services\Import\TextImportService;
 use App\Services\PinyinDictionary;
 use App\Services\VariantCharNormalizer;
 use App\Support\PinyinUmlaut;
@@ -29,7 +28,11 @@ class AdminBatchLoadBookTitlesController extends Controller {
      */
     protected $toolsRepository;
 
-    public function __construct(OperationRepository $operationRepository, ToolsRepository $toolsRepository) {
+    public function __construct(
+        OperationRepository $operationRepository,
+        ToolsRepository $toolsRepository,
+        protected TextImportService $textImportService
+    ) {
         $this->operationRepository = $operationRepository;
         $this->toolsRepository = $toolsRepository;
     }
@@ -112,55 +115,33 @@ class AdminBatchLoadBookTitlesController extends Controller {
         $batchId = $this->generateBatchId();
         $results = [];
 
+        // 存儲過程（配號、書名標準化、拼音派生、稽核）已抽到 TextImportService 聚合根
+        // （docs/ENTITY_AGGREGATE_ARCHITECTURE.md §6 step 2），與 mutation API（resource=
+        // text-entity）共用同一實作；本控制器保留批次語義（解析、批前校驗、batch 標記、撤回）。
         DB::transaction(function () use (&$results, $rows, $batchId) {
-            $nextId = (int) DB::table('TEXT_CODES')->max('c_textid');
-            if ($nextId < 0) {
-                $nextId = 0;
-            }
-
             foreach ($rows as $row) {
-                $nextId++;
-
-                $normalizedTitle = $this->normalizeTitle($row['title']);
-                $titleWithoutVolume = $this->stripVolumeInfo($row['title']);
-                $pinyinTitle = $this->buildPinyin($titleWithoutVolume);
                 $dynasty = $this->lookupDynasty($row['author_id']);
 
-                $payload = [
-                    'c_textid' => $nextId,
-                    'c_title_chn' => $normalizedTitle,
-                    'c_title' => $pinyinTitle,
-                    'c_text_type_id' => '01',
-                    'c_text_dy' => $dynasty,
-                    'c_source' => $row['source'],
-                    'c_notes' => '[' . $batchId . ']',
-                ];
-
-                $payload = $this->toolsRepository->timestamp($payload, true);
-
-                TextCode::create($payload);
-
-                $this->operationRepository->store(
-                    Auth::id(),
-                    '',
-                    1,
-                    'TEXT_CODES',
-                    $nextId,
-                    $payload
-                );
+                $created = $this->textImportService->create([
+                    'title' => $row['title'],
+                    'type_id' => '01',
+                    'dynasty_code' => $dynasty !== null ? (int) $dynasty : null,
+                    'source_id' => (int) $row['source'],
+                    'notes' => '[' . $batchId . ']',
+                ]);
 
                 $results[] = [
                     'line' => $row['line'],
                     'author_id' => $row['author_id'],
-                    'title' => $normalizedTitle,
-                    'title_pinyin' => $pinyinTitle,
+                    'title' => $created['title'],
+                    'title_pinyin' => $created['title_pinyin'],
                     'source' => $row['source'],
                     'dynasty' => $dynasty,
-                    'text_type' => $payload['c_text_type_id'],
-                    'notes' => $payload['c_notes'],
-                    'created_by' => $payload['c_created_by'] ?? null,
-                    'created_date' => $payload['c_created_date'] ?? null,
-                    'c_textid' => $nextId,
+                    'text_type' => '01',
+                    'notes' => '[' . $batchId . ']',
+                    'created_by' => $created['row']['c_created_by'] ?? null,
+                    'created_date' => $created['row']['c_created_date'] ?? null,
+                    'c_textid' => $created['textid'],
                     'variant_replacements' => $row['variant_replacements'] ?? [],
                 ];
             }
@@ -601,75 +582,24 @@ class AdminBatchLoadBookTitlesController extends Controller {
     }
 
     /**
-     * Standardize variant glyphs in the title (峯→峰) via char_variant_map, lenient
-     * mode (every row in the table applies, c_strict_excluded is ignored — this is
-     * a book-title context, not a person name). Unlike VariantCharNormalizer (which
-     * only affects the pinyin lookup and leaves the title untouched), this rewrites
-     * the stored 中文書名 itself. It is applied ONCE in parseEntries() when the row's
-     * title is first built, so every downstream consumer — c_title_chn, the pinyin
-     * (c_title) and the unpinyinable check — receives an already standardized title
-     * and the three can never disagree on which character the title contains.
+     * Standardize variant glyphs in the title (峯→峰) — delegates to the aggregate root
+     * (see TextImportService::standardizeTitleVariants for the semantics). Applied ONCE in
+     * parseEntries() when the row's title is first built, so every downstream consumer —
+     * c_title_chn, the pinyin (c_title) and the unpinyinable check — receives an already
+     * standardized title and the three can never disagree on which character it contains.
+     * （service create 內會再跑一次；對已標準化書名為冪等 no-op。）
      *
      * @return array{title: string, variant_replacements: array<int,array{from:string,to:string}>}
      */
     protected function standardizeTitleVariants(string $title): array {
-        $result = CharVariantMapService::replaceLenient($title);
-
-        // 用 flattenReplaced() 而不是自己 foreach：replaced 的值在衝突時會是 list
-        // （見 CharVariantMapService::mergeReplaced()），直接 foreach 會讓 'to' 變成陣列、
-        // JSON 化後打壞批次結果頁的契約（Pages/Admin/BatchLoadBookTitles/Index.tsx）。
-        return [
-            'title' => $result['text'],
-            'variant_replacements' => CharVariantMapService::flattenReplaced($result['replaced']),
-        ];
+        return $this->textImportService->standardizeTitleVariants($title);
     }
 
     /**
-     * Remove redundant punctuation/spaces from the supplied title.
-     */
-    protected function normalizeTitle(string $title): string {
-        $title = preg_replace('/\s+/u', '', $title);
-        $title = str_replace(['（', '）'], ['(', ')'], $title);
-        $title = preg_replace('/[:：]\s*/u', ': ', $title);
-
-        return trim($title);
-    }
-
-    /**
-     * Remove volume/annotation info trailing after colon characters.
+     * Remove volume/annotation info trailing after colon characters（委派聚合根，語義單源）。
      */
     protected function stripVolumeInfo(string $title): string {
-        return trim(preg_replace('/[:：].*$/u', '', $title));
-    }
-
-    /**
-     * Convert Chinese title to a space-separated pinyin string.
-     */
-    protected function buildPinyin(string $title): string {
-        // 標準化異體字（僅用於拼音轉換，不修改原始標題）
-        $normalizedTitle = VariantCharNormalizer::normalize($title);
-
-        $chars = preg_split('//u', $normalizedTitle, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-        $syllables = [];
-
-        foreach ($chars as $char) {
-            if (preg_match('/\p{Han}/u', $char)) {
-                $syllables[] = strtolower(PinyinDictionary::getPinyin($char));
-            } elseif (preg_match('/[A-Za-z0-9]/u', $char)) {
-                $syllables[] = strtolower($char);
-            }
-        }
-
-        $syllables = array_filter($syllables, static function ($syllable) {
-            return $syllable !== '';
-        });
-
-        if (empty($syllables)) {
-            return strtolower(trim(preg_replace('/\s+/u', ' ', $normalizedTitle)));
-        }
-
-        // 止血：把生成拼音中殘留的 v 代寫正規化為 ü。
-        return PinyinUmlaut::normalize(implode(' ', $syllables));
+        return $this->textImportService->stripVolumeInfo($title);
     }
 
     /**

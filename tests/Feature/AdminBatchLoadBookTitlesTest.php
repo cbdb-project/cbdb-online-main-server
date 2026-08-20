@@ -80,6 +80,22 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             $table->smallInteger('rate')->default(0);
         });
 
+        // TextImportService（store() 已改走聚合根）除 operations 外亦寫 audit_log。
+        Schema::create('audit_log', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->dateTime('occurred_at');
+            $table->dateTime('created_at');
+            $table->string('table_name', 64);
+            $table->string('operation', 16);
+            $table->string('actor_type', 32);
+            $table->string('actor_id', 128);
+            $table->string('operation_id', 64);
+            $table->text('row_pk');
+            $table->string('row_pk_text', 512)->nullable();
+            $table->longText('old_data')->nullable();
+            $table->longText('new_data')->nullable();
+        });
+
         Schema::create('pinyin', function (Blueprint $table) {
             $table->increments('id');
             $table->string('c_chn');
@@ -119,6 +135,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
 
     protected function tearDown(): void {
         Schema::dropIfExists('pinyin');
+        Schema::dropIfExists('audit_log');
         Schema::dropIfExists('char_variant_map');
         Schema::dropIfExists('operations');
         Schema::dropIfExists('BIOG_MAIN');
@@ -226,7 +243,9 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $this->assertSame((string) $record->c_textid, $operation->resource_id);
         $encoded = json_decode($operation->resource_data, true);
         $this->assertSame('ce shi gao', $encoded['c_title']);
-        $this->assertSame('54321', $encoded['c_source']);
+        // TextImportService（聚合根）落庫前把 c_source 轉整數（prod 欄位本為 int），
+        // operations 快照隨之為整數；原內聯實作存的是使用者輸入字串。
+        $this->assertSame(54321, $encoded['c_source']);
         $this->assertSame($record->c_notes, $encoded['c_notes']);
 
         $followUp = $this->get(route('admin.batch-load-book-titles'));

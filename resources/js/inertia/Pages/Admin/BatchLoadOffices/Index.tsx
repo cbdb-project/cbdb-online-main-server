@@ -3,6 +3,7 @@ import { useForm, usePage } from '@inertiajs/react';
 import DashboardLayout from '../../../Layouts/DashboardLayout';
 import { Button } from '../../../components/ui/Button';
 import { FormField } from '../../../components/ui/FormField';
+import { LineNumberedTextarea } from '../../../components/ui/LineNumberedTextarea';
 import { useTranslation } from '../../../hooks/useTranslation';
 import type { SharedProps } from '../../../types/page';
 
@@ -54,14 +55,10 @@ export default function BatchLoadOffices() {
 
                 <form onSubmit={(e) => { e.preventDefault(); form.post(urls.store, { preserveScroll: true }); }}>
                     <FormField label={t('batch_data_tab_sep')} htmlFor="entries" error={form.errors.entries}>
-                        <textarea
-                            id="entries"
-                            rows={10}
-                            spellCheck={false}
-                            className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            placeholder={t('batch_offices_placeholder')}
+                        <LineNumberedTextarea
                             value={form.data.entries}
-                            onChange={(e) => form.setData('entries', e.target.value)}
+                            onChange={(v) => form.setData('entries', v)}
+                            placeholder={t('batch_offices_placeholder')}
                         />
                     </FormField>
                     <div className="flex gap-2">

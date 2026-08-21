@@ -480,6 +480,33 @@ validate 與 service，所以替換與標籤歸一自動生效；已補
 - 修掉 G4 的不一致：`TEXT_CODES.c_title_chn` 兩路徑對齊。
 - 測試：create 含「淸」的 `c_title_chn` → 落庫「清」，且與書名批次匯入同輸入同結果；`char_variant_map` 自身不被替換；單 codepoint 驗證回 422。
 
+#### S5 執行結果補記
+
+- **`char_variant_map` 的 guard 在 S3 已經做完**（守衛與快取重置下移到 `CodeTableCreateHandler`、
+  `AbstractCodeTableMutationHandler` 的 direct 與 proposal、以及通用核准的
+  `applyCreateProposal()`／`applyUpdateProposal()`），S5 只補替換本身。
+- **G4 的不一致真正發生在 create 路徑**：`config/code_table_writes.php`（create 用）有
+  `TEXT_CODES.c_title_chn`，而 `config/code_table_mutations.php`（update 用）沒有中文標題欄。
+  三條路徑（Codes UI／書名批次匯入／token API create）現在對同一個「淸嘉錄」都得「清嘉錄」。
+- **一個曾經寫錯、由 review 糾正的判斷**：我原本以為 update config「只開放拼音／拉丁欄」、
+  掛鉤是 no-op。實際上 **`TEXT_INSTANCE_DATA.c_publisher` 是不帶 `_chn` 後綴的中文欄**
+  （本計畫 D3 自己列的 8 個同類欄之一，且不在任何排除清單），所以 update 掛鉤今天就是活的。
+  相關註解已改正，測試主鎖也換成 `c_publisher` 的真實情境（另有 422 那條鎖住「替換跑在
+  變更偵測之前」、proposal 那條鎖住 payload 與核准重放一致）。
+- **代碼表 create 今天沒有 D7 缺口，但前提要寫下來**：`code_table_writes.php` 只登錄
+  `TEXT_CODES`（`c_textid` int）與 `char_variant_map`（`id` int），且 handler 一律 `(int)` 轉主鍵，
+  文本型主鍵的表根本無法登錄。已在該 config 加註：日後要登錄文本型主鍵的代碼表，必須先
+  移除那個 `(int)` 轉型並補 D7 查重——`VariantEquivalentLookup::findExistingRow()` 在
+  「主鍵全部都在替換範圍內」時只記 warning 就跳過（沒有能收斂候選集的 SQL 條件），
+  單一文本主鍵正好落在那個分支。
+- **`API.md` 已在本步同步**（依 AGENTS.md 的文檔維護原則，API 改動不延後）：notices 的涵蓋
+  範圍改成「人物主檔＋所有人物子資源＋代碼表 create／update＋實體聚合」，並明寫
+  **失敗回應（409／422）也可能帶 notices**；同時修掉兩處已過時的敘述——「只有
+  `c_alt_name_chn` 會產生 notices」與「異體字只做嚴格替換」（S3 之後同列的一般文本欄走
+  全量規則，所以會出現「別名欄保留某異體字、同列 `c_notes` 裡同一個字被替換」的刻意差異）。
+- 尚未對齊的**非字形**差異（不屬 G4，S9 記一句）：書名批次匯入獨有的標點／空白收斂
+  （`normalizeTitle()`）、簡體字形與無拼音把關、拼音派生，token API create 沒有這些門檻。
+
 ### S6：提案核准的直接寫庫分支（G5）
 
 - **主分支先說清**：`applyProposal():405` 把 `HANDLER_ROUTED_RESOURCES` 內的資源導到 `applyViaMutationHandler():483` 以 v2 direct handler 重放，所以**大多數人物子資源提案由 S3 的基底掛鉤自動覆蓋**，走不到下面兩條。

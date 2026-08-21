@@ -23,6 +23,7 @@ use Illuminate\Support\Str;
  * 呼叫端仍須依 MutationController 契約傳 person_id，通常為 0）。
  */
 abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler {
+    use \App\Services\Mutations\Concerns\AppliesVariantReplacement;
     use \App\Services\Mutations\Concerns\GuardsCharVariantMapWrites;
     protected OperationRepository $operationRepository;
     protected AuditLogService $auditLogService;
@@ -122,6 +123,19 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
         // 保存前處理（如 §D-6 Tier 1 拼音 v→ü 歸一化）；於變更偵測前，確保冪等（已是 ü→不觸發更新）。
         $updateData = $this->preprocessUpdateData($updateData);
 
+        // 異體字落地替換（型別驅動）。同樣必須在**變更偵測之前**：使用者把變體形改成
+        // 參考形時，比較的雙方要是替換後的值，否則「送變體形、現值已是參考形」會被判成
+        // 有變更而寫一次無意義的 UPDATE，反之也可能漏掉真正的變更。
+        //
+        // 這條掛鉤**今天就是活的**：`config/code_table_mutations.php` 多數表只開放拼音／
+        // 拉丁欄（對它們替換是恆等映射，因為對照表的鍵都是漢字），但
+        // `TEXT_INSTANCE_DATA.c_publisher` 是不帶 `_chn` 後綴的中文欄（見 plan D3 列的
+        // 8 個同類欄），送「淸華書局」會落庫「清華書局」。別因為「看起來全是拼音欄」
+        // 就把這裡當成 no-op 而移除。
+        // char_variant_map 自身在 EXCLUDED_TABLES（替換等於自我吞噬），不受影響。
+        $this->resetVariantReplaced();
+        $updateData = $this->applyVariantReplacement($updateData);
+
         // 檢查是否有實際變更
         $originalArray = $this->auditLogService->normalizeRow($original);
         $hasEffectiveChange = false;
@@ -133,9 +147,11 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
             }
         }
         if (!$hasEffectiveChange) {
-            return $this->errorResponse('未偵測到任何修改內容', 422, [
+            // 使用者送的字被歸一成與現值相同時，422 也要帶 notices，
+            // 否則「未偵測到任何修改內容」看起來毫無道理（對齊人物子資源 handler）。
+            return $this->withVariantNotices($this->errorResponse('未偵測到任何修改內容', 422, [
                 'changes' => ['no_effective_changes'],
-            ]);
+            ]));
         }
 
         $resourceId = CompositePrimaryKey::buildStoredResourceId($pk);
@@ -209,7 +225,7 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
 
         $this->resetVariantMapCacheIfNeeded($table);
 
-        return response()->json([
+        return $this->withVariantNotices(response()->json([
             'ok' => true,
             'resource' => $this->resourceName(),
             'mode' => 'direct',
@@ -220,7 +236,7 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
                 'operation_id' => $operation?->id,
                 'row' => $newArray,
             ],
-        ]);
+        ]));
     }
 
     protected function handleProposal(int $personId, array $pk, string $resourceId, array $updateData, array $originalArray, string $comment): JsonResponse {
@@ -256,7 +272,9 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
             $originalArray
         );
 
-        return response()->json([
+        // 提案 payload 已是替換後的值（掛鉤在 mode 分派之前），所以提案回應也要帶 notices
+        // ——否則提案人不知道自己送的字形在審核畫面上已被改過。
+        return $this->withVariantNotices(response()->json([
             'ok' => true,
             'resource' => $this->resourceName(),
             'mode' => 'proposal',
@@ -267,7 +285,7 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
                 'status' => 'proposal_updated',
                 'operation_id' => $operation?->id,
             ],
-        ]);
+        ]));
     }
 
     /**

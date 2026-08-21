@@ -561,6 +561,39 @@ validate 與 service，所以替換與標籤歸一自動生效；已補
 - `UnidirectionalRelationshipRepairController::executeRepair()`（insert `:190`）：建鏡像列時逐字複製 `c_text_title`／`c_notes`，落庫前套。
 - 測試：v1 端點提交含「淸」的人物提案 → payload 已替換；經 `confirm()` 回填後 `BIOG_MAIN` 為「清」；另補「提案 payload 未替換（模擬歷史資料）→ 回填時仍替換」鎖住雙保險。
 
+#### S7 執行結果補記
+
+四個區塊都串上了，但 review 找出**兩個「修一半比不修更糟」的形狀**，以及三項邊界問題：
+
+1. **修復工具只能替換非主鍵欄**（HIGH）。`ASSOC_DATA.c_text_title` 既是主鍵成員、也是鏡像的
+   **定位鍵**（`RelationshipMirrorService::reverseRelationExists()`／`locateOppositeEdges()` 都拿
+   正向列的原字形做精確比對）。只把補建的鏡像歸一會造成：(a) 缺邊偵測仍以正向列的變體形去找
+   ⇒ 找不到新鏡像 ⇒ 這對關係永遠被報成單向、修復按鈕修不掉；(b) 再按一次修復同樣找不到 ⇒
+   再插一次同樣的列 ⇒ 撞唯一鍵、整筆回滾，工具失去幂等；(c) 對面若已有另一個變體形的鏡像，
+   兩者 PK 不同又都歸一成同一形 ⇒ 靜默鑄出重複列。
+   所以修復路徑排除主鍵成員（`c_notes`／`c_pages` 等內容欄照樣歸一），鏡像與正向列保持同形；
+   真正的收斂留給「使用者下次經編輯器觸碰這段關係」（S3 的觸碰即歸一，那條路有 D7 守衛）。
+2. **`confirm()` 的替換不可溢出到「只刪不寫」的分支**。`op_type=4` 的三個 `OFFICE_*` 分支只做
+   `$biog->delete()`、完全不寫 `$data`，卻仍把它存成 operations 快照——而那份快照是
+   `restoreDelete()` 重建被刪列的依據。替換它等於「還原出一列從未存在過的字形」，也違反
+   「快照＝當時實際發生什麼」（v1 的 `resource_original` 同理不替換）。改為保留未替換的
+   `$originalData` 給這三個分支。
+3. **`VariantReplaceScope` 的型別快取毒化**（S1 註解自己警告過的失效模式，S7 是第一個把
+   **未驗證外部字串**送進來的呼叫點）。`isKnownDataTable()` 大小寫／空白不敏感，但
+   `textColumns()` 以正規化名當快取鍵、卻用原始字串查 schema ⇒ `" BIOG_MAIN "` 會查到空欄位集
+   並被三層快取記住，該表在這個 process 之後都不替換。修法：`loadKnownTables()` 改存 canonical
+   拼法、新增 `canonicalTableName()`、`textColumns()` 一律用 canonical 名查 schema。
+   **但兩個外部入口（v1／confirm）刻意收斂成「表名必須與註冊表拼法完全相同才替換」**——
+   下游分派本來就是精確比對，把 canonical 名套進分派等於放寬未驗證字串能觸發寫入的範圍。
+4. **複製工具的歸一撞鍵**：`Duplicate_Collateral_Info()` 逐列複製時，替換會把「同一人底下只差
+   字形的兩列」壓成同一個主鍵，第二次 insert 撞唯一鍵讓整個複製交易回滾 ⇒ 該功能對這些人物
+   永久失敗且沒有可行動訊息（違反 §1.1「撞鍵轉友好報錯」）。改為保留第一列、跳過等價列並記
+   warning。
+5. 已知且刻意接受：v1「payload 已替換 vs `resource_original` 未替換」會讓審核頁的 diff 出現
+   使用者沒動過的欄位（含變體字的 `c_notes` 等）——這是掛鉤在提交端的必然結果，S9 的 CHANGELOG
+   會記一句。另外 re-encode 除了鍵序／escaping，理論上還會把 `{}` 變 `[]`；所有現有消費者都是
+   decode 後使用，assoc 模式下不可見，判定無實害。
+
 ### S8：把「新增文本錄入必須掛落地替換」寫成常規
 
 **硬性關卡，不得因時間壓力跳過。** 本階段價值有一半在「以後不會再漏」——第二階段之所以漏掉 19 個 handler，正是因為當時沒有任何機制會在漏掉時發出聲音。

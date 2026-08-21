@@ -295,7 +295,10 @@ final class VariantReplaceScope {
         }
 
         if (!array_key_exists($t, self::$columnTypes)) {
-            self::$columnTypes[$t] = self::loadColumnTypes($table);
+            // 用 canonical 名查 schema：快取鍵是正規化名，但查詢必須用註冊表的原始拼法，
+            // 否則「BIOG_MAIN 」（尾空白）這種外部字串會查到空結果並被快取住，
+            // 讓該表在這個 process 之後都不替換（S1 註解警告過的靜默失效模式）。
+            self::$columnTypes[$t] = self::loadColumnTypes(self::canonicalTableName($table) ?? $table);
         }
 
         if (!array_key_exists($t, self::$textColumnCache)) {
@@ -325,6 +328,21 @@ final class VariantReplaceScope {
         }
 
         return isset(self::$knownTables[self::normalize($table)]);
+    }
+
+    /**
+     * 把（可能來自外部、大小寫／空白不精確的）表名換成註冊表裡的原始拼法。
+     *
+     * 未知表回 null——呼叫端據此走 fail-closed，也避免把未驗證字串送進 Schema 查詢。
+     */
+    public static function canonicalTableName(string $table): ?string {
+        if (self::$knownTables === null) {
+            self::$knownTables = self::loadKnownTables();
+        }
+
+        $canonical = self::$knownTables[self::normalize($table)] ?? null;
+
+        return is_string($canonical) ? $canonical : null;
     }
 
     /** 清快取。**必須在 TestCase::setUp() 呼叫**——測試自建的合成表在不同檔案有不同欄位集。 */
@@ -365,10 +383,14 @@ final class VariantReplaceScope {
             }
         }
 
+        // 值存**註冊表裡的原始拼法**（不是 true）：外部字串（例如 v1 token API 的 resource）
+        // 可能帶大小寫差異或前後空白，正規化後雖然通得過 isKnownDataTable()，但拿原字串去查
+        // schema 會查不到欄位、而那個空結果會被三層快取記住 ⇒ 該表在這個 process 之後都不
+        // 替換。所以要能把外部字串換成 canonical 名再去查 schema。
         $set = [];
         foreach ($names as $name) {
             if ($name !== '') {
-                $set[self::normalize($name)] = true;
+                $set[self::normalize($name)] = $name;
             }
         }
 

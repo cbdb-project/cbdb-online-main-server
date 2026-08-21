@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
+use App\Services\CharVariantMapService;
 use App\Services\RelationshipMirrorService;
+use App\Support\CompositePrimaryKey;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -186,6 +189,24 @@ class UnidirectionalRelationshipRepairController extends Controller {
             // 創建反向關係記錄
             $newRelation = $this->buildReverseRelation($type, $relation, $params);
             $newRelation = $this->toolsRepository->timestamp($newRelation, true);
+            // 異體字落地替換：只替換**非主鍵欄**（c_notes／c_pages 等內容欄），主鍵成員一律不動。
+            //
+            // 為什麼主鍵成員必須排除（review 抓到的資料完整性問題）：`ASSOC_DATA.c_text_title`
+            // 既是主鍵成員、也是鏡像的**定位鍵**（RelationshipMirrorService::locateOppositeEdges()
+            // 與 reverseRelationExists() 都拿正向列的原字形做精確比對）。若只把補建的鏡像歸一：
+            //   1. 缺邊偵測仍以正向列的變體形去找 ⇒ 找不到新鏡像 ⇒ 這對關係永遠被報成單向；
+            //   2. 使用者再按一次修復，`reverseRelationExists()` 同樣找不到 ⇒ 再插一次同樣的列
+            //      ⇒ 撞唯一鍵 1062、整筆回滾，修復工具失去幂等；
+            //   3. 對面若已有另一個變體形的鏡像，兩者 PK 不同又都歸一成同一形 ⇒ 靜默鑄出重複列。
+            // 這個工具的職責是「補一條與正向列成對的反向邊」，所以鏡像必須與正向列同形。
+            // 真正的收斂發生在使用者下次**經編輯器觸碰**這段關係時（S3 的「觸碰即歸一」會把
+            // 正向與鏡像一起改名，且該路徑有 D7 守衛）。
+            $keyColumns = CompositePrimaryKey::SCHEMAS[(string) $config['table']] ?? [];
+            $replaceableColumns = Arr::except($newRelation, $keyColumns);
+            $newRelation = array_replace(
+                $newRelation,
+                CharVariantMapService::replaceRow($replaceableColumns, (string) $config['table'])['data']
+            );
 
             DB::table($config['table'])->insert($newRelation);
 

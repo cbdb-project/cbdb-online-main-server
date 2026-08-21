@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\CharVariantMapService;
+use App\Support\VariantReplaceScope;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -65,6 +67,7 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase {
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('char_variant_map');
         // 按照依赖关系顺序删除表（先删除有外键约束的表）
         Schema::dropIfExists('operations');
         Schema::dropIfExists('audit_log');
@@ -1347,5 +1350,84 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase {
                 && ($rowPk['c_assoc_id'] ?? null) == $person1->c_personid
                 && ($rowPk['c_assoc_code'] ?? null) == 5;
         }));
+    }
+
+    /**
+     * 異體字落地替換（plan S7）：修復工具**不可**替換主鍵／定位鍵成員。
+     *
+     * `ASSOC_DATA.c_text_title` 既是主鍵成員也是鏡像定位鍵（`reverseRelationExists()` 與
+     * `locateOppositeEdges()` 都拿正向列的原字形做精確比對）。若把補建的鏡像歸一：
+     *   1. 缺邊偵測仍以正向列的變體形去找 ⇒ 找不到新鏡像 ⇒ 永遠被報成單向；
+     *   2. 再按一次修復同樣找不到 ⇒ 再插一次同樣的列 ⇒ 撞唯一鍵、整筆回滾（失去幂等）。
+     * 所以鏡像的 c_text_title 必須與正向列同形，而 c_notes 這類**非鍵**內容欄照樣歸一。
+     */
+    #[Test]
+    public function assoc_repair_keeps_key_glyph_paired_but_normalizes_content_columns() {
+        Schema::create('char_variant_map', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->string('c_variant_char', 10);
+            $table->string('c_reference_char', 10);
+            $table->tinyInteger('c_strict_excluded')->default(1);
+            $table->string('c_notes', 255)->nullable();
+            $table->timestamps();
+            $table->unique('c_variant_char', 'char_variant_map_c_variant_char_unique');
+        });
+        DB::table('char_variant_map')->insert([
+            ['c_variant_char' => '淸', 'c_reference_char' => '清', 'c_strict_excluded' => 0],
+        ]);
+        CharVariantMapService::reset();
+        VariantReplaceScope::reset();
+
+        $person1 = $this->createTestPerson();
+        $person2 = $this->createTestPerson();
+
+        DB::table('ASSOC_DATA')->insert([
+            'c_personid' => $person1->c_personid,
+            'c_assoc_id' => $person2->c_personid,
+            'c_assoc_code' => 4,
+            'c_kin_code' => 0,
+            'c_kin_id' => 0,
+            'c_assoc_kin_code' => 0,
+            'c_assoc_kin_id' => 0,
+            'c_text_title' => '淸文獻',
+            'c_assoc_first_year' => 1000,
+            'c_inst_code' => 0,
+            'c_inst_name_code' => 0,
+            'c_source' => 200,
+            'c_pages' => '20-25',
+            'c_notes' => '淸代備註',
+        ]);
+
+        $payload = [
+            'c_personid' => $person1->c_personid,
+            'c_assoc_id' => $person2->c_personid,
+            'c_assoc_code' => 4,
+            'new_c_assoc_code' => 5,
+        ];
+
+        $this->actingAs($this->adminUser)
+            ->postJson(route('admin.unidirectional-relationship-repair.assoc'), $payload)
+            ->assertStatus(200);
+
+        $mirror = DB::table('ASSOC_DATA')
+            ->where('c_personid', $person2->c_personid)
+            ->where('c_assoc_id', $person1->c_personid)
+            ->first();
+        $this->assertNotNull($mirror, '應補建反向關係');
+        $this->assertSame('淸文獻', $mirror->c_text_title, '主鍵／定位鍵成員必須與正向列同形');
+        $this->assertSame('清代備註', $mirror->c_notes, '非鍵內容欄照樣歸一');
+
+        // 幂等：再按一次修復要得到「反向關係已存在」的乾淨 400，而不是撞唯一鍵回滾。
+        $this->actingAs($this->adminUser)
+            ->postJson(route('admin.unidirectional-relationship-repair.assoc'), $payload)
+            ->assertStatus(400);
+
+        $this->assertSame(
+            2,
+            DB::table('ASSOC_DATA')->count(),
+            '不得插出第三列（正向 + 鏡像共 2 列）'
+        );
+
+        Schema::dropIfExists('char_variant_map');
     }
 }

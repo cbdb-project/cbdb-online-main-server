@@ -24,6 +24,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
@@ -1976,6 +1977,10 @@ class BasicInformationController extends Controller {
         $data['c_personid'] = $new_id;
         $data = $this->toolRepository->timestamp($data, true); //建檔資訊
         $data['c_modified_by'] = $data['c_modified_date'] = '';
+        // 異體字落地替換：這是「複製既有列」而非新錄入，但既然要複製出**一列新資料**，
+        // 就該複製成正規化後的字形（否則另存出來的人物永遠帶著舊字形，而且新列不受
+        // D6「不回溯校正」保護的理由——它不是既有資料）。
+        $data = CharVariantMapService::replaceRow($data, 'BIOG_MAIN')['data'];
         $flight = null;
         DB::transaction(function () use (&$flight, $data, $new_id) {
             $flight = BiogMain::create($data);
@@ -2003,6 +2008,43 @@ class BasicInformationController extends Controller {
     }
 
     //20240701新增Duplicate Collateral Info功能
+    /**
+     * 複製工具用的「歸一後主鍵」去重器。
+     *
+     * 為什麼需要：`Duplicate_Collateral_Info()` 逐列複製子表，而異體字替換會把「同一人底下
+     * 只差字形的兩列」（例如 `c_pages` = `淸一` 與 `清一`、或 `c_text_title` 同理）壓成**同一個
+     * 主鍵**。第二次 insert 就撞唯一鍵、整個 DB::transaction 回滾 ⇒ 複製功能對這些人物永久
+     * 失敗，而且沒有可行動的訊息（AGENTS.md §1.1 要求撞鍵轉友好報錯）。
+     *
+     * 這裡改成「保留第一列、跳過後續等價列並記 warning」：複製本來就是便利功能，
+     * 少一列語義重複的資料比整個功能失敗好，而原始資料完全不動（D6）。
+     *
+     * @param array<string,mixed> $row 替換後的列
+     * @param array<string,bool> $seen 呼叫端持有的已見主鍵集（by reference）
+     */
+    protected function shouldSkipDuplicateAfterVariantReplacement(string $table, array $row, array &$seen): bool {
+        $keyColumns = CompositePrimaryKey::SCHEMAS[$table] ?? [];
+        if ($keyColumns === []) {
+            return false;
+        }
+
+        $fingerprint = [];
+        foreach ($keyColumns as $column) {
+            $fingerprint[] = (string) ($row[$column] ?? '');
+        }
+        $fingerprint = $table.'|'.implode('|', $fingerprint);
+
+        if (isset($seen[$fingerprint])) {
+            Log::warning('複製時跳過異體字歸一後重複的列', ['table' => $table, 'fingerprint' => $fingerprint]);
+
+            return true;
+        }
+
+        $seen[$fingerprint] = true;
+
+        return false;
+    }
+
     public function Duplicate_Collateral_Info($id) {
         if (!Auth::check()) {
             flash('請登入後編輯 @ '.Carbon::now(), 'error');
@@ -2018,11 +2060,17 @@ class BasicInformationController extends Controller {
         $flight = null;
         $new_id = BiogMain::max('c_personid') + 1;
 
-        DB::transaction(function () use (&$flight, $id, $new_id, $auditLogService) {
+        // 替換後可能把「只差字形的兩列」壓成同一個主鍵，逐表記錄已見主鍵以便跳過（見
+        // shouldSkipDuplicateAfterVariantReplacement()）。
+        $seenKeys = [];
+
+        DB::transaction(function () use (&$flight, $id, $new_id, $auditLogService, &$seenKeys) {
             $data = BiogMain::find($id)->toArray();
             $data['c_personid'] = $new_id;
             $data = $this->toolRepository->timestamp($data, true); //建檔資訊
             $data['c_modified_by'] = $data['c_modified_date'] = '';
+            // 異體字落地替換（同 saveas()：複製出的是新列，要複製成正規化後的字形）。
+            $data = CharVariantMapService::replaceRow($data, 'BIOG_MAIN')['data'];
 
             $flight = BiogMain::create($data);
             $operation = $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_MAIN', $new_id, $data);
@@ -2052,6 +2100,13 @@ class BasicInformationController extends Controller {
                 $addr_data['c_personid'] = $new_id;
                 $addr_data = Arr::except($addr_data, ['_token']);
                 $addr_data = $this->toolRepository->timestamp($addr_data, true); //建檔資訊
+                // 異體字落地替換：複製出的是**新列**，要複製成正規化後的字形；且必須早於下面
+                // operations／audit 的 resource_id 與 row_pk 組裝（BIOG_SOURCE_DATA 的 c_pages、
+                // ASSOC_DATA 的 c_text_title 都是文本型主鍵成員，三者必須看到同一個字形）。
+                $addr_data = CharVariantMapService::replaceRow($addr_data, 'BIOG_ADDR_DATA')['data'];
+                if ($this->shouldSkipDuplicateAfterVariantReplacement('BIOG_ADDR_DATA', $addr_data, $seenKeys)) {
+                    continue;
+                }
                 DB::table('BIOG_ADDR_DATA')->insert($addr_data);
                 $operation = $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_ADDR_DATA', CompositePrimaryKey::buildStoredResourceId([
                     'c_personid' => $addr_data['c_personid'],
@@ -2085,6 +2140,13 @@ class BasicInformationController extends Controller {
                 $source_data = (array)$source_data;
                 $source_data['c_personid'] = $new_id;
                 $source_data = Arr::except($source_data, ['_token']);
+                // 異體字落地替換：複製出的是**新列**，要複製成正規化後的字形；且必須早於下面
+                // operations／audit 的 resource_id 與 row_pk 組裝（BIOG_SOURCE_DATA 的 c_pages、
+                // ASSOC_DATA 的 c_text_title 都是文本型主鍵成員，三者必須看到同一個字形）。
+                $source_data = CharVariantMapService::replaceRow($source_data, 'BIOG_SOURCE_DATA')['data'];
+                if ($this->shouldSkipDuplicateAfterVariantReplacement('BIOG_SOURCE_DATA', $source_data, $seenKeys)) {
+                    continue;
+                }
                 DB::table('BIOG_SOURCE_DATA')->insert($source_data);
                 $operation = $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_SOURCE_DATA', CompositePrimaryKey::buildStoredResourceId([
                     'c_personid' => $source_data['c_personid'],
@@ -2116,6 +2178,13 @@ class BasicInformationController extends Controller {
                 $kin_data = (array)$kin_data;
                 $kin_data['c_personid'] = $new_id;
                 $kin_data = $this->toolRepository->timestamp($kin_data, true); //建檔資訊
+                // 異體字落地替換：複製出的是**新列**，要複製成正規化後的字形；且必須早於下面
+                // operations／audit 的 resource_id 與 row_pk 組裝（BIOG_SOURCE_DATA 的 c_pages、
+                // ASSOC_DATA 的 c_text_title 都是文本型主鍵成員，三者必須看到同一個字形）。
+                $kin_data = CharVariantMapService::replaceRow($kin_data, 'KIN_DATA')['data'];
+                if ($this->shouldSkipDuplicateAfterVariantReplacement('KIN_DATA', $kin_data, $seenKeys)) {
+                    continue;
+                }
                 DB::table('KIN_DATA')->insert($kin_data);
                 $operation = $this->operationRepository->store(Auth::id(), $new_id, 1, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
                     'c_personid' => $kin_data['c_personid'],
@@ -2147,6 +2216,13 @@ class BasicInformationController extends Controller {
                 $kin_pair_id = $kin_data['c_personid'];
                 $kin_data['c_kin_id'] = $new_id;
                 $kin_data = $this->toolRepository->timestamp($kin_data, true); //建檔資訊
+                // 異體字落地替換：複製出的是**新列**，要複製成正規化後的字形；且必須早於下面
+                // operations／audit 的 resource_id 與 row_pk 組裝（BIOG_SOURCE_DATA 的 c_pages、
+                // ASSOC_DATA 的 c_text_title 都是文本型主鍵成員，三者必須看到同一個字形）。
+                $kin_data = CharVariantMapService::replaceRow($kin_data, 'KIN_DATA')['data'];
+                if ($this->shouldSkipDuplicateAfterVariantReplacement('KIN_DATA', $kin_data, $seenKeys)) {
+                    continue;
+                }
                 DB::table('KIN_DATA')->insert($kin_data);
                 $operation = $this->operationRepository->store(Auth::id(), $kin_pair_id, 1, 'KIN_DATA', CompositePrimaryKey::buildStoredResourceId([
                     'c_personid' => $kin_data['c_personid'],
@@ -2184,6 +2260,13 @@ class BasicInformationController extends Controller {
                 $assoc_data['c_tertiary_personid'] = 0;
                 $assoc_data['c_tertiary_type_notes'] = null;
                 $assoc_data = $this->toolRepository->timestamp($assoc_data, true); //建檔資訊
+                // 異體字落地替換：複製出的是**新列**，要複製成正規化後的字形；且必須早於下面
+                // operations／audit 的 resource_id 與 row_pk 組裝（BIOG_SOURCE_DATA 的 c_pages、
+                // ASSOC_DATA 的 c_text_title 都是文本型主鍵成員，三者必須看到同一個字形）。
+                $assoc_data = CharVariantMapService::replaceRow($assoc_data, 'ASSOC_DATA')['data'];
+                if ($this->shouldSkipDuplicateAfterVariantReplacement('ASSOC_DATA', $assoc_data, $seenKeys)) {
+                    continue;
+                }
                 DB::table('ASSOC_DATA')->insert($assoc_data);
                 $operation = $this->operationRepository->store(Auth::id(), $new_id, 1, 'ASSOC_DATA', CompositePrimaryKey::buildStoredResourceId([
                     'c_personid' => $assoc_data['c_personid'],
@@ -2233,6 +2316,13 @@ class BasicInformationController extends Controller {
                 $assoc_data['c_tertiary_personid'] = 0;
                 $assoc_data['c_tertiary_type_notes'] = null;
                 $assoc_data = $this->toolRepository->timestamp($assoc_data, true); //建檔資訊
+                // 異體字落地替換：複製出的是**新列**，要複製成正規化後的字形；且必須早於下面
+                // operations／audit 的 resource_id 與 row_pk 組裝（BIOG_SOURCE_DATA 的 c_pages、
+                // ASSOC_DATA 的 c_text_title 都是文本型主鍵成員，三者必須看到同一個字形）。
+                $assoc_data = CharVariantMapService::replaceRow($assoc_data, 'ASSOC_DATA')['data'];
+                if ($this->shouldSkipDuplicateAfterVariantReplacement('ASSOC_DATA', $assoc_data, $seenKeys)) {
+                    continue;
+                }
                 DB::table('ASSOC_DATA')->insert($assoc_data);
                 $operation = $this->operationRepository->store(Auth::id(), $assoc_pair_id, 1, 'ASSOC_DATA', CompositePrimaryKey::buildStoredResourceId([
                     'c_personid' => $assoc_data['c_personid'],
@@ -2277,6 +2367,13 @@ class BasicInformationController extends Controller {
                 $inst_data['c_personid'] = $new_id;
                 $inst_data = Arr::except($inst_data, ['_token']);
                 $inst_data = $this->toolRepository->timestamp($inst_data, true); //建檔資訊
+                // 異體字落地替換：複製出的是**新列**，要複製成正規化後的字形；且必須早於下面
+                // operations／audit 的 resource_id 與 row_pk 組裝（BIOG_SOURCE_DATA 的 c_pages、
+                // ASSOC_DATA 的 c_text_title 都是文本型主鍵成員，三者必須看到同一個字形）。
+                $inst_data = CharVariantMapService::replaceRow($inst_data, 'BIOG_INST_DATA')['data'];
+                if ($this->shouldSkipDuplicateAfterVariantReplacement('BIOG_INST_DATA', $inst_data, $seenKeys)) {
+                    continue;
+                }
                 DB::table('BIOG_INST_DATA')->insert($inst_data);
                 $operation = $this->operationRepository->store(Auth::id(), $new_id, 1, 'BIOG_INST_DATA', CompositePrimaryKey::buildStoredResourceId([
                     'c_personid' => $inst_data['c_personid'],
@@ -2311,6 +2408,13 @@ class BasicInformationController extends Controller {
                 $status_data['c_personid'] = $new_id;
                 $status_data = Arr::except($status_data, ['_token']);
                 $status_data = $this->toolRepository->timestamp($status_data, true); //建檔資訊
+                // 異體字落地替換：複製出的是**新列**，要複製成正規化後的字形；且必須早於下面
+                // operations／audit 的 resource_id 與 row_pk 組裝（BIOG_SOURCE_DATA 的 c_pages、
+                // ASSOC_DATA 的 c_text_title 都是文本型主鍵成員，三者必須看到同一個字形）。
+                $status_data = CharVariantMapService::replaceRow($status_data, 'STATUS_DATA')['data'];
+                if ($this->shouldSkipDuplicateAfterVariantReplacement('STATUS_DATA', $status_data, $seenKeys)) {
+                    continue;
+                }
                 DB::table('STATUS_DATA')->insert($status_data);
                 $operation = $this->operationRepository->store(Auth::id(), $new_id, 1, 'STATUS_DATA', CompositePrimaryKey::buildStoredResourceId([
                     'c_personid' => $status_data['c_personid'],

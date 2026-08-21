@@ -10,7 +10,9 @@ use App\Models\Operation;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
+use App\Services\CharVariantMapService;
 use App\Support\CompositePrimaryKey;
+use App\Support\VariantReplaceScope;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
@@ -222,6 +224,28 @@ class CrowdsourcingController extends Controller {
         $pId = $data[0]['resource_id'];
         $data = $data[0]['resource_data'];
         $data = json_decode($data, true);
+
+        // 異體字落地替換（型別驅動）。眾包回填是**歷史 payload 的最後一道**：提交端可能早於
+        // 落地替換上線（v1 端點的舊提案），所以這裡必須自己替換一次；依 D8 重複套用是幂等的。
+        //
+        // 掛在這裡（decode 之後、進 switch 之前）一次覆蓋全部會寫入的分支——它們的目標表都是
+        // $resource（新增 4：BIOG_MAIN／OFFICE_CODES／OFFICE_CODE_TYPE_REL／OFFICE_TYPE_TREE；
+        // 更新與 BIOG_MAIN 刪除共 5 處 $biog->update()）。$resource 由 operations 列帶來、
+        // 未知表由 VariantReplaceScope 的 fail-closed 擋掉（原樣不動）。
+        //
+        // **$originalData 保留未替換的 payload**：op_type=4 的三個 OFFICE_* 分支只做
+        // $biog->delete()、完全不寫 $data，卻仍把它存進 operations 當快照。那份快照是
+        // restoreDelete() 重建被刪列的依據，替換它等於「還原出一列從未存在過的字形」，
+        // 也違反「快照＝當時實際發生什麼」的原則（v1 的 resource_original 同理不替換）。
+        $originalData = $data;
+        // 同 v1 端點：只有與註冊表拼法**完全相同**時才替換，與下面 switch 的精確比對對稱
+        // （鬆散寫法會落到 default、根本不寫入，替換它只會製造「改了卻沒落庫」的不對稱），
+        // 同時避免把不精確的字串送進 schema 查詢而毒化型別快取。
+        $canonicalResource = VariantReplaceScope::canonicalTableName((string) $resource);
+        if (is_array($data) && $canonicalResource !== null && $canonicalResource === (string) $resource) {
+            $data = CharVariantMapService::replaceRow($data, $canonicalResource)['data'];
+        }
+
         $updated_at = Carbon::now()->format('YmdHis');
 
         //資料對應處理
@@ -348,7 +372,8 @@ class CrowdsourcingController extends Controller {
                     $ori = json_decode($biog);
                     $biog->delete();
                     DB::table('operations')->where('id', $id)->update(['crowdsourcing_status' => 1, 'rate' => $rate, 'updated_at' => $updated_at]);
-                    $this->operationRepository->store(Auth::id(), 0, 4, $resource, $pId, $data, $ori);
+                    // 本分支不寫 $data，只刪列；快照用**未替換**的 payload（見上方 $originalData 註解）。
+                    $this->operationRepository->store(Auth::id(), 0, 4, $resource, $pId, $originalData, $ori);
                     flash('Delete success @ '.Carbon::now(), 'success');
 
                     break;
@@ -358,7 +383,7 @@ class CrowdsourcingController extends Controller {
                     $ori = json_decode($biog);
                     $biog->delete();
                     DB::table('operations')->where('id', $id)->update(['crowdsourcing_status' => 1, 'rate' => $rate, 'updated_at' => $updated_at]);
-                    $this->operationRepository->store(Auth::id(), 0, 4, $resource, $pId, $data, $ori);
+                    $this->operationRepository->store(Auth::id(), 0, 4, $resource, $pId, $originalData, $ori); // 同上：不寫 $data，快照不替換
                     flash('Update success @ '.Carbon::now(), 'success');
 
                     break;
@@ -367,7 +392,7 @@ class CrowdsourcingController extends Controller {
                     $ori = json_decode($biog);
                     $biog->delete();
                     DB::table('operations')->where('id', $id)->update(['crowdsourcing_status' => 1, 'rate' => $rate, 'updated_at' => $updated_at]);
-                    $this->operationRepository->store(Auth::id(), 0, 4, $resource, $pId, $data, $ori);
+                    $this->operationRepository->store(Auth::id(), 0, 4, $resource, $pId, $originalData, $ori); // 同上：不寫 $data，快照不替換
                     flash('Delete success @ '.Carbon::now(), 'success');
 
                     break;

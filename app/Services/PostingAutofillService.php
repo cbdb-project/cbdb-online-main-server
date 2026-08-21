@@ -844,9 +844,17 @@ class PostingAutofillService {
      */
     protected function fuzzyMatchOffice(string $officeName, ?int $dynastyCode = null, ?string $adminType = null): ?array {
         // ========== Step 1: 精確匹配 c_office_chn ==========
+        // 異體字：S4 之後新寫入的 OFFICE_CODES.c_office_chn 是歸一後的參考形，而 LLM 從
+        // 文本抽出的官名可能是變體形 ⇒ 純精確比對會落空、退成 Step 3 的模糊匹配（match_type
+        // 由 exact 降成 fuzzy）或整個失敗。把參考形一併納入候選；原輸入仍優先。
+        $reference = CharVariantMapService::replaceFor('OFFICE_CODES', 'c_office_chn', $officeName)['text'];
+        $exactNames = $reference === $officeName ? [$officeName] : [$officeName, $reference];
+
         $query = DB::table('OFFICE_CODES')
             ->select('c_office_id as id', 'c_office_chn as text')
-            ->where('c_office_chn', '=', $officeName);
+            ->whereIn('c_office_chn', $exactNames)
+            // 原輸入的字面優先（同時命中兩形時不要隨機挑）。
+            ->orderByRaw('CASE WHEN c_office_chn = ? THEN 0 ELSE 1 END', [$officeName]);
 
         if ($dynastyCode !== null) {
             $query->where('c_dy', '=', $dynastyCode);
@@ -1451,17 +1459,40 @@ class PostingAutofillService {
      * @return int|null 解析出的 c_nianhao_id；無法確定時回傳 null
      */
     protected function resolveNianhaoId(string $name, ?int $dynasty, ?int $yearHint): ?int {
-        $query = DB::table('NIAN_HAO')->where('c_nianhao_chn', $name);
-        if ($dynasty !== null) {
-            $query->where('c_dy', $dynasty);
-        }
-        $candidates = $query->get(['c_nianhao_id', 'c_firstyear', 'c_lastyear']);
+        // 異體字：**先精確探原輸入、落空才擴成兩形**。
+        //
+        // 不能一開始就 whereIn 兩形：庫裡若同時有變體形與參考形兩列（D6 不自動合併），
+        // 候選會從 1 筆變 2 筆，而本方法在「候選 >1 且無法用年份消歧」時是直接回 null
+        // （改由呼叫端轉 suggested）⇒ 原本 exact 命中的年號會靜默降級成「無法確定」。
+        // 先精確、落空才擴，既修好「代碼表寫另一形」的情況，也不動原本會命中的路徑。
+        $reference = CharVariantMapService::replaceFor('NIAN_HAO', 'c_nianhao_chn', $name)['text'];
+        $nameSets = $reference === $name ? [[$name]] : [[$name], [$name, $reference]];
 
-        if ($candidates->isEmpty() && $dynasty !== null) {
-            // 按朝代過濾找不到時，退而不限朝代重試（沿用既有行為）。
-            $candidates = DB::table('NIAN_HAO')
-                ->where('c_nianhao_chn', $name)
-                ->get(['c_nianhao_id', 'c_firstyear', 'c_lastyear']);
+        // 探測順序：**先把所有名稱候選在指定朝代內試完，全落空才放寬朝代**。
+        //
+        // 不能在每一輪名稱候選裡就先做「不限朝代」的 fallback：那會讓「原字形在別的朝代有一筆、
+        // 參考形在指定朝代有一筆」的情況回傳**別的朝代**那一筆，而指定朝代明明有等價形可用。
+        // 朝代條件比字形條件更該被尊重。
+        $probe = function (array $names, bool $withDynasty) use ($dynasty) {
+            $query = DB::table('NIAN_HAO')->whereIn('c_nianhao_chn', $names);
+            if ($withDynasty && $dynasty !== null) {
+                $query->where('c_dy', $dynasty);
+            }
+
+            return $query->get(['c_nianhao_id', 'c_firstyear', 'c_lastyear']);
+        };
+
+        $candidates = collect();
+        foreach ([true, false] as $withDynasty) {
+            if (!$withDynasty && $dynasty === null) {
+                break; // 沒有朝代條件時第二輪與第一輪相同，不必重跑
+            }
+            foreach ($nameSets as $names) {
+                $candidates = $probe($names, $withDynasty);
+                if ($candidates->isNotEmpty()) {
+                    break 2;
+                }
+            }
         }
 
         if ($candidates->count() === 1) {

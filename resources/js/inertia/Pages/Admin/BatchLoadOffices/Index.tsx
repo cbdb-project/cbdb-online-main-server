@@ -7,10 +7,17 @@ import { LineNumberedTextarea } from '../../../components/ui/LineNumberedTextare
 import { useTranslation } from '../../../hooks/useTranslation';
 import type { SharedProps } from '../../../types/page';
 
+interface VariantReplacement {
+    from: string;
+    to: string;
+}
+
 interface ResultRow {
     line: number;
     office_id: number | string;
     name: string;
+    /** 本列實際套用的異體字替換（後端 flattenReplaced 的結果）。 */
+    variant_replacements?: VariantReplacement[];
     translation: string;
     pinyin: string;
     dynasty_label: string | null;
@@ -84,7 +91,16 @@ export default function BatchLoadOffices() {
                                     <tr key={`${r.line}-${r.office_id}`} className="border-t border-border">
                                         <td className="px-3 py-1.5">{r.line}</td>
                                         <td className="px-3 py-1.5">{r.office_id}</td>
-                                        <td className="px-3 py-1.5">{r.name}</td>
+                                        <td className="px-3 py-1.5">
+                                            <div>{r.name}</div>
+                                            {r.variant_replacements && r.variant_replacements.length > 0 && (
+                                                <div className="text-xs text-muted-foreground">
+                                                    {t('batch_variant_replaced_hint', {
+                                                        pairs: r.variant_replacements.map((v) => `${v.from}→${v.to}`).join('、'),
+                                                    })}
+                                                </div>
+                                            )}
+                                        </td>
                                         <td className="px-3 py-1.5">{r.translation}</td>
                                         <td className="px-3 py-1.5">{r.pinyin}</td>
                                         <td className="px-3 py-1.5">{r.dynasty_label} / {r.dynasty_code}</td>

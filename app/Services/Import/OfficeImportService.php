@@ -4,6 +4,7 @@ namespace App\Services\Import;
 
 use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
+use App\Services\CharVariantMapService;
 use App\Services\Import\Concerns\SharesImportHelpers;
 use Illuminate\Support\Facades\DB;
 
@@ -31,6 +32,14 @@ use Illuminate\Support\Facades\DB;
  */
 class OfficeImportService implements EntityAggregateService {
     use SharesImportHelpers;
+
+    /**
+     * 上一次 officeColumns() 實際套用的異體字替換（變體字 → 參考字）。
+     * 供批次匯入結果頁組 variant_replacements（比照書名匯入）。
+     *
+     * @var array<string,string|array<int,string>>
+     */
+    protected array $lastVariantReplaced = [];
 
     public function __construct(
         protected OperationRepository $operationRepository,
@@ -98,8 +107,30 @@ class OfficeImportService implements EntityAggregateService {
      * @param array{name:string,name_alt?:?string,translation?:?string,translation_alt?:?string,pinyin?:?string,pinyin_alt?:?string,dynasty_code:int,source_id:int,pages?:?string,notes?:?string} $input
      */
     protected function officeColumns(array $input): array {
-        $name = (string) $input['name'];
-        $nameAlt = (isset($input['name_alt']) && trim((string) $input['name_alt']) !== '') ? (string) $input['name_alt'] : null;
+        // 異體字落地替換。**必須早於 buildPinyin()**：拼音是從中文逐字派生的，而
+        // `pinyin.c_chn` 被排除在替換範圍外、異體字保有自己的讀音，所以先替換才會拿到
+        // 參考字的讀音——這正是想要的結果。
+        //
+        // 這裡用 replaceFor() 而不是 replaceRow()：$input 的鍵是輸入欄名（name／name_alt／
+        // notes／pages），不是 OFFICE_CODES 的欄位名，replaceRow() 會全部判成非文本欄而跳過。
+        $variantReplaced = [];
+        $replace = function (?string $value, string $column) use (&$variantReplaced): ?string {
+            if ($value === null || $value === '') {
+                return $value;
+            }
+            $result = CharVariantMapService::replaceFor('OFFICE_CODES', $column, $value);
+            $variantReplaced = CharVariantMapService::mergeReplaced($variantReplaced, $result['replaced']);
+
+            return $result['text'];
+        };
+
+        $name = (string) $replace((string) $input['name'], 'c_office_chn');
+        $nameAlt = (isset($input['name_alt']) && trim((string) $input['name_alt']) !== '')
+            ? $replace((string) $input['name_alt'], 'c_office_chn_alt')
+            : null;
+        $input['notes'] = $replace(isset($input['notes']) ? (string) $input['notes'] : null, 'c_notes');
+        $input['pages'] = $replace(isset($input['pages']) ? (string) $input['pages'] : null, 'c_pages');
+        $this->lastVariantReplaced = $variantReplaced;
 
         $pinyin = (isset($input['pinyin']) && trim((string) $input['pinyin']) !== '')
             ? (string) $input['pinyin']
@@ -155,6 +186,9 @@ class OfficeImportService implements EntityAggregateService {
             'type_ids' => $typeIds,
             'operation_id_office' => $officeOp?->id,
             'operation_id_rel' => $relOps[0]?->id ?? null,
+            // 實際落庫的中文名（可能已被異體字替換），與本次替換紀錄。
+            'name' => (string) $columns['c_office_chn'],
+            'variant_replaced' => $this->lastVariantReplaced,
         ];
     }
 
@@ -207,6 +241,9 @@ class OfficeImportService implements EntityAggregateService {
             'types_added' => $toAdd,
             'types_removed' => $toRemove,
             'operation_id_office' => $officeOp?->id,
+            // 與 create() 對稱：實際落庫的職名與本次替換紀錄（供呼叫端組 notices）。
+            'name' => (string) $after['c_office_chn'],
+            'variant_replaced' => $this->lastVariantReplaced,
         ];
     }
 

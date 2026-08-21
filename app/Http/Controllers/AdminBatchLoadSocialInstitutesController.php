@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\CharVariantMapService;
 use App\Services\Import\SocialInstituteImportService;
+use App\Support\VariantLabelMap;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -106,7 +108,10 @@ class AdminBatchLoadSocialInstitutesController extends Controller {
 
                 $results[] = [
                     'line' => $row['line'],
-                    'name' => $row['name'],
+                    // 顯示**實際生效**的機構名：新建時是歸一後的參考形，複用既有碼時是既有列
+                    // 的原字面（刻意不歸一，見 SocialInstituteImportService::resolveNameCode()）。
+                    'name' => $created['name'] ?? $row['name'],
+                    'variant_replacements' => CharVariantMapService::flattenReplaced($created['variant_replaced'] ?? []),
                     'name_code' => $created['name_code'],
                     'name_pinyin' => $created['name_pinyin'],
                     'name_created' => $created['name_created'],
@@ -162,8 +167,13 @@ class AdminBatchLoadSocialInstitutesController extends Controller {
             }
 
             $name = trim($parts[0]);
-            $typeLabel = trim($parts[1]);
-            $dynastyLabel = trim($parts[2]);
+            // 標籤在此就歸一：validateLookups() 與交易內 $typeMap[...]／$dynastyMap[...]
+            // （無檢查陣列存取）吃的都是這個值。只在驗證階段歸一會讓後者拋
+            // "Undefined array key" 而不是乾淨的逐列錯誤。
+            $typeLabelRaw = trim($parts[1]);
+            $dynastyLabelRaw = trim($parts[2]);
+            $typeLabel = VariantLabelMap::normalizeLabel($typeLabelRaw, 'SOCIAL_INSTITUTION_TYPES', 'c_inst_type_hz');
+            $dynastyLabel = VariantLabelMap::normalizeLabel($dynastyLabelRaw, 'DYNASTIES', 'c_dynasty_chn');
             $addrId = trim($parts[4]);
             $sourceId = trim($parts[5]);
 
@@ -200,6 +210,9 @@ class AdminBatchLoadSocialInstitutesController extends Controller {
                 'name' => $name,
                 'type_label' => $typeLabel,
                 'dynasty_label' => $dynastyLabel,
+                // 保留使用者原輸入供錯誤訊息使用（查表用歸一後的值）。
+                'type_label_raw' => $typeLabelRaw,
+                'dynasty_label_raw' => $dynastyLabelRaw,
                 'addr_id' => (int) $addrId,
                 'source_id' => (int) $sourceId,
             ];
@@ -218,28 +231,24 @@ class AdminBatchLoadSocialInstitutesController extends Controller {
      * @return array<string,int>
      */
     protected function getTypeMap(): array {
+        // 鍵已做異體字歸一（見 App\Support\VariantLabelMap）；碰撞取最小碼並記 warning。
         $records = DB::table('SOCIAL_INSTITUTION_TYPES')
             ->select('c_inst_type_code', 'c_inst_type_hz', 'c_inst_type_py')
             ->orderBy('c_inst_type_code')
             ->get();
 
-        $map = [];
-
+        $hzPairs = [];
+        $pyPairs = [];
         foreach ($records as $record) {
             $code = (int) $record->c_inst_type_code;
-            $hz = trim((string) ($record->c_inst_type_hz ?? ''));
-            $py = trim((string) ($record->c_inst_type_py ?? ''));
-
-            if ($hz !== '') {
-                $map[$hz] = $code;
-            }
-
-            if ($py !== '') {
-                $map[$py] = $code;
-            }
+            $hzPairs[] = [(string) ($record->c_inst_type_hz ?? ''), $code];
+            $pyPairs[] = [(string) ($record->c_inst_type_py ?? ''), $code];
         }
 
-        return $map;
+        [$hzMap] = VariantLabelMap::build($hzPairs, 'SOCIAL_INSTITUTION_TYPES', 'c_inst_type_hz');
+        [$pyMap] = VariantLabelMap::build($pyPairs, 'SOCIAL_INSTITUTION_TYPES', 'c_inst_type_py');
+
+        return $hzMap + $pyMap; // 漢字鍵優先
     }
 
     /**
@@ -248,13 +257,14 @@ class AdminBatchLoadSocialInstitutesController extends Controller {
      * @return array<string,int>
      */
     protected function getDynastyMap(): array {
-        return DB::table('DYNASTIES')
+        // 鍵已做異體字歸一（見 App\Support\VariantLabelMap）；碰撞取最小碼並記 warning。
+        $pairs = DB::table('DYNASTIES')
             ->orderBy('c_dy')
-            ->pluck('c_dy', 'c_dynasty_chn')
-            ->mapWithKeys(function ($code, $label) {
-                return [trim((string) $label) => (int) $code];
-            })
-            ->toArray();
+            ->get(['c_dy', 'c_dynasty_chn'])
+            ->map(fn ($row) => [(string) ($row->c_dynasty_chn ?? ''), (int) $row->c_dy])
+            ->all();
+
+        return VariantLabelMap::build($pairs, 'DYNASTIES', 'c_dynasty_chn')[0];
     }
 
     /**
@@ -270,11 +280,13 @@ class AdminBatchLoadSocialInstitutesController extends Controller {
 
         foreach ($rows as $row) {
             if (!array_key_exists($row['type_label'], $typeMap)) {
-                $errors[] = "第 {$row['line']} 行找不到類型「{$row['type_label']}」對應的代碼";
+                $typeLabelForMessage = $row['type_label_raw'] ?? $row['type_label'];
+                $errors[] = "第 {$row['line']} 行找不到類型「{$typeLabelForMessage}」對應的代碼";
             }
 
             if (!array_key_exists($row['dynasty_label'], $dynastyMap)) {
-                $errors[] = "第 {$row['line']} 行找不到朝代「{$row['dynasty_label']}」對應的代碼";
+                $dynastyLabelForMessage = $row['dynasty_label_raw'] ?? $row['dynasty_label'];
+                $errors[] = "第 {$row['line']} 行找不到朝代「{$dynastyLabelForMessage}」對應的代碼";
             }
         }
 

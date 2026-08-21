@@ -3,6 +3,7 @@
 namespace App\Services\Mutations\Concerns;
 
 use App\Services\Import\OfficeImportService;
+use App\Support\VariantLabelMap;
 
 /**
  * 「官職實體」聚合寫入的共用輸入解析與欄位校驗，供 create／update handler 共用，
@@ -55,11 +56,13 @@ trait ResolvesOfficeAggregateInput {
 
         // 朝代：給碼（dynasty_code/c_dy）優先；否則以朝代名（dynasty_label）解析。
         $dynastyMap = $service->dynastyMap();
+        $dynastyCodes = $service->dynastyCodes();
         $dynastyCode = $this->scalarOrNull($changes['dynasty_code'] ?? $changes['c_dy'] ?? null);
         $dynastyLabelError = false;
         if (($dynastyCode === null || $dynastyCode === '') && isset($changes['dynasty_label'])) {
             $label = trim((string) ($this->scalarOrNull($changes['dynasty_label']) ?? ''));
-            $dynastyCode = $dynastyMap[$label] ?? null;
+            // map 的鍵已歸一，傳入標籤也要歸一，兩個方向才都命中（見 VariantLabelMap）。
+            $dynastyCode = VariantLabelMap::lookup($dynastyMap, $label, 'DYNASTIES', 'c_dynasty_chn');
             if ($dynastyCode === null) {
                 $dynastyLabelError = true;
             }
@@ -74,7 +77,9 @@ trait ResolvesOfficeAggregateInput {
         if ($name === '') {
             $errors['name'] = ['required'];
         }
-        if ($dynastyCode === null || $dynastyCode === '' || !in_array((int) $dynastyCode, $dynastyMap, true)) {
+        // 白名單用 dynastyCodes() 而不是 map 的值：標籤歸一後鍵碰撞時 map 只留最小碼，
+        // 拿 map 當白名單會讓另一個完全合法的 c_dy 開始被判 invalid。
+        if ($dynastyCode === null || $dynastyCode === '' || !in_array((int) $dynastyCode, $dynastyCodes, true)) {
             $errors['dynasty'] = ['invalid'];
         }
         if ($typeIds === []) {

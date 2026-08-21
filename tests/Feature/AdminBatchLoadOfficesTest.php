@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\CharVariantMapService;
+use App\Support\VariantReplaceScope;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -112,6 +114,8 @@ class AdminBatchLoadOfficesTest extends TestCase {
     }
 
     protected function tearDown(): void {
+        // char_variant_map 的清理放在這裡而不是各測試方法尾：斷言失敗時方法尾不會執行。
+        Schema::dropIfExists('char_variant_map');
         Schema::dropIfExists('audit_log');
         Schema::dropIfExists('pinyin');
         Schema::dropIfExists('operations');
@@ -231,5 +235,95 @@ class AdminBatchLoadOfficesTest extends TestCase {
         $response->assertSessionHas('batch_errors');
 
         $this->assertSame(0, DB::table('OFFICE_CODES')->count());
+    }
+    // ── 異體字落地替換（plan S4）────────────────────────────
+
+    /**
+     * 與 database/migrations/2026_07_15_000000_create_char_variant_map_table.php 同源的
+     * 最小種子（只要「淸→清」）。其餘測試不建這張表，所以它們走
+     * CharVariantMapService 的「表不存在就降級」路徑、行為不變。
+     */
+    protected function seedCharVariantMap(): void {
+        Schema::create('char_variant_map', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->string('c_variant_char', 10);
+            $table->string('c_reference_char', 10);
+            $table->tinyInteger('c_strict_excluded')->default(1);
+            $table->string('c_notes', 255)->nullable();
+            $table->timestamps();
+            $table->unique('c_variant_char', 'char_variant_map_c_variant_char_unique');
+        });
+        DB::table('char_variant_map')->insert([
+            ['c_variant_char' => '淸', 'c_reference_char' => '清', 'c_strict_excluded' => 0],
+        ]);
+        CharVariantMapService::reset();
+        VariantReplaceScope::reset();
+    }
+
+    protected function seedOfficeLookups(string $dynastyLabel = '清'): void {
+        DB::table('DYNASTIES')->insert(['c_dy' => 20, 'c_dynasty_chn' => $dynastyLabel]);
+        DB::table('OFFICE_TYPE_TREE')->insert([
+            'c_office_type_node_id' => '200501', 'c_office_type_desc_chn' => '宗人府',
+        ]);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 4763]);
+    }
+
+    /** (a) 表格寫變體形「淸」、代碼表寫參考形「清」→ 應成功。 */
+    #[Test]
+    public function test_dynasty_label_in_variant_form_matches_reference_form_code_row(): void {
+        $this->seedCharVariantMap();
+        $this->actingAs($this->makeUser());
+        $this->seedOfficeLookups('清');
+
+        $this->post(route('admin.batch-load-offices.store'), [
+            'entries' => "宗人府供事\tClerk\t淸\t200501\t宗人府\t4763",
+        ])->assertRedirect(route('admin.batch-load-offices'));
+
+        $this->assertDatabaseHas('OFFICE_CODES', ['c_office_id' => 1, 'c_dy' => 20]);
+    }
+
+    /**
+     * (b) 表格寫參考形「清」、代碼表寫變體形「淸」→ 也要成功。
+     * 只歸一傳入標籤修不到這個方向（輸入本來就是參考字），必須連 map 的鍵一起歸一。
+     */
+    #[Test]
+    public function test_dynasty_label_in_reference_form_matches_variant_form_code_row(): void {
+        $this->seedCharVariantMap();
+        $this->actingAs($this->makeUser());
+        $this->seedOfficeLookups('淸');
+
+        $this->post(route('admin.batch-load-offices.store'), [
+            'entries' => "宗人府供事\tClerk\t清\t200501\t宗人府\t4763",
+        ])->assertRedirect(route('admin.batch-load-offices'));
+
+        $this->assertDatabaseHas('OFFICE_CODES', ['c_office_id' => 1, 'c_dy' => 20]);
+    }
+
+    /**
+     * 職名本身的異體字要落地替換，而且**必須早於拼音派生**——拼音是逐字查
+     * `pinyin.c_chn`（該表被排除在替換範圍外、異體字保有自己讀音），先替換才會拿到
+     * 參考字的讀音，中文欄與拼音欄才不會各說各話。結果頁另外顯示替換明細。
+     */
+    #[Test]
+    public function test_office_name_variant_is_replaced_before_pinyin_derivation(): void {
+        $this->seedCharVariantMap();
+        $this->actingAs($this->makeUser());
+        $this->seedOfficeLookups('清');
+
+        $this->post(route('admin.batch-load-offices.store'), [
+            'entries' => "淸吏司\tClerk\t清\t200501\t宗人府\t4763",
+        ])->assertRedirect(route('admin.batch-load-offices'));
+
+        $record = DB::table('OFFICE_CODES')->first();
+        $this->assertSame('清吏司', $record->c_office_chn, '職名應以參考形落庫');
+        $this->assertSame('qing li si', $record->c_office_pinyin, '拼音應由參考形派生');
+
+        // 結果頁的 props 帶落庫後的職名與替換明細（比照書名匯入）。斷言直接讀 flash 資料
+        // 而不是 assertSee：Inertia 把 props JSON 化時會把非 ASCII escape 成 \\uXXXX，
+        // assertSee 對「淸」這種字元會落空。
+        $results = session('batch_results');
+        $this->assertIsArray($results);
+        $this->assertSame('清吏司', $results[0]['name']);
+        $this->assertSame([['from' => '淸', 'to' => '清']], $results[0]['variant_replacements']);
     }
 }

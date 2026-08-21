@@ -417,6 +417,61 @@ D3 已內嵌一份已查證的代碼鍵清單，直接進排除常數。本步�
 - 批次匯入結果頁補 `variant_replacements`，比照書名匯入。
 - 測試：`AdminBatchLoadOfficesTest`／`AdminBatchLoadSocialInstitutesTest` 補——(a) 表格寫「淸」、代碼表「清」→ 成功；(b) 表格寫「清」、代碼表「淸」→ 成功（前一版會漏的方向）；(c) 代碼表同時有兩形 → 有 warning 且**兩個代碼都仍可用**；(d) **既有 name code 是「淸…」、匯入「淸…」→ 複用既有碼、不新建，且該列名稱文本保持「淸…」原形**（鎖住上面那個刻意的不對稱）；(e) 兩列分別寫「淸」「清」的同一機構名 → 收斂到同一個碼。
 
+#### S4 執行結果補記
+
+計畫列的項目都做了（`VariantLabelMap` 兩側歸一 + 碰撞取最小碼 + 扁平白名單、5 個 map builder、
+5 個 lookup site、`officeColumns()` 早於 `buildPinyin()`、`resolveNameCode()` 兩形都探、
+批次結果頁 `variant_replacements`）。review 另外找出九項計畫沒列到的問題，一併修在本步：
+
+1. **v2／React 路徑回傳的是使用者原輸入、且完全沒有 notices**。`OfficeAggregateDefinition`／
+   `SocialInstitutionAggregateDefinition` 的 `result()` 用 `$input['name']` 組回應 ⇒ DB 寫參考形、
+   回應回變體形，React 編輯器儲存後畫面與資料庫不一致，使用者也不知道字被改過（批次匯入使用者
+   反而看得到提示）。改為回 `$serviceResult['name']`，並以內部鍵 `__variant_replaced` 讓
+   `AbstractEntityAggregateHandler::envelope()` 掛上 notices。
+2. **`SOCIAL_INSTITUTION_ADDR.c_pages`／`c_notes` 漏替換**：同一次 update 裡機構層的 `c_notes`
+   被歸一、地址列的原樣入庫。這兩欄同樣是已知表的文本欄，本來就在範圍內。
+3. **`VariantReplaceScope`／白名單語義不可順手放寬**：`allCodes` 只收「有標籤」的列。原本連
+   無標籤列（含 `c_dy` 為 NULL 被折成 0 的佔位列）也收，等於讓 `dynasty_code=0` 從被擋變成通過。
+4. **碰撞 warning 只在「原始標籤互不相同」時記**：否則庫裡本來就有的重複字面（舊碼一直靜默
+   last-wins）會開始每次建 map 就刷一行。另外 `dynastyMapAndCodes()`／`typeMapAndCodes()` 加
+   per-instance memo——同一請求會同時用到 `*Map()` 與 `*Codes()`，不 memo 就是重複查詢、重複
+   build、重複 warning。
+5. **`typeCodes()` 要取 hz／py 兩份的聯集**：schema 允許 `c_inst_type_hz` 為 null（只有拼音名），
+   舊 `typeMap()` 也是任一有值就收；只取 hz 那份會讓這種列的合法 `type_code` 被判 invalid（422）。
+6. **`resolveNameCode()` 改成「先精確探原輸入、落空才擴成兩形」**：直接 `whereIn` + 最小碼優先，
+   會讓輸入「清溪書院」時被字面不同的「淸溪書院」（較小的碼）搶走，機構掛到另一個既有名稱碼上。
+7. **`resolveNianhaoId()`／`fuzzyMatchOffice()` 同理，而且朝代條件優先於字形條件**：直接
+   `whereIn` 兩形會讓候選從 1 筆變 2 筆而觸發「無法消歧就回 null」的靜默降級；而「每輪名稱候選
+   就先做不限朝代 fallback」會回別朝代的原字形、忽略指定朝代的等價形。正確順序是：先把所有
+   名稱候選在**指定朝代內**試完，全落空才放寬朝代。
+8. **改名護欄要問 resolver，不能比字串**：`SocialInstitutionAggregateDefinition::guardWrite()`
+   原本比 `$input['name']` 與 `$existing['name']`。純字串相等會把「只換字形」（兩形都探 ⇒ 同一個
+   code）誤報成 409；只比「歸一後字串」又會漏掉反方向（輸入參考形、既有列是另一個變體形 ⇒ 歸一後
+   看起來相同，但會**新建** code ⇒ 正是護欄要擋的既存引用失配）。改用唯讀的
+   `SocialInstituteImportService::findExistingNameCode()` 判斷「這次儲存會不會換掉 name_code」。
+9. **替換紀錄不得跨列殘留**：`SocialInstituteImportService` 的累積器是 merge 寫入，而批次匯入是
+   同一個 service 實例逐列呼叫 ⇒ 第二列的結果頁會顯示第一列的替換。`create()`／`update()` 進入
+   時重置，並補回歸測試。
+10. 批次匯入的錯誤訊息改用保留下來的**原始標籤**（`*_label_raw`）：查表用歸一後的值，但訊息裡
+    顯示歸一後的字會讓使用者一頭霧水（他從沒打過那個字）。
+
+**明文記錄的已知邊界**（不是本步造成的回歸，也沒被本步修好）：
+`resolveNameCode()` 的去重是**單向**的，只涵蓋「輸入變體形、既有列參考形」。反方向（輸入參考形、
+既有列是**另一個**變體形）無法用精確比對命中——那需要列舉輸入的所有「前像」（組合爆炸，本計畫
+D7 已明確否決該做法）或在表上加一個歸一後的影子欄。該情境會像 S4 之前一樣新建一個名稱碼；
+測試 `testReferenceFormInputDoesNotMergeIntoExistingVariantRow` 把這個行為釘死，避免被誤以為
+已解決。真正的修法（影子欄或一次性資料合併）屬獨立工作。
+
+另一個刻意的不對稱（計畫本來就寫明）：兩形都在時複用既有的變體形列，該列的 `c_inst_name_hz`
+永不歸一，與 D7 第二類「觸碰即歸一」相反——為了不製造重複碼而接受的取捨，由測試
+`test_existing_variant_form_name_code_is_reused_and_not_normalized` 鎖住。
+
+提案核准重放（`approveEntityAggregateProposal` → 以 direct 重放同一 handler）走的是同一條
+validate 與 service，所以替換與標籤歸一自動生效；已補
+`testApprovingProposalAppliesVariantReplacementAndLabelNormalization` 作回歸鎖。順帶記錄：
+提案存的是**原始 changes**、替換發生在核准當下（§4.5「存意圖」），所以中間若有人改了
+`char_variant_map`／`DYNASTIES`，提交時與核准時的結果會不同——這是既有設計，不是缺陷。
+
 ### S5：token API 代碼表 create／update（G4）
 
 - `CodeTableCreateHandler`：目前無前處理掛鉤點，在 `:86 array_intersect_key` 之後、`:101` 落庫之前插入（抽出 protected 掛鉤方法）。`:99` 的 `ToolsRepository::timestamp()` 蓋稽核欄，掛在其前即可（稽核欄本來也在排除清單）。

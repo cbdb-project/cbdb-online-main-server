@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\CharVariantMapService;
+use App\Support\VariantReplaceScope;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -119,6 +121,8 @@ class ApiV2MutateSocialInstituteImportTest extends TestCase {
     }
 
     protected function tearDown(): void {
+        // char_variant_map 的清理放在這裡而不是各測試方法尾：斷言失敗時方法尾不會執行。
+        Schema::dropIfExists('char_variant_map');
         foreach ([
             'pinyin', 'TEXT_CODES', 'ADDR_CODES', 'DYNASTIES', 'SOCIAL_INSTITUTION_TYPES',
             'SOCIAL_INSTITUTION_ADDR', 'SOCIAL_INSTITUTION_CODES', 'SOCIAL_INSTITUTION_NAME_CODES',
@@ -240,5 +244,42 @@ class ApiV2MutateSocialInstituteImportTest extends TestCase {
         $p['changes']['dynasty_label'] = '宋';
         $this->postJson('/api/v2/create', $p)->assertOk();
         $this->assertDatabaseHas('SOCIAL_INSTITUTION_CODES', ['c_inst_type_code' => 3, 'c_inst_begin_dy' => 15]);
+    }
+
+    /**
+     * 異體字（plan S4）：以**標籤**指定朝代／類型時，兩個方向都要命中——
+     * 表格／payload 寫變體形而代碼表寫參考形，或反過來。
+     *
+     * 反方向（payload 參考形、代碼表變體形）只靠「歸一傳入標籤」是修不到的：
+     * 輸入本來就是參考字、替換後不變，而既有代碼表列在 D6 之下永不歸一。
+     * 必須連 map 的鍵一起歸一。
+     */
+    #[Test]
+    public function testDynastyLabelMatchesAcrossVariantForms(): void {
+        Schema::create('char_variant_map', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->string('c_variant_char', 10);
+            $table->string('c_reference_char', 10);
+            $table->tinyInteger('c_strict_excluded')->default(1);
+            $table->string('c_notes', 255)->nullable();
+            $table->timestamps();
+            $table->unique('c_variant_char', 'char_variant_map_c_variant_char_unique');
+        });
+        DB::table('char_variant_map')->insert([
+            ['c_variant_char' => '淸', 'c_reference_char' => '清', 'c_strict_excluded' => 0],
+        ]);
+        CharVariantMapService::reset();
+        VariantReplaceScope::reset();
+
+        // 代碼表寫**變體形**，payload 送**參考形**。
+        DB::table('DYNASTIES')->insert(['c_dy' => 40, 'c_dynasty_chn' => '淸']);
+        $this->actingAs($this->makeUser(email: 'si-label-variant@example.com'));
+
+        $p = $this->payload();
+        unset($p['changes']['dynasty_code']);
+        $p['changes']['dynasty_label'] = '清';
+        $this->postJson('/api/v2/create', $p)->assertOk();
+        $this->assertDatabaseHas('SOCIAL_INSTITUTION_CODES', ['c_inst_begin_dy' => 40]);
+
     }
 }

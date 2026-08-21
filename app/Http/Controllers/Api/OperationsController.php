@@ -10,7 +10,9 @@ use App\Models\OfficeTypeTree;
 use App\Models\Operation;
 use App\Models\User;
 use App\Repositories\BiogMainRepository;
+use App\Services\CharVariantMapService;
 use App\Services\SecurityAuditLogger;
+use App\Support\VariantReplaceScope;
 use Auth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -55,6 +57,46 @@ class OperationsController extends Controller {
         return $x;
     }
 
+    /**
+     * 對客戶端送來的 JSON payload 套異體字落地替換（v1 token API 仍在服役）。
+     *
+     * 幾個刻意的選擇：
+     * - **先過 fail-closed**：`$resource` 由客戶端任意給、無白名單，未知表一律原樣存入
+     *   （`VariantReplaceScope::modeFor()` 內部也會 fail-closed，這裡先擋是為了連 decode 都省）。
+     * - **decode 失敗就原樣存入**：維持現況語義（壞 JSON 原樣存、到 `CrowdsourcingController::confirm()`
+     *   才爆），不可變成字串 `"null"`，也不可在此當場拋錯而改變既有 API 行為。
+     * - re-encode 用 `JSON_UNESCAPED_UNICODE`：中文以原字元存，比較與人工檢視都直覺；
+     *   代價是既存位元內容（鍵序／escaping）可能與客戶端原字串不同，這是可接受的。
+     *
+     * @param mixed $json 客戶端送來的原始 JSON 字串
+     */
+    private function replaceVariantsInJsonPayload($json, ?string $resource): string {
+        $raw = (string) $json;
+
+        // **只有與註冊表拼法完全相同時才替換**，刻意與下游的分派保持對稱：
+        // `CrowdsourcingController::confirm()` 的 switch 與 `update_operations()` 的
+        // `$y == "BIOG_MAIN"` 都是精確比對，所以 `" biog_main "` 這種鬆散寫法根本不會被寫入
+        // 任何表。若這裡放行它去替換，就會出現「payload 被改寫、卻永遠不會落庫」的不對稱，
+        // 而且等於讓未驗證的外部字串進到 schema 查詢（那條路徑的空結果會被快取住，
+        // 讓該表在這個 process 之後都不替換——S1 註解警告過的靜默失效）。
+        $canonical = $resource === null || $resource === ''
+            ? null
+            : VariantReplaceScope::canonicalTableName($resource);
+        if ($canonical === null || $canonical !== $resource) {
+            return $raw;
+        }
+
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return $raw;
+        }
+
+        $replaced = CharVariantMapService::replaceRow($decoded, $canonical)['data'];
+        $encoded = json_encode($replaced, JSON_UNESCAPED_UNICODE);
+
+        return $encoded === false ? $raw : $encoded;
+    }
+
     public function add_operations($keyword) {
         $user = $this->resolveActiveUserByToken($keyword['token'] ?? null);
         if (!$user) {
@@ -72,7 +114,7 @@ class OperationsController extends Controller {
 
         $operation = new Operation();
         $operation->resource = $y;
-        $operation->resource_data = $x;
+        $operation->resource_data = $this->replaceVariantsInJsonPayload($x, $y);
         $operation->user_id = $token; //這邊要規劃由token取值.
         $operation->crowdsourcing_status = 2;
         $operation->op_type = 1;
@@ -140,7 +182,9 @@ class OperationsController extends Controller {
         $operation->resource = $y;
         $operation->c_personid = $c_personid;
         $operation->resource_id = $resource_id;
-        $operation->resource_data = $x;
+        $operation->resource_data = $this->replaceVariantsInJsonPayload($x, $y);
+        // resource_original 是**歷史快照**（更新前的既有列），刻意不替換——那是「當時實際
+        // 長什麼樣」的事實，改寫它等於偽造紀錄（與 restore 不做內容替換同一個道理）。
         $operation->resource_original = $ori;
         $operation->user_id = $token; //這邊要規劃由token取值.
         $operation->crowdsourcing_status = 2;

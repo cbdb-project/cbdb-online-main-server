@@ -5,6 +5,7 @@ namespace App\Services\Mutations\EntityAggregate;
 use App\Services\Import\EntityAggregateService;
 use App\Services\Import\SocialInstituteImportService;
 use App\Services\Mutations\Concerns\ResolvesSocialInstituteAggregateInput;
+use App\Support\VariantLabelMap;
 
 /**
  * 「社會機構實體」的聚合定義（resource=social-institution）：收斂原 SocialInstituteImportHandler／
@@ -63,20 +64,23 @@ class SocialInstitutionAggregateDefinition extends AbstractEntityAggregateDefini
         $sourceId = $this->scalarOrNull($changes['source_id'] ?? $changes['c_source'] ?? null);
 
         $typeMap = $this->instService->typeMap();
+        $typeCodes = $this->instService->typeCodes();
         $typeCode = $this->scalarOrNull($changes['type_code'] ?? $changes['c_inst_type_code'] ?? null);
         if (($typeCode === null || $typeCode === '') && isset($changes['type_label'])) {
             $label = trim((string) ($this->scalarOrNull($changes['type_label']) ?? ''));
-            $typeCode = $typeMap[$label] ?? null;
+            // map 的鍵已歸一，傳入標籤也要歸一（見 VariantLabelMap）。
+            $typeCode = VariantLabelMap::lookup($typeMap, $label, 'SOCIAL_INSTITUTION_TYPES', 'c_inst_type_hz');
             if ($typeCode === null) {
                 return [['type_label' => ['not_found']], []];
             }
         }
 
         $dynastyMap = $this->instService->dynastyMap();
+        $dynastyCodes = $this->instService->dynastyCodes();
         $dynastyCode = $this->scalarOrNull($changes['dynasty_code'] ?? $changes['c_inst_begin_dy'] ?? null);
         if (($dynastyCode === null || $dynastyCode === '') && isset($changes['dynasty_label'])) {
             $label = trim((string) ($this->scalarOrNull($changes['dynasty_label']) ?? ''));
-            $dynastyCode = $dynastyMap[$label] ?? null;
+            $dynastyCode = VariantLabelMap::lookup($dynastyMap, $label, 'DYNASTIES', 'c_dynasty_chn');
             if ($dynastyCode === null) {
                 return [['dynasty_label' => ['not_found']], []];
             }
@@ -86,10 +90,10 @@ class SocialInstitutionAggregateDefinition extends AbstractEntityAggregateDefini
         if ($name === '') {
             $errors['name'] = ['required'];
         }
-        if ($typeCode === null || $typeCode === '' || !in_array((int) $typeCode, $typeMap, true)) {
+        if ($typeCode === null || $typeCode === '' || !in_array((int) $typeCode, $typeCodes, true)) {
             $errors['type'] = ['invalid'];
         }
-        if ($dynastyCode === null || $dynastyCode === '' || !in_array((int) $dynastyCode, $dynastyMap, true)) {
+        if ($dynastyCode === null || $dynastyCode === '' || !in_array((int) $dynastyCode, $dynastyCodes, true)) {
             $errors['dynasty'] = ['invalid'];
         }
         if ($addrId === null || $addrId === '' || !ctype_digit((string) $addrId)) {
@@ -115,8 +119,34 @@ class SocialInstitutionAggregateDefinition extends AbstractEntityAggregateDefini
         ]];
     }
 
+    /**
+     * 這次儲存會不會換掉 c_inst_name_code（唯讀探測，不配號也不建列）。
+     *
+     * @param array<string,mixed> $input
+     * @param array<string,mixed> $existing
+     */
+    protected function nameCodeWouldChange(array $input, array $existing): bool {
+        $name = (string) ($input['name'] ?? '');
+        if ($name === '') {
+            return false;
+        }
+
+        $resolved = $this->instService->findExistingNameCode($name);
+
+        // 解析不到既有列 ⇒ 儲存時會新建一個 code ⇒ 就是改名。
+        return $resolved === null || $resolved !== (int) ($existing['name_code'] ?? 0);
+    }
+
     public function guardWrite(string $operation, ?int $id, array $input, ?array $existing): ?array {
-        if ($operation === 'update' && $existing !== null && ($input['name'] ?? null) !== ($existing['name'] ?? null)) {
+        // 護欄要問的是「這次儲存會不會真的換掉 c_inst_name_code」，所以直接問 resolver，
+        // 不做字串比對：
+        //  - 純字串相等會把「只換字形」（resolveNameCode 兩形都探 ⇒ 同一個 code）誤報成
+        //    rename_blocked_while_referenced（409），那其實是 no-op；
+        //  - 反過來，只比「歸一後字串」又會漏掉反方向——輸入參考形而既有列是另一個變體形時，
+        //    歸一後兩邊看起來相同，但 resolveNameCode() 會**新建**一個 code，那正是護欄
+        //    要擋的「既存引用失配」。
+        if ($operation === 'update' && $existing !== null
+            && $this->nameCodeWouldChange($input, $existing)) {
             // 改名護欄：名稱改變且仍被人物資料引用時擋下（其餘欄位可正常修改）。
             $refCount = $this->instService->referenceCount((int) $id);
             if ($refCount > 0) {
@@ -149,10 +179,13 @@ class SocialInstitutionAggregateDefinition extends AbstractEntityAggregateDefini
                 'status' => 'created',
                 'operation_id' => $serviceResult['operation_id_code'],
                 'name_created' => $serviceResult['name_created'],
+                // 回應必須回**實際生效**的名稱：新建時是歸一後的參考形，複用既有碼時是既有
+                // 列的原字面（刻意不歸一）。回 $input['name'] 會與資料庫不一致。
+                '__variant_replaced' => $serviceResult['variant_replaced'] ?? [],
                 'row' => [
                     'c_inst_code' => $serviceResult['inst_code'],
                     'c_inst_name_code' => $serviceResult['name_code'],
-                    'c_inst_name_hz' => $input['name'],
+                    'c_inst_name_hz' => $serviceResult['name'] ?? $input['name'],
                     'c_inst_name_py' => $serviceResult['name_pinyin'],
                     'c_inst_type_code' => (int) $input['type_code'],
                     'c_inst_addr_id' => (int) $input['addr_id'],
@@ -168,10 +201,11 @@ class SocialInstitutionAggregateDefinition extends AbstractEntityAggregateDefini
                 'name_changed' => $serviceResult['name_changed'],
                 'addr_added' => $serviceResult['addr_added'],
                 'addr_removed' => $serviceResult['addr_removed'],
+                '__variant_replaced' => $serviceResult['variant_replaced'] ?? [],
                 'row' => [
                     'c_inst_code' => $id,
                     'c_inst_name_code' => $serviceResult['name_code'],
-                    'c_inst_name_hz' => $input['name'],
+                    'c_inst_name_hz' => $serviceResult['name'] ?? $input['name'],
                     'c_inst_type_code' => $input['type_code'],
                 ],
             ];

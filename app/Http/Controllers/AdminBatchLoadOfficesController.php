@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\CharVariantMapService;
 use App\Services\Import\OfficeImportService;
+use App\Support\VariantLabelMap;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -101,7 +103,10 @@ class AdminBatchLoadOfficesController extends Controller {
                 $results[] = [
                     'line' => $row['line'],
                     'office_id' => $created['office_id'],
-                    'name' => $row['name'],
+                    // 顯示**實際落庫**的職名（可能已做異體字替換），不是使用者原輸入，
+                    // 否則結果頁與資料庫不一致。變更明細另外列在 variant_replacements。
+                    'name' => $created['name'] ?? $row['name'],
+                    'variant_replacements' => CharVariantMapService::flattenReplaced($created['variant_replaced'] ?? []),
                     'pinyin' => $created['pinyin'],
                     'translation' => $row['translation'],
                     'dynasty_label' => $row['dynasty_label'],
@@ -152,7 +157,11 @@ class AdminBatchLoadOfficesController extends Controller {
 
             $name = trim($parts[0]);
             $translation = trim($parts[1]);
-            $dynastyLabel = trim($parts[2]);
+            // 標籤在此就歸一：validateDynasties() 與交易內的 $dynastyMap[$row['dynasty_label']]
+            // （無檢查陣列存取）吃的都是這個值。只在驗證階段歸一會讓後者拋
+            // "Undefined array key" 而不是乾淨的逐列錯誤。
+            $dynastyLabelRaw = trim($parts[2]);
+            $dynastyLabel = VariantLabelMap::normalizeLabel($dynastyLabelRaw, 'DYNASTIES', 'c_dynasty_chn');
             $typeId = trim($parts[3]);
             $department = trim($parts[4]);
             $sourceId = trim($parts[5]);
@@ -185,6 +194,9 @@ class AdminBatchLoadOfficesController extends Controller {
                 'name' => $name,
                 'translation' => $translation,
                 'dynasty_label' => $dynastyLabel,
+                // 保留使用者原輸入供錯誤訊息使用：查表用歸一後的值，但訊息裡要顯示他真的
+                // 打了什麼（顯示歸一後的字會讓人一頭霧水——他從沒打過那個字）。
+                'dynasty_label_raw' => $dynastyLabelRaw,
                 'type_id' => $typeId,
                 'department' => $department,
                 'source_id' => (int) $sourceId,
@@ -204,13 +216,16 @@ class AdminBatchLoadOfficesController extends Controller {
      * @return array<string,int>
      */
     protected function getDynastyMap(): array {
-        return DB::table('DYNASTIES')
+        // 鍵已做異體字歸一（見 App\Support\VariantLabelMap）：D6 不回溯校正，既有 DYNASTIES
+        // 列若字面是「淸」就永遠是「淸」，只歸一表格裡的標籤查不到它。兩側都歸一，
+        // 「表格寫淸／代碼表寫清」與反方向才都命中。碰撞取最小碼並記 warning。
+        $pairs = DB::table('DYNASTIES')
             ->orderBy('c_dy')
-            ->pluck('c_dy', 'c_dynasty_chn')
-            ->mapWithKeys(function ($code, $label) {
-                return [trim((string) $label) => (int) $code];
-            })
-            ->toArray();
+            ->get(['c_dy', 'c_dynasty_chn'])
+            ->map(fn ($row) => [(string) ($row->c_dynasty_chn ?? ''), (int) $row->c_dy])
+            ->all();
+
+        return VariantLabelMap::build($pairs, 'DYNASTIES', 'c_dynasty_chn')[0];
     }
 
     /**
@@ -224,7 +239,8 @@ class AdminBatchLoadOfficesController extends Controller {
         $errors = [];
         foreach ($rows as $row) {
             if (!array_key_exists($row['dynasty_label'], $dynastyMap)) {
-                $errors[] = "第 {$row['line']} 行找不到朝代「{$row['dynasty_label']}」對應的代碼";
+                $label = $row['dynasty_label_raw'] ?? $row['dynasty_label'];
+                $errors[] = "第 {$row['line']} 行找不到朝代「{$label}」對應的代碼";
             }
         }
 

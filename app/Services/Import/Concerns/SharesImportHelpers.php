@@ -6,6 +6,7 @@ use App\Models\Operation;
 use App\Services\PinyinDictionary;
 use App\Support\CompositePrimaryKey;
 use App\Support\PinyinUmlaut;
+use App\Support\VariantLabelMap;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -17,13 +18,49 @@ use Illuminate\Support\Facades\DB;
  * 使用端須以建構子注入 $operationRepository（OperationRepository）與 $auditLogService（AuditLogService）。
  */
 trait SharesImportHelpers {
-    /** 朝代名→代碼對照。 */
+    /**
+     * dynastyMapAndCodes() 的 per-instance memo（見該方法註解）。
+     *
+     * @var array{0: array<string,int>, 1: array<int,int>}|null
+     */
+    protected ?array $dynastyMapMemo = null;
+
+    /**
+     * 朝代名→代碼對照。**鍵已做異體字歸一**（見 App\Support\VariantLabelMap 的長註解）：
+     * D6 不做回溯校正，既有 DYNASTIES 列的字面若是「淸」就永遠是「淸」，所以只歸一
+     * 傳入標籤查不到它；兩側都歸一才讓「表格寫淸／代碼表寫清」與反方向都命中。
+     *
+     * 歸一後鍵碰撞時取**最小**代碼（不是既有 last-wins 的最大者）並記 warning；
+     * 白名單檢查請改用 dynastyCodes()，否則會漏掉被碰撞吃掉的那個合法代碼。
+     */
     public function dynastyMap(): array {
-        return DB::table('DYNASTIES')
+        return $this->dynastyMapAndCodes()[0];
+    }
+
+    /** 全部合法朝代代碼（含標籤歸一後被碰撞吃掉的那些）。 */
+    public function dynastyCodes(): array {
+        return $this->dynastyMapAndCodes()[1];
+    }
+
+    /**
+     * @return array{0: array<string,int>, 1: array<int,int>}
+     *
+     * per-instance memo：dynastyMap() 與 dynastyCodes() 各自呼叫本方法，而單一 v2 請求
+     * 會同時用到兩者（驗證 + 白名單）⇒ 不 memo 就是每次一條 query、一次 build、
+     * 以及**重複的碰撞 warning**。同一請求內代碼表不會變，memo 安全。
+     */
+    protected function dynastyMapAndCodes(): array {
+        if ($this->dynastyMapMemo !== null) {
+            return $this->dynastyMapMemo;
+        }
+
+        $pairs = DB::table('DYNASTIES')
             ->orderBy('c_dy')
-            ->pluck('c_dy', 'c_dynasty_chn')
-            ->mapWithKeys(fn ($code, $label) => [trim((string) $label) => (int) $code])
-            ->toArray();
+            ->get(['c_dy', 'c_dynasty_chn'])
+            ->map(fn ($row) => [(string) ($row->c_dynasty_chn ?? ''), (int) $row->c_dy])
+            ->all();
+
+        return $this->dynastyMapMemo = VariantLabelMap::build($pairs, 'DYNASTIES', 'c_dynasty_chn');
     }
 
     /** 校驗來源 TEXT_ID 存在於 TEXT_CODES；回傳缺失的 id。 */

@@ -7,9 +7,16 @@ import { LineNumberedTextarea } from '../../../components/ui/LineNumberedTextare
 import { useTranslation } from '../../../hooks/useTranslation';
 import type { SharedProps } from '../../../types/page';
 
+interface VariantReplacement {
+    from: string;
+    to: string;
+}
+
 interface ResultRow {
     line: number;
     name: string;
+    /** 本列實際套用的異體字替換（後端 flattenReplaced 的結果）。 */
+    variant_replacements?: VariantReplacement[];
     name_code: string | number | null;
     name_pinyin: string | null;
     name_created: boolean;
@@ -88,7 +95,16 @@ export default function BatchLoadSocialInstitutes() {
                                     {results.map((r) => (
                                         <tr key={`${r.line}-${r.inst_code}`} className="border-t border-border">
                                             <td className="px-3 py-1.5">{r.line}</td>
-                                            <td className="px-3 py-1.5">{r.name}</td>
+                                            <td className="px-3 py-1.5">
+                                                <div>{r.name}</div>
+                                                {r.variant_replacements && r.variant_replacements.length > 0 && (
+                                                    <div className="text-xs text-muted-foreground">
+                                                        {t('batch_variant_replaced_hint', {
+                                                            pairs: r.variant_replacements.map((v) => `${v.from}→${v.to}`).join('、'),
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </td>
                                             <td className="px-3 py-1.5">{r.name_code}</td>
                                             <td className="px-3 py-1.5">{r.name_pinyin}</td>
                                             <td className="px-3 py-1.5">{r.name_created ? t('batch_yes') : t('batch_no')}</td>

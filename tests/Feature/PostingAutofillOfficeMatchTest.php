@@ -107,4 +107,79 @@ class PostingAutofillOfficeMatchTest extends TestCase {
         }
         $this->assertTrue(true);
     }
+    // ── 異體字（plan S4）：AI 錄入的兩處精確比對 ────────────
+
+    /** 呼叫 protected resolveNianhaoId。 */
+    protected function resolveNianhao(string $name, ?int $dynasty, ?int $yearHint): ?int {
+        $service = app(PostingAutofillService::class);
+        $ref = new ReflectionClass($service);
+        $method = $ref->getMethod('resolveNianhaoId');
+        $method->setAccessible(true);
+        $id = $method->invoke($service, $name, $dynasty, $yearHint);
+
+        return $id === null ? null : (int) $id;
+    }
+
+    /**
+     * 官名精確比對要涵蓋參考形：S4 之後新寫入的 OFFICE_CODES.c_office_chn 是歸一後的
+     * 參考形，而 LLM 從文本抽出的官名可能是變體形。落空會退成模糊匹配
+     * （match_type 由 exact 降成 fuzzy）或整個失敗。
+     */
+    public function test_variant_form_office_name_still_matches_exactly() {
+        DB::table('OFFICE_CODES')->insert([
+            'c_office_id' => 90001, 'c_dy' => 20, 'c_office_chn' => '清吏司', 'c_office_chn_alt' => null,
+        ]);
+
+        $result = $this->matchOffice('淸吏司', 20, null);
+
+        $this->assertNotNull($result);
+        $this->assertSame(90001, (int) $result['id']);
+        $this->assertSame('exact', $result['match_type'], '應維持 exact，不可降級成 fuzzy');
+    }
+
+    /** 原輸入的字面優先：兩形都在時不可隨機挑。 */
+    public function test_office_exact_match_prefers_the_submitted_form() {
+        DB::table('OFFICE_CODES')->insert([
+            ['c_office_id' => 90002, 'c_dy' => 20, 'c_office_chn' => '清吏司', 'c_office_chn_alt' => null],
+            ['c_office_id' => 90003, 'c_dy' => 20, 'c_office_chn' => '淸吏司', 'c_office_chn_alt' => null],
+        ]);
+
+        $this->assertSame(90003, (int) $this->matchOffice('淸吏司', 20, null)['id']);
+        $this->assertSame(90002, (int) $this->matchOffice('清吏司', 20, null)['id']);
+    }
+
+    /** 年號：變體形輸入要能對上參考形的代碼表列。 */
+    public function test_variant_form_nianhao_resolves_to_reference_form_row() {
+        DB::table('NIAN_HAO')->insert([
+            'c_nianhao_id' => 9101, 'c_dy' => 20, 'c_nianhao_chn' => '清和', 'c_firstyear' => 1700, 'c_lastyear' => 1710,
+        ]);
+
+        $this->assertSame(9101, $this->resolveNianhao('淸和', 20, null));
+    }
+
+    /**
+     * codex round 2：**朝代條件優先於字形條件**。
+     *
+     * 原字形在別的朝代有一筆、參考形在指定朝代有一筆時，必須回指定朝代那一筆——
+     * 不可在第一輪名稱候選就做「不限朝代」的 fallback 而回了別的朝代。
+     */
+    public function test_nianhao_prefers_reference_form_within_requested_dynasty_over_other_dynasty() {
+        DB::table('NIAN_HAO')->insert([
+            // 原字形，但在別的朝代
+            ['c_nianhao_id' => 9201, 'c_dy' => 19, 'c_nianhao_chn' => '淸和', 'c_firstyear' => 1400, 'c_lastyear' => 1410],
+            // 參考形，在指定的朝代
+            ['c_nianhao_id' => 9202, 'c_dy' => 20, 'c_nianhao_chn' => '清和', 'c_firstyear' => 1700, 'c_lastyear' => 1710],
+        ]);
+
+        $this->assertSame(9202, $this->resolveNianhao('淸和', 20, null), '指定朝代內的等價形優先於別朝代的原字形');
+    }
+
+    /** 指定朝代完全落空時，才放寬朝代（沿用既有行為）。 */
+    public function test_nianhao_falls_back_across_dynasties_only_when_requested_dynasty_has_none() {
+        DB::table('NIAN_HAO')->insert([
+            'c_nianhao_id' => 9301, 'c_dy' => 19, 'c_nianhao_chn' => '淸和', 'c_firstyear' => 1400, 'c_lastyear' => 1410,
+        ]);
+
+        $this->assertSame(9301, $this->resolveNianhao('淸和', 20, null));
+    }
 }

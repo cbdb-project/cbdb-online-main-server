@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\CharVariantMapService;
+use App\Support\VariantReplaceScope;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -174,6 +176,8 @@ class ApiV2MutateSocialInstituteEntityTest extends TestCase {
     }
 
     protected function tearDown(): void {
+        // char_variant_map 的清理放在這裡而不是各測試方法尾：斷言失敗時方法尾不會執行。
+        Schema::dropIfExists('char_variant_map');
         foreach ([
             'POSTED_TO_OFFICE_DATA', 'ASSOC_DATA', 'ENTRY_DATA', 'BIOG_INST_DATA', 'pinyin',
             'YEAR_RANGE_CODES', 'NIAN_HAO', 'ADDR_CODES', 'TEXT_CODES', 'DYNASTIES',
@@ -350,5 +354,183 @@ class ApiV2MutateSocialInstituteEntityTest extends TestCase {
             'target' => ['pk' => ['c_inst_code' => 10]],
         ])->assertStatus(409);
         $this->assertDatabaseHas('SOCIAL_INSTITUTION_CODES', ['c_inst_code' => 10]);
+    }
+    // ── 異體字：標籤歸一與代碼白名單（plan S4）──────────────
+
+    /**
+     * 最小 char_variant_map 種子（「淸→清」）。其餘測試不建這張表，走
+     * CharVariantMapService 的「表不存在就降級」路徑、行為不變。
+     */
+    protected function seedCharVariantMap(): void {
+        Schema::create('char_variant_map', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->string('c_variant_char', 10);
+            $table->string('c_reference_char', 10);
+            $table->tinyInteger('c_strict_excluded')->default(1);
+            $table->string('c_notes', 255)->nullable();
+            $table->timestamps();
+            $table->unique('c_variant_char', 'char_variant_map_c_variant_char_unique');
+        });
+        DB::table('char_variant_map')->insert([
+            ['c_variant_char' => '淸', 'c_reference_char' => '清', 'c_strict_excluded' => 0],
+        ]);
+        CharVariantMapService::reset();
+        VariantReplaceScope::reset();
+    }
+
+    /**
+     * (c) 代碼表同時有兩形（「淸」40 與「清」41）時，標籤歸一會讓兩列的鍵塌成一個
+     * ——但**兩個代碼都必須仍然可用**。
+     *
+     * 這是把白名單從 `in_array(..., $map)` 改成 `in_array(..., $service->dynastyCodes())`
+     * 的理由：拿 map 的值當白名單時，被碰撞吃掉的 41 會開始被判 dynasty invalid，
+     * 而它是一個完全合法的 c_dy。
+     */
+    #[Test]
+    public function testBothCodesStayValidWhenTwoDynastyLabelsNormalizeToTheSameKey(): void {
+        $this->seedCharVariantMap();
+        DB::table('DYNASTIES')->insert([
+            ['c_dy' => 40, 'c_dynasty_chn' => '淸'],
+            ['c_dy' => 41, 'c_dynasty_chn' => '清'],
+        ]);
+        $this->actingAs($this->makeUser('si-variant-whitelist@example.com'));
+
+        // 被碰撞「吃掉」的那個碼（41，因為 map 只留最小的 40）仍須被接受。
+        $this->postJson('/api/v2/mutate', $this->updatePayload(['dynasty_code' => 41]))
+            ->assertOk();
+        $this->assertDatabaseHas('SOCIAL_INSTITUTION_CODES', ['c_inst_code' => 10, 'c_inst_begin_dy' => 41]);
+
+        // 另一個（40）當然也要能用。
+        $this->postJson('/api/v2/mutate', $this->updatePayload(['dynasty_code' => 40]))
+            ->assertOk();
+        $this->assertDatabaseHas('SOCIAL_INSTITUTION_CODES', ['c_inst_code' => 10, 'c_inst_begin_dy' => 40]);
+
+    }
+
+    /**
+     * 機構層與**地址列**的文本欄都要替換，回應回落庫值並帶 notices。
+     *
+     * 地址列的 c_pages／c_notes 是 review 抓到的缺口：同一次 update 裡機構層的 c_notes
+     * 被歸一、地址列的 c_notes 原樣入庫（SOCIAL_INSTITUTION_ADDR 同樣是已知表、兩欄都是
+     * 文本型，本來就在替換範圍內）。
+     */
+    #[Test]
+    public function testUpdateReplacesVariantsInInstitutionAndAddressTextColumns(): void {
+        $this->seedCharVariantMap();
+        $this->actingAs($this->makeUser('si-variant-text@example.com'));
+
+        $response = $this->postJson('/api/v2/mutate', $this->updatePayload([
+            'notes' => '淸代重修',
+            'pages' => '淸卷一',
+            'addresses' => [[
+                'addr_id' => 101,
+                'notes' => '淸址備註',
+                'pages' => '淸址頁',
+            ]],
+        ]))->assertOk();
+
+        $code = DB::table('SOCIAL_INSTITUTION_CODES')->where('c_inst_code', 10)->first();
+        $this->assertSame('清代重修', $code->c_notes);
+        $this->assertSame('清卷一', $code->c_pages);
+
+        $addr = DB::table('SOCIAL_INSTITUTION_ADDR')->where('c_inst_code', 10)->first();
+        $this->assertSame('清址備註', $addr->c_notes, '地址列的備註也必須歸一');
+        $this->assertSame('清址頁', $addr->c_pages);
+
+        $this->assertNotEmpty($response->json('notices'), '回應必須帶異體字通知');
+    }
+
+    /**
+     * 「只換了字形」的改名在 resolveNameCode() 兩形都探之下其實是 no-op，
+     * 不得被改名護欄誤報成 409（該機構仍被人物資料引用）。
+     */
+    #[Test]
+    public function testVariantOnlyRenameIsNotBlockedByReferenceGuard(): void {
+        $this->seedCharVariantMap();
+        // 既有名稱是參考形，且被人物資料引用。
+        DB::table('SOCIAL_INSTITUTION_NAME_CODES')->where('c_inst_name_code', 5)
+            ->update(['c_inst_name_hz' => '清溪書院']);
+        DB::table('BIOG_INST_DATA')->insert(['c_personid' => 1, 'c_inst_code' => 10, 'c_inst_name_code' => 5]);
+        $this->actingAs($this->makeUser('si-variant-rename@example.com'));
+
+        $response = $this->postJson('/api/v2/mutate', $this->updatePayload([
+            'name' => '淸溪書院', // 只是字形不同 ⇒ 解析到同一個 name_code
+            'notes' => '改備註',
+        ]));
+
+        $this->assertSame(200, $response->getStatusCode(), '只換字形不算改名，不該被引用護欄擋下');
+        $this->assertSame(5, (int) DB::table('SOCIAL_INSTITUTION_CODES')->where('c_inst_code', 10)->value('c_inst_name_code'));
+        $this->assertSame('清溪書院', DB::table('SOCIAL_INSTITUTION_NAME_CODES')->where('c_inst_name_code', 5)->value('c_inst_name_hz'), '既有列不歸一也不被改寫');
+        $this->assertSame('清溪書院', $response->json('result.row.c_inst_name_hz'), '回應要回實際生效的名稱');
+    }
+
+    /**
+     * codex：`typeCodes()` 必須是 hz／py 兩份的**聯集**。schema 允許 c_inst_type_hz 為
+     * null（只有拼音名），舊 typeMap() 也是任一有值就收；只取 hz 那份會讓這種列的
+     * 合法 type_code 在白名單驗證被錯判 invalid（422）。
+     */
+    #[Test]
+    public function testTypeCodeWithOnlyPinyinLabelStaysValid(): void {
+        DB::table('SOCIAL_INSTITUTION_TYPES')->insert([
+            'c_inst_type_code' => 9, 'c_inst_type_hz' => null, 'c_inst_type_py' => 'shuyuan-only',
+        ]);
+        $this->actingAs($this->makeUser('si-py-only@example.com'));
+
+        $this->postJson('/api/v2/mutate', $this->updatePayload(['type_code' => 9]))->assertOk();
+        $this->assertDatabaseHas('SOCIAL_INSTITUTION_CODES', ['c_inst_code' => 10, 'c_inst_type_code' => 9]);
+    }
+
+    /**
+     * 去重是**單向**的，這條把邊界釘死：輸入參考形而既有列是**另一個**變體形時，
+     * 精確比對命中不了（反方向需要列舉輸入的所有前像，plan 明確否決），
+     * 所以會像 S4 之前一樣新建一個名稱碼。
+     *
+     * 這不是本步造成的回歸（S4 之前同樣新建），但也沒被本步修好——寫成測試是為了讓
+     * 這個已知缺口有明文、不會被誤以為已解決。真正的修法是加一個歸一後的影子欄或
+     * 做一次性資料合併，屬獨立工作。
+     */
+    #[Test]
+    public function testReferenceFormInputDoesNotMergeIntoExistingVariantRow(): void {
+        $this->seedCharVariantMap();
+        DB::table('SOCIAL_INSTITUTION_NAME_CODES')->insert([
+            'c_inst_name_code' => 7, 'c_inst_name_hz' => '淸溪書院', 'c_inst_name_py' => 'qing xi shu yuan',
+        ]);
+        $this->actingAs($this->makeUser('si-reverse-direction@example.com'));
+
+        $response = $this->postJson('/api/v2/mutate', $this->updatePayload([
+            'name' => '清溪書院', // 參考形；既有列是變體形
+        ]))->assertOk();
+
+        $newCode = (int) DB::table('SOCIAL_INSTITUTION_CODES')->where('c_inst_code', 10)->value('c_inst_name_code');
+        $this->assertNotSame(7, $newCode, '反方向不會併入既有變體形列（已知邊界）');
+        $this->assertSame('清溪書院', DB::table('SOCIAL_INSTITUTION_NAME_CODES')->where('c_inst_name_code', $newCode)->value('c_inst_name_hz'));
+        // 沒有發生字元替換（輸入本來就是參考形）⇒ 不該有異體字通知。
+        $this->assertNull($response->json('notices'));
+    }
+
+    /**
+     * codex round 2：改名護欄要問「這次儲存會不會真的換掉 c_inst_name_code」，
+     * 不能只比歸一後的字串。
+     *
+     * 反方向（輸入參考形、既有列是另一個變體形）歸一後兩邊字串看起來相同，但
+     * resolveNameCode() 會**新建**一個 code ⇒ 對被引用的機構就是既存引用失配，
+     * 必須照樣回 409。
+     */
+    #[Test]
+    public function testReferenceFormInputIsStillBlockedWhenInstitutionIsReferenced(): void {
+        $this->seedCharVariantMap();
+        DB::table('SOCIAL_INSTITUTION_NAME_CODES')->where('c_inst_name_code', 5)
+            ->update(['c_inst_name_hz' => '淸溪書院']); // 既有名稱是變體形
+        DB::table('BIOG_INST_DATA')->insert(['c_personid' => 1, 'c_inst_code' => 10, 'c_inst_name_code' => 5]);
+        $this->actingAs($this->makeUser('si-reverse-guard@example.com'));
+
+        $response = $this->postJson('/api/v2/mutate', $this->updatePayload([
+            'name' => '清溪書院', // 參考形：歸一後與既有列「看起來相同」，但會新建 code
+        ]));
+
+        $this->assertSame(409, $response->getStatusCode(), '會換掉 name_code ⇒ 仍須被引用護欄擋下');
+        $this->assertSame(5, (int) DB::table('SOCIAL_INSTITUTION_CODES')->where('c_inst_code', 10)->value('c_inst_name_code'));
+        $this->assertSame(1, DB::table('SOCIAL_INSTITUTION_NAME_CODES')->where('c_inst_name_hz', '淸溪書院')->count());
+        $this->assertSame(0, DB::table('SOCIAL_INSTITUTION_NAME_CODES')->where('c_inst_name_hz', '清溪書院')->count(), '不得新建名稱列');
     }
 }

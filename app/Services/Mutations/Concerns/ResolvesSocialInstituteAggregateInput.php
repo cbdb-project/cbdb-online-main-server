@@ -25,15 +25,17 @@ trait ResolvesSocialInstituteAggregateInput {
             $errors['name'] = ['required'];
         }
 
-        $typeMap = $service->typeMap();
+        // 白名單一律用 *Codes()：標籤歸一後鍵碰撞時 map 只留最小碼，
+        // 拿 map 的值當白名單會讓另一個完全合法的代碼開始被判 invalid。
+        $dynastyCodes = $service->dynastyCodes();
+
         $typeCode = $this->scalarOrNull($changes['type_code'] ?? $changes['c_inst_type_code'] ?? null);
-        if ($typeCode === null || $typeCode === '' || !in_array((int) $typeCode, $typeMap, true)) {
+        if ($typeCode === null || $typeCode === '' || !in_array((int) $typeCode, $service->typeCodes(), true)) {
             $errors['type'] = ['invalid'];
         }
 
-        $dynastyMap = $service->dynastyMap();
         $dynastyCode = $this->scalarOrNull($changes['dynasty_code'] ?? $changes['c_inst_begin_dy'] ?? null);
-        if ($dynastyCode === null || $dynastyCode === '' || !in_array((int) $dynastyCode, $dynastyMap, true)) {
+        if ($dynastyCode === null || $dynastyCode === '' || !in_array((int) $dynastyCode, $dynastyCodes, true)) {
             $errors['dynasty'] = ['invalid'];
         }
 
@@ -90,7 +92,7 @@ trait ResolvesSocialInstituteAggregateInput {
         // 參照表存在性（僅對給值欄）：朝代／年號／year range 皆為 CASCADE 外鍵目標，寫入不存在
         // 的碼會直接 FK 失敗，這裡先以 422 擋下並給欄位級錯誤。
         foreach (['floruit_dy', 'end_dy'] as $k) {
-            if ($input[$k] !== null && !in_array($input[$k], $dynastyMap, true)) {
+            if ($input[$k] !== null && !in_array((int) $input[$k], $dynastyCodes, true)) {
                 $errors[$k] = ['invalid'];
             }
         }

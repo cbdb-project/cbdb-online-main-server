@@ -68,9 +68,12 @@ class OfficeAggregateDefinition extends AbstractEntityAggregateDefinition {
                 'pk' => ['c_office_id' => $serviceResult['office_id']],
                 'status' => 'created',
                 'operation_id' => $serviceResult['operation_id_office'],
+                // 回應必須回**落庫值**：異體字替換發生在 service 內，回 $input['name'] 會讓
+                // 前端畫面與資料庫不一致（而且使用者不知道字被改過）。
+                '__variant_replaced' => $serviceResult['variant_replaced'] ?? [],
                 'row' => [
                     'c_office_id' => $serviceResult['office_id'],
-                    'c_office_chn' => $input['name'],
+                    'c_office_chn' => $serviceResult['name'] ?? $input['name'],
                     'c_office_pinyin' => $serviceResult['pinyin'],
                     'type_ids' => $serviceResult['type_ids'],
                 ],
@@ -84,9 +87,10 @@ class OfficeAggregateDefinition extends AbstractEntityAggregateDefinition {
                 'operation_id' => $serviceResult['operation_id_office'],
                 'types_added' => $serviceResult['types_added'],
                 'types_removed' => $serviceResult['types_removed'],
+                '__variant_replaced' => $serviceResult['variant_replaced'] ?? [],
                 'row' => [
                     'c_office_id' => $id,
-                    'c_office_chn' => $input['name'],
+                    'c_office_chn' => $serviceResult['name'] ?? $input['name'],
                     'c_office_pinyin' => $serviceResult['pinyin'],
                     'type_ids' => $serviceResult['type_ids'],
                 ],

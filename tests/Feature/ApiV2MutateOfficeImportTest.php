@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Operation;
 use App\Models\User;
+use App\Services\CharVariantMapService;
+use App\Support\VariantReplaceScope;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -114,6 +116,8 @@ class ApiV2MutateOfficeImportTest extends TestCase {
     }
 
     protected function tearDown(): void {
+        // char_variant_map 的清理放在這裡而不是各測試方法尾：斷言失敗時方法尾不會執行。
+        Schema::dropIfExists('char_variant_map');
         foreach (['POSTED_TO_OFFICE_DATA', 'pinyin', 'TEXT_CODES', 'DYNASTIES', 'OFFICE_TYPE_TREE', 'OFFICE_CODE_TYPE_REL', 'OFFICE_CODES', 'audit_log', 'operations', 'users'] as $t) {
             Schema::dropIfExists($t);
         }
@@ -438,5 +442,96 @@ class ApiV2MutateOfficeImportTest extends TestCase {
         $this->postJson('/api/v2/create', $this->payload())->assertStatus(403);
         $this->postJson('/api/v2/create', $this->payload(['mode' => 'proposal']))->assertOk();
         $this->assertSame(1, DB::table('operations')->where('op_type', Operation::TYPE_PROPOSAL_CREATE)->count());
+    }
+    // ── 異體字落地替換（plan S4；review 補的 v2／React 覆蓋）──────
+
+    /**
+     * 最小 char_variant_map 種子（「淸→清」）。其餘測試不建這張表，走
+     * CharVariantMapService 的「表不存在就降級」路徑、行為不變。
+     */
+    protected function seedCharVariantMap(): void {
+        Schema::create('char_variant_map', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->string('c_variant_char', 10);
+            $table->string('c_reference_char', 10);
+            $table->tinyInteger('c_strict_excluded')->default(1);
+            $table->string('c_notes', 255)->nullable();
+            $table->timestamps();
+            $table->unique('c_variant_char', 'char_variant_map_c_variant_char_unique');
+        });
+        DB::table('char_variant_map')->insert([
+            ['c_variant_char' => '淸', 'c_reference_char' => '清', 'c_strict_excluded' => 0],
+        ]);
+        CharVariantMapService::reset();
+        VariantReplaceScope::reset();
+    }
+
+    /**
+     * v2／React 路徑：職名、別名、備註、頁碼四欄都要落地替換，**回應要回落庫值並帶
+     * notices**。
+     *
+     * 回 `$input['name']` 是這一步 review 抓到的缺陷：DB 寫參考形、回應回變體形，
+     * React 編輯器儲存後畫面與資料庫不一致，使用者也不知道字被改過（批次匯入使用者
+     * 反而看得到提示）。
+     */
+    #[Test]
+    public function testOfficeCreateReplacesVariantsInAllTextColumnsAndReturnsStoredValues(): void {
+        $this->seedCharVariantMap();
+        $this->actingAs($this->makeUser(email: 'office-variant@example.com'));
+
+        $response = $this->postJson('/api/v2/create', $this->payload([
+            'changes' => [
+                'name' => '淸吏司',
+                'name_alt' => '淸吏司別名',
+                'notes' => '淸代備註',
+                'pages' => '淸頁',
+                'dynasty_code' => 15,
+                'type_id' => 'x01',
+                'source_id' => 7596,
+            ],
+        ]))->assertOk();
+
+        $row = DB::table('OFFICE_CODES')->first();
+        $this->assertSame('清吏司', $row->c_office_chn);
+        $this->assertSame('清吏司別名', $row->c_office_chn_alt);
+        $this->assertSame('清代備註', $row->c_notes);
+        $this->assertSame('清頁', $row->c_pages);
+        $this->assertSame('qing li si', $row->c_office_pinyin, '拼音須由參考形派生');
+
+        $this->assertSame('清吏司', $response->json('result.row.c_office_chn'), '回應必須回落庫值');
+        $this->assertNotEmpty($response->json('notices'), '回應必須帶異體字通知');
+
+    }
+
+    /**
+     * 提案核准重放時，異體字替換與標籤歸一同樣生效（核准走
+     * `approveEntityAggregateProposal` → 以 direct 重放同一個 handler ⇒ 同 validate、
+     * 同 service、同替換）。提案存的是**原始 changes**，替換發生在核准當下（§4.5 存意圖）。
+     */
+    #[Test]
+    public function testApprovingProposalAppliesVariantReplacementAndLabelNormalization(): void {
+        $this->seedCharVariantMap();
+        // 代碼表寫變體形，提案的標籤送參考形 ⇒ 需要 map 鍵歸一才對得上。
+        DB::table('DYNASTIES')->insert(['c_dy' => 40, 'c_dynasty_chn' => '淸']);
+        $this->actingAs($this->makeUser(email: 'of-p-variant@example.com'));
+
+        $p = $this->payload(['mode' => 'proposal']);
+        $p['changes']['name'] = '淸吏司';
+        unset($p['changes']['dynasty_code']);
+        $p['changes']['dynasty_label'] = '清';
+        $this->postJson('/api/v2/create', $p)->assertOk();
+
+        // 提案存的是原始輸入（尚未替換）。
+        $operation = Operation::where('resource', 'office')->firstOrFail();
+        $stored = json_decode($operation->resource_data, true);
+        $this->assertSame('淸吏司', $stored['changes']['name'] ?? ($stored['name'] ?? null));
+
+        $this->post(route('operations.proposals.approve', $operation))->assertRedirect();
+
+        $row = DB::table('OFFICE_CODES')->where('c_office_chn', '清吏司')->first();
+        $this->assertNotNull($row, '核准落庫時職名應為參考形');
+        $this->assertSame(40, (int) $row->c_dy, '朝代標籤歸一後應對上變體形的代碼表列');
+        $this->assertSame('qing li si', $row->c_office_pinyin);
+
     }
 }

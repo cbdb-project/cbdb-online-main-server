@@ -4,6 +4,7 @@ namespace App\Services\Mutations\EntityAggregate;
 
 use App\Models\Operation;
 use App\Repositories\OperationRepository;
+use App\Services\CharVariantMapService;
 use App\Services\Mutations\AbstractMutationHandler;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -117,12 +118,31 @@ abstract class AbstractEntityAggregateHandler extends AbstractMutationHandler {
      * @param array<string, mixed> $result
      */
     protected function envelope(string $resource, string $operation, array $result): JsonResponse {
-        return response()->json([
+        // 異體字落地替換的通知：definition 的 result() 以內部鍵 __variant_replaced 帶上來，
+        // 這裡剝掉它並掛成回應層的 notices（對齊人物子資源 handler）。
+        // 沒有這一步，v2／React 使用者的字被靜默改寫而毫無提示——批次匯入使用者反而看得到。
+        $replaced = $result['__variant_replaced'] ?? [];
+        // __notices：不是「字元替換」但仍需告知使用者的訊息（例如名稱被併入既有的另一個
+        // 字形——那個方向不是正規化，記成 replaced 會謊稱「已正規化」且箭頭反向）。
+        $extraNotices = $result['__notices'] ?? [];
+        unset($result['__variant_replaced'], $result['__notices']);
+
+        $payload = [
             'ok' => true,
             'resource' => $resource,
             'mode' => 'direct',
             'operation' => $operation,
             'result' => $result,
-        ]);
+        ];
+
+        $notices = array_merge(
+            CharVariantMapService::buildNotices(is_array($replaced) ? $replaced : []),
+            array_values(array_filter(is_array($extraNotices) ? $extraNotices : [], 'is_string'))
+        );
+        if ($notices !== []) {
+            $payload['notices'] = $notices;
+        }
+
+        return response()->json($payload);
     }
 }

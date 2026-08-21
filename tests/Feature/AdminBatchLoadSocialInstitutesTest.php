@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\CharVariantMapService;
+use App\Support\VariantReplaceScope;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -123,6 +125,8 @@ class AdminBatchLoadSocialInstitutesTest extends TestCase {
     }
 
     protected function tearDown(): void {
+        // char_variant_map 的清理放在這裡而不是各測試方法尾：斷言失敗時方法尾不會執行。
+        Schema::dropIfExists('char_variant_map');
         Schema::dropIfExists('audit_log');
         Schema::dropIfExists('pinyin');
         Schema::dropIfExists('operations');
@@ -309,5 +313,156 @@ class AdminBatchLoadSocialInstitutesTest extends TestCase {
         $response->assertSessionHas('batch_errors');
 
         $this->assertSame(0, DB::table('SOCIAL_INSTITUTION_CODES')->count());
+    }
+    // ── 異體字落地替換（plan S4）────────────────────────────
+
+    /**
+     * 與 database/migrations/2026_07_15_000000_create_char_variant_map_table.php 同源的
+     * 最小種子（只要「淸→清」這一組）。本測試檔其餘測試不建這張表，所以那些測試在
+     * CharVariantMapService 的「表不存在就降級」路徑下完全不做替換、行為不變。
+     */
+    protected function seedCharVariantMap(): void {
+        Schema::create('char_variant_map', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->string('c_variant_char', 10);
+            $table->string('c_reference_char', 10);
+            $table->tinyInteger('c_strict_excluded')->default(1);
+            $table->string('c_notes', 255)->nullable();
+            $table->timestamps();
+            $table->unique('c_variant_char', 'char_variant_map_c_variant_char_unique');
+        });
+        DB::table('char_variant_map')->insert([
+            ['c_variant_char' => '淸', 'c_reference_char' => '清', 'c_strict_excluded' => 0],
+        ]);
+        CharVariantMapService::reset();
+        VariantReplaceScope::reset();
+    }
+
+    protected function seedInstituteLookups(string $dynastyLabel = '清'): void {
+        DB::table('SOCIAL_INSTITUTION_TYPES')->insert([
+            'c_inst_type_code' => 10, 'c_inst_type_hz' => '書院', 'c_inst_type_py' => 'shuyuan',
+        ]);
+        DB::table('DYNASTIES')->insert(['c_dy' => 40, 'c_dynasty_chn' => $dynastyLabel]);
+        DB::table('ADDR_CODES')->insert(['c_addr_id' => 7793]);
+        DB::table('TEXT_CODES')->insert(['c_textid' => 4763]);
+    }
+
+    /** (a) 表格寫變體形「淸」、代碼表寫參考形「清」→ 應成功。 */
+    #[Test]
+    public function test_dynasty_label_in_variant_form_matches_reference_form_code_row(): void {
+        $this->seedCharVariantMap();
+        $this->actingAs($this->makeUser());
+        $this->seedInstituteLookups('清');
+
+        $this->post(route('admin.batch-load-social-institutes.store'), [
+            'entries' => "南浦書院\t書院\t淸\t浦城\t7793\t4763",
+        ])->assertRedirect(route('admin.batch-load-social-institutes'));
+
+        $this->assertDatabaseHas('SOCIAL_INSTITUTION_CODES', ['c_inst_code' => 1, 'c_inst_begin_dy' => 40]);
+    }
+
+    /**
+     * (b) 表格寫參考形「清」、代碼表寫變體形「淸」→ 也要成功。
+     *
+     * 這個方向只靠「歸一傳入標籤」是修不到的：使用者輸入本來就是參考字、替換後不變，
+     * 而既有代碼表列在 D6 之下永不歸一。必須連 map 的鍵一起歸一。
+     */
+    #[Test]
+    public function test_dynasty_label_in_reference_form_matches_variant_form_code_row(): void {
+        $this->seedCharVariantMap();
+        $this->actingAs($this->makeUser());
+        $this->seedInstituteLookups('淸');
+
+        $this->post(route('admin.batch-load-social-institutes.store'), [
+            'entries' => "南浦書院\t書院\t清\t浦城\t7793\t4763",
+        ])->assertRedirect(route('admin.batch-load-social-institutes'));
+
+        $this->assertDatabaseHas('SOCIAL_INSTITUTION_CODES', ['c_inst_code' => 1, 'c_inst_begin_dy' => 40]);
+    }
+
+    /**
+     * (d) 既有 name code 是變體形「淸…」、匯入同樣的「淸…」→ 複用既有碼、不新建，
+     * 且該列的名稱文本**保持變體形**。
+     *
+     * 這鎖住 plan S4 明文記錄的刻意不對稱：為了不製造重複碼而複用既有列，
+     * 代價是該列永不歸一（與 D7「觸碰即歸一」相反）。
+     */
+    #[Test]
+    public function test_existing_variant_form_name_code_is_reused_and_not_normalized(): void {
+        $this->seedCharVariantMap();
+        $this->actingAs($this->makeUser());
+        $this->seedInstituteLookups('清');
+        DB::table('SOCIAL_INSTITUTION_NAME_CODES')->insert([
+            'c_inst_name_code' => 500, 'c_inst_name_hz' => '淸溪書院', 'c_inst_name_py' => 'qing xi shu yuan',
+        ]);
+
+        $this->post(route('admin.batch-load-social-institutes.store'), [
+            'entries' => "淸溪書院\t書院\t清\t浦城\t7793\t4763",
+        ])->assertRedirect(route('admin.batch-load-social-institutes'));
+
+        $this->assertSame(1, DB::table('SOCIAL_INSTITUTION_NAME_CODES')->count(), '不得新建第二個 name code');
+        $this->assertDatabaseHas('SOCIAL_INSTITUTION_NAME_CODES', [
+            'c_inst_name_code' => 500,
+            'c_inst_name_hz' => '淸溪書院', // 刻意不歸一
+        ]);
+        $this->assertDatabaseHas('SOCIAL_INSTITUTION_CODES', ['c_inst_name_code' => 500]);
+    }
+
+    /**
+     * (d′) 既有 name code 是參考形、匯入變體形 → 同樣複用，不新建。
+     * 這是「只替換傳入值」會漏的反方向。
+     */
+    #[Test]
+    public function test_variant_form_import_reuses_existing_reference_form_name_code(): void {
+        $this->seedCharVariantMap();
+        $this->actingAs($this->makeUser());
+        $this->seedInstituteLookups('清');
+        DB::table('SOCIAL_INSTITUTION_NAME_CODES')->insert([
+            'c_inst_name_code' => 500, 'c_inst_name_hz' => '清溪書院', 'c_inst_name_py' => 'qing xi shu yuan',
+        ]);
+
+        $this->post(route('admin.batch-load-social-institutes.store'), [
+            'entries' => "淸溪書院\t書院\t清\t浦城\t7793\t4763",
+        ])->assertRedirect(route('admin.batch-load-social-institutes'));
+
+        $this->assertSame(1, DB::table('SOCIAL_INSTITUTION_NAME_CODES')->count());
+        $this->assertDatabaseHas('SOCIAL_INSTITUTION_CODES', ['c_inst_name_code' => 500]);
+    }
+
+    /** (e) 同一批裡兩列分別寫「淸」「清」的同一機構名 → 收斂到同一個 name code。 */
+    #[Test]
+    public function test_two_rows_with_different_variant_forms_converge_to_one_name_code(): void {
+        $this->seedCharVariantMap();
+        $this->actingAs($this->makeUser());
+        $this->seedInstituteLookups('清');
+
+        $this->post(route('admin.batch-load-social-institutes.store'), [
+            'entries' => "淸溪書院\t書院\t清\t浦城\t7793\t4763\n清溪書院\t書院\t清\t浦城\t7793\t4763",
+        ])->assertRedirect(route('admin.batch-load-social-institutes'));
+
+        $this->assertSame(1, DB::table('SOCIAL_INSTITUTION_NAME_CODES')->count(), '兩列應收斂到同一個 name code');
+        $this->assertDatabaseHas('SOCIAL_INSTITUTION_NAME_CODES', ['c_inst_name_hz' => '清溪書院']);
+        $this->assertSame(2, DB::table('SOCIAL_INSTITUTION_CODES')->count(), '機構列仍是兩筆');
+    }
+
+    /**
+     * 替換紀錄不得跨列殘留：批次匯入是同一個 service 實例逐列呼叫，而
+     * lastVariantReplaced 是以 merge 累積的。第一列有替換、第二列沒有時，
+     * 第二列的結果頁不能顯示第一列的替換。
+     */
+    #[Test]
+    public function test_variant_replacements_do_not_leak_between_rows(): void {
+        $this->seedCharVariantMap();
+        $this->actingAs($this->makeUser());
+        $this->seedInstituteLookups('清');
+
+        $this->post(route('admin.batch-load-social-institutes.store'), [
+            'entries' => "淸溪書院\t書院\t清\t浦城\t7793\t4763\n白鹿洞書院\t書院\t清\t浦城\t7793\t4763",
+        ])->assertRedirect(route('admin.batch-load-social-institutes'));
+
+        $results = session('batch_results');
+        $this->assertIsArray($results);
+        $this->assertSame([['from' => '淸', 'to' => '清']], $results[0]['variant_replacements']);
+        $this->assertSame([], $results[1]['variant_replacements'], '第二列不得帶到第一列的替換紀錄');
     }
 }

@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import DashboardLayout from '../../../Layouts/DashboardLayout';
 import { Button } from '../../../components/ui/Button';
 import { FormField } from '../../../components/ui/FormField';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
+import { LineNumberedTextarea } from '../../../components/ui/LineNumberedTextarea';
 import { useTranslation } from '../../../hooks/useTranslation';
 import { getCsrfToken } from '../../../components/PersonBrowser/shared/csrf';
 import type { SharedProps } from '../../../types/page';
@@ -31,55 +32,6 @@ interface ResultRow {
 interface Toast {
     msg: string;
     type?: 'success' | 'error' | 'warning';
-}
-
-interface EntriesEditorProps {
-    id?: string;
-    value: string;
-    onChange: (value: string) => void;
-    placeholder?: string;
-    'aria-invalid'?: boolean;
-    'aria-describedby'?: string;
-}
-
-// FormField 會把 id / aria-invalid / aria-describedby clone 到單一子元素上；
-// 這裡把這些屬性轉發到真正的 <textarea>，讓行號側欄僅作為視覺裝飾疊加。
-function EntriesEditor({ id, value, onChange, placeholder, 'aria-invalid': ariaInvalid, 'aria-describedby': ariaDescribedBy }: EntriesEditorProps) {
-    const gutterRef = useRef<HTMLPreElement>(null);
-    const lineCount = Math.max(1, value.split('\n').length);
-
-    return (
-        <div
-            className={cn(
-                'flex items-stretch overflow-hidden rounded-md border border-input bg-background shadow-sm focus-within:ring-2 focus-within:ring-ring',
-                ariaInvalid && 'border-destructive'
-            )}
-        >
-            <pre
-                ref={gutterRef}
-                aria-hidden="true"
-                className="m-0 select-none overflow-hidden whitespace-pre border-r border-border bg-muted/50 px-2 py-2 text-right font-mono text-sm leading-normal text-muted-foreground"
-            >
-                {Array.from({ length: lineCount }, (_, i) => i + 1).join('\n')}
-            </pre>
-            <textarea
-                id={id}
-                rows={10}
-                spellCheck={false}
-                aria-invalid={ariaInvalid}
-                aria-describedby={ariaDescribedBy}
-                className="w-full flex-1 resize-y border-0 bg-transparent px-3 py-2 font-mono text-sm leading-normal shadow-none focus-visible:outline-none"
-                placeholder={placeholder}
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                onScroll={(e) => {
-                    if (gutterRef.current) {
-                        gutterRef.current.scrollTop = e.currentTarget.scrollTop;
-                    }
-                }}
-            />
-        </div>
-    );
 }
 
 interface BatchBooksPageProps extends SharedProps {
@@ -353,7 +305,7 @@ export default function BatchLoadBookTitles() {
 
                 <form onSubmit={(e) => { e.preventDefault(); submit(false); }}>
                     <FormField label={t('batch_data_tab_sep')} htmlFor="entries" error={form.errors.entries}>
-                        <EntriesEditor
+                        <LineNumberedTextarea
                             value={form.data.entries}
                             onChange={(v) => form.setData('entries', v)}
                             placeholder={t('batch_book_placeholder')}

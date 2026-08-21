@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Support\VariantReplaceScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * 異體字落地替換服務
@@ -50,6 +52,192 @@ class CharVariantMapService {
     }
 
     /**
+     * 對整列資料套落地替換：逐欄查 VariantReplaceScope::modeFor() 決定模式，
+     * 非文本欄／排除欄／未知表原樣保留。
+     *
+     * **只做淺層掃描**：非字串值（int／null／**陣列**）原樣跳過。這是刻意的——
+     * POSTED_TO_ADDR_DATA 的 resource_data['rows'] 與 PostingMutationHandler 的
+     * __proposal_aux／ADDRESS_AUX_KEYS 是騎在 $changes 裡的嵌套結構／非欄位鍵，
+     * 不該被當成欄位處理。
+     *
+     * **呼叫約定**：$table 一律傳**目標資料表**，永不傳 'operations'——
+     * operations.resource_id 是序列化的複合主鍵、內含中文 PK 成員，
+     * 改寫它會讓提案與目標列脫鉤。
+     *
+     * @param array<string,mixed> $data
+     * @return array{data: array<string,mixed>, replaced: array<string,string|array<int,string>>}
+     *         replaced 的值通常是字串；當同一個變體在這一列被解析成**不同**的參考字
+     *         （strict 欄與 lenient 欄的閉包終點不同）時會是陣列，兩個結果都保留。
+     */
+    public static function replaceRow(array $data, string $table): array {
+        $replaced = [];
+
+        foreach ($data as $column => $value) {
+            if (!is_string($value) || $value === '') {
+                continue;
+            }
+
+            $result = self::replaceFor($table, (string) $column, $value);
+            if ($result['replaced'] === []) {
+                continue;
+            }
+
+            $data[$column] = $result['text'];
+            $replaced = self::mergeReplaced($replaced, $result['replaced']);
+        }
+
+        return ['data' => $data, 'replaced' => $replaced];
+    }
+
+    /**
+     * 合併兩份 replaced，**保留衝突的兩個參考字**。
+     *
+     * 為什麼不能用 `+=` 或 `array_merge`：同一個變體在同一次操作裡可以被解析成不同的
+     * 參考字——strict 與 lenient 的閉包終點可以不同（`龴→峯`(excluded=0) +
+     * `峯→峰`(excluded=1)：strict 得「峯」、lenient 得「峰」）。`+=` 保留先出現者、
+     * `array_merge` 保留後出現者，兩者都會靜默丟掉一個，讓**通知與實際落庫的字形不一致**
+     * ——而通知是使用者唯一能看見替換發生的管道。
+     *
+     * 衝突時值升級成 list；沒有衝突時維持純字串（絕大多數情況）。
+     *
+     * @param array<string,string|array<int,string>> $base
+     * @param array<string,string|array<int,string>> $incoming
+     * @return array<string,string|array<int,string>>
+     */
+    public static function mergeReplaced(array $base, array $incoming): array {
+        foreach ($incoming as $variant => $reference) {
+            foreach (is_array($reference) ? $reference : [$reference] as $one) {
+                if (!array_key_exists($variant, $base)) {
+                    $base[$variant] = $one;
+
+                    continue;
+                }
+
+                $existing = is_array($base[$variant]) ? $base[$variant] : [$base[$variant]];
+                if (!in_array($one, $existing, true)) {
+                    $existing[] = $one;
+                    $base[$variant] = $existing;
+                }
+            }
+        }
+
+        return $base;
+    }
+
+    /**
+     * 把 replaced 攤平成 `[['from' => 變體, 'to' => 參考], …]`。
+     *
+     * 給需要**結構化 payload**（而非通知字串）的呼叫端用：那些地方不能收到
+     * `string|array` 聯集，否則 JSON 化之後前端契約會壞
+     * （例如批次匯入結果頁的 variant_replacements）。
+     *
+     * @param array<string,string|array<int,string>> $replaced
+     * @return array<int,array{from: string, to: string}>
+     */
+    public static function flattenReplaced(array $replaced): array {
+        $pairs = [];
+        foreach ($replaced as $variant => $reference) {
+            foreach (is_array($reference) ? $reference : [$reference] as $one) {
+                $pairs[] = ['from' => (string) $variant, 'to' => (string) $one];
+            }
+        }
+
+        return $pairs;
+    }
+
+    /**
+     * 單值替換，模式仍由 VariantReplaceScope::modeFor() 決定。
+     *
+     * 很多掛鉤點手上**不是「以欄位名為鍵的整列」**：OfficeImportService 在
+     * buildPinyin() 之前拿到的 $input 鍵是 name／name_alt／notes（欄位名只在
+     * officeColumns() 的 return 才出現）、SocialInstituteImportService::resolveNameCode()
+     * 拿到的是裸字串。對那些位置呼叫 replaceRow() 會靜默 no-op，必須用這個入口。
+     *
+     * @return array{text: string, replaced: array<string,string>}
+     */
+    public static function replaceFor(string $table, string $column, string $value): array {
+        $mode = VariantReplaceScope::modeFor($table, $column);
+
+        if ($mode === 'strict') {
+            return self::replaceStrict($value);
+        }
+
+        if ($mode === 'lenient') {
+            return self::replaceLenient($value);
+        }
+
+        return ['text' => $value, 'replaced' => []];
+    }
+
+    /**
+     * char_variant_map 專用的結構驗證：單一 codepoint、不製造環。
+     *
+     * 為什麼不用 Eloquent observer：app/Models/ 下沒有 char_variant_map 的 model，
+     * 它的每一條寫入都是 DB::table()，observer 攔不到；要攔就得把刻意 table-agnostic
+     * 的泛用 CRUD（Codes UI 服務 80 張表）為這一張表特例化。所以改成共用 guard，
+     * 由各寫入端呼叫。
+     *
+     * @param array<string,mixed> $row 可能是部分 payload（restoreUpdate 用歷史快照），
+     *                                 會與現有列 merge 後再驗
+     * @param int|null $excludeId 更新／還原既有列時要排除該列的舊邊，否則會誤報環：
+     *                            表有 id=5 `乙→甲`、id=9 `甲→丙`，把 id=5 改成 `丙→乙`
+     *                            是合法的 `甲→丙→乙`，但把舊邊算進去會看到 `乙→甲→丙→乙`
+     *
+     * @throws \RuntimeException 驗證不通過
+     */
+    public static function assertWritable(array $row, ?int $excludeId = null): void {
+        $current = [];
+        if ($excludeId !== null) {
+            $existing = DB::table('char_variant_map')->where('id', $excludeId)->first();
+            if ($existing !== null) {
+                $current = [
+                    'c_variant_char' => $existing->c_variant_char,
+                    'c_reference_char' => $existing->c_reference_char,
+                ];
+            }
+        }
+
+        $variant = (string) ($row['c_variant_char'] ?? $current['c_variant_char'] ?? '');
+        $reference = (string) ($row['c_reference_char'] ?? $current['c_reference_char'] ?? '');
+
+        // 兩欄都沒被碰到（例如只改 c_notes）：不需驗證。
+        if (!array_key_exists('c_variant_char', $row) && !array_key_exists('c_reference_char', $row)) {
+            return;
+        }
+
+        // 只送了單邊字元欄、又沒有既有列可以 merge：這是呼叫端沒傳 id 的問題，
+        // 報「必須是單一字元」會誤導（使用者根本沒動另一欄）。
+        if ($variant === '' || $reference === '') {
+            throw new \RuntimeException(__('variant.incomplete_payload'));
+        }
+
+        if (mb_strlen($variant) !== 1 || mb_strlen($reference) !== 1) {
+            throw new \RuntimeException(__('variant.single_codepoint_required'));
+        }
+
+        if ($variant === $reference) {
+            throw new \RuntimeException(__('variant.self_reference_not_allowed'));
+        }
+
+        // 把待寫入的邊放進現有邊集（排除被取代的舊邊），看會不會成環。
+        $edges = DB::table('char_variant_map')
+            ->when($excludeId !== null, fn ($q) => $q->where('id', '!=', $excludeId))
+            ->pluck('c_reference_char', 'c_variant_char')
+            ->all();
+        $edges[$variant] = $reference;
+
+        $node = $variant;
+        $seen = [];
+        while (isset($edges[$node]) && !isset($seen[$node])) {
+            $seen[$node] = true;
+            $node = $edges[$node];
+        }
+        if (isset($edges[$node]) && isset($seen[$node])) {
+            throw new \RuntimeException(__('variant.cycle_not_allowed', ['char' => $node]));
+        }
+    }
+
+    /**
      * 清除靜態快取（測試用，比照 VariantCharNormalizer::reset() 慣例）。
      */
     public static function reset(): void {
@@ -63,7 +251,8 @@ class CharVariantMapService {
      * （BIOG_MAIN create／update、ALTNAME_DATA create／update 等）共用同一份措辭，
      * 避免各自組字造成用語不一致。
      *
-     * @param array<string,string> $replaced 異體字 => 參考字
+     * @param array<string,string|array<int,string>> $replaced 異體字 => 參考字
+     *        （同一變體在同一列被解析成多個參考字時，值會是陣列——見 replaceRow()）
      * @return array<int,string> 空陣列代表無需通知
      */
     public static function buildNotices(array $replaced): array {
@@ -73,10 +262,17 @@ class CharVariantMapService {
 
         $pairs = [];
         foreach ($replaced as $variant => $reference) {
-            $pairs[] = "「{$variant}」已正規化為「{$reference}」";
+            // 同一個變體可能在同一列裡被解析成不同的參考字——strict 與 lenient 的閉包
+            // 終點可以不同（`龴→峯`(excluded=0) + `峯→峰`(excluded=1)：strict 得「峯」、
+            // lenient 得「峰」）。replaceRow() 遇到這種衝突會把值升級成陣列，
+            // 這裡兩種形狀都要能渲染，否則通知會告訴使用者錯誤的字。
+            $references = is_array($reference) ? $reference : [$reference];
+            foreach ($references as $one) {
+                $pairs[] = __('variant.notice_pair', ['variant' => $variant, 'reference' => (string) $one]);
+            }
         }
 
-        return ['異體字：'.implode('、', $pairs)];
+        return [__('variant.notice', ['pairs' => implode(__('variant.notice_separator'), $pairs)])];
     }
 
     /**
@@ -95,7 +291,7 @@ class CharVariantMapService {
      * header／cookie，需要重新評估這裡是否要改用 `$response->setData($data)` 保留原始
      * response 物件（含 header）而非重建。
      *
-     * @param array<string,string> $replaced
+     * @param array<string,string|array<int,string>> $replaced 形狀同 buildNotices()
      */
     public static function withNotices(JsonResponse $response, array $replaced): JsonResponse {
         $notices = self::buildNotices($replaced);
@@ -139,9 +335,12 @@ class CharVariantMapService {
      */
     protected static function lenientMap(): array {
         if (self::$lenientMap === null) {
-            self::$lenientMap = DB::table('char_variant_map')
-                ->pluck('c_reference_char', 'c_variant_char')
-                ->all();
+            self::$lenientMap = self::resolveMap(
+                DB::table('char_variant_map')
+                    ->pluck('c_reference_char', 'c_variant_char')
+                    ->all(),
+                'lenient'
+            );
         }
 
         return self::$lenientMap;
@@ -152,12 +351,117 @@ class CharVariantMapService {
      */
     protected static function strictMap(): array {
         if (self::$strictMap === null) {
-            self::$strictMap = DB::table('char_variant_map')
-                ->where('c_strict_excluded', 0)
-                ->pluck('c_reference_char', 'c_variant_char')
-                ->all();
+            self::$strictMap = self::resolveMap(
+                DB::table('char_variant_map')
+                    ->where('c_strict_excluded', 0)
+                    ->pluck('c_reference_char', 'c_variant_char')
+                    ->all(),
+                'strict'
+            );
         }
 
         return self::$strictMap;
+    }
+
+    /**
+     * 把一份**已按模式過濾**的邊集，解析成可安全重複套用的對照表。
+     *
+     * 順序必須是「移除環上出邊 → 對剩餘無環圖算傳遞閉包」，不可顛倒——先算閉包會在
+     * 環上無限迴圈（`A→B`、`B→A` 或自環 `A→A` 在環移除前閉包沒有定義）。
+     *
+     * 為什麼要傳遞閉包：`strtr()` 單次呼叫是同時替換，但**呼叫兩次不等於呼叫一次**。
+     * 若表裡同時有 `A→B` 與 `B→C`，兩次套用得到 `C`、一次只得到 `B`，機制就不幂等。
+     * 做完閉包後所有 key 都映射到終端節點，而終端節點沒有出邊故不是 key ⇒
+     * key 集 ∩ value 集 = ∅ ⇒ 重複套用是不動點。
+     *
+     * 為什麼**按模式各自算**：兩張 map 必須各自對已過濾的邊集獨立計算。若先對全表算閉包
+     * 再按 flag 過濾，`X→峯`(excluded=1 的 峯→峰) 會讓 strict map 得到 `X→峰`，等於透過
+     * 傳遞把一條 strict-excluded 的邊套進人名欄，廢掉 c_strict_excluded 的唯一用途。
+     * （今天的實作在 SQL 層就過濾，天然滿足；這裡的註解是擋住「共用 loader」那個重構。）
+     *
+     * @param array<string,string> $edges 異體字 => 參考字（已按模式過濾）
+     * @return array<string,string>
+     */
+    protected static function resolveMap(array $edges, string $mode): array {
+        // 只保留單一 codepoint 的邊：幂等論證只在單字元 key 下成立（多字元下
+        // `甲乙→丙丁` + `丁→戊` 的閉包接不起來，第二趟會再改一次）。寫入端有 guard，
+        // 這裡是對既有／繞過 guard 的資料做防禦。
+        $clean = [];
+        foreach ($edges as $variant => $reference) {
+            $variant = (string) $variant;
+            $reference = (string) $reference;
+            if ($variant === '' || mb_strlen($variant) !== 1 || mb_strlen($reference) !== 1) {
+                Log::error('char_variant_map: 略過非單一 codepoint 的對照', [
+                    'mode' => $mode,
+                    'variant' => $variant,
+                    'reference' => $reference,
+                ]);
+
+                continue;
+            }
+            $clean[$variant] = $reference;
+        }
+
+        $clean = self::dropCycleEdges($clean, $mode);
+
+        // 傳遞閉包：逐 key 走鏈到終端節點。此時圖已無環，走鏈必然終止。
+        $resolved = [];
+        foreach ($clean as $variant => $reference) {
+            $target = $reference;
+            while (isset($clean[$target])) {
+                $target = $clean[$target];
+            }
+            if ($target !== $variant) {
+                $resolved[$variant] = $target;
+            }
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * 移除**構成環的邊**，其餘照常生效。
+     *
+     * 不拋錯也不回空 map：這兩個 map 方法是所有替換的唯一入口，在此 throw 會讓
+     * Codes UI、所有 v2 mutate、批次匯入、眾包核准、提案核准一起爆（一筆 `峰→峯`
+     * 或打錯字的 `A→A` 就夠）；回空 map 則等於全站靜默不替換。降級要局部且有聲音。
+     *
+     * `c_variant_char` 有唯一鍵 ⇒ 圖是 out-degree ≤ 1 的 functional graph，
+     * 「環上節點」＝「從自己出發能走回自己」，逐 key 走鏈 + visited set 即可精確定位。
+     * **「鏈進入環」（`A→B`、`B→C`、`C→B`）只丟環上節點（B、C）的出邊，`A→B` 要保留**。
+     *
+     * @param array<string,string> $edges
+     * @return array<string,string>
+     */
+    protected static function dropCycleEdges(array $edges, string $mode): array {
+        $onCycle = [];
+
+        foreach (array_keys($edges) as $start) {
+            $seen = [];
+            $node = $start;
+            while (isset($edges[$node]) && !isset($seen[$node])) {
+                $seen[$node] = true;
+                $node = $edges[$node];
+            }
+            // 走鏈停在一個已造訪過的節點 ⇒ 該節點在環上；沿環標記整圈。
+            if (isset($edges[$node]) && isset($seen[$node])) {
+                $cursor = $node;
+                do {
+                    $onCycle[$cursor] = true;
+                    $cursor = $edges[$cursor];
+                } while ($cursor !== $node);
+            }
+        }
+
+        if ($onCycle === []) {
+            return $edges;
+        }
+
+        Log::error('char_variant_map: 偵測到環，已丟棄環上的對照', [
+            'mode' => $mode,
+            'chars' => array_keys($onCycle),
+        ]);
+
+        return array_diff_key($edges, $onCycle);
     }
 }

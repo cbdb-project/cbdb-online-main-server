@@ -217,7 +217,7 @@ class BiogMainMutationHandler extends AbstractMutationHandler {
         // docs/CHAR_VARIANT_MAP_CALL_SITE_WIRING_PLAN.md 待決事項 1）。
         $surnameReplaced = CharVariantMapService::replaceStrict((string) ($payload['c_surname_chn'] ?? ''));
         $mingziReplaced = CharVariantMapService::replaceStrict((string) ($payload['c_mingzi_chn'] ?? ''));
-        $variantReplaced = array_merge($surnameReplaced['replaced'], $mingziReplaced['replaced']);
+        $variantReplaced = CharVariantMapService::mergeReplaced($surnameReplaced['replaced'], $mingziReplaced['replaced']);
         $payload['c_surname_chn'] = $surnameReplaced['text'];
         $payload['c_mingzi_chn'] = $mingziReplaced['text'];
 

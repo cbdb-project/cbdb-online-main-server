@@ -8,6 +8,7 @@ use App\Models\OfficeCodeTypeRel;
 use App\Models\OfficeTypeTree;
 use App\Models\Operation;
 use App\Repositories\OperationRepository;
+use App\Services\CharVariantMapService;
 use App\Support\BasicInformationHistory;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
@@ -1142,14 +1143,18 @@ class OperationsController extends Controller {
     }
 
     protected function performRestore(Operation $operation) {
-        switch ((int) $operation->op_type) {
-            case 3:
-                return $this->restoreUpdate($operation);
-            case 4:
-                return $this->restoreDelete($operation);
-            default:
-                throw new \RuntimeException(__('operations.restore_unsupported_type'));
+        $result = match ((int) $operation->op_type) {
+            3 => $this->restoreUpdate($operation),
+            4 => $this->restoreDelete($operation),
+            default => throw new \RuntimeException(__('operations.restore_unsupported_type')),
+        };
+
+        // 還原了對照表本身 ⇒ 行程內的閉包／環快取已陳舊，清掉讓下次替換重新載入。
+        if (strtolower((string) $operation->resource) === 'char_variant_map') {
+            CharVariantMapService::reset();
         }
+
+        return $result;
     }
 
     protected function restoreUpdate(Operation $operation) {
@@ -1193,6 +1198,12 @@ class OperationsController extends Controller {
         if (!$query->exists()) {
             throw new \RuntimeException(__('operations.restore_row_not_found'));
         }
+
+        // char_variant_map 是對照表本身：還原一筆被改／被刪的對照，可能重新引入環或
+        // 多字元 key，繞過其餘 9 個寫入端的 guard（見 docs/CHAR_VARIANT_MAP_TEXT_COLUMN_ROLLOUT_PLAN.md S1）。
+        // 注意這與「restore 不做內容替換」不衝突：那是不對還原內容做落地替換（保留歷史字形），
+        // 這裡是對這張表的寫入做結構驗證。
+        $this->assertCharVariantMapWritable($table, $payload, $conditions);
         $query->update($payload);
 
         return [
@@ -1223,6 +1234,12 @@ class OperationsController extends Controller {
             $payload['c_modified_date'] = Carbon::now();
         }
         $conditions = $this->buildKeyConditions($operation, $target, $target);
+        // char_variant_map 是對照表本身：還原一筆被改／被刪的對照，可能重新引入環或
+        // 多字元 key，繞過其餘 9 個寫入端的 guard（見 docs/CHAR_VARIANT_MAP_TEXT_COLUMN_ROLLOUT_PLAN.md S1）。
+        // 注意這與「restore 不做內容替換」不衝突：那是不對還原內容做落地替換（保留歷史字形），
+        // 這裡是對這張表的寫入做結構驗證。
+        $this->assertCharVariantMapWritable($table, $payload, $conditions);
+
         if (!empty($conditions)) {
             DB::table($table)->updateOrInsert($conditions, $payload);
         } else {
@@ -1321,6 +1338,40 @@ class OperationsController extends Controller {
         }
 
         return [];
+    }
+
+    /**
+     * char_variant_map 的還原路徑結構把關（單一 codepoint、不成環）。
+     *
+     * 這張表在 resourceKeyColumns() 有明文登記，所以 restore 對它是刻意支援的；
+     * 但它同時是所有落地替換的資料來源，還原一筆壞對照會讓全站的替換降級。
+     *
+     * restore 是 10 個寫入入口中**唯一不在 S2／S5／S6 編輯範圍內**的那條，所以在 S1 就掛。
+     * 其餘 9 個（Codes UI 5、token API 2、提案核准 2）的 guard **尚未掛上**，
+     * 分別由計畫的 S2／S5／S6 補（見 docs/CHAR_VARIANT_MAP_TEXT_COLUMN_ROLLOUT_PLAN.md）。
+     *
+     * @param array<string,mixed> $payload
+     * @param array<string,mixed> $conditions
+     */
+    protected function assertCharVariantMapWritable($table, array $payload, array $conditions): void {
+        if (strtolower((string) $table) !== 'char_variant_map') {
+            return;
+        }
+
+        // $excludeId 必須取得，否則會把「更新既有列」誤判成新增而誤報環
+        // （表有 乙→甲、甲→丙 時，把那列改成 丙→乙 是合法的，但把被取代的舊邊算進去
+        // 就會看到假的環 乙→甲→丙→乙）。
+        //
+        // 這張表的 key 只有單一欄 id（resourceKeyColumns()），所以 $conditions 只可能是
+        // [] 或 ['id' => N]：restoreUpdate 走到這裡時 $conditions 一定非空（它在上面已
+        // 對 empty($conditions) 拋 restore_no_pk），restoreDelete 則可能是 [] 而
+        // $excludeId = null 正是該路徑的正確語義（被還原的列已被刪、不在任何邊上）。
+        //
+        // 附註：若 operation.resource 存成大寫 CHAR_VARIANT_MAP，resourceKeyColumns() 的
+        // 字面查表會回 []，restoreUpdate 會**先**以 restore_no_pk 失敗、走不到這裡。
+        $excludeId = isset($conditions['id']) ? (int) $conditions['id'] : null;
+
+        CharVariantMapService::assertWritable($payload, $excludeId);
     }
 
     protected function filterColumns($table, array $data) {

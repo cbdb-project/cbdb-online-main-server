@@ -1496,6 +1496,15 @@ class BiogMainRepository {
         $data['c_kin_code'] = $data['c_kin_code'] == -999 ? '0' : $data['c_kin_code'];
         $data['c_kin_id'] = $data['c_kin_id'] == -999 ? '0' : $data['c_kin_id'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
+        // 異體字落地替換（型別驅動）。提案核准走這條路（applyKinshipProposal／
+        // applyAssocProposal 不重放 v2 handler，直接呼叫本方法），所以 S3 的基底掛鉤覆蓋不到。
+        // legacy Blade 路徑共用本方法（flag=new 下已被 LegacyBladeFormGate 下架），共用同一份
+        // 替換語義本來就是想要的。掛在哨兵正規化之後、timestamp() 與任何 PK 計算之前；
+        // 稽核欄由排除清單擋住。
+        // KIN_DATA 的主鍵三欄都是數值，替換不會改鍵（不涉 D7）。
+        $data = CharVariantMapService::replaceRow($data, 'KIN_DATA')['data'];
+        // 零額外查詢的守衛（$inScope === [] 直接 return null）；掛著防日後主鍵變動時漏掉。
+        $this->assertNoVariantEquivalentRow('KIN_DATA', $data, [array_intersect_key((array) $row, array_flip(CompositePrimaryKey::SCHEMAS['KIN_DATA']))]);
         $data = (new ToolsRepository())->timestamp($data);
 
         $ori_data = $data;
@@ -1570,6 +1579,15 @@ class BiogMainRepository {
         $data['c_kin_code'] = $data['c_kin_code'] == -999 ? '0' : $data['c_kin_code'];
         $data['c_kin_id'] = $data['c_kin_id'] == -999 ? '0' : $data['c_kin_id'];
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
+        // 異體字落地替換（型別驅動）。提案核准走這條路（applyKinshipProposal／
+        // applyAssocProposal 不重放 v2 handler，直接呼叫本方法），所以 S3 的基底掛鉤覆蓋不到。
+        // legacy Blade 路徑共用本方法（flag=new 下已被 LegacyBladeFormGate 下架），共用同一份
+        // 替換語義本來就是想要的。掛在哨兵正規化之後、timestamp() 與任何 PK 計算之前；
+        // 稽核欄由排除清單擋住。
+        // KIN_DATA 的主鍵三欄都是數值，替換不會改鍵（不涉 D7）。
+        $data = CharVariantMapService::replaceRow($data, 'KIN_DATA')['data'];
+        // KIN_DATA 主鍵三欄全數值 ⇒ 這道守衛零額外查詢；掛著是為了日後主鍵若變動不會漏。
+        $this->assertNoVariantEquivalentRow('KIN_DATA', $data);
         $data = (new ToolsRepository())->timestamp($data, true);
 
         $ori_Data = $data;
@@ -2445,6 +2463,25 @@ class BiogMainRepository {
         $old_c_assocship_pair2 = $old_c_assocship_pair['c_assoc_pair2'] ?? null;
 
         $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_assocship_pair', 'c_kinship_pair', 'c_assoc_kinship_pair', 'ai_fill_log_id']);
+        // 異體字落地替換（型別驅動）。提案核准走這條路（applyKinshipProposal／
+        // applyAssocProposal 不重放 v2 handler，直接呼叫本方法），所以 S3 的基底掛鉤覆蓋不到。
+        // legacy Blade 路徑共用本方法（flag=new 下已被 LegacyBladeFormGate 下架），共用同一份
+        // 替換語義本來就是想要的。掛在哨兵正規化之後、timestamp() 與任何 PK 計算之前；
+        // 稽核欄由排除清單擋住。
+        // 只替換 $data（要寫入的值）。定位既有列用的是 $id 解析出來的舊 PK，**不可替換**：
+        // 既有列可能存變體形（D6 不做回溯校正），替換定位器會讓 update 落空。
+        $data = CharVariantMapService::replaceRow($data, 'ASSOC_DATA')['data'];
+        // D7（改鍵時）：排除自己交給 lookup 內部；並且**只在真的改鍵時檢查**——既有資料
+        // 可能早就兩形並存，使用者只改 c_notes 是合法操作，無條件檢查會讓那些列永遠改不了。
+        $selfPk = array_intersect_key((array) $row, array_flip(CompositePrimaryKey::SCHEMAS['ASSOC_DATA']));
+        $newPk = array_intersect_key(array_replace($selfPk, $data), array_flip(CompositePrimaryKey::SCHEMAS['ASSOC_DATA']));
+        foreach (CompositePrimaryKey::SCHEMAS['ASSOC_DATA'] as $pkColumn) {
+            if ((string) ($newPk[$pkColumn] ?? '') !== (string) ($selfPk[$pkColumn] ?? '')) {
+                $this->assertNoVariantEquivalentRow('ASSOC_DATA', $newPk, [$selfPk]);
+
+                break;
+            }
+        }
         $data = (new ToolsRepository())->timestamp($data);
 
         $ori_data = $data;
@@ -2886,6 +2923,34 @@ class BiogMainRepository {
         }
     }
 
+    /**
+     * D7「兩形並存」守衛：核准／legacy 寫入路徑用（v2 側由 handler 的掛鉤負責）。
+     *
+     * 為什麼非做不可：`ASSOC_DATA.c_text_title` 是主鍵成員且在替換範圍內，所以替換等於改鍵。
+     * 既有列可能存變體形（D6 不做回溯校正），此時「原樣重送同一個變體形」在替換之後 PK 值
+     * 就不同了 ⇒ insert 成功、唯一鍵擋不住 ⇒ 同一組關係出現兩列語義相同、字形不同的資料。
+     * **在本步之前，同一筆輸入是乾淨的 1062**（approve() 有專屬 QueryException catch 回滾 +
+     * 友善提示），所以少了這道守衛就是把「乾淨拒絕」換成「靜默鑄出重複列」——比不替換更糟。
+     *
+     * KIN_DATA 三個主鍵欄都是數值 ⇒ `findExistingRow()` 的 `$inScope === []` 分支直接
+     * return null，零額外查詢；仍然掛上是為了日後主鍵若變動不會漏。
+     *
+     * @param array<string,mixed> $data 替換後、即將落庫的資料
+     * @param array<int,array<string,mixed>> $excludePks 要排除的列（改鍵時排除自己）
+     */
+    protected function assertNoVariantEquivalentRow(string $table, array $data, array $excludePks = []): void {
+        $keyColumns = CompositePrimaryKey::SCHEMAS[$table] ?? [];
+        if ($keyColumns === []) {
+            return;
+        }
+
+        if (VariantEquivalentLookup::findExistingRow($table, $keyColumns, $data, $excludePks) !== null) {
+            throw new \RuntimeException(
+                '已存在異體字歸一後相同的紀錄（字形不同），無法寫入；請先手動整理後再試。'
+            );
+        }
+    }
+
     /** 鏡像列集合是否為空（backfill 情境）。Collection 與陣列都要能吃。 */
     protected function isEmptyRowSet($rows): bool {
         if ($rows instanceof \Illuminate\Support\Collection) {
@@ -3146,6 +3211,18 @@ class BiogMainRepository {
         if ($data['c_assoc_first_year'] == '') {  #這個判斷式只會將「社會關係始年」為空白時，填充為-9999，如果使用者填寫0，會維持0的值而不更動。
             $data['c_assoc_first_year'] = '-9999';
         }
+        // 異體字落地替換（型別驅動）。提案核准走這條路（applyKinshipProposal／
+        // applyAssocProposal 不重放 v2 handler，直接呼叫本方法），所以 S3 的基底掛鉤覆蓋不到。
+        // legacy Blade 路徑共用本方法（flag=new 下已被 LegacyBladeFormGate 下架），共用同一份
+        // 替換語義本來就是想要的。掛在哨兵正規化之後、timestamp() 與任何 PK 計算之前；
+        // 稽核欄由排除清單擋住。
+        // ⚠️ ASSOC_DATA.c_text_title 是主鍵成員，替換等於改鍵——必須在下方 insert 與
+        // resource_id 組裝之前替換，兩者才看到同一個值（否則 operations 的 resource_id
+        // 會指向一個不存在的字形）。
+        $data = CharVariantMapService::replaceRow($data, 'ASSOC_DATA')['data'];
+        // D7：替換把 c_text_title（PK 成員）改成參考形之後，必須確認沒有「歸一後相同但
+        // 字形不同」的既有列，否則就是靜默鑄出重複列（見 assertNoVariantEquivalentRow）。
+        $this->assertNoVariantEquivalentRow('ASSOC_DATA', $data);
         $data = (new ToolsRepository())->timestamp($data, true);
 
         $ori_Data = $data;

@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Operation;
 use App\Models\User;
+use App\Services\CharVariantMapService;
+use App\Support\VariantReplaceScope;
 use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -219,6 +221,7 @@ class OperationsProposalControllerTest extends TestCase {
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('char_variant_map');
         Schema::dropIfExists('KINSHIP_CODES');
         Schema::dropIfExists('KIN_DATA');
         Schema::dropIfExists('ASSOC_CODES');
@@ -1421,5 +1424,461 @@ class OperationsProposalControllerTest extends TestCase {
         $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 101]);
         $this->assertSame(2, DB::table('KIN_DATA')->count(), '回滾：正反向皆不得半刪');
         $this->assertSame(0, DB::table('operations')->where('resource', 'KIN_DATA')->where('op_type', Operation::TYPE_DELETE)->count(), '不得寫入 final delete operation');
+    }
+    // ── 異體字落地替換：提案核准端（plan S6）────────────────
+
+    /**
+     * 最小 char_variant_map 種子（「淸→清」）。本檔其餘測試不建這張表，走
+     * CharVariantMapService 的「表不存在就降級」路徑、行為不變。
+     */
+    protected function seedCharVariantMap(): void {
+        Schema::create('char_variant_map', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->string('c_variant_char', 10);
+            $table->string('c_reference_char', 10);
+            $table->tinyInteger('c_strict_excluded')->default(1);
+            $table->string('c_notes', 255)->nullable();
+            $table->timestamps();
+            $table->unique('c_variant_char', 'char_variant_map_c_variant_char_unique');
+        });
+        DB::table('char_variant_map')->insert([
+            ['c_variant_char' => '淸', 'c_reference_char' => '清', 'c_strict_excluded' => 0],
+        ]);
+        CharVariantMapService::reset();
+        VariantReplaceScope::reset();
+    }
+
+    /**
+     * 通用核准分支（applyCreateProposal）：**歷史遺留 payload** 的補網。
+     *
+     * 提案建立端（S2／S3／S5）存進 payload 的已是替換後值，所以這條測試刻意手造一筆
+     * 「落地替換上線前送出」的提案（payload 裡還是變體形），核准時必須替換後才落庫。
+     * TEXT_CODES 不在 HANDLER_ROUTED_RESOURCES，所以走的正是這條通用分支。
+     */
+    #[Test]
+    public function testApproveCreateProposalReplacesVariantsInLegacyPayload(): void {
+        $this->seedCharVariantMap();
+        $this->actingAs($this->makeAdmin());
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource' => 'TEXT_CODES',
+            'resource_id' => '90001',
+            'resource_data' => [
+                'c_textid' => 90001,
+                'c_title' => '淸嘉錄',
+                '__key_columns' => ['c_textid'],
+                '__review_status' => 'pending',
+                '__proposal_meta' => ['action' => 'create', 'submitted_by' => 'tester'],
+            ],
+        ]);
+
+        $this->post(route('operations.proposals.approve', $operation))->assertRedirect();
+
+        $this->assertSame('清嘉錄', DB::table('TEXT_CODES')->where('c_textid', 90001)->value('c_title'));
+    }
+
+    /** 通用核准分支（applyUpdateProposal）同理。 */
+    #[Test]
+    public function testApproveUpdateProposalReplacesVariantsInLegacyPayload(): void {
+        $this->seedCharVariantMap();
+        DB::table('TEXT_CODES')->insert(['c_textid' => 90002, 'c_title' => '舊名']);
+        $this->actingAs($this->makeAdmin());
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+            'resource' => 'TEXT_CODES',
+            'resource_id' => '90002',
+            'resource_data' => [
+                'c_textid' => 90002,
+                'c_title' => '淸嘉錄',
+                '__key_columns' => ['c_textid'],
+                '__review_status' => 'pending',
+                '__proposal_meta' => ['action' => 'update', 'submitted_by' => 'tester'],
+            ],
+            'resource_original' => ['c_textid' => 90002, 'c_title' => '舊名'],
+        ]);
+
+        $this->post(route('operations.proposals.approve', $operation))->assertRedirect();
+
+        $this->assertSame('清嘉錄', DB::table('TEXT_CODES')->where('c_textid', 90002)->value('c_title'));
+    }
+
+    /**
+     * 親屬提案核准不重放 v2 handler（直接呼叫 BiogMainRepository::kinshipStoreById），
+     * 所以 S3 的基底掛鉤覆蓋不到，必須在 repository 那層獨立掛。
+     */
+    #[Test]
+    public function testApproveKinshipCreateProposalReplacesVariants(): void {
+        $this->seedCharVariantMap();
+        $this->actingAs($this->makeAdmin());
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource' => 'KIN_DATA',
+            'resource_id' => '1000-2000-100',
+            'resource_data' => [
+                'c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100,
+                'c_source' => 10, 'c_notes' => '淸代族譜',
+                'c_kinship_pair' => 0,
+                '__key_columns' => ['c_personid', 'c_kin_id', 'c_kin_code'],
+                '__review_status' => 'pending',
+                '__proposal_meta' => ['action' => 'create', 'submitted_by' => 'tester'],
+            ],
+        ]);
+        $operation->c_personid = 1000;
+        $operation->save();
+
+        $this->post(route('operations.proposals.approve', $operation))->assertRedirect();
+
+        $this->assertSame(
+            '清代族譜',
+            DB::table('KIN_DATA')->where(['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100])->value('c_notes')
+        );
+    }
+
+    /**
+     * 社會關係提案核准同理，而且 `c_text_title` 是**主鍵成員**——替換等於改鍵，
+     * 所以落庫的列與 operations 的 resource_id 必須看到同一個字形。
+     */
+    #[Test]
+    public function testApproveAssocCreateProposalReplacesVariantsInPrimaryKeyMember(): void {
+        $this->seedCharVariantMap();
+        $this->actingAs($this->makeAdmin());
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource' => 'ASSOC_DATA',
+            'resource_id' => '1000-1-2000-0-0-0-0-淸書-1060',
+            'resource_data' => [
+                'c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000,
+                'c_kin_code' => 0, 'c_kin_id' => 0, 'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0,
+                'c_text_title' => '淸書', 'c_assoc_first_year' => 1060, 'c_source' => 10,
+                'c_assocship_pair' => 0, 'c_kinship_pair' => 0, 'c_assoc_kinship_pair' => 0,
+                '__key_columns' => [
+                    'c_personid', 'c_assoc_code', 'c_assoc_id', 'c_kin_code', 'c_kin_id',
+                    'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year',
+                ],
+                '__review_status' => 'pending',
+                '__proposal_meta' => ['action' => 'create', 'submitted_by' => 'tester'],
+            ],
+        ]);
+        $operation->c_personid = 1000;
+        $operation->save();
+
+        $this->post(route('operations.proposals.approve', $operation))->assertRedirect();
+
+        $this->assertTrue(
+            DB::table('ASSOC_DATA')->where('c_personid', 1000)->where('c_text_title', '清書')->exists(),
+            'PK 成員應以參考形落庫'
+        );
+        $this->assertFalse(
+            DB::table('ASSOC_DATA')->where('c_personid', 1000)->where('c_text_title', '淸書')->exists()
+        );
+
+        // 落庫後寫的 operation（TYPE_CREATE）其 resource_id 必須用替換後的字形，
+        // 否則還原／稽核會指向一個不存在的列。
+        $created = DB::table('operations')
+            ->where('resource', 'ASSOC_DATA')
+            ->where('op_type', Operation::TYPE_CREATE)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($created);
+        // resource_id 是 http_build_query()（值 percent-encoded），先解碼再比字形。
+        $decodedResourceId = urldecode((string) $created->resource_id);
+        $this->assertStringContainsString('清書', $decodedResourceId);
+        $this->assertStringNotContainsString('淸書', $decodedResourceId);
+    }
+
+    /**
+     * review：`assocPerformUpdate` 的替換也要測（原本只測了 create）。
+     *
+     * 這條同時斷言 plan 要求的「四處看到同一個字形」：落庫列、`operations.resource_id`、
+     * `audit_log.row_pk`、**以及鏡像列**（鏡像是 `$data_mirror = $data` 直接繼承替換值，
+     * 是重構時最容易失手的地方）。
+     */
+    #[Test]
+    public function testApproveAssocUpdateProposalReplacesVariantsEverywhere(): void {
+        $this->seedCharVariantMap();
+
+        // 正向列與鏡像列都存舊書名。
+        DB::table('ASSOC_DATA')->insert([
+            ['c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000, 'c_kin_code' => 0, 'c_kin_id' => 0,
+                'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0, 'c_text_title' => '舊書', 'c_assoc_first_year' => 1060, 'c_source' => 10],
+            ['c_personid' => 2000, 'c_assoc_code' => 2, 'c_assoc_id' => 1000, 'c_kin_code' => 0, 'c_kin_id' => 1000,
+                'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 1000, 'c_text_title' => '舊書', 'c_assoc_first_year' => 1060, 'c_source' => 10],
+        ]);
+
+        $this->actingAs($this->makeAdmin());
+
+        $fwdPk = [
+            'c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000, 'c_kin_code' => 0, 'c_kin_id' => 0,
+            'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0, 'c_text_title' => '舊書', 'c_assoc_first_year' => 1060,
+        ];
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+            'resource' => 'ASSOC_DATA',
+            'resource_id' => '1000-1-2000-0-0-0-0-舊書-1060',
+            'resource_data' => array_merge($fwdPk, [
+                'c_text_title' => '淸書', // 改書名，字形是變體形
+                'c_source' => 10,
+                'c_assocship_pair' => 2, 'c_kinship_pair' => 0, 'c_assoc_kinship_pair' => 0,
+                '__key_columns' => array_keys($fwdPk),
+                '__review_status' => 'pending',
+                '__proposal_meta' => ['action' => 'update', 'submitted_by' => 'tester'],
+            ]),
+            'resource_original' => array_merge($fwdPk, ['c_source' => 10]),
+        ]);
+        $operation->c_personid = 1000;
+        $operation->save();
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])
+            ->assertRedirect();
+
+        // 1) 落庫列
+        $this->assertTrue(
+            DB::table('ASSOC_DATA')->where('c_personid', 1000)->where('c_text_title', '清書')->exists(),
+            '正向列應以參考形落庫'
+        );
+        $this->assertFalse(DB::table('ASSOC_DATA')->where('c_text_title', '淸書')->exists(), '不得留下變體形');
+
+        // 2) 鏡像列
+        $this->assertTrue(
+            DB::table('ASSOC_DATA')->where('c_personid', 2000)->where('c_text_title', '清書')->exists(),
+            '鏡像列也要看到同一個字形'
+        );
+
+        // 3) operations.resource_id（percent-encoded，需先解碼）
+        $updated = DB::table('operations')
+            ->where('resource', 'ASSOC_DATA')
+            ->where('op_type', Operation::TYPE_UPDATE)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($updated);
+        $this->assertStringContainsString('清書', urldecode((string) $updated->resource_id));
+
+        // 4) audit_log.row_pk
+        $audit = DB::table('audit_log')
+            ->where('table_name', 'ASSOC_DATA')
+            ->where('operation', 'UPDATE')
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($audit);
+        $this->assertStringContainsString('清書', (string) $audit->row_pk);
+        $this->assertStringNotContainsString('淸書', (string) $audit->row_pk);
+    }
+
+    /** review：`kinshipUpdateById` 的替換也要測。 */
+    #[Test]
+    public function testApproveKinshipUpdateProposalReplacesVariants(): void {
+        $this->seedCharVariantMap();
+        // 親屬更新要求對面鏡像存在（否則 kinshipUpdateById 回 err、核准中止），
+        // 比照既有的 testApproveKinUpdateProposalSucceedsWhenMirrorInSync 建雙邊。
+        DB::table('KIN_DATA')->insert([
+            ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100,
+                'c_source' => 10, 'c_notes' => '舊注', 'c_autogen_notes' => 'auto-x'],
+            ['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 101,
+                'c_source' => 10, 'c_notes' => '舊注', 'c_autogen_notes' => 'auto-x'],
+        ]);
+        $this->actingAs($this->makeAdmin());
+
+        $fwdPk = ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100];
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+            'resource' => 'KIN_DATA',
+            'resource_id' => '1000-2000-100',
+            'resource_data' => array_merge($fwdPk, [
+                'c_source' => 10, 'c_notes' => '淸代族譜', 'c_autogen_notes' => 'auto-x',
+                'c_kinship_pair' => 101,
+                '__key_columns' => array_keys($fwdPk),
+                '__review_status' => 'pending',
+                '__proposal_meta' => ['action' => 'update', 'submitted_by' => 'tester'],
+            ]),
+            'resource_original' => array_merge($fwdPk, ['c_source' => 10, 'c_notes' => '舊注', 'c_autogen_notes' => 'auto-x']),
+        ]);
+        $operation->c_personid = 1000;
+        $operation->save();
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])
+            ->assertRedirect();
+
+        $this->assertSame(
+            '清代族譜',
+            DB::table('KIN_DATA')->where($fwdPk)->value('c_notes')
+        );
+        $this->assertSame(
+            '清代族譜',
+            DB::table('KIN_DATA')->where(['c_personid' => 2000, 'c_kin_id' => 1000, 'c_kin_code' => 101])->value('c_notes'),
+            '鏡像列也要看到替換後的值'
+        );
+    }
+
+    /**
+     * review（HIGH）：核准時替換把 `c_text_title` 改成參考形之後，若已有一列「歸一後相同
+     * 但字形不同」的資料，必須擋下——**不可靜默鑄出兩形並存的重複列**。
+     *
+     * 在這道守衛之前，同一筆輸入是乾淨的 1062（approve() 有專屬 QueryException catch）；
+     * 加了替換卻不加守衛，就是把「乾淨拒絕」換成「靜默重複」。
+     */
+    #[Test]
+    public function testApproveAssocCreateProposalBlocksVariantEquivalentDuplicate(): void {
+        $this->seedCharVariantMap();
+        // 既有列存變體形（D6 不做回溯校正）。
+        DB::table('ASSOC_DATA')->insert([
+            'c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000, 'c_kin_code' => 0, 'c_kin_id' => 0,
+            'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0, 'c_text_title' => '淸書', 'c_assoc_first_year' => 1060, 'c_source' => 10,
+        ]);
+        $this->actingAs($this->makeAdmin());
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource' => 'ASSOC_DATA',
+            'resource_id' => '1000-1-2000-0-0-0-0-清書-1060',
+            'resource_data' => [
+                'c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000,
+                'c_kin_code' => 0, 'c_kin_id' => 0, 'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0,
+                'c_text_title' => '清書', 'c_assoc_first_year' => 1060, 'c_source' => 10,
+                'c_assocship_pair' => 0, 'c_kinship_pair' => 0, 'c_assoc_kinship_pair' => 0,
+                '__key_columns' => [
+                    'c_personid', 'c_assoc_code', 'c_assoc_id', 'c_kin_code', 'c_kin_id',
+                    'c_assoc_kin_code', 'c_assoc_kin_id', 'c_text_title', 'c_assoc_first_year',
+                ],
+                '__review_status' => 'pending',
+                '__proposal_meta' => ['action' => 'create', 'submitted_by' => 'tester'],
+            ],
+        ]);
+        $operation->c_personid = 1000;
+        $operation->save();
+
+        $this->post(route('operations.proposals.approve', $operation))->assertRedirect();
+
+        $this->assertSame(1, DB::table('ASSOC_DATA')->count(), '不得鑄出第二列語義重複的關係');
+        $this->assertSame('淸書', DB::table('ASSOC_DATA')->value('c_text_title'), '既有列不變（整筆回滾）');
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('pending', $payload['__review_status'] ?? null, '核准應失敗、提案維持 pending（不是被標成 rejected）');
+    }
+
+    /**
+     * codex：delete 提案的兩形探測——目標列已被另一筆核准改名成參考形時，
+     * 舊字形的定位器落空，必須用歸一後的 PK 再探一次並真的刪掉；
+     * 不可當成「冪等成功」而寫下一筆沒發生的 DELETE 稽核。
+     */
+    #[Test]
+    public function testApproveDeleteProposalFindsRowRenamedByVariantNormalization(): void {
+        $this->seedCharVariantMap();
+
+        // 現況：列已是**參考形**（被另一筆核准歸一過）。
+        DB::table('ASSOC_DATA')->insert([
+            'c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000, 'c_kin_code' => 0, 'c_kin_id' => 0,
+            'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0, 'c_text_title' => '清書', 'c_assoc_first_year' => 1060, 'c_source' => 10,
+        ]);
+        $this->actingAs($this->makeAdmin());
+
+        // 待審的 delete 提案仍指向**舊字形**。
+        $oldPk = [
+            'c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000, 'c_kin_code' => 0, 'c_kin_id' => 0,
+            'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0, 'c_text_title' => '淸書', 'c_assoc_first_year' => 1060,
+        ];
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_DELETE,
+            'resource' => 'ASSOC_DATA',
+            'resource_id' => '1000-1-2000-0-0-0-0-淸書-1060',
+            'resource_data' => array_merge($oldPk, [
+                '__key_columns' => array_keys($oldPk),
+                '__review_status' => 'pending',
+                '__proposal_meta' => ['action' => 'delete', 'submitted_by' => 'tester'],
+            ]),
+            'resource_original' => array_merge($oldPk, ['c_source' => 10]),
+        ]);
+        $operation->c_personid = 1000;
+        $operation->save();
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])
+            ->assertRedirect();
+
+        $this->assertSame(0, DB::table('ASSOC_DATA')->count(), '歸一後的那一列才是目標，必須真的被刪除');
+
+        // codex：最終 DELETE operation 的 resource_id 必須跟著**實際刪除的列**（參考形），
+        // 否則同一筆稽核的 resource_id（舊字形）與 resource_data／audit row_pk（新字形）互相矛盾。
+        $deleted = DB::table('operations')
+            ->where('resource', 'ASSOC_DATA')
+            ->where('op_type', Operation::TYPE_DELETE)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($deleted);
+        $this->assertStringContainsString('清書', urldecode((string) $deleted->resource_id));
+        $this->assertStringNotContainsString('淸書', urldecode((string) $deleted->resource_id));
+
+        // 快照（resource_data／resource_original）與 audit row_pk 也必須是同一個字形，
+        // 否則「還原這筆刪除」會以舊字形重建一列不存在過的資料。
+        $deletedPayload = json_decode((string) $deleted->resource_data, true);
+        $this->assertSame('清書', $deletedPayload['c_text_title'] ?? null);
+        $deletedOriginal = json_decode((string) $deleted->resource_original, true);
+        $this->assertSame('清書', $deletedOriginal['c_text_title'] ?? null);
+
+        $auditDelete = DB::table('audit_log')
+            ->where('table_name', 'ASSOC_DATA')
+            ->where('operation', 'DELETE')
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($auditDelete);
+        $this->assertStringContainsString('清書', (string) $auditDelete->row_pk);
+        $this->assertStringNotContainsString('淸書', (string) $auditDelete->row_pk);
+    }
+
+    /**
+     * codex：D7 守衛在 update 側必須排除自己、且**只在真的改鍵時**檢查——
+     * 既有資料可能早就兩形並存，只改 c_notes 是合法操作，不可被擋成「永遠改不了」。
+     */
+    #[Test]
+    public function testApproveAssocUpdateOfNonKeyFieldIsNotBlockedByCoexistingVariantForms(): void {
+        $this->seedCharVariantMap();
+
+        // 兩列**只有 c_text_title 的字形不同**、歸一後相同——這才是「歷史上就已兩形並存」，
+        // 也才是無條件檢查會誤擋的形狀（其餘 PK 欄都相同，所以互為等價候選）。
+        DB::table('ASSOC_DATA')->insert([
+            ['c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000, 'c_kin_code' => 0, 'c_kin_id' => 0,
+                'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0, 'c_text_title' => '清書', 'c_assoc_first_year' => 1060, 'c_source' => 10],
+            ['c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000, 'c_kin_code' => 0, 'c_kin_id' => 0,
+                'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0, 'c_text_title' => '淸書', 'c_assoc_first_year' => 1060, 'c_source' => 10],
+        ]);
+        $this->actingAs($this->makeAdmin());
+
+        $fwdPk = [
+            'c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 2000, 'c_kin_code' => 0, 'c_kin_id' => 0,
+            'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0, 'c_text_title' => '清書', 'c_assoc_first_year' => 1060,
+        ];
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+            'resource' => 'ASSOC_DATA',
+            'resource_id' => '1000-1-2000-0-0-0-0-清書-1060',
+            'resource_data' => array_merge($fwdPk, [
+                'c_source' => 10, 'c_notes' => '只改備註',
+                'c_assocship_pair' => 0, 'c_kinship_pair' => 0, 'c_assoc_kinship_pair' => 0,
+                '__key_columns' => array_keys($fwdPk),
+                '__review_status' => 'pending',
+                '__proposal_meta' => ['action' => 'update', 'submitted_by' => 'tester'],
+            ]),
+            'resource_original' => array_merge($fwdPk, ['c_source' => 10]),
+        ]);
+        $operation->c_personid = 1000;
+        $operation->save();
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])
+            ->assertRedirect();
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status'] ?? null, '沒有改鍵 ⇒ 不該被 D7 擋下');
+        $this->assertSame(
+            '只改備註',
+            DB::table('ASSOC_DATA')->where('c_personid', 1000)->where('c_text_title', '清書')->value('c_notes')
+        );
+        $this->assertNull(
+            DB::table('ASSOC_DATA')->where('c_text_title', '淸書')->value('c_notes'),
+            '另一形那列不該被動到'
+        );
     }
 }

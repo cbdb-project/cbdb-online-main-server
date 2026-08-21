@@ -518,6 +518,41 @@ validate 與 service，所以替換與標籤歸一自動生效；已補
 - **`char_variant_map` 的 guard**：`applyCreateProposal()`／`applyUpdateProposal()` 落庫前呼叫 `assertWritable()`，成功後 `CharVariantMapService::reset()`——該表**不在** `HANDLER_ROUTED_RESOURCES`，所以它的提案核准就是走這兩條。
 - **`OperationsController::restore()` 不做內容替換**（S1 只在它掛 `assertWritable()` 結構驗證，兩者不同）。本步測試含「restore 後歷史字形原樣保留」的負向斷言，鎖住這個刻意的不對稱。
 
+#### S6 執行結果補記
+
+計畫列的兩項在前面步驟已完成：`char_variant_map` 在通用核准路徑的 guard ＋ 清快取（**S3** 做的），
+實體聚合提案核准（**S4** 覆蓋，且已有回歸鎖）。本步真正新增的是四件事，以及 review 找出的五項。
+
+1. 通用分支 `applyCreateProposal()`／`applyUpdateProposal()` 的替換掛在**方法最上方、
+   `buildKeyConditions()` 之前**（計畫已強調不可寫成「落庫前」）。價值是對**歷史遺留 payload**
+   補網——提案建立端在 S2／S3／S5 已替換過。
+2. 親屬／社會關係的四個 repository 寫入方法（`kinshipStoreById`／`kinshipUpdateById`／
+   `assocStoreById`／`assocPerformUpdate`）各自掛鉤：核准不重放 v2 handler，S3 覆蓋不到。
+   `assocUpdateById` 只替換 `$data`，定位器（`$row`／`$id` 解析出的舊 PK）不動。
+3. **新增 D7 守衛 `assertNoVariantEquivalentRow()`（review 抓到的 HIGH）**：
+   `ASSOC_DATA.c_text_title` 是主鍵成員，替換等於改鍵。既有列可能存變體形，於是「原樣重送同一
+   變體形」在替換後 PK 值就不同了 ⇒ insert 成功、唯一鍵擋不住 ⇒ 靜默鑄出兩形並存的重複列。
+   **在加上替換之前，同一筆輸入是乾淨的 1062**（`approve()` 有專屬 QueryException catch 回滾），
+   所以少了守衛等於把「乾淨拒絕」換成「靜默重複」。update 側排除自己（交給 lookup 內部）
+   且**只在真的改鍵時檢查**（否則歷史上就已兩形並存的列會變成永遠改不了）。KIN_DATA 也掛——
+   三個主鍵欄全數值 ⇒ `$inScope === []` 直接 return null ＝零額外查詢，防日後主鍵變動時漏掉。
+   通用分支也接上同一個 lookup，理由相同（今天零成本，但把日後的缺口永久封掉）。
+4. **`applyDeleteProposal()` 的過期提案**：本階段起文本型 PK 真的會被核准改寫，於是「待審 delete
+   提案指向舊字形、目標列已被另一筆核准改名」從理論變成常態。直接當成冪等成功會讓 `approve()`
+   寫下一筆 DELETE 稽核並標記 approved，**而資料列還在**——稽核鏈記錄了一件沒發生的事。
+   改為：先用歸一後的 PK 再探一次；兩種字形都找不到才維持冪等並記 warning。
+   連帶修好 `logFinalOperation()`：DELETE 的 `resource_id` **與兩份快照**都改用實際刪除的那一列，
+   否則 resource_id（新字形）、resource_data（舊字形）、audit row_pk（新字形）三者互相矛盾，
+   還原時會以舊字形重建一列不存在過的資料。
+5. **restore 不做內容替換**（負向斷言，含正向對照）：restore 的語義是「恢復成歷史快照當時的
+   樣子」，順手歸一就不是還原而是改寫歷史。S1 只在 restore 掛了 `char_variant_map` 的**結構**
+   驗證（`assertWritable`），與內容替換是兩件不同的事。負向測試自己先斷言「替換機制在本環境
+   是活的」，否則機制整體死掉時它會假綠。
+
+驗證覆蓋：通用分支 create／update、親屬與社會關係的 create 與 update（assoc 那條斷言落庫列、
+`operations.resource_id`、`audit_log.row_pk`、**鏡像列**四處同一字形）、D7 守衛擋下重複列且提案
+維持 `pending`、非改鍵不被誤擋、delete 的兩形探測與三處字形一致、restore 原樣保留。
+
 ### S7：眾包回填、v1 端點、複製與修復工具（G6–G9）
 
 - `CrowdsourcingController::confirm():202` 落庫前套 `replaceRow()`，寫入點：`BiogMain::create` `:238`、`OfficeCode::create` `:250`、`OfficeCodeTypeRel::create` `:263`、`OfficeTypeTree::create` `:273`（`c_office_type_desc_chn` 是中文欄）、`$biog->update($data)` **五處**（`:293`／`:303`／`:313`／`:322`／`:340`）。

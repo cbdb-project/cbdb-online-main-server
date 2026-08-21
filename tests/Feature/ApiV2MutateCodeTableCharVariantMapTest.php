@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Operation;
 use App\Models\User;
+use App\Services\CharVariantMapService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -223,6 +225,126 @@ class ApiV2MutateCodeTableCharVariantMapTest extends TestCase {
         ])->assertStatus(409);
 
         $this->assertDatabaseHas('char_variant_map', ['id' => 43, 'c_variant_char' => '靑']);
+    }
+
+    /**
+     * 結構守衛必須掛在**落庫層**（handler），不是只掛在 Codes UI controller：
+     * `char_variant_map` 登記在 config/code_table_mutations.php，用 API 就能寫。
+     *
+     * 成環的對照（表裡已有 `峯→峰`，再送 `峰→峯`）若讓它落庫，`resolveMap()` 的
+     * `dropCycleEdges()` 會把環上**兩條**邊一起丟掉、只留一行 Log::error ⇒ 這組字的
+     * 落地替換在全站靜默停止。S3 之後這個洞的影響面是所有人物寫入路徑。
+     */
+    #[Test]
+    public function testCreateCyclicMappingIsRejectedByApi(): void {
+        $this->actingAs($this->makeUser(email: 'cvm-cycle@example.com'));
+        DB::table('char_variant_map')->insert(['id' => 60, 'c_variant_char' => '峯', 'c_reference_char' => '峰', 'c_strict_excluded' => 1]);
+
+        $res = $this->postJson('/api/v2/create', [
+            'resource' => 'char_variant_map',
+            'person_id' => 0,
+            'target' => ['pk' => ['id' => 61]],
+            'changes' => ['c_variant_char' => '峰', 'c_reference_char' => '峯', 'c_strict_excluded' => 1],
+        ]);
+
+        $res->assertStatus(422);
+        $this->assertSame(1, DB::table('char_variant_map')->count(), '成環的對照不得落庫');
+    }
+
+    /** 多字元對照同樣要在落庫前擋下（會被 resolveMap() 靜默丟棄）。 */
+    #[Test]
+    public function testCreateMultiCodepointMappingIsRejectedByApi(): void {
+        $this->actingAs($this->makeUser(email: 'cvm-multi@example.com'));
+
+        $this->postJson('/api/v2/create', [
+            'resource' => 'char_variant_map',
+            'person_id' => 0,
+            'target' => ['pk' => ['id' => 70]],
+            'changes' => ['c_variant_char' => '甲乙', 'c_reference_char' => '丙', 'c_strict_excluded' => 1],
+        ])->assertStatus(422);
+
+        $this->assertSame(0, DB::table('char_variant_map')->count());
+    }
+
+    /** 更新成環同樣要擋（排除自己那一列後仍成環）。 */
+    #[Test]
+    public function testUpdateIntoCycleIsRejectedByApi(): void {
+        $this->actingAs($this->makeUser(email: 'cvm-cycle-upd@example.com'));
+        DB::table('char_variant_map')->insert([
+            ['id' => 80, 'c_variant_char' => '峯', 'c_reference_char' => '峰', 'c_strict_excluded' => 1],
+            ['id' => 81, 'c_variant_char' => '靑', 'c_reference_char' => '青', 'c_strict_excluded' => 1],
+        ]);
+
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'char_variant_map',
+            'person_id' => 0,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => ['id' => 81]],
+            'changes' => ['c_variant_char' => '峰', 'c_reference_char' => '峯'],
+        ])->assertStatus(422);
+
+        $this->assertDatabaseHas('char_variant_map', ['id' => 81, 'c_variant_char' => '靑']);
+    }
+
+    /** 落庫成功後必須重置對照表快取，否則新對照在該 process 的剩餘生命週期內不生效。 */
+    #[Test]
+    public function testCreateResetsVariantMapCacheSoNewMappingTakesEffect(): void {
+        $this->actingAs($this->makeUser(email: 'cvm-reset@example.com'));
+
+        // 先讓服務把（此時為空的）對照表快取起來。
+        $this->assertSame('龴', CharVariantMapService::replaceLenient('龴')['text']);
+
+        $this->postJson('/api/v2/create', [
+            'resource' => 'char_variant_map',
+            'person_id' => 0,
+            'target' => ['pk' => ['id' => 90]],
+            'changes' => ['c_variant_char' => '龴', 'c_reference_char' => '甲', 'c_strict_excluded' => 0],
+        ])->assertOk();
+
+        $this->assertSame('甲', CharVariantMapService::replaceLenient('龴')['text'], '新對照應立即生效（快取已重置）');
+    }
+
+    /**
+     * codex round 2：**歷史待審提案**（不經現行 submission guard 建立）核准時，
+     * 通用 applyCreateProposal() 也必須驗結構——否則成環的對照落庫後
+     * dropCycleEdges() 會把整組邊丟掉，該組字的替換全站靜默停止。
+     */
+    #[Test]
+    public function testApprovingLegacyCyclicCreateProposalIsRejected(): void {
+        DB::table('char_variant_map')->insert(['id' => 100, 'c_variant_char' => '峯', 'c_reference_char' => '峰', 'c_strict_excluded' => 1]);
+
+        $proposer = $this->makeUser(email: 'cvm-legacy-proposer@example.com');
+        $operationId = DB::table('operations')->insertGetId([
+            'user_id' => $proposer->id,
+            'c_personid' => 0,
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource' => 'char_variant_map',
+            'resource_id' => '101',
+            'resource_data' => json_encode([
+                'id' => 101,
+                'c_variant_char' => '峰',
+                'c_reference_char' => '峯',
+                'c_strict_excluded' => 1,
+                '__review_status' => 'pending',
+                '__key_columns' => ['id'],
+                '__proposal_meta' => [
+                    'action' => 'create',
+                    'table' => 'char_variant_map',
+                    'submitted_by' => $proposer->name,
+                    'submitted_by_id' => $proposer->id,
+                ],
+            ], JSON_UNESCAPED_UNICODE),
+            'resource_original' => json_encode([]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($this->makeUser(User::STATUS_ACTIVE, User::ROLE_SUPER_ADMIN, 'cvm-legacy-admin@example.com'));
+        $this->post(route('operations.proposals.approve', $operationId), ['review_comment' => '同意']);
+
+        $this->assertSame(1, DB::table('char_variant_map')->count(), '成環的對照不得因核准而落庫');
+        $this->assertDatabaseMissing('char_variant_map', ['id' => 101]);
     }
 
     #[Test]

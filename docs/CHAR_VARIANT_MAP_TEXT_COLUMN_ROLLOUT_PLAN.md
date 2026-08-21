@@ -311,6 +311,90 @@ D3 已內嵌一份已查證的代碼鍵清單，直接進排除常數。本步�
 - v2 回應以 `withNotices()` 帶 `notices`；422／409 也要帶。
 - 測試（`tests/Feature/ApiV2MutateVariantReplacementTest.php`）：`ASSOC_DATA.c_text_title`（PK 成員 + 鏡像撞號回 409）、**`BIOG_SOURCE_DATA.c_pages`**（PK 第三欄）、`EVENTS_DATA.c_event`、`POSSESSION_DATA.c_possession_desc_chn`、`ENTRY_DATA.c_exam_rank`、`STATUS_DATA.c_supplement`、各表 `c_notes`；BIOG_MAIN 姓名 strict 而同列 `c_notes`／`c_tribe` lenient（與上面 `replaceRow` 的決定是同一個原子變更）；**編輯既有變體形列時的 D7「PK 改名」行為**。
 
+#### S3 執行結果補記（review 後追加的四項）
+
+實作時 review 找出四個計畫原本沒列、但必須一起處理的問題，都已在同一步完成：
+
+1. **D7「兩形並存」查重必須同時接到 v2 create 側**（原本只在 S2 為 Codes UI 做）。
+   既有列可能存變體形（D6 不做回溯校正），只比對替換後的值會讓「原樣重送變體形」
+   INSERT 出第二列語義重複資料，而唯一鍵擋不住（不同字形＝不同鍵值）——**比不替換更糟**，
+   而且落地替換上線前這種輸入本來是乾淨的 409。
+   做法：把 `CodesController` 的四個 helper 抽成 `App\Support\VariantEquivalentLookup`
+   （controller 改為薄委派），接到 `AbstractPersonSubresourceCreateHandler` 的既有列查重
+   與待審提案防呆、以及 `SourceMutationHandler` 的 create 兩處。
+   **踩到的陷阱**：`resource_id` 格式依表而異——代碼表是 `buildCompositeId()` 的位置式
+   `'_._'` 串接（可用位置式 LIKE 樣式收斂），人物子資源是
+   `CompositePrimaryKey::buildStoredResourceId()` ＝ `http_build_query()` 查詢字串，
+   位置式樣式對它完全無效（會靜默失去這道查重）。後者改用有索引的 `operations.c_personid`
+   收斂候選集。
+
+2. **BIOG_MAIN 的替換範圍收到「使用者本次實際變更的欄」**。`BiogMainMutationHandler`
+   是唯一在伺服器端把「原列 ∪ changes」合成整列再送進 repository 的資源，整列替換會
+   (a) 回溯改寫使用者沒碰過的既有欄（違反 D6）、(b) 讓 `updated_fields` 與實際落庫不一致，
+   提案審核 diff 出現提案人沒改過的欄、(c) 讓某個舊欄被歸一而把「完全沒改」的存檔變成
+   一筆真實 UPDATE。做法：`updateById()` 與 `prepareProposalPayload()` 各加一個
+   `$variantFields` 參數（null＝整列，legacy Blade 表單路徑用；v2 傳 `$updatedFields`）。
+   這也讓 BIOG_MAIN 與其他 20 個資源（只替換 `$updateData`／`$rowData`）語義一致。
+
+3. **`VariantReplaceScope::loadColumnTypes()` 不再快取瞬時錯誤的負結果**。原本任何
+   `Throwable` 都回 `[]`，而該結果會被 `$columnTypes`／`$textColumnCache`／`$modeCache`
+   三層快取住 ⇒ 一次連線抖動就讓該表在**這個 process 的剩餘生命週期**都不做替換（長生命
+   週期的 queue worker／artisan 批次匯入尤其致命），資料靜默留變體形且沒有錯誤回應。
+   改為：只有 `Schema::hasTable()` 確認「表確實不存在」才降級並快取，其餘一律 rethrow
+   ——與 `CharVariantMapService::loadEdges()` 的策略對齊。
+
+4. **`char_variant_map` 的結構守衛下移到落庫層**。它登記在
+   `config/code_table_mutations.php`，所以 `/api/v2/create`／`/api/v2/mutate` 就能寫，
+   而 `assertWritable()`／`reset()` 原本只掛在 `CodesController` 與 `OperationsController`
+   ⇒ 用 API 新增一筆成環的對照（表裡已有 `峯→峰`，再送 `峰→峯`）會落庫成功，之後
+   `dropCycleEdges()` 把環上兩條邊一起丟掉、只留 `Log::error`，這組字的替換在全站靜默停止。
+   S3 把替換面擴到所有人物寫入路徑後，影響面從 Codes UI 擴到全站。做法：新增
+   `Concerns\GuardsCharVariantMapWrites`，掛在 `CodeTableCreateHandler`、
+   `AbstractCodeTableMutationHandler::handleDirect()`、`CodeTableDeleteHandler`。
+
+第二輪 review 又找出四項，同樣已在本步修完：
+
+5. **D7 查重必須同時接到改鍵（update）側**，不是只有 create。DB 唯一鍵只擋同字形；把某列
+   的文本型 PK 成員改成「歸一後等於另一既有變體形列」的值時，精確比對查不到、唯一鍵也不
+   衝突 ⇒ 一樣落成兩形並存。修在 `AbstractPersonSubresourceMutationHandler::handle()`
+   （分派 direct／proposal 之前，一次涵蓋兩條路）與 `SourceMutationHandler` 的 update 分支。
+   **自我排除必須比對「實際命中那一列的 PK 值」而非 `$targetPk`**：payload 的 PK 可能帶哨兵
+   別名（`sources` 的 `c_textid=-999` 實際落庫是 0），拿別名比會把原列自己誤判成別列而回假 409
+   （`testDirectSourceUpdateSupportsSelect2ZeroTextIdAliasWithoutChangesPersonId` 抓到過一次）。
+
+6. **`meta.__` 內部鍵不可由客戶端帶進來**。`__approving_operation_id` 是核准重放時「排除待審
+   的自己那一筆」的內部訊號（核准端直接呼叫 handler、不經 API 控制器）。原本 API 把 `meta`
+   原樣傳進 handler ⇒ 眾包使用者只要塞上自己那筆待審提案的 id，就能讓待審重複防呆（含 D7
+   等價字形查重）放行，再送一筆變體形的重複提案。修法：`Api\MutationController` 的 5 個入口
+   統一以 `sanitizeClientMeta()` 剝掉 `__` 前綴鍵（同時堵住 `SourceMutationHandler` 既有的同型洞）。
+
+7. **`char_variant_map` 的守衛還要補提案與通用核准兩條路**。它不在
+   `OperationsProposalController::HANDLER_ROUTED_RESOURCES`，核准走通用 `applyUpdateProposal()`
+   的 raw update：提案時不驗、核准時也不驗、且不重置快取。修法：
+   `AbstractCodeTableMutationHandler::handleProposal()` 提交即擋，`applyUpdateProposal()`
+   落庫前 `assertWritable()`、落庫後 `reset()`。
+
+8. **順手修掉一個既有的姓名清空 bug**（develop 上行為相同，但正好在本次重寫的那幾行）：
+   `updateById()`／`prepareProposalPayload()` 原本**無條件** `c_name_chn = 姓 . 名`，而 v2 的
+   payload 是「原列 ∪ changes」⇒ 沒有明確姓氏的歷史人物（兩個分欄 NULL、`c_name_chn` 存完整
+   姓名）只要被更新任何一欄，姓名就被靜默清成空字串。`store()` 早有等價保護，現在三處一致：
+   兩個分欄都空時不重組。
+
+測試 harness 另修三處（`FakeQueryBuilder` 把 `!=` 當等值比較會讓語義完全反過來、
+`FakeSchemaBuilder` 缺 `getColumns()`／`getForeignKeys()`）——都是假 driver 與真實 Laravel API
+的落差，不是生產碼問題；補上後 `personFkColumns()` 那段也不再被 `catch(\Throwable)` 靜默吞掉。
+
+另記兩件**刻意接受**的行為（不修，S9 一併寫進文檔）：
+
+- `ASSOC_DATA.c_text_title` 被替換時，`syncAssocMirrorOnUpdate()` 會把對面鏡像列的同名
+  PK 成員一起改名（定位器用替換前的舊值，不會落空）。這是對既有資料的回溯改寫，與 D6
+  精神有張力，明文記為「觸碰即歸一」的刻意例外。撞既有參考形鏡像列時是乾淨的 409 + 整筆
+  回滾（走基底的 `isUniqueConstraintViolation`），已有回歸測試。
+- 文本型 PK 成員改名後，改名前的 `operations.resource_id`／`audit_log.row_pk` 仍指向舊
+  字形，同一筆資料的歷史被切成兩個身分。這是**任何** PK 改名共有的性質（手動改別名一樣
+  會發生），不是替換引入的新機制；若要處理應該是「改名時遷移舊 resource_id」的獨立工作，
+  不是收窄替換範圍。
+
 ### S4：實體聚合（官職／社會機構）串接（G3）
 
 **這一步的所有精確比對都要按 D7 處理兩形並存。**

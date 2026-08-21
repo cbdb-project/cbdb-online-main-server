@@ -386,13 +386,27 @@ final class VariantReplaceScope {
         try {
             $columns = Schema::getColumns($table);
         } catch (\Throwable $e) {
-            // 表不存在或 driver 不支援：視為沒有文本欄，配合 fail-closed。
+            // **只有「表確實不存在」才降級**（部署未跑 migration、測試建了精簡表集）。
+            // 這個判定是確定性的，快取它安全。
             //
-            // ⚠️ 這個負結果會被 $columnTypes／$modeCache 快取住，所以在 web request 裡
-            // 一次連線抖動就會讓該表的文本欄在**這個 process 的剩餘生命週期**都不被替換
-            // （測試有 TestCase::setUp() 的 reset() 兜著，web 沒有）。因此這裡記 warning，
-            // 讓「整批資料沒被替換」這種靜默失效至少留下痕跡。
-            Log::warning('VariantReplaceScope: 讀取欄位型別失敗，該表本次視為無文本欄', [
+            // 其他 Throwable（連線抖動、暫時性 metadata 鎖、driver 不支援）一律往上拋：
+            // 這裡的負結果會被 $columnTypes／$textColumnCache／$modeCache 三層快取住，
+            // 一次瞬時錯誤就會讓該表在**這個 process 的剩餘生命週期**都不做替換，資料
+            // 靜默留變體形而且沒有任何錯誤回應。長生命週期的 queue worker／artisan
+            // 批次匯入尤其致命。與 CharVariantMapService::loadEdges() 的策略一致。
+            $tableMissing = false;
+
+            try {
+                $tableMissing = !Schema::hasTable($table);
+            } catch (\Throwable) {
+                // hasTable 也失敗 ⇒ 連線本身有問題，不是「表不存在」⇒ 照原例外往上拋。
+            }
+
+            if (!$tableMissing) {
+                throw $e;
+            }
+
+            Log::warning('VariantReplaceScope: 資料表不存在，該表視為無文本欄', [
                 'table' => $table,
                 'error' => $e->getMessage(),
             ]);

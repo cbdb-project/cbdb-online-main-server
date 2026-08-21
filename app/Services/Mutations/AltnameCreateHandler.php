@@ -5,7 +5,6 @@ namespace App\Services\Mutations;
 use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
 use App\Services\BracketNormalizer;
-use App\Services\CharVariantMapService;
 use App\Services\NameSearchIndexService;
 use App\Support\PinyinUmlaut;
 use Illuminate\Http\JsonResponse;
@@ -13,14 +12,6 @@ use Illuminate\Support\Facades\Schema;
 
 class AltnameCreateHandler extends AbstractPersonSubresourceCreateHandler {
     protected NameSearchIndexService $nameSearchIndexService;
-
-    /**
-     * 本次 preprocessCreateData() 對 c_alt_name_chn 實際套用的異體字替換
-     * （異體字 => 參考字）。handleDirect()／handleProposal() 併入回應的 notices。
-     *
-     * @var array<string,string>
-     */
-    protected array $variantReplaced = [];
 
     public function __construct(
         OperationRepository $operationRepository,
@@ -79,15 +70,10 @@ class AltnameCreateHandler extends AbstractPersonSubresourceCreateHandler {
         // #71：非 PK 碼欄 c_source 完全幂等（null/''/-999→0），對齊已修的 AltnameMutationHandler。
         $data = $this->normalizeEmptyCodeFields($data, ['c_source']);
 
-        // 異體字落地替換（嚴格模式）。發生在 extractPkFromRow() 之前（見
-        // AbstractPersonSubresourceCreateHandler::handle() 119-122 行），替換後的值
-        // 自然成為新 PK 的一部分（見 docs/CHAR_VARIANT_MAP_CALL_SITE_WIRING_PLAN.md
-        // 待決事項 3）。
-        if (array_key_exists('c_alt_name_chn', $data)) {
-            $replaced = CharVariantMapService::replaceStrict((string) $data['c_alt_name_chn']);
-            $data['c_alt_name_chn'] = $replaced['text'];
-            $this->variantReplaced = $replaced['replaced'];
-        }
+        // 異體字落地替換（c_alt_name_chn 為 strict 模式）已由基底類別的通用掛鉤在
+        // 本方法之前完成，替換紀錄收在 $this->variantReplaced、通知由 handle() 掛上。
+        // 這裡**不要**再自己呼叫 CharVariantMapService：通用掛鉤先跑過，值已是參考形，
+        // 再呼叫一次的 replaced 恆為 []，assign 回去會讓別名替換通知靜默消失。
 
         return $data;
     }
@@ -101,15 +87,7 @@ class AltnameCreateHandler extends AbstractPersonSubresourceCreateHandler {
 
         $this->syncAltnameIndexAfterCreate($rowData);
 
-        return CharVariantMapService::withNotices($response, $this->variantReplaced);
-    }
-
-    protected function handleProposal(int $personId, array $actualPk, array $rowData, string $comment): JsonResponse {
-        $response = parent::handleProposal($personId, $actualPk, $rowData, $comment);
-
-        return $response->getStatusCode() === 200
-            ? CharVariantMapService::withNotices($response, $this->variantReplaced)
-            : $response;
+        return $response;
     }
 
     protected function syncAltnameIndexAfterCreate(array $rowData): void {

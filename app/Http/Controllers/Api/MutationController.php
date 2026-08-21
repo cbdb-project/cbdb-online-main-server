@@ -61,7 +61,7 @@ class MutationController extends Controller {
         $personId = $payload['person_id'] ?? null;
         $targetPk = $payload['target']['pk'] ?? null;
         $changes = $payload['changes'] ?? null;
-        $meta = $payload['meta'] ?? [];
+        $meta = self::sanitizeClientMeta($payload['meta'] ?? []);
 
         if (!is_array($targetPk)) {
             return $this->errorResponse('缺少 target.pk', 422, ['target.pk' => ['required']]);
@@ -137,7 +137,7 @@ class MutationController extends Controller {
         $personId = $payload['person_id'] ?? null;
         $targetPk = $payload['target']['pk'] ?? null;
         $changes = $payload['changes'] ?? null;
-        $meta = is_array($payload['meta'] ?? null) ? $payload['meta'] : [];
+        $meta = self::sanitizeClientMeta($payload['meta'] ?? []);
 
         if (!is_array($targetPk)) {
             return $this->errorResponse('缺少 target.pk', 422, ['target.pk' => ['required']]);
@@ -377,7 +377,7 @@ class MutationController extends Controller {
         $personId = $payload['person_id'] ?? null;
         $targetPk = $payload['target']['pk'] ?? null;
         $changes = $payload['changes'] ?? [];
-        $meta = $payload['meta'] ?? [];
+        $meta = self::sanitizeClientMeta($payload['meta'] ?? []);
 
         if (!is_array($targetPk)) {
             return $this->errorResponse('缺少 target.pk', 422, ['target.pk' => ['required']]);
@@ -413,7 +413,7 @@ class MutationController extends Controller {
         $mode = strtolower((string) ($payload['mode'] ?? 'direct'));
         $personId = $payload['person_id'] ?? null;
         $targetPk = $payload['target']['pk'] ?? null;
-        $meta = $payload['meta'] ?? [];
+        $meta = self::sanitizeClientMeta($payload['meta'] ?? []);
 
         if (!is_array($targetPk)) {
             return $this->errorResponse('缺少 target.pk', 422, ['target.pk' => ['required']]);
@@ -533,7 +533,7 @@ class MutationController extends Controller {
         $personId = $item['person_id'] ?? null;
         $targetPk = $item['target']['pk'] ?? null;
         $changes = $item['changes'] ?? null;
-        $meta = $item['meta'] ?? $defaults['meta'] ?? [];
+        $meta = self::sanitizeClientMeta($item['meta'] ?? $defaults['meta'] ?? []);
 
         $fail = fn (string $msg, array $errors): array => [
             'index' => $index, 'http_status' => 422, 'ok' => false, 'message' => $msg, 'errors' => $errors,
@@ -607,5 +607,30 @@ class MutationController extends Controller {
         }
 
         return response()->json($body, $status);
+    }
+
+    /**
+     * 剝掉客戶端 meta 裡的**內部鍵**（`__` 前綴）。
+     *
+     * `__approving_operation_id` 是核准流程重放 handler 時用來「排除待審的自己那一筆」的
+     * 內部訊號（見 OperationsProposalController::applyViaMutationHandler()，它直接呼叫
+     * handler、不經本控制器）。若讓客戶端帶進來，眾包使用者只要在 `meta` 裡塞上自己那筆
+     * 待審提案的 id，就能讓待審重複防呆（含 D7 的等價字形查重）直接放行，再送一筆**變體形**
+     * 的重複提案——精確比對的 `hasPendingCreateProposal()` 擋不住不同字形，兩筆依序核准
+     * 就落成兩列語義重複資料。
+     *
+     * @param mixed $meta
+     * @return array<string,mixed>
+     */
+    private static function sanitizeClientMeta($meta): array {
+        if (!is_array($meta)) {
+            return [];
+        }
+
+        return array_filter(
+            $meta,
+            static fn ($key) => !is_string($key) || !str_starts_with($key, '__'),
+            ARRAY_FILTER_USE_KEY
+        );
     }
 }

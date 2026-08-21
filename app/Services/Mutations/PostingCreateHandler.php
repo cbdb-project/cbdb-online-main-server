@@ -33,6 +33,7 @@ use Illuminate\Support\Facades\Schema;
  * 輸入契約：target.pk 可為空 {}；欄位走 changes（須含 c_office_id；c_addr 為地址陣列副表）。
  */
 class PostingCreateHandler extends AbstractMutationHandler {
+    use \App\Services\Mutations\Concerns\AppliesVariantReplacement;
     protected BiogMainRepository $biogMainRepository;
     protected AuditLogService $auditLogService;
     protected OperationRepository $operationRepository;
@@ -86,6 +87,16 @@ class PostingCreateHandler extends AbstractMutationHandler {
     }
 
     public function handle(string $resource, string $mode, string $operation, int $personId, array $targetPk, array $changes, array $meta = []): JsonResponse {
+        // 異體字落地替換的通知統一在此掛上（成功與 409／422 皆帶）。
+        $this->resetVariantReplaced();
+
+        return $this->withVariantNotices(
+            $this->handleAfterVariantReset($resource, $mode, $operation, $personId, $targetPk, $changes, $meta)
+        );
+    }
+
+    /** handle() 的原始流程；異體字通知由 handle() 統一掛上。 */
+    protected function handleAfterVariantReset(string $resource, string $mode, string $operation, int $personId, array $targetPk, array $changes, array $meta = []): JsonResponse {
         $authorizationError = $mode === 'proposal' ? $this->authorizeProposal() : $this->authorizeDirect();
         if ($authorizationError) {
             return $authorizationError;
@@ -111,6 +122,10 @@ class PostingCreateHandler extends AbstractMutationHandler {
         if ($cs === null || $cs === '' || (int) $cs === -999) {
             $writable['c_source'] = '0';
         }
+
+        // 異體字落地替換（型別驅動；POSTED_TO_OFFICE_DATA 全文本欄走 lenient）。放在白名單化與
+        // 哨兵正規化之後、direct／proposal 分派之前；PK 兩欄皆為數值，無文本型 PK 成員。
+        $writable = $this->applyVariantReplacement($writable, 'POSTED_TO_OFFICE_DATA');
 
         $addr = $changes['c_addr'] ?? [];
         if (!is_array($addr)) {

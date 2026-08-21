@@ -155,7 +155,7 @@ class BiogMainCreateHandler extends AbstractMutationHandler {
         }
 
         $flight = $storeResult['model'];
-        $variantReplaced = $storeResult['replaced'];
+        $variantReplaced = $storeResult['variant_replaced'] ?? [];
 
         if ($flight && Schema::hasTable('CBDB__NAME_FTS')) {
             $this->nameSearchIndexService->reindexPerson($flight);

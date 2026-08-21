@@ -6,6 +6,7 @@ use App\Models\Operation;
 use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
 use App\Support\CompositePrimaryKey;
+use App\Support\VariantEquivalentLookup;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -27,6 +28,7 @@ use Illuminate\Support\Str;
  */
 abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutationHandler {
     use \App\Services\Mutations\Concerns\RecordsAiFillSubmission;
+    use \App\Services\Mutations\Concerns\AppliesVariantReplacement;
 
     protected OperationRepository $operationRepository;
     protected AuditLogService $auditLogService;
@@ -75,6 +77,18 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
     // ── handle ───────────────────────────────────────────────
 
     public function handle(string $resource, string $mode, string $operation, int $personId, array $targetPk, array $changes, array $meta = []): JsonResponse {
+        // 異體字落地替換的通知一律在此統一掛上：涵蓋成功、409（替換後撞既有 PK）與
+        // 422（替換後無實際變更）三類回應——使用者必須知道「我輸入的字被正規化了」，
+        // 尤其是在被擋下來的時候，否則錯誤訊息看起來毫無道理。
+        $this->resetVariantReplaced();
+
+        return $this->withVariantNotices(
+            $this->handleAfterVariantReset($resource, $mode, $operation, $personId, $targetPk, $changes, $meta)
+        );
+    }
+
+    /** handle() 的原始流程；異體字通知由 handle() 統一掛上。 */
+    protected function handleAfterVariantReset(string $resource, string $mode, string $operation, int $personId, array $targetPk, array $changes, array $meta = []): JsonResponse {
         // 1. 授權
         $authorizationError = $mode === 'proposal' ? $this->authorizeProposal() : $this->authorizeDirect();
         if ($authorizationError) {
@@ -133,6 +147,11 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
             return $this->errorResponse('參數校驗失敗', 422, $validationErrors);
         }
 
+        // 9.5 異體字落地替換（型別驅動；見 Concerns\AppliesVariantReplacement）。
+        // 必須早於 preprocessUpdateData()、hasEffectiveChanges() 與 buildNewPk()：
+        // 「只把變體形改成參考形」不能被當成無變更擋掉，替換後的值也要進新 PK。
+        $updateData = $this->applyVariantReplacement($updateData);
+
         // 10. 前處理（子類可覆寫，如 -999 → 0 轉換）
         $updateData = $this->preprocessUpdateData($updateData);
 
@@ -141,6 +160,16 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
         if (!$this->hasEffectiveChanges($originalArray, $updateData)) {
             return $this->errorResponse('未偵測到任何修改內容', 422, [
                 'changes' => ['no_effective_changes'],
+            ]);
+        }
+
+        // 11.5 D7「兩形並存」查重（改鍵時）。DB 唯一鍵只擋得住**同字形**的碰撞，
+        // 而既有列可能存變體形（D6 不做回溯校正）：把某列的文本型 PK 成員改成
+        // 「歸一後等於另一既有變體形列」的值時，精確比對查不到、唯一鍵也不衝突，
+        // 就會落成兩列語義相同、字形不同的資料。與 create 側同一個缺口。
+        if ($this->findVariantEquivalentPkConflict($targetPk, $updateData, $originalArray) !== null) {
+            return $this->errorResponse('變更後的主鍵與現有記錄重複（異體字歸一後相同）', 409, [
+                'target.pk' => ['conflict'],
             ]);
         }
 
@@ -311,6 +340,59 @@ abstract class AbstractPersonSubresourceMutationHandler extends AbstractMutation
                 'row' => $newArray,
             ],
         ]);
+    }
+
+    /**
+     * 改鍵後的新 PK 是否與**另一**既有列「異體字歸一後相同」。
+     *
+     * 回傳該衝突列，或 null（沒衝突／候選列就是正在編輯的這一列）。
+     * 排除自己是必要的：例如 `BIOG_SOURCE_DATA` 只改 `c_pages` 時，其餘 PK 欄與原列
+     * 完全相同，`VariantEquivalentLookup` 會把原列自己撈回來，誤報 409。
+     *
+     * @param array<string,mixed> $targetPk
+     * @param array<string,mixed> $updateData
+     */
+    protected function findVariantEquivalentPkConflict(array $targetPk, array $updateData, array $originalArray) {
+        $newPk = $this->buildNewPk($targetPk, $updateData);
+
+        // 排除「正在編輯的那一列」交給 lookup 內部處理，**不能**拿回傳值在外面判斷：
+        // 候選集可以有多列同時歸一成同一個值（`愼齋` 與 `慬齋` 都歸一成 `慎齋`），
+        // 外部判斷只看得到第一筆，是自己就誤判成沒衝突，真正衝突的另一列被漏掉。
+        //
+        // 排除用的 PK 取自 $originalArray（**實際命中那一列的值**）而不是 $targetPk：
+        // payload 的 PK 可能帶哨兵別名（sources 的 c_textid=-999 實際落庫是 0），
+        // 拿別名比會把原列自己當成別列而回假 409。
+        $selfPk = array_intersect_key($originalArray, array_flip($this->keyColumns()));
+
+        // **只在真的改鍵時才檢查**。既有資料可能早就有兩列歸一後相同（D6 不做回溯校正），
+        // 此時使用者只改某列的 c_notes 這種非 PK 欄是**合法操作**：它既沒有新增、也沒有
+        // 把任何列改造成語義重複。無條件檢查會把那些歷史資料變成「任何更新都做不了」。
+        if (!$this->pkDiffers($newPk, $selfPk)) {
+            return null;
+        }
+
+        return VariantEquivalentLookup::findExistingRow(
+            $this->tableName(),
+            $this->keyColumns(),
+            $newPk,
+            [$selfPk]
+        );
+    }
+
+    /**
+     * 兩組主鍵值是否不同（逐欄字串比對，與其他 PK 比對處一致）。
+     *
+     * @param array<string,mixed> $left
+     * @param array<string,mixed> $right
+     */
+    protected function pkDiffers(array $left, array $right): bool {
+        foreach ($this->keyColumns() as $column) {
+            if ((string) ($left[$column] ?? '') !== (string) ($right[$column] ?? '')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // ── Proposal Update ──────────────────────────────────────

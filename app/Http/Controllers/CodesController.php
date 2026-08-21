@@ -11,6 +11,7 @@ use App\Services\CharVariantMapService;
 use App\Support\ColumnFilterExpression;
 use App\Support\ColumnFilterParseException;
 use App\Support\PinyinUmlaut;
+use App\Support\VariantEquivalentLookup;
 use App\Support\VariantReplaceScope;
 use Carbon\Carbon;
 use Illuminate\Contracts\Database\Query\Expression;
@@ -2449,90 +2450,27 @@ class CodesController extends Controller {
     }
 
     /**
-     * 主鍵欄位分成「在替換範圍內的文本欄」與「其餘」。
+     * D7「兩形並存」查重與其輔助方法：實作已抽到 `App\Support\VariantEquivalentLookup`，
+     * 供代碼表 CRUD 與 v2 mutation 的 create 路徑共用——同一個缺口在兩邊都會鑄出語義
+     * 重複列（唯一鍵擋不住不同字形），不能只修一邊。這裡保留薄委派層以維持原呼叫點。
      *
      * @param array<int,string> $keyColumns
-     * @return array{0: array<int,string>, 1: array<int,string>} [替換範圍內的, 其餘的]
+     * @return array{0: array<int,string>, 1: array<int,string>}
      */
     protected function splitKeyColumnsByVariantScope(string $table, array $keyColumns): array {
-        $inScope = [];
-        $fixed = [];
-
-        foreach ($keyColumns as $column) {
-            if (VariantReplaceScope::modeFor($table, $column) === null) {
-                $fixed[] = $column;
-            } else {
-                $inScope[] = $column;
-            }
-        }
-
-        return [$inScope, $fixed];
+        return VariantEquivalentLookup::splitKeyColumns($table, $keyColumns);
     }
 
     /**
-     * D7「兩形並存」的去重：找出**歸一後與本次輸入相同**的既有列。
-     *
-     * D6 不做回溯校正，所以既有列的文本主鍵可能還是任一個變體形；而對照是**多對一**
-     * （多個變體可指向同一參考字），所以「歸一後相同」的字形可能很多。
-     * 只用替換後的值查重會錯過那些列，鑄出語義重複的列——而資料庫唯一鍵擋不住
-     * （不同字形是不同鍵值），**比不替換更糟**。
-     *
-     * 做法：**把不在替換範圍內的主鍵欄固定在 SQL 條件裡，取回那一小群候選列，
-     * 再在 PHP 端把它們的文本主鍵歸一後比對**。這樣是**精確**的（不管對照表是什麼形狀）、
-     * 而且只要**一次查詢**。
-     *
-     * 早期版本改用「列舉所有等價字形再逐一查」，那個做法有兩個缺點：查詢次數是等價字形數
-     * （最壞可達數十次），而且為了避免組合爆炸設的上限本身是**正確性缺口**——超過上限就
-     * 退回只比對正規形，等於完全失去這道去重。
-     *
      * @param array<int,string> $keyColumns
-     * @param array<string,mixed> $after 替換後的資料
+     * @param array<string,mixed> $after
      * @return mixed 既有列（stdClass）或 null
      */
     protected function findExistingRowInEitherVariantForm(string $table, array $keyColumns, array $after) {
-        [$inScope, $fixed] = $this->splitKeyColumnsByVariantScope($table, $keyColumns);
-
-        // 主鍵沒有任何可替換的文本欄 ⇒ 一般查重就夠，零額外成本。
-        if ($inScope === []) {
-            return null;
-        }
-
-        // 全部主鍵欄都可替換 ⇒ 沒有能收斂候選集的 SQL 條件，會變成全表掃描。
-        // 目前沒有這種表（ALTNAME_DATA 是 3 鍵、只有 1 個文本欄可替換），
-        // 真的出現時記 warning 並跳過，不要靜默做全表掃描。
-        if ($fixed === []) {
-            \Illuminate\Support\Facades\Log::warning('D7 去重跳過：主鍵全部在替換範圍內，無法收斂候選集', [
-                'table' => $table,
-                'key_columns' => $keyColumns,
-            ]);
-
-            return null;
-        }
-
-        $query = DB::table($table);
-        foreach ($fixed as $column) {
-            if (!array_key_exists($column, $after)) {
-                return null;
-            }
-            $query->where($column, $after[$column]);
-        }
-
-        foreach ($query->get() as $row) {
-            if ($this->rowMatchesAfterNormalization($table, $inScope, (array) $row, $after)) {
-                return $row;
-            }
-        }
-
-        return null;
+        return VariantEquivalentLookup::findExistingRow($table, $keyColumns, $after);
     }
 
     /**
-     * D7：待審的新增提案裡有沒有「歸一後與本次輸入相同」的一筆。
-     *
-     * `hasActiveCreateProposalConflict()` 是拿 `resource_id` 做完全相等比對，
-     * 所以 S2 之前留下的 pending 提案（帶變體形 resource_id）不會與新提案（帶歸一後
-     * resource_id）衝突 ⇒ 兩筆並存、依序核准就落成兩種字形的兩筆列。
-     *
      * @param array<int,string> $keyColumns
      * @param array<string,mixed> $after
      */
@@ -2542,135 +2480,34 @@ class CodesController extends Controller {
         array $after,
         ?int $excludeOperationId = null
     ): bool {
-        [$inScope] = $this->splitKeyColumnsByVariantScope($table, $keyColumns);
-        if ($inScope === []) {
-            return false;
-        }
+        // 代碼表的 resource_id 是 buildCompositeId() 的位置式 '_._' 串接，用位置式 LIKE 收斂。
+        [$inScope] = VariantEquivalentLookup::splitKeyColumns($table, $keyColumns);
 
-        if (!Schema::hasTable('operations')) {
-            return false;
-        }
-
-        $query = DB::table('operations')
-            ->where('resource', $table)
-            ->where('op_type', Operation::TYPE_PROPOSAL_CREATE);
-        if ($excludeOperationId !== null) {
-            $query->where('id', '!=', $excludeOperationId);
-        }
-
-        // 用「前導的非替換範圍主鍵欄」組出 resource_id 前綴來收斂候選集。
-        // resource_id 是 buildCompositeId() 以 '_._' 串起來的複合主鍵，所以前導欄可以做
-        // 前綴 LIKE，而 operations 上的 (resource, resource_id, op_type) 索引吃得到。
-        // 少了這個條件就會把該表**所有歷史** create proposal（含已核准／已取消）全部撈回來
-        // 反序列化，集合隨歷史無上限成長。
-        if (($pattern = $this->variantProposalResourceIdPattern($keyColumns, $inScope, $after)) !== null) {
-            $query->where('resource_id', 'like', $pattern);
-        }
-
-        // 分批而非一次載入：候選集理論上無上限（**不能用 limit 截斷**——截斷會重現
-        // 「漏抓重複」的正確性缺口）。用 lazyById() 而不是 cursor()：PDO MySQL 預設是
-        // buffered query（config/database.php 沒關掉 MYSQL_ATTR_USE_BUFFERED_QUERY），
-        // cursor() 仍會把整個結果集先讀進 PHP 記憶體；lazyById() 以 id 分頁，
-        // 每批大小固定，記憶體才真的有界。
-        foreach ($query->lazyById(500) as $operation) {
-            $payload = json_decode((string) $operation->resource_data, true);
-            if (!is_array($payload)) {
-                continue;
-            }
-            if (!in_array($payload['__review_status'] ?? null, ['pending', 'rejected'], true)) {
-                continue;
-            }
-            // 其餘主鍵欄必須相同，文本主鍵欄則比對歸一後的值
-            foreach ($keyColumns as $column) {
-                if (in_array($column, $inScope, true)) {
-                    continue;
-                }
-                if ((string) ($payload[$column] ?? '') !== (string) ($after[$column] ?? '')) {
-                    continue 2;
-                }
-            }
-            if ($this->rowMatchesAfterNormalization($table, $inScope, $payload, $after)) {
-                return true;
-            }
-        }
-
-        return false;
+        return VariantEquivalentLookup::hasEquivalentPendingCreateProposal(
+            $table,
+            $keyColumns,
+            $after,
+            $excludeOperationId,
+            VariantEquivalentLookup::proposalResourceIdPattern($keyColumns, $inScope, $after)
+        );
     }
 
     /**
-     * 用「非替換範圍的主鍵欄」組出 `resource_id` 的 LIKE 樣式，把候選集收斂在 SQL 層。
-     *
-     * `resource_id` 是 `buildCompositeId()` 以 `'_._'` 串起的**位置式**序列化，所以可以
-     * 逐位置組樣式：在替換範圍內的欄位放 `%`、其餘放實際值。
-     *
-     * **不能只做「前導前綴」**：production 的 `ALTNAME_DATA` 主鍵順序是
-     * `(c_alt_name_chn, c_alt_name_type_code, c_personid)`——第一欄正是可替換的文字欄，
-     * 前導前綴會直接失效而退回全掃。位置式樣式在任何順序下都能收斂。
-     *
-     * 這個樣式是**寬鬆的預篩**（分隔符裡的 `_` 本身是 LIKE 單字元通配、且值含 `%`／`_`
-     * 時會退成 `%`），只會多撈不會少撈——精確比對在 PHP 端由
-     * `rowMatchesAfterNormalization()` 完成，所以寬鬆是安全的。
-     *
      * @param array<int,string> $keyColumns
-     * @param array<int,string> $inScope 在替換範圍內的主鍵欄
+     * @param array<int,string> $inScope
      * @param array<string,mixed> $after
-     * @return string|null null = 無法收斂（所有主鍵欄都是通配），呼叫端就別加這個條件
      */
     protected function variantProposalResourceIdPattern(array $keyColumns, array $inScope, array $after): ?string {
-        $parts = [];
-        $hasLiteral = false;
-
-        foreach ($keyColumns as $column) {
-            if (in_array($column, $inScope, true)) {
-                $parts[] = '%';
-
-                continue;
-            }
-
-            $value = array_key_exists($column, $after) && $after[$column] !== null
-                ? (string) $after[$column]
-                : '';
-
-            // 值本身含 LIKE 通配字元時退成 '%'：跨 driver 的 ESCAPE 語法不一致
-            // （SQLite 需要顯式 ESCAPE），而寬鬆預篩本來就安全。
-            if ($value === '' || strpbrk($value, '%_') !== false) {
-                $parts[] = '%';
-
-                continue;
-            }
-
-            $parts[] = $value;
-            $hasLiteral = true;
-        }
-
-        if (!$hasLiteral) {
-            return null;
-        }
-
-        return implode('_._', $parts);
+        return VariantEquivalentLookup::proposalResourceIdPattern($keyColumns, $inScope, $after);
     }
 
     /**
-     * 候選列的文本主鍵歸一後是否與本次輸入相同。
-     *
-     * @param array<int,string> $inScope 在替換範圍內的主鍵欄
+     * @param array<int,string> $inScope
      * @param array<string,mixed> $candidate
-     * @param array<string,mixed> $after 替換後的資料
+     * @param array<string,mixed> $after
      */
     protected function rowMatchesAfterNormalization(string $table, array $inScope, array $candidate, array $after): bool {
-        foreach ($inScope as $column) {
-            $candidateValue = $candidate[$column] ?? null;
-            if (!is_string($candidateValue)) {
-                return false;
-            }
-
-            $normalized = CharVariantMapService::replaceFor($table, $column, $candidateValue)['text'];
-            if ($normalized !== (string) ($after[$column] ?? '')) {
-                return false;
-            }
-        }
-
-        return true;
+        return VariantEquivalentLookup::rowMatchesAfterNormalization($table, $inScope, $candidate, $after);
     }
 
     /**
@@ -2698,6 +2535,10 @@ class CodesController extends Controller {
      * @return string|null null = 通過；非 null = 錯誤訊息
      */
     protected function guardCharVariantMapWrite(string $table, array $data, array $conditions = []): ?string {
+        // ⚠️ 同名但**不同回傳型別**的孿生實作：v2 API 側是
+        // App\Services\Mutations\Concerns\GuardsCharVariantMapWrites::guardCharVariantMapWrite()
+        // （回 ?JsonResponse，給 handler 用）。兩者驗的是同一件事（CharVariantMapService::assertWritable），
+        // 差別只在錯誤呈現方式（這裡回訊息字串供 flash）。改一邊記得改另一邊。
         if (strtolower($table) !== 'char_variant_map') {
             return null;
         }

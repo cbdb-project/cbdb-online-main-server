@@ -23,6 +23,7 @@ use Illuminate\Support\Str;
  * 呼叫端仍須依 MutationController 契約傳 person_id，通常為 0）。
  */
 abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler {
+    use \App\Services\Mutations\Concerns\GuardsCharVariantMapWrites;
     protected OperationRepository $operationRepository;
     protected AuditLogService $auditLogService;
 
@@ -158,6 +159,11 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
         $operation = null;
         $newArray = [];
 
+        // char_variant_map：落庫前驗結構，並排除自己那一列（單邊改欄時要能 merge 舊值）。
+        if (($guardError = $this->guardCharVariantMapWrite($table, $updateData, isset($pk['id']) ? (int) $pk['id'] : null)) !== null) {
+            return $guardError;
+        }
+
         try {
             DB::transaction(function () use ($table, $pk, $resourceId, $updateData, $originalArray, $comment, $operationId, $personId, &$operation, &$newArray) {
                 $this->whereByPk(DB::table($table), $pk)->update($updateData);
@@ -201,6 +207,8 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
             throw $e;
         }
 
+        $this->resetVariantMapCacheIfNeeded($table);
+
         return response()->json([
             'ok' => true,
             'resource' => $this->resourceName(),
@@ -216,6 +224,13 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
     }
 
     protected function handleProposal(int $personId, array $pk, string $resourceId, array $updateData, array $originalArray, string $comment): JsonResponse {
+        // char_variant_map：提案階段就擋。核准走的是通用 applyUpdateProposal()（本表不在
+        // HANDLER_ROUTED_RESOURCES），那條路徑不驗結構——讓成環的對照混進待審提案，
+        // 核准時就會直接落庫，之後 dropCycleEdges() 把整組邊丟掉、替換全站靜默停止。
+        if (($guardError = $this->guardCharVariantMapWrite($this->tableName(), $updateData, isset($pk['id']) ? (int) $pk['id'] : null)) !== null) {
+            return $guardError;
+        }
+
         $proposalData = array_merge($originalArray, $updateData, [
             '__proposal_meta' => [
                 'action' => 'update',

@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
  * 定義見 config/code_table_writes.php。按單主鍵刪除，走既有授權 + operations + AuditLog（before-image）。
  */
 class CodeTableDeleteHandler extends AbstractMutationHandler {
+    use \App\Services\Mutations\Concerns\GuardsCharVariantMapWrites;
     protected array $definitions;
     protected OperationRepository $operationRepository;
     protected AuditLogService $auditLogService;
@@ -99,6 +100,12 @@ class CodeTableDeleteHandler extends AbstractMutationHandler {
                 $operation ? (string) $operation->id : null
             );
         });
+
+        // 注意：本方法開頭已無條件回 403（碼表刪除停用中），以下都是不可達的既有碼。
+        // 若日後恢復刪除，char_variant_map 刪列後**必須**呼叫
+        // $this->resetVariantMapCacheIfNeeded($table)（trait 已掛好），
+        // 否則被刪掉的對照在該 process 的剩餘生命週期內還會繼續替換。
+        $this->resetVariantMapCacheIfNeeded($table);
 
         return response()->json([
             'ok' => true,

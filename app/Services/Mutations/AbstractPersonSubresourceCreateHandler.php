@@ -7,6 +7,7 @@ use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
 use App\Services\AuditLogService;
 use App\Support\CompositePrimaryKey;
+use App\Support\VariantEquivalentLookup;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -26,7 +27,11 @@ use Illuminate\Support\Str;
  * - 統一 response shape
  */
 abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHandler {
+    use \App\Services\Mutations\Concerns\AppliesVariantReplacement;
     use \App\Services\Mutations\Concerns\RecordsAiFillSubmission;
+
+    /** 核准提案重放時「自己那一筆」的 operation id（見 handle()）；null = 非核准重放。 */
+    protected ?int $approvingOperationId = null;
 
     protected OperationRepository $operationRepository;
     protected AuditLogService $auditLogService;
@@ -75,6 +80,23 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
     // ── handle ───────────────────────────────────────────────
 
     public function handle(string $resource, string $mode, string $operation, int $personId, array $targetPk, array $changes, array $meta = []): JsonResponse {
+        // 異體字落地替換的通知一律在此統一掛上：涵蓋成功、409（替換後撞既有 PK）與
+        // 422（替換後無實際變更）三類回應——使用者必須知道「我輸入的字被正規化了」，
+        // 尤其是在被擋下來的時候，否則錯誤訊息看起來毫無道理。
+        $this->resetVariantReplaced();
+        // 核准提案時以 direct/proposal 重放本 handler，待審的那筆提案正是自己；
+        // handleProposal() 的簽章不含 $meta（多個子類覆寫它），所以在這裡先收下來。
+        $this->approvingOperationId = isset($meta['__approving_operation_id'])
+            ? (int) $meta['__approving_operation_id']
+            : null;
+
+        return $this->withVariantNotices(
+            $this->handleAfterVariantReset($resource, $mode, $operation, $personId, $targetPk, $changes, $meta)
+        );
+    }
+
+    /** handle() 的原始流程；異體字通知由 handle() 統一掛上。 */
+    protected function handleAfterVariantReset(string $resource, string $mode, string $operation, int $personId, array $targetPk, array $changes, array $meta = []): JsonResponse {
         // 1. 授權
         $authorizationError = $mode === 'proposal' ? $this->authorizeProposal() : $this->authorizeDirect();
         if ($authorizationError) {
@@ -117,14 +139,23 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
             return $this->errorResponse('參數校驗失敗', 422, $validationErrors);
         }
 
+        // 7.5 異體字落地替換（型別驅動；見 Concerns\AppliesVariantReplacement）。
+        // 必須早於 preprocessCreateData()、extractPkFromRow() 與 findExistingRow()：
+        // 文本型 PK 成員替換後的值才會成為實際寫入的 PK，查重也才看到替換後的值。
+        $rowData = $this->applyVariantReplacement($rowData);
+
         // 8. 前處理（子類可覆寫，如 -999 → 0 轉換）
         $rowData = $this->preprocessCreateData($rowData);
 
         // 8.1 從正規化後的 rowData 提取實際 PK（前處理可能改變 key 值）
         $actualPk = $this->extractPkFromRow($rowData);
 
-        // 9. 檢查目標 PK 是否已存在（使用正規化後的 PK）
-        $existing = $this->findExistingRow($actualPk);
+        // 9. 檢查目標 PK 是否已存在（使用正規化後的 PK）。
+        // 第二個條件是 D7「兩形並存」查重：既有列可能存變體形（D6 不做回溯校正），
+        // 只比對替換後的值會讓「原樣重送變體形」鑄出第二列語義重複資料——而唯一鍵
+        // 擋不住（不同字形＝不同鍵值）。落地替換上線前這種輸入是乾淨的 409。
+        $existing = $this->findExistingRow($actualPk)
+            ?: VariantEquivalentLookup::findExistingRow($this->tableName(), $this->keyColumns(), $rowData);
         if ($existing) {
             return $this->errorResponse('目標主鍵已存在', 409, ['target.pk' => ['conflict']]);
         }
@@ -215,6 +246,11 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
                 // 子類在同一交易內的後續處理（例如社會關係/親屬寫互逆鏡像列），保證原子性
                 $this->afterDirectInsert($personId, $actualPk, $rowData, $insertedArray, $operation);
             });
+        } catch (\InvalidArgumentException $e) {
+            // 子類／鏡像同步明確拋出的衝突（例如 D7 等價字形 preflight、Altname 的括號正規化
+            // 撞號）→ 整筆交易已回滾，回 409 而不是漏成 500。對齊
+            // AbstractPersonSubresourceMutationHandler::handleDirect() 的同名 catch。
+            return $this->errorResponse($e->getMessage(), 409, ['target.pk' => ['conflict']]);
         } catch (\Illuminate\Database\QueryException $e) {
             if ($this->isUniqueConstraintViolation($e)) {
                 return $this->errorResponse('目標主鍵已存在', 409, ['target.pk' => ['conflict']]);
@@ -267,8 +303,19 @@ abstract class AbstractPersonSubresourceCreateHandler extends AbstractMutationHa
     protected function handleProposal(int $personId, array $actualPk, array $rowData, string $comment): JsonResponse {
         $resourceId = CompositePrimaryKey::buildStoredResourceId($actualPk);
 
-        // 檢查：相同 resource_id 不得已有待審核的新增提案
-        if ($this->operationRepository->hasPendingCreateProposal($this->tableName(), $resourceId)) {
+        // 檢查：相同 resource_id 不得已有待審核的新增提案。
+        // 第二個條件同樣是 D7 查重：帶變體形 resource_id 的舊提案與帶歸一後 resource_id
+        // 的新提案不會相等 ⇒ 兩筆並存、依序核准就落成兩種字形的兩列。
+        // 核准重放時要排除「自己那一筆」（meta.__approving_operation_id），否則自擋。
+        if ($this->operationRepository->hasPendingCreateProposal($this->tableName(), $resourceId)
+            || VariantEquivalentLookup::hasEquivalentPendingCreateProposal(
+                $this->tableName(),
+                $this->keyColumns(),
+                $rowData,
+                $this->approvingOperationId,
+                null,
+                $personId // 人物子資源的 resource_id 是查詢字串，改用有索引的 operations.c_personid 收斂
+            )) {
             return $this->errorResponse('相同主鍵已有待審核的新增提案', 409, [
                 'target.pk' => ['pending_proposal_exists'],
             ]);

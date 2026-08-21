@@ -22,6 +22,7 @@ use Illuminate\Support\Str;
  * person_id 對本表無意義：呼叫端仍須帶（controller 要求），本 handler 僅將其原樣記入 operations.c_personid。
  */
 class CodeTableCreateHandler extends AbstractMutationHandler {
+    use \App\Services\Mutations\Concerns\GuardsCharVariantMapWrites;
     protected array $definitions;
     protected OperationRepository $operationRepository;
     protected AuditLogService $auditLogService;
@@ -89,6 +90,12 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
         $insertedArray = [];
         $comment = is_string($meta['comment'] ?? null) ? trim($meta['comment']) : '';
 
+        // char_variant_map：落庫前驗結構（單一 codepoint、不成環），否則成環的對照會讓
+        // dropCycleEdges() 靜默丟掉整組邊、該組字的替換在全站停止（見 trait 註解）。
+        if (($guardError = $this->guardCharVariantMapWrite($table, $row)) !== null) {
+            return $guardError;
+        }
+
         try {
             DB::transaction(function () use (&$operation, &$insertedArray, $table, $keyColumn, $explicit, $explicitId, $def, $row, $personId, $operationId, $comment) {
                 $id = $explicit
@@ -138,6 +145,8 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
 
             throw $e;
         }
+
+        $this->resetVariantMapCacheIfNeeded($table);
 
         return response()->json([
             'ok' => true,

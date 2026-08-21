@@ -38,6 +38,7 @@ use App\Support\CompositePrimaryKey;
 use App\Support\ExecutionTimeLimit;
 use App\Support\MemoryLimit;
 use App\Support\PinyinUmlaut;
+use App\Support\VariantEquivalentLookup;
 use Carbon\Carbon;
 //修改結束
 
@@ -243,20 +244,44 @@ class BiogMainRepository {
     /**
      * @param $request
      * @param $id
+     * @param array<int,string>|null $variantFields 只對這些欄位做異體字落地替換；null＝整列。
+     *                                              v2 只送「使用者本次實際變更的欄」（見下方註解）。
      */
-    public function updateById($request, $id) {
+    public function updateById($request, $id, ?array $variantFields = null) {
         $data = $request->all();
 
-        // 異體字落地替換（嚴格模式）：先替換姓／名分欄，再組出 c_name_chn，維持
-        // c_name_chn === c_surname_chn.c_mingzi_chn 的既有 invariant（見
-        // docs/CHAR_VARIANT_MAP_CALL_SITE_WIRING_PLAN.md 待決事項 1）。
-        $surnameReplaced = CharVariantMapService::replaceStrict((string) $request->c_surname_chn);
-        $mingziReplaced = CharVariantMapService::replaceStrict((string) $request->c_mingzi_chn);
-        $variantReplaced = CharVariantMapService::mergeReplaced($surnameReplaced['replaced'], $mingziReplaced['replaced']);
-        $data['c_surname_chn'] = $surnameReplaced['text'];
-        $data['c_mingzi_chn'] = $mingziReplaced['text'];
+        // 異體字落地替換：替換範圍由 VariantReplaceScope 按「表.欄位」決定——姓名欄
+        // （c_surname_chn／c_mingzi_chn／c_name_chn）走 strict、其餘文本欄（c_notes／
+        // c_tribe／c_fl_ey_notes／c_fl_ly_notes…）走 lenient。舊碼只手掛兩個姓名欄，
+        // 其他文本欄全漏（見 plan S3）。
+        //
+        // **$variantFields 為什麼必要**：v2 的 $request 是 handler 用「原列 ∪ changes」
+        // 合成的整列，整列替換等於對使用者沒碰過的既有欄做回溯校正（D6 明說不做），
+        // 而且會讓「完全沒改任何欄」的存檔因為某個舊欄被歸一而變成一筆真實 UPDATE，
+        // 連 updated_fields 都對不上。所以 v2 只把「本次實際變更的欄」列進替換範圍，
+        // 與 21 個子資源 handler（只替換 $updateData）語義一致。
+        // legacy Blade 表單路徑傳 null＝整列，那裡的 $request->all() 確實全是使用者提交的值。
+        $variantScope = $variantFields === null
+            ? $data
+            : array_intersect_key($data, array_flip($variantFields));
+        $variantResult = CharVariantMapService::replaceRow($variantScope, 'BIOG_MAIN');
+        $data = array_replace($data, $variantResult['data']);
+        $variantReplaced = $variantResult['replaced'];
 
-        $c_name_chn = $surnameReplaced['text'].$mingziReplaced['text'];
+        // 組出 c_name_chn，維持 c_name_chn === c_surname_chn.c_mingzi_chn 的既有 invariant。
+        // 必須讀**替換後**的 $data，不可回頭讀 $request（那是替換前的原始輸入）。
+        //
+        // **兩個分欄都是空的時候不重組**：v2 的 $request 是「原列 ∪ changes」，沒有明確
+        // 姓氏的歷史人物兩個分欄本來就是 NULL，而 c_name_chn 存著完整姓名。無條件相加
+        // 會把它清成空字串——對這種人物做任何更新（哪怕只改卒年）都會靜默清掉姓名。
+        // store() 早就有等價的 array_key_exists 保護（見該處長註解與
+        // ApiV2CreateBiogMainTest::testDirectBiogMainCreateWithOnlyNameChnDoesNotClearItWhenPartsAreAbsent）。
+        $data['c_surname_chn'] = (string) ($data['c_surname_chn'] ?? '');
+        $data['c_mingzi_chn'] = (string) ($data['c_mingzi_chn'] ?? '');
+        $hasNameParts = $data['c_surname_chn'] !== '' || $data['c_mingzi_chn'] !== '';
+        $c_name_chn = $hasNameParts
+            ? $data['c_surname_chn'].$data['c_mingzi_chn']
+            : (string) ($data['c_name_chn'] ?? '');
         $c_name = trim($request->c_surname.' '.$request->c_mingzi);
         #20230626修改外文全名呈現順序
         #$c_name_proper = $request->c_surname_proper.' '.$request->c_mingzi_proper;
@@ -295,8 +320,11 @@ class BiogMainRepository {
         $hasChanges = $this->hasMeaningfulChanges($data, $ori, ['c_modified_by', 'c_modified_date', 'c_created_by', 'c_created_date']);
 
         if (!$hasChanges) {
+            // 也要帶 variant_replaced：使用者送的字被靜默歸一成與現值相同時，
+            // 光回「未偵測到任何修改內容」毫無線索（呼叫端據此組 notices）。
             return [
                 'no_changes' => true,
+                'variant_replaced' => $variantReplaced,
             ];
         }
 
@@ -367,7 +395,9 @@ class BiogMainRepository {
     public function store(Request $request) {
         $data = $request->all();
 
-        // 異體字落地替換（嚴格模式）。v2 API 的 ALLOWED_FIELDS 允許呼叫端只送
+        // 異體字落地替換：整列一次過（姓名欄 strict、其餘文本欄 lenient，由
+        // VariantReplaceScope 按「表.欄位」決定），再依下述分支組 c_name_chn。
+        // v2 API 的 ALLOWED_FIELDS 允許呼叫端只送
         // c_name_chn（不拆分姓／名，例如無明確姓氏的歷史人物），也允許送
         // c_surname_chn/c_mingzi_chn（此時依「待決事項 2」無條件由分欄重組
         // c_name_chn，不採信客戶端傳來的值，避免分欄與組合欄不同步）。若兩個分欄
@@ -375,17 +405,16 @@ class BiogMainRepository {
         // 送分欄，只能直接替換 c_name_chn 本身，不能無條件拿兩個不存在的分欄相加把
         // c_name_chn 覆寫成空字串（見 tests/Feature/ApiV2CreateBiogMainTest.php
         // 只送 c_name_chn 的既有使用情境）。
+        $variantResult = CharVariantMapService::replaceRow($data, 'BIOG_MAIN');
+        $data = $variantResult['data'];
+        $variantReplaced = $variantResult['replaced'];
+
         if (array_key_exists('c_surname_chn', $data) || array_key_exists('c_mingzi_chn', $data)) {
-            $surnameReplaced = CharVariantMapService::replaceStrict((string) ($data['c_surname_chn'] ?? ''));
-            $mingziReplaced = CharVariantMapService::replaceStrict((string) ($data['c_mingzi_chn'] ?? ''));
-            $variantReplaced = CharVariantMapService::mergeReplaced($surnameReplaced['replaced'], $mingziReplaced['replaced']);
-            $data['c_surname_chn'] = $surnameReplaced['text'];
-            $data['c_mingzi_chn'] = $mingziReplaced['text'];
-            $data['c_name_chn'] = $surnameReplaced['text'].$mingziReplaced['text'];
+            $data['c_surname_chn'] = (string) ($data['c_surname_chn'] ?? '');
+            $data['c_mingzi_chn'] = (string) ($data['c_mingzi_chn'] ?? '');
+            $data['c_name_chn'] = $data['c_surname_chn'].$data['c_mingzi_chn'];
         } else {
-            $nameChnReplaced = CharVariantMapService::replaceStrict((string) ($data['c_name_chn'] ?? ''));
-            $data['c_name_chn'] = $nameChnReplaced['text'];
-            $variantReplaced = $nameChnReplaced['replaced'];
+            $data['c_name_chn'] = (string) ($data['c_name_chn'] ?? '');
         }
 
         $data = (new ToolsRepository())->timestamp($data, true);
@@ -411,7 +440,8 @@ class BiogMainRepository {
                 $operation ? (string) $operation->id : null
             );
 
-            return ['model' => $flight, 'replaced' => $variantReplaced];
+            // key 名與 updateById() 一致（統一為 variant_replaced，見 plan S3）。
+            return ['model' => $flight, 'variant_replaced' => $variantReplaced];
         });
     }
 
@@ -2709,6 +2739,9 @@ class BiogMainRepository {
                     // 多條垃圾鏡像、force 名義成功實際沒清」的不一致；codex MINOR）。
                     $only = $drifted->first();
                     $updateSet = Arr::except($dataMirror, ['c_created_by', 'c_created_date']);
+                    // D7：force 就地收斂也是改鍵（c_text_title 是 PK 成員），同樣要先確認對面
+                    // 沒有另一列歸一後相同但字形不同的關係——唯一鍵擋不住不同字形。
+                    $this->assertMirrorRenameHasNoVariantEquivalentRow('ASSOC_DATA', collect([$only]), $updateSet);
                     $pkWhere = [];
                     foreach (CompositePrimaryKey::SCHEMAS['ASSOC_DATA'] as $col) {
                         $pkWhere[] = [$col, '=', $only->$col];
@@ -2737,6 +2770,9 @@ class BiogMainRepository {
                 $insert['c_created_by'] = \App\Support\AuditActor::currentName();
                 $insert['c_created_date'] = Carbon::now();
             }
+            // D7：補建鏡像列也可能與對面既有的變體形列歸一後相同（唯一鍵擋不住不同字形），
+            // 所以插入前一樣要 preflight；這裡沒有「自己」要排除。
+            $this->assertMirrorRenameHasNoVariantEquivalentRow('ASSOC_DATA', collect([]), $insert);
             DB::table('ASSOC_DATA')->insert($insert);
             $auditLog->write(
                 'ASSOC_DATA',
@@ -2760,6 +2796,13 @@ class BiogMainRepository {
             $this->detectMirrorConflicts('ASSOC_DATA', $mirroredRows, $conflictBaselines, $updateSet, $auditLog);
         }
 
+        // D7「兩形並存」：c_text_title 是 ASSOC_DATA 的 PK 成員，異體字落地替換會讓鏡像列
+        // 一起改鍵。DB 唯一鍵只擋得住**同字形**的碰撞，若對面已存在另一列「歸一後與新鍵相同
+        // 但字形不同」的關係（例如 `愼書` 與 `慬書` 都歸一成 `慎書`），這個 update 不會撞唯一鍵，
+        // 對面就留下兩筆歸一後相同的關係。這裡先擋成乾淨的衝突（整筆交易回滾 → 409）。
+        // 排除本次要更新的那些鏡像列自己（$mirroredRows）。
+        $this->assertMirrorRenameHasNoVariantEquivalentRow('ASSOC_DATA', $mirroredRows, $updateSet);
+
         $query->update($updateSet);
 
         foreach ($mirroredRows as $mirroredRow) {
@@ -2777,6 +2820,79 @@ class BiogMainRepository {
                 $operationId
             );
         }
+    }
+
+    /**
+     * 鏡像列改鍵前，確認對面沒有另一列「異體字歸一後與新主鍵相同」的資料。
+     *
+     * 為什麼 DB 擋不住：不同字形＝不同鍵值，唯一鍵不衝突。而落地替換會把被觸碰的那一列
+     * 歸一，於是對面可能同時留下 `慎書`（剛改的）與 `慬書`（歸一後也是 `慎書`）兩筆語義
+     * 相同的關係。拋 InvalidArgumentException 讓 v2 handler 轉成 409 並回滾整筆
+     * （legacy／核准路徑則冒成「套用失敗」，兩者都比靜默鑄出重複列好）。
+     *
+     * @param \Illuminate\Support\Collection<int,object> $mirroredRows 本次要更新的鏡像列（排除自己）
+     * @param array<string,mixed> $updateSet 鏡像列更新後的欄位值（含替換後的 PK 成員）
+     */
+    public function assertMirrorRenameHasNoVariantEquivalentRow(string $table, $mirroredRows, array $updateSet): void {
+        $keyColumns = CompositePrimaryKey::SCHEMAS[$table] ?? [];
+        if ($keyColumns === []) {
+            return;
+        }
+
+        // 新鍵：鏡像列原值疊上 updateSet（updateSet 未必含全部 PK 欄）。
+        // $mirroredRows 為空＝這是「補建新列」的情境（backfill），此時 $updateSet 本身就是
+        // 完整的新列，沒有「自己」要排除。
+        $excludePks = [];
+        $newPks = [];
+        foreach ($mirroredRows as $row) {
+            $rowArray = (array) $row;
+            $oldPk = array_intersect_key($rowArray, array_flip($keyColumns));
+            $newPk = array_intersect_key(array_replace($rowArray, $updateSet), array_flip($keyColumns));
+            $excludePks[] = $oldPk;
+
+            // 只在**落地替換範圍內的 PK 欄**（此處是 c_text_title）真的變動時才檢查。
+            //
+            // 為什麼不是「任何 PK 欄變動就檢查」：鏡像同步本來就會改寫幾個數值 PK 欄
+            // （c_kin_id／c_assoc_kin_id 會被設成正向那個人的 id），所以「只改對面備註」
+            // 也會讓 PK 變動。若據此檢查，對面早就存在兩形並存的歷史資料（D6 不回溯校正）
+            // 會讓這種合法操作被誤擋成 409——而那個重複是替換上線前就有的，擋它並沒有
+            // 防止任何新的重複產生。異體字造成的收斂只可能來自文本型 PK 欄的變動。
+            [$inScopePkColumns] = VariantEquivalentLookup::splitKeyColumns($table, $keyColumns);
+            foreach ($inScopePkColumns as $column) {
+                if ((string) ($oldPk[$column] ?? '') !== (string) ($newPk[$column] ?? '')) {
+                    $newPks[] = $newPk;
+
+                    break;
+                }
+            }
+        }
+
+        // 有命中鏡像列、但沒有任何一列改鍵 ⇒ 無須檢查（下面的 $newPks === [] 分支是
+        // 「補建新列」專用，不能讓它在這裡誤觸發）。
+        if ($newPks === [] && !$this->isEmptyRowSet($mirroredRows)) {
+            return;
+        }
+
+        if ($newPks === []) {
+            $newPks[] = array_intersect_key($updateSet, array_flip($keyColumns));
+        }
+
+        foreach ($newPks as $newPk) {
+            if (VariantEquivalentLookup::findExistingRow($table, $keyColumns, $newPk, $excludePks) !== null) {
+                throw new \InvalidArgumentException(
+                    '對面的鏡像資料已有一筆異體字歸一後相同的紀錄，請先手動整理後再儲存。'
+                );
+            }
+        }
+    }
+
+    /** 鏡像列集合是否為空（backfill 情境）。Collection 與陣列都要能吃。 */
+    protected function isEmptyRowSet($rows): bool {
+        if ($rows instanceof \Illuminate\Support\Collection) {
+            return $rows->isEmpty();
+        }
+
+        return empty($rows);
     }
 
     /**
@@ -3099,6 +3215,14 @@ class BiogMainRepository {
                     $this->createAssocMirrorBaselines($data_mirror, $data['c_assoc_code'])
                 );
             } else {
+                // D7：反向碼為哨兵 0（無有效反向可定位）時走盲插。此時 c_text_title 已是
+                // 歸一後的字形，若對面已存在同一組固定 PK、書名為歷史變體形的鏡像列，
+                // 這一插就造成兩形並存（唯一鍵擋不住不同字形）。
+                // 只在 $detectConflict（v2／核准路徑）時檢查——legacy direct 明文維持原盲插 parity。
+                if ($detectConflict) {
+                    $this->assertMirrorRenameHasNoVariantEquivalentRow('ASSOC_DATA', collect([]), $data_mirror);
+                }
+
                 DB::table('ASSOC_DATA')->insert($data_mirror);
                 $auditLog->write(
                     'ASSOC_DATA',

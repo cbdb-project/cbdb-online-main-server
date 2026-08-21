@@ -298,3 +298,154 @@
 .sidebar-scroll::-webkit-scrollbar-thumb:hover {
     background-color: rgba(255, 255, 255, 0.4);
 }
+
+/*
+ * LLM（Query Playground NL 查詢／歷史問答、nl-query-logs）產出的 Markdown 排版，
+ * 由 components/ui/Markdown.tsx 套用。色彩全部走語意 token，深色模式自動翻轉。
+ *
+ * 放在 @layer components：需要贏過 Tailwind preflight（@layer base 會把 ul/ol 的
+ * list-style 清成 none），但必須輸給 utilities，否則呼叫端用 className 傳入的
+ * Tailwind class 會被這裡的規則無聲蓋掉（元件用 cn() 合併 class，理應是 utilities 優先）。
+ */
+@layer components {
+    .cbdb-markdown {
+        line-height: 1.7;
+        overflow-wrap: anywhere;
+    }
+
+    .cbdb-markdown > :first-child {
+        margin-top: 0;
+    }
+
+    .cbdb-markdown > :last-child {
+        margin-bottom: 0;
+    }
+
+    .cbdb-markdown p {
+        margin: 0.5rem 0;
+    }
+
+    .cbdb-markdown h1,
+    .cbdb-markdown h2,
+    .cbdb-markdown h3,
+    .cbdb-markdown h4,
+    .cbdb-markdown h5,
+    .cbdb-markdown h6 {
+        margin: 1rem 0 0.5rem;
+        font-weight: 600;
+        line-height: 1.35;
+    }
+
+    .cbdb-markdown h1 { font-size: 1.25em; }
+    .cbdb-markdown h2 { font-size: 1.15em; }
+    .cbdb-markdown h3 { font-size: 1.05em; }
+    .cbdb-markdown h4,
+    .cbdb-markdown h5,
+    .cbdb-markdown h6 { font-size: 1em; }
+
+    .cbdb-markdown ul,
+    .cbdb-markdown ol {
+        margin: 0.5rem 0;
+        padding-left: 1.5rem;
+    }
+
+    .cbdb-markdown ul { list-style: disc; }
+    .cbdb-markdown ol { list-style: decimal; }
+    .cbdb-markdown ul ul { list-style: circle; }
+
+    .cbdb-markdown li {
+        margin: 0.15rem 0;
+    }
+
+    /* 巢狀清單與清單內段落不要再吃一次段落留白，否則層級一深就散開。 */
+    .cbdb-markdown li > ul,
+    .cbdb-markdown li > ol,
+    .cbdb-markdown li > p {
+        margin: 0.15rem 0;
+    }
+
+    .cbdb-markdown a {
+        color: var(--primary);
+        text-decoration: underline;
+    }
+
+    .cbdb-markdown code {
+        background-color: var(--muted);
+        border-radius: 3px;
+        padding: 0.1em 0.3em;
+        font-size: 0.9em;
+    }
+
+    .cbdb-markdown pre {
+        background-color: var(--surface-sunken);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 0.625rem;
+        margin: 0.625rem 0;
+        overflow-x: auto;
+    }
+
+    .cbdb-markdown pre code {
+        background-color: transparent;
+        border-radius: 0;
+        padding: 0;
+        font-size: 0.85em;
+        white-space: pre;
+    }
+
+    .cbdb-markdown blockquote {
+        border-left: 3px solid var(--border);
+        padding-left: 0.75rem;
+        margin: 0.5rem 0;
+        color: var(--muted-foreground);
+    }
+
+    .cbdb-markdown hr {
+        border: none;
+        border-top: 1px solid var(--border);
+        margin: 0.75rem 0;
+    }
+
+    /*
+     * 表格可能很寬（LLM 常直接把查詢結果列成表），display:block + max-width 讓它自己
+     * 橫向捲動而不撐破卡片。副作用：窄表格會貼齊內容寬度而非撐滿容器，且 thead 無法 sticky。
+     * 若放在 flex 子項內，容器需自行加 min-width:0，否則 max-width:100% 不會生效。
+     */
+    .cbdb-markdown table {
+        display: block;
+        width: max-content;
+        max-width: 100%;
+        overflow-x: auto;
+        border-collapse: collapse;
+        margin: 0.625rem 0;
+        font-size: 0.95em;
+    }
+
+    .cbdb-markdown th,
+    .cbdb-markdown td {
+        border: 1px solid var(--border);
+        padding: 0.375rem 0.625rem;
+    }
+
+    /*
+     * GFM 對齊語法（|:-:|--:|）會讓 marked 輸出 align 屬性，但屬性屬於較低的層疊來源，
+     * 會輸給任何作者樣式，故預設對齊只套在「沒有 align 的儲存格」上。
+     */
+    .cbdb-markdown th:not([align]),
+    .cbdb-markdown td:not([align]) {
+        text-align: left;
+    }
+
+    .cbdb-markdown th {
+        background-color: var(--surface-sunken);
+        font-weight: 600;
+    }
+
+    /* 行內模式：不應帶入區塊留白或自成一行的行高，讓它能直接接在既有句子後面。 */
+    .cbdb-markdown-inline {
+        display: inline;
+        margin: 0;
+        line-height: inherit;
+        overflow-wrap: inherit;
+    }
+}

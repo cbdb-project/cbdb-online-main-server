@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import ToolTracePanel, { type ToolCallTrace, type ToolResultSummary } from './ToolTracePanel';
+import { Markdown } from '../ui/Markdown';
 import { useTranslation } from '../../hooks/useTranslation';
 
 interface Evidence {
@@ -495,7 +496,9 @@ function TurnAnswer({
     return (
         <div>
             <div style={{
-                backgroundColor: 'var(--surface-sunken)',
+                // 不用 --surface-sunken：與 .cbdb-markdown 的 pre／th 底色相同，答案內的程式碼區塊
+                // 與表頭會融進卡片（與下方 caveat 的 --muted 衝突同一類問題）。
+                backgroundColor: 'var(--card)',
                 border: '1px solid var(--border)',
                 borderRadius: 6,
                 padding: 20,
@@ -504,19 +507,19 @@ function TurnAnswer({
                 <h4 style={{ margin: '0 0 12px', fontSize: '1rem', fontWeight: 600, color: 'var(--foreground)' }}>
                     {t('qa_answer')}
                 </h4>
-                <div
+                <Markdown
+                    source={turn.answerMarkdown}
                     style={{
                         fontSize: '0.9rem',
-                        lineHeight: 1.7,
                         color: 'var(--foreground)',
                     }}
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(turn.answerMarkdown || '') }}
                 />
             </div>
 
-            {turn.caveat && (
+            {turn.caveat?.trim() && (
                 <div style={{
-                    backgroundColor: 'var(--muted)',
+                    // 不用 --muted：與 .cbdb-markdown code 的底色相同，caveat 內的行內程式碼會融進背景。
+                    backgroundColor: 'var(--surface-sunken)',
                     border: '1px solid var(--border)',
                     borderRadius: 6,
                     padding: 10,
@@ -524,7 +527,7 @@ function TurnAnswer({
                     fontSize: '0.8rem',
                     color: 'var(--muted-foreground)',
                 }}>
-                    ⚠ {turn.caveat}
+                    ⚠ <Markdown inline source={turn.caveat} />
                 </div>
             )}
 
@@ -627,8 +630,8 @@ function TurnAnswer({
                                             }}>
                                                 {ev.type === 'database' ? t('qa_db') : t('qa_model')}
                                             </span>
-                                            <strong>{ev.label}</strong>
-                                            <span style={{ color: 'var(--muted-foreground)' }}>— {ev.detail}</span>
+                                            <strong><Markdown inline source={ev.label} /></strong>
+                                            <span style={{ color: 'var(--muted-foreground)' }}>— <Markdown inline source={ev.detail} /></span>
                                         </div>
                                     ))}
                                 </div>
@@ -639,97 +642,4 @@ function TurnAnswer({
             )}
         </div>
     );
-}
-
-/**
- * Simple Markdown to HTML renderer.
- * Handles headings, bold, italic, lists, blockquotes, code blocks, tables, and paragraphs.
- */
-function renderMarkdown(md: string): string {
-    // Escape HTML first
-    let html = md
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-
-    // Code blocks (``` ... ```)
-    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_match, _lang, code) => {
-        return `<pre style="background:var(--surface-sunken);border:1px solid var(--border);border-radius:4px;padding:10px;font-size:0.85rem;overflow-x:auto;"><code>${code.trim()}</code></pre>`;
-    });
-
-    // Inline code
-    html = html.replace(/`([^`]+)`/g, '<code style="background:var(--muted);padding:1px 4px;border-radius:3px;font-size:0.85em;">$1</code>');
-
-    // Headings
-    html = html.replace(/^#### (.+)$/gm, '<h6 style="margin:12px 0 4px;font-size:0.85rem;font-weight:600;">$1</h6>');
-    html = html.replace(/^### (.+)$/gm, '<h5 style="margin:14px 0 6px;font-size:0.9rem;font-weight:600;">$1</h5>');
-    html = html.replace(/^## (.+)$/gm, '<h4 style="margin:16px 0 8px;font-size:1rem;font-weight:600;">$1</h4>');
-    html = html.replace(/^# (.+)$/gm, '<h3 style="margin:18px 0 10px;font-size:1.1rem;font-weight:700;">$1</h3>');
-
-    // Bold and italic
-    html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
-    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-
-    // Blockquotes
-    html = html.replace(/^&gt; (.+)$/gm, '<blockquote style="border-left:3px solid var(--border);padding-left:12px;margin:8px 0;color:var(--muted-foreground);">$1</blockquote>');
-
-    // Unordered lists
-    html = html.replace(/^[-*] (.+)$/gm, '<li style="margin-left:16px;">$1</li>');
-
-    // Wrap consecutive <li> in <ul>
-    html = html.replace(/((?:<li[^>]*>.*?<\/li>\n?)+)/g, '<ul style="padding-left:8px;margin:8px 0;">$1</ul>');
-
-    // Markdown tables
-    html = html.replace(
-        /(^\|.+\|[ \t]*\n\|[ \t:|-]+\|[ \t]*\n(?:\|.+\|[ \t]*\n?)*)/gm,
-        (_tableBlock: string) => {
-            const lines = _tableBlock.trim().split('\n');
-            if (lines.length < 2) return _tableBlock;
-
-            const parseRow = (line: string) =>
-                line.replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
-
-            const headers = parseRow(lines[0]);
-
-            // Parse alignment from separator row
-            const separators = parseRow(lines[1]);
-            const aligns = separators.map(s => {
-                if (s.startsWith(':') && s.endsWith(':')) return 'center';
-                if (s.endsWith(':')) return 'right';
-                return 'left';
-            });
-
-            let table = '<div style="overflow-x:auto;margin:10px 0;"><table style="border-collapse:collapse;width:100%;font-size:0.85rem;">';
-            table += '<thead><tr>';
-            headers.forEach((h, i) => {
-                table += `<th style="border:1px solid var(--border);padding:6px 10px;background:var(--surface-sunken);text-align:${aligns[i] || 'left'};">${h}</th>`;
-            });
-            table += '</tr></thead><tbody>';
-
-            for (let i = 2; i < lines.length; i++) {
-                if (!lines[i].trim()) continue;
-                const cells = parseRow(lines[i]);
-                table += '<tr>';
-                cells.forEach((c, j) => {
-                    table += `<td style="border:1px solid var(--border);padding:6px 10px;text-align:${aligns[j] || 'left'};">${c}</td>`;
-                });
-                table += '</tr>';
-            }
-
-            table += '</tbody></table></div>';
-            return table;
-        },
-    );
-
-    // Horizontal rule
-    html = html.replace(/^---$/gm, '<hr style="border:none;border-top:1px solid var(--border);margin:12px 0;" />');
-
-    // Paragraphs: convert double newlines to paragraph breaks
-    html = html.replace(/\n\n/g, '</p><p style="margin:8px 0;">');
-
-    // Single line breaks
-    html = html.replace(/\n/g, '<br/>');
-
-    return `<p style="margin:8px 0;">${html}</p>`;
 }

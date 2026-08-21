@@ -4,6 +4,33 @@
 
 ## 2026-08
 
+### LLM 產出的 Markdown 統一改用共用渲染器（Query Playground QA／NL 查詢／NL 查詢日誌／AI 代碼查詢）
+- 起因：`/app/query-playground?mode=qa` 的回答與 `/app/query-playground/nl-query-logs` 的 LLM Response 都是 Markdown，但前者靠 `HistoricalQaPanel.tsx` 裡一個手刻的正則渲染器、後者根本沒渲染。實測手刻版對一段典型回答的輸出：有序清單 `1. ` 原樣輸出（只認 `^[-*] `）、`[文字](網址)` 完全不處理、巢狀清單的子項會**漏到 `<ul>` 外面**變成裸文字，最嚴重的是「`
+
+` → `</p><p>`」那一輪跑在程式碼區塊**之後**，於是 ``` fence 內只要有空行就會被插進 `</p><p>`、換行又被重複轉成 `<br/>`——程式碼區塊等於整塊壞掉。區塊元素也一律被包進最外層 `<p>`（`<p><h4>`、`<p><table>`），是無效 HTML。
+- 新增 `resources/js/inertia/utils/markdown.ts`（marked 18 + DOMPurify 3）與 `components/ui/Markdown.tsx`，並刪掉手刻渲染器（HistoricalQaPanel 735 → 645 行）。排版樣式在 `resources/css/inertia.css` 的 `.cbdb-markdown`，色彩全走語意 token，深色模式自動翻轉。
+- **內容視為不可信輸入**：LLM 回答可經由使用者提問與資料庫內容被提示注入誘導，因此設兩道獨立防線——(1) marked 的 `html` renderer 把區塊級（`Tokens.HTML`）與行內（`Tokens.Tag`）的原始 HTML 全部逸出成文字，`link` 限制協定（僅 http/https/mailto 與站內相對路徑）並強制 `rel="noopener noreferrer nofollow"`，`image` 退化成替代文字（不對第三方主機發請求）；(2) DOMPurify 白名單再過一次。**兩道刻意不互相依賴**：第一道已足以讓所有安全測試變綠，所以特地把 `sanitizeHtml` 匯出、直接餵 HTML 做測試——實測把它換成 identity 後有 10 條測試變紅（改之前是 0 條，等於第二道防線完全沒被覆蓋）。
+- **`class`／`style` 不放行**：Markdown 語法產不出有意義的 class，而本站是 Tailwind 且無 CSP，放行 `class` 等於送出 `fixed inset-0 z-50` 這種可覆蓋整頁的版面原語。`align` 放行是為了 GFM 表格對齊，CSS 端相應改成 `th:not([align])`——`align` 是呈現性屬性，層疊優先級低於作者樣式，原本的 `text-align:left` 會把每一欄都壓回靠左。
+- **GFM 任務清單改用 ☑／☐ 符號**：`<input type="checkbox">` 不在白名單內會被整個拿掉，導致「已完成」與「未完成」渲染後長得一模一樣（資訊遺失），故改在 `checkbox` renderer 輸出符號。
+- **`href` 用另一套逸出、不動 `&`**：網址裡的 `&` 是合法的查詢字串分隔符，比照內文再逸出一次會讓 `?a=1&b=2` 變成 `?a=1&amp;amp;b=2` 而連到錯的位址。
+- CSS 包在 `@layer components`：要贏過 Tailwind preflight 的 `ol,ul{list-style:none}`，但必須輸給 utilities，否則呼叫端用 `className` 傳進來的 Tailwind class 會被無聲蓋掉（元件用 `cn()` 合併 class，理應 utilities 優先）。
+- 接上的呼叫點（逐一確認欄位是否真的可能含 Markdown，不是全部套上去）：
+  - `HistoricalQaPanel`：`answer_markdown`（區塊）、`caveat`／`evidence[].label`／`evidence[].detail`（行內）。
+  - `NlQueryPanel`：`explanation`（行內）。
+  - `Admin/NlQueryLogs`：頂層 `explanation` 欄（區塊），以及 `llm_response` 展開後的欄位。**QA 與 NL→SQL 共用 `nl_query_logs` 表**（QA 的 `question` 前綴 `[QA] `），所以這頁本來就會渲染完整的 QA payload。
+  - `AiCodeLookupPanel`：`summary`（區塊；`CodeLookupService` 是另一個 LLM 功能）。
+- **日誌頁採「指定 key 白名單」而不是一律渲染**：`JsonValue`／`JsonTable` 原本不把 key 往下傳，若對每個字串葉節點都套 Markdown，`sql`／`sql_used` 會被打壞——區塊模式下單獨一行 `---` 會把前一行變成 `<h2>`（`SELECT a | b FROM t` 後面接 `---` 實測就是這樣），字串裡出現**成對**的 `*`（如 `LIKE '%*%' ... LIKE '%*%'`）會被吃成斜體，`tool_calls[].function.arguments` 的 JSON 字串同理。因此把 key 串進 `JsonValue`，只有 `answer_markdown`（區塊）與 `summary`／`caveat`／`explanation`（行內）會被渲染，其餘維持 `MultilineText`。原始 JSON 切換鈕保留，管理員隨時能看未處理的位元組。
+  - 附帶一提，CBDB 的識別碼本身是安全的：CommonMark 禁止詞中 `_` 強調，所以 `BIOG_MAIN`、`c_name_chn`、`POSTED_TO_ADDR_DATA` 實測都原樣輸出。真正會被吃掉的是一個字串裡出現成對的 `*` 或前後包夾的 `_`。
+  - **`label`／`detail` 刻意不在白名單內**：這裡比對的是裸 key，而 `label` 會誤中 tool_results 的 `result_summary.preview[].label`——那是原始資料庫值，且 SQL 由模型自己寫，`SELECT c_name_chn AS label` 就足以把任意欄位值送進來，歷史人名裡的 `*`／`_` 會被靜默吃掉。QA 面板的 `evidence` 直接來自模型 JSON、不經 tool preview，所以在面板裡仍以行內模式渲染。
+  - **無 key 的頂層內容依模式分流**：`choices[0].message.content` 解析不出 JSON 時會退回原文，此時沒有 key 可依據。QA 模式的 `parseQaResponse` 會把原文整段當成 `answer_markdown`（確實是 Markdown 回答），但 NL→SQL 模式的同一條路徑可能是模型直接吐出的裸 SQL——**codex 覆核指出這條會繞過整個 key 白名單**。因此後端 `prepareNlLog()` 多回一個 `is_qa`（依 `question` 的 `[QA] ` 前綴判定，判定集中在後端、不讓前端各處自己比對字串），只有 QA 模式才渲染。
+  - 判斷條件抽成純函式 `utils/nlLogMarkdownFields.ts`（7 tests）：這是整個改動裡最容易寫反的一段——**預設分支（原樣顯示）才是安全的那一邊**，任何「多渲染一點」的改動都會默默打壞 SQL，而它埋在 `.tsx` 裡沒有元件測試環境可以釘。後端那條 `is_qa` 也補了測試，並實測把 `str_starts_with` 放寬成 `str_contains` 會讓它變紅。
+  - 中間版本曾讓陣列元素沿用父層 key（`inheritedKey`），**review 後移除**：QA 契約裡六個白名單 key 全是字串、沒有一個是陣列，所以它對真實 payload 完全沒作用；而它唯一可達的效果恰好是反的——會讓白名單 key 底下的陣列元素被套上 Markdown。`sql_used[#0]` 本來就落在安全的預設分支，不需要這層。
+- **建議追問（`suggested_follow_ups`）刻意不渲染**：那些字串會被 `onPickSuggestion()` 原樣塞進提問輸入框，渲染後標籤會與實際送出的值不一致。
+- **兩處容器底色與 Markdown 元素撞色**，都是開始真的渲染之後才會顯形（舊路徑是純文字，沒有 `code`／`pre`／`th` 可撞）：`caveat` 由 `--muted` 改成 `--surface-sunken`（`--muted` 正是 `.cbdb-markdown code` 的底色）；答案卡片由 `--surface-sunken` 改成 `--card`（`--surface-sunken` 正是 `.cbdb-markdown` 的 `pre` 與 `th` 底色，程式碼區塊與表頭會融進卡片）。
+- 測試 `resources/js/inertia/utils/markdown.test.ts`（32 tests，檔首 `// @vitest-environment jsdom` 單檔覆寫；DOMPurify 需要 window，另外兩個純函式測試維持 node 環境）：逐條釘住舊渲染器的具體失效（有序清單、連結、巢狀清單、程式碼區塊不得含 `<br>`／`<p>`、區塊元素不得被包進 `<p>`），以及兩道防線各自的行為。
+- **未動 API.md**：沒有新路由，也沒有改任何請求／回應欄位——這次全部是既有欄位在前端的呈現方式。
+- **舊版 Blade `query_playground/nl_query_logs.blade.php` 未同步**（按 AGENTS.md「新功能只做在 React/Inertia」）。注意該路由 `routes/web.php` 的 `query-playground/nl-query-logs` **沒有 migration flag、也不會轉址**，直接 render Blade 視圖，所以 super admin 走舊網址仍會看到未渲染的 `explanation`。
+
 ### 新增 `KINREL_REDUCTION`（親屬關係化簡規則表）
 - 需求：把 CBDB 團隊維護的親屬關係化簡規則（來源試算表 `KINREL_REDUCTION.xlsx`，8 筆）落進資料庫，並接上全站既有的「代碼表」機制。規則語義是把複合親屬關係字串（`KINSHIP_CODES.c_kinrel`，如 `BB`＝兄弟之兄弟）逐步化簡到等價最簡關係（`B`），同時調整四個親屬距離步數；它是 `KINSHIP_CODES.c_kinrel_simplified` 的規則來源。
 - **Schema 沿用 CBDB 慣例而非 Laravel 預設**：全大寫表名、`c_` 前綴欄名、MySQL 端顯式指定 `utf8mb4_general_ci`（`config/database.php` 的預設是 `utf8mb4_unicode_ci`，但 CBDB 全庫是 general_ci，見 `2025_11_20_100000_alter_admin_cat_tables_collation`）、`ENGINE=InnoDB ROW_FORMAT=DYNAMIC`，與同族的 `KINSHIP_CODES`／`KIN_MOURNING`／`KIN_MOURNING_STEPS` 對齊。

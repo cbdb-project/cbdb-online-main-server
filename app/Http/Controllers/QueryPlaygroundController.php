@@ -622,6 +622,11 @@ class QueryPlaygroundController extends Controller {
             'execution_time_ms' => $log->execution_time_ms,
             'success' => (bool) $log->success,
             'question' => $log->question,
+            // QA 與 NL→SQL 共用 nl_query_logs，唯一的區別是 answerFromNL 寫入時給 question 加了
+            // '[QA] ' 前綴。前端要靠它決定「解析不出 JSON 的回應原文」該不該當成 Markdown 渲染
+            // （QA 的 fallback 是 answer_markdown；NL→SQL 的則可能是裸 SQL）。判定放後端，
+            // 避免前端各處各自比對前綴字串。
+            'is_qa' => str_starts_with((string) $log->question, '[QA] '),
             'generated_sql' => $log->generated_sql,
             'explanation' => $log->explanation,
             'error_message' => $log->error_message,

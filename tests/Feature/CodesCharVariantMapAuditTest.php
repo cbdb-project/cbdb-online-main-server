@@ -152,10 +152,14 @@ class CodesCharVariantMapAuditTest extends TestCase {
             'c_strict_excluded' => 1,
         ]);
 
+        // 參考字必須是單一字元：CharVariantMapService::assertWritable() 從 S2 起會擋下
+        // 多字元的對照（幂等論證只在單一 codepoint 下成立，見計畫 D8）。原本這裡用的
+        // 「新參考字」是 4 個字、本來就不是合法的「參考字」，改用單一字元。
+        // 本測試的主體是稽核紀錄，不是多字元是否放行。
         $response = $this->put('/codes/char_variant_map/101', [
             'id' => 101,
             'c_variant_char' => '舊',
-            'c_reference_char' => '新參考字',
+            'c_reference_char' => '新',
             'c_strict_excluded' => 0,
         ]);
 
@@ -164,6 +168,6 @@ class CodesCharVariantMapAuditTest extends TestCase {
         $audit = DB::table('audit_log')->where('table_name', 'char_variant_map')->where('operation', 'UPDATE')->first();
         $this->assertNotNull($audit);
         $this->assertSame('旧', json_decode($audit->old_data, true)['c_reference_char']);
-        $this->assertSame('新參考字', json_decode($audit->new_data, true)['c_reference_char']);
+        $this->assertSame('新', json_decode($audit->new_data, true)['c_reference_char']);
     }
 }

@@ -325,6 +325,56 @@ class CharVariantMapServiceRowTest extends TestCase {
         $this->assertSame('甲乙清', $result['text'], '多字元對照不該生效');
     }
 
+    // ─────────────────── 對照表缺表時的降級（S2 引入） ───────────────────
+
+    /**
+     * 表不存在時降級為「不替換」，而不是拋錯。
+     *
+     * 從 S2 起落地替換掛在 Codes UI 全部 5 條寫入路徑上，若缺表就拋錯，
+     * **整個代碼表的寫入功能都會 500**——為了一個正規化的加值功能讓核心錄入功能停擺
+     * 是不對的取捨（尚未 migrate／部分遷移的環境會踩到）。
+     */
+    #[Test]
+    public function testMissingMappingTableDegradesToNoReplacementInsteadOfThrowing(): void {
+        Schema::dropIfExists('char_variant_map');
+        $this->resetCaches();
+
+        $this->assertSame('淸', CharVariantMapService::replaceLenient('淸')['text']);
+        $this->assertSame('淸', CharVariantMapService::replaceStrict('淸')['text']);
+        $this->assertSame([], CharVariantMapService::replaceLenient('淸')['replaced']);
+    }
+
+    /**
+     * 缺表狀態可以在 process 內快取（它是確定性條件），但 `reset()` 必須能清掉它。
+     *
+     * 為什麼要快取：`replaceRow()` 逐欄呼叫，缺表時每欄都會做一次 `Schema::hasTable()`
+     * 並寫一行 warning——一次 20 欄的儲存＝20 次 metadata 查詢，S3 接上批次匯入後
+     * 會放大成「列數 × 欄數」。
+     *
+     * 為什麼 `reset()` 必須清得掉：測試會在同一個 process 內建／刪表，而寫入端
+     * （Codes UI 等）在成功寫入對照表後也會 `reset()`。
+     *
+     * 注意這與「不快取**瞬時錯誤**」不衝突：瞬時錯誤現在一律往上拋，
+     * 所以沒有「把失敗結果快取住」的路徑（見 loadEdges()）。
+     */
+    #[Test]
+    public function testMissingTableStateIsClearedByReset(): void {
+        Schema::dropIfExists('char_variant_map');
+        $this->resetCaches();
+
+        $this->assertSame('淸', CharVariantMapService::replaceLenient('淸')['text'], '缺表時不替換');
+
+        $this->createVariantMapTable();
+        $this->seedDefaultMappings();
+        $this->resetCaches();
+
+        $this->assertSame(
+            '清',
+            CharVariantMapService::replaceLenient('淸')['text'],
+            'reset() 之後應重新判定缺表狀態並恢復替換'
+        );
+    }
+
     // ─────────────────── mergeReplaced／flattenReplaced 的代數性質 ───────────────────
 
     /**

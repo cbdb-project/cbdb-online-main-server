@@ -29,6 +29,11 @@ return [
                 'c_url_api', 'c_url_api_coda', 'c_url_homepage', 'c_notes', 'c_title_alt_chn',
             ],
         ],
+        // ⚠️ 新增登錄項前提：本檔的 handler 一律把主鍵 `(int)` 轉型，所以**只能登錄數值主鍵的
+        // 表**。若日後要登錄文本型主鍵的代碼表（例如 *_TYPES 的中文名當 PK），必須先處理兩件事：
+        // (1) 移除該 `(int)` 轉型；(2) 補上 D7「兩形並存」查重——
+        // `VariantEquivalentLookup::findExistingRow()` 在「主鍵全部都在替換範圍內」時只記
+        // warning 就跳過（沒有能收斂候選集的 SQL 條件），單一文本主鍵正好落在那個分支。
         'char_variant_map' => [
             'resource' => 'char-variant-map',
             'aliases' => ['char-variant-map', 'char_variant_map', 'charvariantmap'],

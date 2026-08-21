@@ -22,6 +22,7 @@ use Illuminate\Support\Str;
  * person_id 對本表無意義：呼叫端仍須帶（controller 要求），本 handler 僅將其原樣記入 operations.c_personid。
  */
 class CodeTableCreateHandler extends AbstractMutationHandler {
+    use \App\Services\Mutations\Concerns\AppliesVariantReplacement;
     use \App\Services\Mutations\Concerns\GuardsCharVariantMapWrites;
     protected array $definitions;
     protected OperationRepository $operationRepository;
@@ -85,6 +86,18 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
         }
 
         $row = array_intersect_key($changes, array_flip($allowed));
+
+        // 異體字落地替換（型別驅動）。掛在白名單化之後、落庫（與 ToolsRepository::timestamp()
+        // 蓋稽核欄）之前；稽核欄本來就在排除清單裡。char_variant_map 自身在 EXCLUDED_TABLES
+        // （替換等於自我吞噬），所以對照表的維護不會被自己改寫。
+        //
+        // 這一步也修掉 G4 的不一致：TEXT_CODES.c_title_chn 走 Codes UI／書名批次匯入會被歸一，
+        // 走 token API 卻不會——同一個輸入落庫兩種字形。
+        // 第二個參數**必須顯式傳**：本類別沒有 tableName()，省略會 fallback 到不存在的
+        // 方法而在 runtime 炸掉（不是靜態錯誤）。
+        $this->resetVariantReplaced();
+        $row = $this->applyVariantReplacement($row, $table);
+
         $operationId = (string) Str::ulid();
         $operation = null;
         $insertedArray = [];
@@ -148,7 +161,7 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
 
         $this->resetVariantMapCacheIfNeeded($table);
 
-        return response()->json([
+        return $this->withVariantNotices(response()->json([
             'ok' => true,
             'resource' => $def['resource'],
             'mode' => 'direct',
@@ -159,7 +172,7 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
                 'operation_id' => $operation?->id,
                 'row' => $insertedArray,
             ],
-        ]);
+        ]));
     }
 
     private function isUniqueConstraintViolation(\Illuminate\Database\QueryException $e): bool {

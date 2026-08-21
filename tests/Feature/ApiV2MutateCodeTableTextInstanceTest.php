@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\CharVariantMapService;
+use App\Support\VariantReplaceScope;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -88,6 +90,7 @@ class ApiV2MutateCodeTableTextInstanceTest extends TestCase {
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('char_variant_map');
         Schema::dropIfExists('TEXT_INSTANCE_DATA');
         Schema::dropIfExists('audit_log');
         Schema::dropIfExists('operations');
@@ -177,5 +180,105 @@ class ApiV2MutateCodeTableTextInstanceTest extends TestCase {
         ])->assertStatus(422);
 
         $this->assertSame('-1', DB::table('TEXT_INSTANCE_DATA')->where('c_textid', 4452)->value('c_pub_notes'));
+    }
+
+    /**
+     * 異體字落地替換（plan S5）：`c_publisher` 是 update 路徑上**真正的中文欄**。
+     *
+     * `config/code_table_mutations.php` 多數表只開放拼音／拉丁欄（對它們替換是恆等映射，
+     * 因為對照表的鍵都是漢字），但 `TEXT_INSTANCE_DATA.c_publisher` 不帶 `_chn` 後綴卻是
+     * 中文欄（見 plan D3 列的 8 個同類欄）。這條測試鎖住 update 掛鉤在真實情境下生效，
+     * 別讓後人以為那裡是 no-op 而移除。
+     */
+    #[Test]
+    public function testUpdateReplacesVariantInPublisherAndReturnsNotices(): void {
+        $this->seedCharVariantMapForVariantTest();
+        $this->actingAs($this->makeUser('ti-variant@example.com'));
+        $this->seedBaojing();
+
+        $res = $this->postJson('/api/v2/mutate', [
+            'resource' => 'text_instance_data',
+            'person_id' => 0,
+            'operation' => 'update',
+            'target' => ['pk' => ['c_textid' => 4452, 'c_text_edition_id' => 1, 'c_text_instance_id' => 1]],
+            'changes' => ['c_publisher' => '淸華書局'],
+        ])->assertOk();
+
+        $this->assertSame(
+            '清華書局',
+            DB::table('TEXT_INSTANCE_DATA')->where('c_textid', 4452)->value('c_publisher')
+        );
+        $this->assertNotEmpty($res->json('notices'), '回應必須帶異體字通知');
+    }
+
+    /**
+     * codex：proposal 分支同樣要覆蓋。掛鉤在 mode 分派**之前**，所以提案 payload 存的
+     * 就該是歸一後的值，回應也要帶 notices；核准（走通用 applyUpdateProposal()）落庫
+     * 結果必須與 payload 一致。
+     */
+    #[Test]
+    public function testProposalStoresReplacedPublisherAndApprovalKeepsIt(): void {
+        $this->seedCharVariantMapForVariantTest();
+        $proposer = $this->makeUser('ti-variant-proposal@example.com');
+        $this->actingAs($proposer);
+        $this->seedBaojing();
+
+        $res = $this->postJson('/api/v2/mutate', [
+            'resource' => 'text_instance_data',
+            'person_id' => 0,
+            'mode' => 'proposal',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_textid' => 4452, 'c_text_edition_id' => 1, 'c_text_instance_id' => 1]],
+            'changes' => ['c_publisher' => '淸華書局'],
+            'meta' => ['comment' => '提案：出版者'],
+        ])->assertOk();
+
+        $this->assertNotEmpty($res->json('notices'), '提案回應也要帶異體字通知');
+
+        $operation = DB::table('operations')->where('resource', 'TEXT_INSTANCE_DATA')->latest('id')->first();
+        $payload = json_decode((string) $operation->resource_data, true);
+        $this->assertSame('清華書局', $payload['c_publisher'], '提案 payload 必須存歸一後的值');
+
+        // 提案未核准前不落庫。
+        $this->assertSame('-1872', DB::table('TEXT_INSTANCE_DATA')->where('c_textid', 4452)->value('c_publisher'));
+
+        // 核准（通用 applyUpdateProposal 路徑）落庫結果須與 payload 一致。
+        $this->actingAs($this->makeAdmin('ti-variant-approver@example.com'));
+        $this->post(route('operations.proposals.approve', $operation->id), ['review_comment' => '同意']);
+
+        $this->assertSame(
+            '清華書局',
+            DB::table('TEXT_INSTANCE_DATA')->where('c_textid', 4452)->value('c_publisher')
+        );
+    }
+
+    /** 最小 char_variant_map 種子（「淸→清」），供本檔異體字測試共用。 */
+    protected function seedCharVariantMapForVariantTest(): void {
+        if (!Schema::hasTable('char_variant_map')) {
+            Schema::create('char_variant_map', function (Blueprint $table) {
+                $table->bigIncrements('id');
+                $table->string('c_variant_char', 10);
+                $table->string('c_reference_char', 10);
+                $table->tinyInteger('c_strict_excluded')->default(1);
+                $table->string('c_notes', 255)->nullable();
+                $table->timestamps();
+                $table->unique('c_variant_char', 'char_variant_map_c_variant_char_unique');
+            });
+        }
+        DB::table('char_variant_map')->insert([
+            ['c_variant_char' => '淸', 'c_reference_char' => '清', 'c_strict_excluded' => 0],
+        ]);
+        CharVariantMapService::reset();
+        VariantReplaceScope::reset();
+    }
+
+    protected function makeAdmin(string $email): User {
+        return User::forceCreate([
+            'name' => 'Instance Approver',
+            'email' => $email,
+            'confirmation_token' => 'tok',
+            'is_active' => User::STATUS_ACTIVE,
+            'is_admin' => User::ROLE_SUPER_ADMIN,
+        ]);
     }
 }

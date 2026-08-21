@@ -364,4 +364,43 @@ class ApiV2MutateCodeTableCharVariantMapTest extends TestCase {
         $this->assertSame(1, DB::table('char_variant_map')->count());
         $this->assertSame(0, DB::table('audit_log')->where('operation', 'DELETE')->count());
     }
+
+    /**
+     * plan S5：對照表**自身**不被替換。
+     *
+     * `char_variant_map` 在 `VariantReplaceScope::EXCLUDED_TABLES`——它的內容就是字形本身，
+     * 替換等於自我吞噬（新增「淸→清」之後，含「淸」的既有列——包括那筆對照自己的
+     * `c_variant_char`——都會被改寫）。S5 把落地替換掛上代碼表 create／update 之後，
+     * 這條測試確保對照表的維護沒有被自己的規則改寫。
+     */
+    #[Test]
+    public function testMappingTableItselfIsNeverRewrittenByItsOwnRules(): void {
+        DB::table('char_variant_map')->insert([
+            'id' => 200, 'c_variant_char' => '淸', 'c_reference_char' => '清', 'c_strict_excluded' => 0,
+        ]);
+        CharVariantMapService::reset();
+        $this->actingAs($this->makeUser(email: 'cvm-self@example.com'));
+
+        // create：變體字欄與備註都含「淸」，都必須原樣保留。
+        $this->postJson('/api/v2/create', [
+            'resource' => 'char_variant_map',
+            'person_id' => 0,
+            'target' => ['pk' => ['id' => 201]],
+            'changes' => ['c_variant_char' => '靑', 'c_reference_char' => '青', 'c_strict_excluded' => 0, 'c_notes' => '與淸/清同類'],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('char_variant_map', ['id' => 201, 'c_notes' => '與淸/清同類']);
+
+        // update：同樣不得被改寫。
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'char_variant_map',
+            'person_id' => 0,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => ['id' => 201]],
+            'changes' => ['c_notes' => '淸淸淸'],
+        ])->assertOk();
+
+        $this->assertSame('淸淸淸', DB::table('char_variant_map')->where('id', 201)->value('c_notes'));
+    }
 }

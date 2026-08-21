@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\CharVariantMapService;
+use App\Support\VariantReplaceScope;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -82,6 +84,7 @@ class ApiV2MutateCodeTableTextCodesTest extends TestCase {
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('char_variant_map');
         Schema::dropIfExists('TEXT_CODES');
         Schema::dropIfExists('audit_log');
         Schema::dropIfExists('operations');
@@ -195,5 +198,84 @@ class ApiV2MutateCodeTableTextCodesTest extends TestCase {
         ])->assertOk()->assertJson(['ok' => true, 'summary' => ['total' => 2, 'ok' => 2, 'failed' => 0]]);
 
         $this->assertSame(2, DB::table('TEXT_CODES')->count());
+    }
+    // ── 異體字落地替換（plan S5：token API 代碼表 create／update）──────
+
+    /**
+     * 與 database/migrations/2026_07_15_000000_create_char_variant_map_table.php 同源的
+     * 最小種子（只要「淸→清」）。其餘測試不建這張表，走 CharVariantMapService 的
+     * 「表不存在就降級」路徑、行為不變。
+     */
+    protected function seedCharVariantMap(): void {
+        Schema::create('char_variant_map', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->string('c_variant_char', 10);
+            $table->string('c_reference_char', 10);
+            $table->tinyInteger('c_strict_excluded')->default(1);
+            $table->string('c_notes', 255)->nullable();
+            $table->timestamps();
+            $table->unique('c_variant_char', 'char_variant_map_c_variant_char_unique');
+        });
+        DB::table('char_variant_map')->insert([
+            ['c_variant_char' => '淸', 'c_reference_char' => '清', 'c_strict_excluded' => 0],
+        ]);
+        CharVariantMapService::reset();
+        VariantReplaceScope::reset();
+    }
+
+    /**
+     * token API 的 create 也要落地替換，並在回應帶 notices。
+     *
+     * 這修掉 G4 的不一致：同一個「淸嘉錄」走 Codes UI／書名批次匯入會被歸一成「清嘉錄」，
+     * 走 token API 卻原樣入庫 ⇒ 同一個輸入落庫兩種字形。
+     */
+    #[Test]
+    public function testCreateReplacesVariantInChineseTitleAndReturnsNotices(): void {
+        $this->seedCharVariantMap();
+        $this->actingAs($this->makeUser(email: 'tc-variant-create@example.com'));
+
+        $res = $this->postJson('/api/v2/create', [
+            'resource' => 'text-codes',
+            'person_id' => 0,
+            'target' => ['pk' => ['c_textid' => 71860]],
+            'changes' => ['c_title_chn' => '淸嘉錄', 'c_source' => 0, 'c_notes' => '淸人所撰'],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('TEXT_CODES', [
+            'c_textid' => 71860,
+            'c_title_chn' => '清嘉錄',
+            'c_notes' => '清人所撰',
+        ]);
+        $this->assertNotEmpty($res->json('notices'), '回應必須帶異體字通知');
+        $this->assertSame('清嘉錄', $res->json('result.row.c_title_chn'), '回應要回落庫值');
+    }
+
+    /**
+     * 送的字被歸一成與現值相同 ⇒ 422「未偵測到任何修改內容」，且**必須帶 notices**，
+     * 否則錯誤訊息看起來毫無道理。
+     *
+     * 這條是「替換跑在變更偵測**之前**」的主鎖：把掛鉤搬到偵測之後就會變 200 而紅。
+     * update 路徑在真實中文欄上的效果由
+     * ApiV2MutateCodeTableTextInstanceTest::testUpdateReplacesVariantInPublisherAndReturnsNotices
+     * 覆蓋（c_publisher 是 update config 裡唯一的中文欄）。
+     */
+    #[Test]
+    public function testUpdateNormalizingToCurrentValueReturns422WithNotices(): void {
+        $this->seedCharVariantMap();
+        DB::table('TEXT_CODES')->insert(['c_textid' => 71862, 'c_title' => '清']);
+        $this->actingAs($this->makeUser(email: 'tc-variant-nochange@example.com'));
+
+        $res = $this->postJson('/api/v2/mutate', [
+            'resource' => 'text_codes',
+            'person_id' => 0,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_textid' => 71862]],
+            'changes' => ['c_title' => '淸'],
+        ]);
+
+        $res->assertStatus(422);
+        $this->assertNotEmpty($res->json('notices'), '422 也要帶異體字通知');
+        $this->assertSame('清', DB::table('TEXT_CODES')->where('c_textid', 71862)->value('c_title'));
     }
 }

@@ -8,6 +8,7 @@ use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
 use App\Services\CharVariantMapService;
 use App\Services\NameSearchIndexService;
+use App\Support\VariantEquivalentLookup;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -742,7 +743,30 @@ class OperationsProposalController extends Controller {
         return $row ? $this->convertRowToArray($row) : null;
     }
 
+    /**
+     * 提案核准時對 payload 做異體字落地替換（型別驅動，範圍由 VariantReplaceScope 決定）。
+     *
+     * payload 到此**已由 `sanitizePayload()` 收斂成純欄位**（`__` 前綴的內部鍵與非欄位鍵都
+     * 已被剃掉），所以這裡處理的就是資料欄。`replaceRow()` 的型別閘門與
+     * `EXCLUDED_COLUMNS_ANY_TABLE`（稽核欄）是第二層保險——**不要**因為看到這段而以為
+     * 可以把呼叫點往上搬到 `sanitizePayload()` 之前。char_variant_map 整表排除，不受影響。
+     *
+     * @param array<string,mixed> $data
+     * @return array<string,mixed>
+     */
+    protected function replaceVariantsForApproval(string $table, array $data): array {
+        return CharVariantMapService::replaceRow($data, $table)['data'];
+    }
+
     protected function applyCreateProposal(string $table, array $data, array $keyColumns): array {
+        // 異體字落地替換：**掛在方法最上方、buildKeyConditions() 之前**，不是「insert 之前」。
+        // 下方 :753 的重複檢查也用 $data 組主鍵條件，若替換晚於它，就會出現「查重用替換前
+        // 的值、落庫用替換後的值」的錯位（§1.3 明文禁止的形狀）。
+        //
+        // 這是**雙保險**：提案建立端（S2／S3／S5）存進 payload 的已是替換後值，本步是對
+        // 歷史遺留 payload（那些在落地替換上線前送出的提案）補網；依 D8 重複套用是幂等的。
+        $data = $this->replaceVariantsForApproval($table, $data);
+
         $data = $this->assignAutoKeyIfNeeded($table, $keyColumns, $data);
         $data = $this->enforceAuditFieldsForCreate($table, $data);
 
@@ -753,6 +777,14 @@ class OperationsProposalController extends Controller {
         $existing = DB::table($table)->where($this->buildKeyConditions($keyColumns, $data))->first();
         if ($existing) {
             throw new \RuntimeException('資料已存在，無法再次新增。');
+        }
+
+        // D7「兩形並存」：上面是替換後值的**精確**比對，擋不住「歸一後相同但字形不同」的
+        // 既有列（那是兩個不同的鍵值，唯一鍵也不會衝突）。今天走這條分支的表其文本型 PK
+        // 成員都在排除清單內，所以 findExistingRow() 會在 $inScope === [] 直接 return null
+        // ＝零額外查詢；掛著是為了日後任何文本型 PK 的表落到這條分支時不會靜默分裂。
+        if (VariantEquivalentLookup::findExistingRow($table, $keyColumns, $data) !== null) {
+            throw new \RuntimeException('已存在異體字歸一後相同的紀錄（字形不同），無法再次新增。');
         }
 
         // char_variant_map 走這條通用核准路徑（不在 HANDLER_ROUTED_RESOURCES）：落庫前必須
@@ -788,6 +820,10 @@ class OperationsProposalController extends Controller {
             throw new \RuntimeException('缺少原始資料，無法更新。');
         }
 
+        // 異體字落地替換：同樣掛在最上方。$conditions 用 $original（既有列的實際值）定位，
+        // 不受替換影響；而 buildUpdatePayload() 與改鍵碰撞偵測都讀 $data，必須看到替換後的值。
+        $data = $this->replaceVariantsForApproval($table, $data);
+
         $data = $this->enforceAuditFieldsForUpdate($table, $data, $original);
         $conditions = $this->buildKeyConditions($keyColumns, $original);
 
@@ -805,6 +841,12 @@ class OperationsProposalController extends Controller {
             $newKeyRow = $this->resolveReadbackKeyRow($keyColumns, $original, $updatePayload);
             if (DB::table($table)->where($this->buildKeyConditions($keyColumns, $newKeyRow))->exists()) {
                 throw new \RuntimeException('變更後的主鍵與現有記錄重複，無法核准此改鍵提案。');
+            }
+
+            // D7：同上，精確比對擋不住等價字形。排除自己（改鍵前那一列）交給 lookup 內部。
+            $selfPk = array_intersect_key($original, array_flip($keyColumns));
+            if (VariantEquivalentLookup::findExistingRow($table, $keyColumns, $newKeyRow, [$selfPk]) !== null) {
+                throw new \RuntimeException('變更後的主鍵與現有記錄異體字歸一後相同，無法核准此改鍵提案。');
             }
         }
 
@@ -858,8 +900,32 @@ class OperationsProposalController extends Controller {
         $conditions = $this->buildKeyConditions($keyColumns, $original);
 
         $row = DB::table($table)->where($conditions)->first();
+
         if (!$row) {
-            // 目標列已不存在：視為冪等成功，回傳原始資料以利稽核紀錄
+            // 刻意**不替換** $original（delete 的定位器就該是歷史快照當時的字形）。但自本階段
+            // 起，文本型 PK 成員（ASSOC_DATA.c_text_title、ALTNAME_DATA.c_alt_name_chn）**真的會**
+            // 被核准改寫，於是「待審的 delete 提案指向舊字形、目標列已被另一筆核准改名」從理論
+            // 變成常態。若直接當成冪等成功，approve() 會照樣寫一筆 DELETE 稽核並標記 approved，
+            // 而資料列還在——稽核鏈記錄了一件沒發生的事。所以先用歸一後的 PK 再探一次。
+            $normalizedOriginal = CharVariantMapService::replaceRow($original, $table)['data'];
+            $normalizedConditions = $this->buildKeyConditions($keyColumns, $normalizedOriginal);
+
+            if ($normalizedConditions !== $conditions) {
+                $row = DB::table($table)->where($normalizedConditions)->first();
+                if ($row) {
+                    $conditions = $normalizedConditions;
+                }
+            }
+        }
+
+        if (!$row) {
+            // 兩種字形都找不到：維持既有的冪等成功語義（目標列可能已被正常刪除），
+            // 但留下痕跡——否則「提案已過期」與「真的刪掉了」在稽核上長得一模一樣。
+            Log::warning('核准刪除提案時目標列已不存在（含異體字歸一後再探一次），視為冪等成功', [
+                'table' => $table,
+                'key_columns' => $keyColumns,
+            ]);
+
             return $original;
         }
 
@@ -1105,22 +1171,34 @@ class OperationsProposalController extends Controller {
             $type = Operation::TYPE_UPDATE;
         }
 
-        // delete 後 appliedRow 為被刪列（= original），以原始 PK 建立 resource_id
-        $resourceIdRow = $type === Operation::TYPE_DELETE ? $original : $appliedRow;
+        // delete 後 appliedRow 為**實際被刪除的那一列**。多數情況它與 $original 相同，
+        // 但當提案指向舊字形、目標列已被異體字歸一改名時，applyDeleteProposal() 會以歸一後的
+        // PK 再探一次並刪掉那一列 ⇒ 兩者字形不同。此時 resource_id 必須跟著實際刪除的列，
+        // 否則同一筆 DELETE 的 resource_id（舊字形）與 resource_data／audit row_pk（新字形）
+        // 互相矛盾，還原時也會指向一個不存在的鍵。
+        $resourceIdRow = $appliedRow;
+        if ($type === Operation::TYPE_DELETE) {
+            $hasKeys = $keyColumns !== [] && !array_diff($keyColumns, array_keys($appliedRow));
+            $resourceIdRow = $hasKeys ? $appliedRow : $original;
+        }
         $resourceId = $this->buildCompositeId($keyColumns, $resourceIdRow);
 
         // 對於 BiogMain 相關提案，使用實際的 c_personid；對於 Codes 提案使用 0
         $personId = $proposal->c_personid ?? 0;
 
         if ($type === Operation::TYPE_DELETE) {
+            // 快照也要用**實際刪除的那一列**，與上面的 resource_id 同源。三者（resource_id、
+            // resource_data／resource_original、audit row_pk）必須是同一個字形，否則
+            // 「還原這筆刪除」會以舊字形重建一列不存在過的資料。
+            // $resourceIdRow 已在上方決定（appliedRow 含齊主鍵時用它，否則回退 original）。
             return $this->operationRepository->store(
                 Auth::id(),
                 $personId,
                 Operation::TYPE_DELETE,
                 $proposal->resource,
                 $resourceId,
-                $original,
-                $original
+                $resourceIdRow,
+                $resourceIdRow
             );
         }
 

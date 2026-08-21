@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\Operation;
 use App\Models\User;
+use App\Services\CharVariantMapService;
 use App\Support\CompositePrimaryKey;
+use App\Support\VariantReplaceScope;
 use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -60,11 +62,14 @@ class OperationsAltnameRestoreTest extends TestCase {
             $table->integer('c_alt_name_type_code');
             $table->string('c_alt_name')->nullable();
             $table->string('c_alt_name_chn');
+            // 真實 ALTNAME_DATA 有 c_notes；異體字還原測試需要一個一般文本欄。
+            $table->text('c_notes')->nullable();
             $table->primary(['c_personid', 'c_alt_name_chn', 'c_alt_name_type_code']);
         });
     }
 
     protected function tearDown(): void {
+        Schema::dropIfExists('char_variant_map');
         Schema::dropIfExists('ALTNAME_DATA');
         Schema::dropIfExists('operations');
         Schema::dropIfExists('users');
@@ -541,5 +546,80 @@ class OperationsAltnameRestoreTest extends TestCase {
         $this->assertNotNull($row);
         $this->assertSame('Version 1', $row->c_alt_name);
         $this->assertEquals(1, $row->c_sequence);
+    }
+
+    /**
+     * plan S6 的負向斷言：**restore 不做內容替換**。
+     *
+     * 這是刻意的不對稱。restore 的語義是「把資料恢復成歷史快照當時的樣子」——若順手把
+     * 快照裡的變體形歸一，那就不是還原而是改寫歷史（而且會讓「還原後再比對快照」永遠不一致）。
+     * S1 只在 restore 掛了 `char_variant_map` 的**結構**驗證（assertWritable），與內容替換是
+     * 兩件不同的事。
+     */
+    #[Test]
+    public function test_restore_does_not_normalize_historical_variant_forms(): void {
+        Schema::create('char_variant_map', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->string('c_variant_char', 10);
+            $table->string('c_reference_char', 10);
+            $table->tinyInteger('c_strict_excluded')->default(1);
+            $table->string('c_notes', 255)->nullable();
+            $table->timestamps();
+            $table->unique('c_variant_char', 'char_variant_map_c_variant_char_unique');
+        });
+        DB::table('char_variant_map')->insert([
+            ['c_variant_char' => '淸', 'c_reference_char' => '清', 'c_strict_excluded' => 0],
+        ]);
+        CharVariantMapService::reset();
+        VariantReplaceScope::reset();
+
+        // 正向對照：先證明替換機制在本測試環境**是活的**。少了這行，若對照表沒載進來
+        // （建表失敗／範圍誤判／快取殘留），下面的「原樣保留」斷言會因為機制整體死掉而
+        // 假綠——負向測試必須自己證明它測的東西存在。
+        $this->assertSame('清', CharVariantMapService::replaceFor('ALTNAME_DATA', 'c_notes', '淸')['text']);
+
+        $this->actingAsAdmin();
+
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 321,
+            'c_sequence' => 2,
+            'c_alt_name_type_code' => 10,
+            'c_alt_name' => 'New Name',
+            'c_alt_name_chn' => '張三',
+        ]);
+
+        $resourceId = CompositePrimaryKey::buildStoredResourceId([
+            'c_personid' => 321,
+            'c_alt_name_chn' => '張三',
+            'c_alt_name_type_code' => 10,
+        ]);
+
+        // 歷史快照的備註帶變體形「淸」——還原後必須原樣保留。
+        $operation = Operation::create([
+            'user_id' => 1,
+            'c_personid' => 321,
+            'op_type' => Operation::TYPE_UPDATE,
+            'resource' => 'ALTNAME_DATA',
+            'resource_id' => $resourceId,
+            'resource_data' => json_encode([
+                'c_personid' => 321, 'c_sequence' => 2, 'c_alt_name_chn' => '張三',
+                'c_alt_name_type_code' => 10, 'c_alt_name' => 'New Name',
+            ], JSON_UNESCAPED_UNICODE),
+            'resource_original' => json_encode([
+                'c_personid' => 321, 'c_sequence' => 1, 'c_alt_name_chn' => '張三',
+                'c_alt_name_type_code' => 10, 'c_alt_name' => 'Old Name',
+                'c_notes' => '淸代舊注',
+            ], JSON_UNESCAPED_UNICODE),
+            'created_at' => Carbon::now(),
+            'updated_at' => Carbon::now(),
+        ]);
+
+        $this->post("/operations/{$operation->id}/restore")->assertRedirect();
+
+        $row = DB::table('ALTNAME_DATA')->where('c_personid', 321)->first();
+        $this->assertSame('淸代舊注', $row->c_notes, 'restore 必須原樣還原歷史字形，不可順手歸一');
+        $this->assertSame('Old Name', $row->c_alt_name);
+
+        Schema::dropIfExists('char_variant_map');
     }
 }

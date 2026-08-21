@@ -132,8 +132,21 @@ D6 之下，同一個概念會同時以變體形（既有列）與參考形（�
 
 1. **兩欄必須是單一 codepoint**（`mb_strlen() === 1`）。幂等論證只在單字元 key 下成立：`甲乙→丙丁` + `丁→戊`，閉包接不起來（exact match），第一次得 `丙丁`、第二次得 `丙戊`。非 BMP 不會誤擋（mbstring 算 1）。**此決定取代第一階段 `:49`／`:53` 那句「varchar(10) 為變體選擇符留餘裕」**——在實作出替代不變式（「value 集不得含任何 key 為子字串」）之前不收錄組合字符；欄位長度不變，只是多一道驗證。
 2. **先按模式過濾、再各自算閉包與環**，且 `$lenientMap`／`$strictMap` 維持兩份獨立快取。**今天的實作已滿足**（`strictMap():153` 在 SQL 層 `where(...):156`），這條是**擋住「共用 loader 載入全表算一次閉包、strict 再按 flag 過濾」那個誘人重構**的護欄——別去找現存的 bug，沒有。若做了該重構：`X→峯`(0)+`峯→峰`(1) ⇒ 全表閉包得 `X→峰`，其 flag 為 0 於是留在 strict map ⇒ strict 透過傳遞把 strict-excluded 的邊套進人名欄，廢掉 `c_strict_excluded` 的唯一用途。
-3. **執行順序必須是「按模式過濾 → 偵測並移除環上出邊 → 對剩餘無環圖算閉包」**。反過來（先算閉包再偵環）**不可實作**：對 `A→B`+`B→A` 或自環 `A→A`，閉包在環移除前沒有定義，一般的走鏈寫法會**無限迴圈**。
-4. **環的處置：只丟棄構成該環的邊 + 記 error log，其餘照常**。兩個 map 方法是所有替換的唯一入口，在此 throw 會讓 Codes UI 80 表、所有 v2 mutate、三支批次匯入、眾包核准、提案核准**一起爆**（一個 `峰→峯` 或打錯字的 `A→A` 就夠）；回空 map 則等於全站靜默不替換。定位精確：functional graph 下「環上節點」＝「從自己出發能走回自己」，逐 key 走鏈 + visited set 即可，`A→A` 自然當長度 1 的環丟掉；改動侷限在兩個 map 方法，**不需動 `replaceUsing()`**。**「鏈進入環」（`A→B`、`B→C`、`C→B`）只丟環上節點（B、C）的出邊，`A→B` 要保留**。
+3. **對照表缺表時降級為「不替換」，其餘錯誤一律往上拋**（S2 實作時新增的決定）。
+   落地替換從 S2 起掛在 Codes UI 全部 5 條寫入路徑上，若在尚未 migrate／部分遷移的環境
+   因為缺表而拋錯，**整個代碼表的寫入功能都會 500**——為了加值功能讓核心錄入功能停擺
+   是錯的取捨。但降級**只限「表不存在」這個確定性條件**：早期寫法對所有 Throwable 都降級
+   並把空 map 快取起來，後果是「一次瞬時錯誤就讓這個 worker 之後所有寫入都不再替換」，
+   只留一行 warning——那正是本階段最想避免的靜默失效。**瞬時錯誤現在一律往上拋**，
+   所以沒有「把失敗結果快取住」的路徑。
+   「表不存在」這個確定性結果**可以**在 process 內快取（`$tableMissing`，`reset()` 會清）：
+   不快取的話 `replaceRow()` 會逐欄各做一次 `Schema::hasTable()`，一次 20 欄的儲存＝20 次
+   metadata 查詢，S3 接上批次匯入後放大成「列數 × 欄數」。
+   **已知限制**：PHP-FPM 每個 request 會重建 static，所以這個快取實務上只活在單一 request 內；
+   長駐程序（queue worker）若在**尚未 migrate** 的環境啟動過一次，之後即使建了表也會持續
+   不替換，需重啟 worker（部署本來就會重啟）。
+4. **執行順序必須是「按模式過濾 → 偵測並移除環上出邊 → 對剩餘無環圖算閉包」**。反過來（先算閉包再偵環）**不可實作**：對 `A→B`+`B→A` 或自環 `A→A`，閉包在環移除前沒有定義，一般的走鏈寫法會**無限迴圈**。
+5. **環的處置：只丟棄構成該環的邊 + 記 error log，其餘照常**。兩個 map 方法是所有替換的唯一入口，在此 throw 會讓 Codes UI 80 表、所有 v2 mutate、三支批次匯入、眾包核准、提案核准**一起爆**（一個 `峰→峯` 或打錯字的 `A→A` 就夠）；回空 map 則等於全站靜默不替換。定位精確：functional graph 下「環上節點」＝「從自己出發能走回自己」，逐 key 走鏈 + visited set 即可，`A→A` 自然當長度 1 的環丟掉；改動侷限在兩個 map 方法，**不需動 `replaceUsing()`**。**「鏈進入環」（`A→B`、`B→C`、`C→B`）只丟環上節點（B、C）的出邊，`A→B` 要保留**。
 
 ### D9：搜尋路徑完全沒有異體字歸一化（必須明講）
 
@@ -186,8 +199,13 @@ public static function replaceFor(string $table, string $column, string $value):
  *  表有 id=5 `乙→甲`、id=9 `甲→丙`，把 id=5 改成 `丙→乙` 是合法的 `甲→丙→乙`，
  *  但把舊邊算進去會看到 `乙→甲→丙→乙`。
  *  $row 可能是部分 payload（restoreUpdate 用歷史快照），需與現有列 merge 後再驗。 */
-public static function assertWritable(array $row, ?int $excludeId = null): void;
+public static function assertWritable(array $row, ?int $excludeId = null): void;  // throws VariantMappingException
 ```
+
+**`assertWritable()` 必須拋專屬型別 `App\Exceptions\VariantMappingException`，呼叫端也只能 catch 它。**
+`Illuminate\Database\QueryException` 繼承 `PDOException` 繼承 `\RuntimeException`，而 `assertWritable()`
+內部會查兩次 `char_variant_map`——呼叫端若 `catch (\RuntimeException)`，任何資料庫錯誤都會被當成
+「驗證失敗」，把原始 SQLSTATE 與 SQL 字串顯示給使用者，而且該次寫入會被靜默跳過而不是誠實地 500。
 
 ### 通知通道與 i18n
 
@@ -264,6 +282,16 @@ D3 已內嵌一份已查證的代碼鍵清單，直接進排除常數。本步�
 
 - direct 兩條：`replaced` 非空時把 `buildNotices()` 的每則訊息 `flash(...,'info')`（**不要自己組字**，見上方 S1 約定）；它們之後才呼叫 `applyColumnDefaultsForBlanks()`（`:1769`／`:1352`），**三條提案路徑不呼叫它**，只需在記 operation 之前。
 - 提案三條：替換後的值進 `operations.resource_data`（`$table` 傳**目標表**，不是 `operations`）。
+- **D7 兩形並存的去重（S2 實作時發現、原本漏掉）**：`ALTNAME_DATA.c_alt_name_chn` 同時是**文本主鍵成員**又在替換範圍內（strict），而 `ALTNAME_DATA` 是 Codes UI 可寫的表——這是 Codes UI 裡唯一會踩到 D7 的形狀。D6 之下既有列的主鍵可能還是變體形，只用**替換後**的值查重就會錯過它、鑄出語義重複的第二列（**比不替換更糟**），而資料庫唯一鍵擋不住（兩個字形是不同的鍵值）。因此三條 create 路徑（`performStore`／`performProposalStore`／`proposalUpdateExisting` 的 create 分支）都要**再以主鍵的「等價字形集合」查一次**。
+  ⚠️ **只探「輸入值 + 替換後值」兩形是不夠的**：對照是**多對一**（`c_variant_char` 有唯一鍵、`c_reference_char` 沒有），所以既有列可能是**另一個**變體——既有 `菁客`（菁→青）、新輸入 `靑客`（靑→青），兩者都歸一成 `青客`，但拿 `靑客`／`青客` 去查都找不到 `菁客`。
+  ⚠️ **也不要用「列舉所有等價字形再逐一查」**（第二版這樣寫、被 codex 抓到）：查詢次數等於等價字形數（最壞數十次），而為了避免組合爆炸設的上限**本身是正確性缺口**——超過上限就退回只比對正規形，等於完全失去這道去重，且那是可由合法對照表資料觸發的（一個參考字有 6 個變體、主鍵含 2 個這樣的字就是 7×7=49）。
+  **正確做法**：把**不在替換範圍內**的主鍵欄固定在 SQL 條件裡取回那一小群候選列，再在 PHP 端把它們的文本主鍵歸一後比對。這是**精確**的（不管對照表什麼形狀）、而且只要**一次查詢**。全部主鍵欄都可替換的表會退化成全表掃描——目前沒有這種表，真的出現時記 warning 並跳過，不要靜默掃全表。
+  待審提案那一側則是以 `resource_id` 的**位置式 LIKE 樣式**收斂（在替換範圍內的欄位放 `%`、其餘放實際值）＋ `lazyById()` 分批。兩個實作陷阱：
+  (a) **不能只做「前導前綴」**——production 的 `ALTNAME_DATA` 主鍵順序是 `(c_alt_name_chn, c_alt_name_type_code, c_personid)`，第一欄正是可替換的文字欄，前導前綴會直接失效而退回全掃。
+  (b) **不能用 `cursor()` 當作「記憶體有界」**——PDO MySQL 預設是 buffered query（`config/database.php` 沒關 `MYSQL_ATTR_USE_BUFFERED_QUERY`），整個結果集仍會先進 PHP 記憶體；要用 `lazyById()`。
+  **測試 fixture 的主鍵順序必須與 production 一致**，否則就會像第一版那樣測不到 (a)。
+  ⚠️ **待審提案也要用等價字形比對**：`hasActiveCreateProposalConflict()` 是拿 `resource_id` 做完全相等比對，S2 之前留下的 pending 提案帶的是變體形 `resource_id`，新提案帶歸一後的 ⇒ 不會衝突 ⇒ 兩筆待審並存，依序核准就落成兩種字形的兩筆列。
+  update 路徑不受影響——它的定位器來自 URL 主鍵。
 - 同時涵蓋 Blade 與 React（共用 `perform*`）。
 - **`char_variant_map` 的 guard**：`performStore()`／`performUpdate()` 落庫前呼叫 `CharVariantMapService::assertWritable($data, $id)`（違反回 flash error 且不寫入），成功後呼叫 `CharVariantMapService::reset()`。三條提案路徑寫的是 `operations`、不改對照表，**不需要** reset，但仍建議在提案建立時先跑 `assertWritable()` 提早拒絕。
 - 測試：`ADDR_CODES.c_name_chn` 含「淸」→ 落庫「清」+ flash；拼音欄拉丁字串 no-op；數字欄不變；`char_variant_map` 自身 `c_notes` 含「淸」**不**被替換；`pinyin` 表新增「峯」讀音 → `c_chn` 保持「峯」；提案 `resource_data` 是替換後值且 `resource_id` 未被改寫。
@@ -317,6 +345,7 @@ D3 已內嵌一份已查證的代碼鍵清單，直接進排除常數。本步�
 
 - **主分支先說清**：`applyProposal():405` 把 `HANDLER_ROUTED_RESOURCES` 內的資源導到 `applyViaMutationHandler():483` 以 v2 direct handler 重放，所以**大多數人物子資源提案由 S3 的基底掛鉤自動覆蓋**，走不到下面兩條。
 - `applyCreateProposal():744`／`applyUpdateProposal():772`（服務代碼表與尚未遷移的表）：**掛鉤點在方法最上方、`buildKeyConditions()` 之前**，不是「insert／update 之前」。`applyCreateProposal()` 的重複檢查在 `:752`，早於 `:757` 的 insert；寫成「落庫前」會重演 §1.3 禁止的錯位（查重用替換前值、落庫用替換後值）。`applyUpdateProposal()` 的 `$conditions` 同理（update `:798`）。今天實際影響小（該分支的文本型 PK 成員都在排除清單），但**措辭會被複製**。
+- **`char_variant_map` 的核准也要 guard ＋ 清快取**：該表**不在** `HANDLER_ROUTED_RESOURCES`，所以它的提案核准就走上面那兩條泛用分支（`applyCreateProposal():757` insert／`applyUpdateProposal():798` update）。S2 已在 Codes UI 的 direct 路徑補了 `assertWritable()` ＋ `CharVariantMapService::reset()`，同樣的理由適用於核准端——核准一筆對照之後若不清快取，這個 worker 之後的替換都還在用舊對照。**兩者要一起補，別只補 guard 漏掉 reset。**
 - `applyKinshipProposal():597`／`applyAssocProposal():637`：不重放 handler、直接呼叫 `BiogMainRepository` 的 kinship／assoc 寫入方法，S3 覆蓋不到，必須獨立補。部分 repository 方法只是薄轉發，真正寫入在 `OfficePostingRepository.php`／`EventStatusRepository.php`，掛鉤要放在真正落庫那層。
 - 實體聚合提案核准（`:226 approveEntityAggregateProposal()` → `:273` 以 direct 重放，注入的正是 S4 那兩個 ImportService）由 S4 覆蓋，本步只需驗證——**含 S4 新增的三個 v2 lookup site**。
 - 雙保險：提案建立端（S2／S3／S5）已替換，核准端再替換一次，依 D8 幂等。與 S2 不衝突：S2 讓存進 payload 的已是替換後值，本步是對歷史遺留 payload 補網。

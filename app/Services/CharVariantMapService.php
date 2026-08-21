@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Exceptions\VariantMappingException;
 use App\Support\VariantReplaceScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * 異體字落地替換服務
@@ -32,6 +34,19 @@ class CharVariantMapService {
      * @var array<string,string>|null
      */
     protected static ?array $strictMap = null;
+
+    /**
+     * 對照表是否缺表（null = 尚未判定）。
+     *
+     * 缺表是**確定性**條件，所以可以在 process 內快取；reset() 會清掉。
+     * 不快取的代價是逐欄放大：replaceRow() 對整列每個欄位都會走一次 map 載入，
+     * 缺表時就變成「每欄一次 metadata 查詢 + 每欄一行 warning」——一次 20 欄的儲存
+     * ＝20 次查詢，而 S3 接上批次匯入後會變成「列數 × 欄數」。
+     *
+     * 這與「不快取瞬時錯誤」的決定不衝突：瞬時錯誤現在一律往上拋（見 loadEdges()），
+     * 所以根本沒有「把失敗結果快取住」的路徑。
+     */
+    protected static ?bool $tableMissing = null;
 
     /**
      * 寬鬆模式：對整段文字做落地替換，表裡任何一筆都套用（忽略 c_strict_excluded）。
@@ -183,7 +198,7 @@ class CharVariantMapService {
      *                            表有 id=5 `乙→甲`、id=9 `甲→丙`，把 id=5 改成 `丙→乙`
      *                            是合法的 `甲→丙→乙`，但把舊邊算進去會看到 `乙→甲→丙→乙`
      *
-     * @throws \RuntimeException 驗證不通過
+     * @throws VariantMappingException 驗證不通過
      */
     public static function assertWritable(array $row, ?int $excludeId = null): void {
         $current = [];
@@ -208,15 +223,15 @@ class CharVariantMapService {
         // 只送了單邊字元欄、又沒有既有列可以 merge：這是呼叫端沒傳 id 的問題，
         // 報「必須是單一字元」會誤導（使用者根本沒動另一欄）。
         if ($variant === '' || $reference === '') {
-            throw new \RuntimeException(__('variant.incomplete_payload'));
+            throw new VariantMappingException(__('variant.incomplete_payload'));
         }
 
         if (mb_strlen($variant) !== 1 || mb_strlen($reference) !== 1) {
-            throw new \RuntimeException(__('variant.single_codepoint_required'));
+            throw new VariantMappingException(__('variant.single_codepoint_required'));
         }
 
         if ($variant === $reference) {
-            throw new \RuntimeException(__('variant.self_reference_not_allowed'));
+            throw new VariantMappingException(__('variant.self_reference_not_allowed'));
         }
 
         // 把待寫入的邊放進現有邊集（排除被取代的舊邊），看會不會成環。
@@ -233,7 +248,7 @@ class CharVariantMapService {
             $node = $edges[$node];
         }
         if (isset($edges[$node]) && isset($seen[$node])) {
-            throw new \RuntimeException(__('variant.cycle_not_allowed', ['char' => $node]));
+            throw new VariantMappingException(__('variant.cycle_not_allowed', ['char' => $node]));
         }
     }
 
@@ -243,6 +258,7 @@ class CharVariantMapService {
     public static function reset(): void {
         self::$lenientMap = null;
         self::$strictMap = null;
+        self::$tableMissing = null;
     }
 
     /**
@@ -335,12 +351,11 @@ class CharVariantMapService {
      */
     protected static function lenientMap(): array {
         if (self::$lenientMap === null) {
-            self::$lenientMap = self::resolveMap(
-                DB::table('char_variant_map')
-                    ->pluck('c_reference_char', 'c_variant_char')
-                    ->all(),
-                'lenient'
-            );
+            $edges = self::loadEdges(null);
+            if ($edges === null) {
+                return [];
+            }
+            self::$lenientMap = self::resolveMap($edges, 'lenient');
         }
 
         return self::$lenientMap;
@@ -351,16 +366,49 @@ class CharVariantMapService {
      */
     protected static function strictMap(): array {
         if (self::$strictMap === null) {
-            self::$strictMap = self::resolveMap(
-                DB::table('char_variant_map')
-                    ->where('c_strict_excluded', 0)
-                    ->pluck('c_reference_char', 'c_variant_char')
-                    ->all(),
-                'strict'
-            );
+            $edges = self::loadEdges(0);
+            if ($edges === null) {
+                return [];
+            }
+            self::$strictMap = self::resolveMap($edges, 'strict');
         }
 
         return self::$strictMap;
+    }
+
+    /**
+     * 讀對照表的邊集。
+     *
+     * **只在「表不存在」時降級為不替換**（回 null，呼叫端不快取這個結果）。
+     * 這一步從 S2 起變成必要：落地替換現在掛在 Codes UI 全部 5 條寫入路徑上，若在
+     * 尚未 migrate／部分遷移的環境因為缺表而拋錯，**整個代碼表的寫入功能都會 500**
+     * ——為了一個正規化的加值功能讓核心錄入功能停擺是不對的取捨。
+     *
+     * **其餘錯誤一律往上拋**（連線問題、欄位被改名、權限…）。早期版本對所有 Throwable
+     * 都降級並把空 map 快取起來，後果是「一次瞬時錯誤就讓這個 worker 之後所有寫入都
+     * 不再替換」，而且只留下一行 warning——那正是本階段最想避免的靜默失效。
+     *
+     * @param int|null $strictExcluded null = 不過濾（lenient）；0 = 只取可用於人名的（strict）
+     * @return array<string,string>|null null = 表不存在，本次不替換（且不要快取）
+     */
+    protected static function loadEdges(?int $strictExcluded): ?array {
+        if (self::$tableMissing === null) {
+            self::$tableMissing = !Schema::hasTable('char_variant_map');
+            if (self::$tableMissing) {
+                Log::warning('char_variant_map 不存在，本次不做落地替換');
+            }
+        }
+
+        if (self::$tableMissing) {
+            return null;
+        }
+
+        $query = DB::table('char_variant_map');
+        if ($strictExcluded !== null) {
+            $query->where('c_strict_excluded', $strictExcluded);
+        }
+
+        return $query->pluck('c_reference_char', 'c_variant_char')->all();
     }
 
     /**

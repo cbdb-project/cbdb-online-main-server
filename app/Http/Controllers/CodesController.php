@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\VariantMappingException;
 use App\Models\Operation;
 use App\Repositories\CodesRepository;
 use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
+use App\Services\CharVariantMapService;
 use App\Support\ColumnFilterExpression;
 use App\Support\ColumnFilterParseException;
 use App\Support\PinyinUmlaut;
+use App\Support\VariantReplaceScope;
 use Carbon\Carbon;
 use Illuminate\Contracts\Database\Query\Expression;
 use Illuminate\Http\RedirectResponse;
@@ -1347,6 +1350,13 @@ class CodesController extends Controller {
         $data = $this->extractFormData($request, $table);
         $data = $this->enforceAuditFieldsForUpdate($data, $originalRow ?: []);
         $data = $this->normalizeCodeTablePinyin($table, $data);
+        // 異體字落地替換：只碰要寫入的 $data，$conditions（來自 URL 主鍵的定位器）不動。
+        [$data, $variantReplaced] = $this->applyVariantReplacement($table, $data);
+        if ($guardError = $this->guardCharVariantMapWrite($table, $data, $conditions)) {
+            flash($guardError, 'error');
+
+            return redirect()->back()->withInput()->withErrors(['char_variant_map' => $guardError]);
+        }
         // 與 performStore 一致：留白的 NOT NULL（有預設值）欄不寫入 null（更新時等於保留原值），
         // 避免觸發完整性違規；留白但無預設值的 NOT NULL 欄仍交由資料庫拋出誠實錯誤。
         $data = $this->applyColumnDefaultsForBlanks($table, $data);
@@ -1356,6 +1366,9 @@ class CodesController extends Controller {
         } catch (\Illuminate\Database\QueryException $e) {
             if ($this->isDuplicateKeyException($e)) {
                 flash('更新失敗：主鍵或唯一值已存在。', 'error');
+                // 這個衝突可能是落地替換自己造成的（使用者輸入的是自認為不同的字形），
+                // 不附上通知的話使用者無從得知系統改了字。
+                $this->flashVariantNotices($variantReplaced);
 
                 return redirect()->back()
                     ->withInput()
@@ -1366,6 +1379,7 @@ class CodesController extends Controller {
             if ($this->isIntegrityConstraintException($e)) {
                 \Illuminate\Support\Facades\Log::warning('Codes 更新完整性違規', ['table' => $table, 'error' => $e->getMessage()]);
                 flash('更新失敗：必填欄位未填寫或關聯值不存在。', 'error');
+                $this->flashVariantNotices($variantReplaced);
 
                 return redirect()->back()
                     ->withInput()
@@ -1380,6 +1394,8 @@ class CodesController extends Controller {
         $this->recordOperation(2, $table, $keyColumns, $updatedRow, $originalRow ?: []);
 
         flash('Update success @ '.Carbon::now(), 'success');
+        $this->flashVariantNotices($variantReplaced);
+        $this->resetVariantMapCacheIfNeeded($table);
 
         $id = $this->buildCompositeId($keyColumns, $updatedRow);
 
@@ -1510,6 +1526,14 @@ class CodesController extends Controller {
 
         $payload = $this->extractFormData($request, $table);
         $payload = $this->normalizeCodeTablePinyin($table, $payload);
+        // 異體字落地替換：必須在下面的主鍵查重之前，否則會出現「查重用替換前值、
+        // 落庫（核准時）用替換後值」的錯位。
+        [$payload, $variantReplaced] = $this->applyVariantReplacement($table, $payload);
+        if ($guardError = $this->guardCharVariantMapWrite($table, $payload)) {
+            flash($guardError, 'error');
+
+            return redirect()->back()->withInput();
+        }
         $keyColumns = $this->getKeyColumns($table);
 
         if (!$this->hasPrimaryKeyValues($keyColumns, $payload)) {
@@ -1519,15 +1543,26 @@ class CodesController extends Controller {
         }
 
         $conditions = $this->buildConditionsFromRow($keyColumns, $payload);
-        $existing = $this->fetchRowByKeys($table, $keyColumns, $conditions);
+        $existing = $this->fetchRowByKeys($table, $keyColumns, $conditions)
+            // D7：也要以主鍵的等價字形查一次，否則既有的變體形列會被錯過（見 helper 說明）。
+            ?: $this->findExistingRowInEitherVariantForm($table, $keyColumns, $payload);
         if ($existing) {
             flash('提案失敗：資料已存在，請改用修改提案。', 'warning');
+            // 這個結果可能是落地替換造成的：使用者打的是變體字形、被換成參考字形之後
+            // 才撞上既有列（或才變成「沒有修改」）。少了通知，加上 withInput() 回填的是
+            // **替換前**的原始輸入，使用者會完全無從理解為什麼。
+            $this->flashVariantNotices($variantReplaced);
 
             return redirect()->back()->withInput();
         }
 
-        if ($this->hasActiveCreateProposalConflict($table, $keyColumns, $payload)) {
+        if ($this->hasActiveCreateProposalConflict($table, $keyColumns, $payload)
+            // D7：待審提案也要用等價字形比對——S2 之前留下的 pending 提案帶的是變體形
+            // resource_id，完全相等比對不會衝突，兩筆並存、依序核准就落成兩筆列。
+            || $this->hasVariantEquivalentCreateProposalConflict($table, $keyColumns, $payload)) {
             flash('提案失敗：已有其他新增提案使用相同主鍵，請調整後再提交。', 'warning');
+            // 同上：這個衝突可能是落地替換造成的。
+            $this->flashVariantNotices($variantReplaced);
 
             return redirect()->back()->withInput();
         }
@@ -1545,6 +1580,10 @@ class CodesController extends Controller {
         if ($operation) {
             flash('已提交新增提案，等待管理員審核 @ '.Carbon::now(), 'info');
         }
+        // 提案路徑同樣要告知：D6 之下既有列保留變體字形，所以使用者只要打開一列
+        // 含異體字的資料再原樣送出，替換就會產生 diff、記成一筆他自己沒察覺的提案。
+        // 至少要讓他看到「系統把字改了」。
+        $this->flashVariantNotices($variantReplaced);
 
         return redirect()->route($showRoute, ['table_name' => $table]);
     }
@@ -1622,7 +1661,23 @@ class CodesController extends Controller {
 
         $data = $this->extractFormData($request, $table);
         $data = $this->normalizeCodeTablePinyin($table, $data); // §D-6：編輯既有提案時亦歸一化 Tier 1，避免核准落庫仍帶 v
+        // 異體字落地替換：同上，在主鍵查重之前。
+        [$data, $variantReplaced] = $this->applyVariantReplacement($table, $data);
         $isCreate = (int) $operation['op_type'] === Operation::TYPE_PROPOSAL_CREATE;
+        // 修改既有對照的提案時必須把「被取代的舊邊」排除，否則合法的改動會被誤報成環
+        // （表有 乙→甲、甲→丙，把那列改成 丙→乙 是合法的 甲→丙→乙）。
+        // create 提案沒有既有列可排除，傳空條件即可。
+        // 定位器要用**權威來源** operation.resource_id，不是使用者送出的 $data['id']：
+        // body 裡的 id 可能被改、可能是空字串或非數字（(int) 會變 0 ⇒ 不排除任何邊 ⇒
+        // 合法修改被誤報成環），也可能指向別列（⇒ 排除錯的邊）。
+        $guardConditions = $isCreate
+            ? []
+            : $this->buildConditionsFromId($keyColumns, (string) ($operation['resource_id'] ?? ''));
+        if ($guardError = $this->guardCharVariantMapWrite($table, $data, $guardConditions)) {
+            flash($guardError, 'error');
+
+            return redirect()->back()->withInput();
+        }
 
         if ($isCreate) {
             if (!$this->hasPrimaryKeyValues($keyColumns, $data)) {
@@ -1632,14 +1687,23 @@ class CodesController extends Controller {
             }
 
             $conditions = $this->buildConditionsFromRow($keyColumns, $data);
-            if (!empty($conditions) && $this->fetchRowByKeys($table, $keyColumns, $conditions)) {
+            $existingRow = !empty($conditions) ? $this->fetchRowByKeys($table, $keyColumns, $conditions) : null;
+            // D7：同上，主鍵的等價字形也要查一次。
+            $existingRow = $existingRow
+                ?: $this->findExistingRowInEitherVariantForm($table, $keyColumns, $data);
+            if ($existingRow) {
                 flash('提案失敗：資料已存在，請改用修改提案。', 'warning');
+                // 同 performProposalStore 的同名分支：衝突可能是落地替換造成的。
+                $this->flashVariantNotices($variantReplaced);
 
                 return redirect()->back()->withInput();
             }
 
-            if ($this->hasActiveCreateProposalConflict($table, $keyColumns, $data, $operation['id'])) {
+            if ($this->hasActiveCreateProposalConflict($table, $keyColumns, $data, $operation['id'])
+                || $this->hasVariantEquivalentCreateProposalConflict($table, $keyColumns, $data, $operation['id'])) {
                 flash('提案失敗：已有其他新增提案使用相同主鍵，請調整後再提交。', 'warning');
+                // 同上：這個衝突可能是落地替換造成的。
+                $this->flashVariantNotices($variantReplaced);
 
                 return redirect()->back()->withInput();
             }
@@ -1681,6 +1745,7 @@ class CodesController extends Controller {
         DB::table('operations')->where('id', $operation['id'])->update($updates);
 
         flash('提案內容已更新，等待審核 @ '.Carbon::now(), 'success');
+        $this->flashVariantNotices($variantReplaced);
 
         return redirect()->route('operations.index', ['proposals_only' => 1]);
     }
@@ -1764,6 +1829,24 @@ class CodesController extends Controller {
         }
         $data = $this->enforceAuditFieldsForCreate($table, $data);
         $data = $this->normalizeCodeTablePinyin($table, $data);
+        // 異體字落地替換。發生在落庫（與資料庫的重複鍵偵測）之前，所以主鍵含文本欄的表
+        // 其查重看到的是替換後的值。
+        [$data, $variantReplaced] = $this->applyVariantReplacement($table, $data);
+        // D7：既有列的文本主鍵可能還是變體形，只用替換後的值查重會錯過它而鑄出重複列。
+        // 資料庫唯一鍵擋不住（兩個字形是不同鍵值），所以必須自己多查一次。
+        if ($this->findExistingRowInEitherVariantForm($table, $keyColumns, $data)) {
+            flash('新增失敗：主鍵或唯一值已存在。', 'error');
+            $this->flashVariantNotices($variantReplaced);
+
+            return redirect()->back()
+                ->withInput()
+                ->withErrors(['duplicate' => '新增失敗：主鍵或唯一值已存在。']);
+        }
+        if ($guardError = $this->guardCharVariantMapWrite($table, $data)) {
+            flash($guardError, 'error');
+
+            return redirect()->back()->withInput()->withErrors(['char_variant_map' => $guardError]);
+        }
         // 留白的 NOT NULL 欄（空字串經 ConvertEmptyStringsToNull 已成 null）改套用資料庫預設值，
         // 避免把 null 寫入 NOT NULL 欄觸發完整性違規（例如 pinyin.c_lastname 留白應視為預設 0）。
         $data = $this->applyColumnDefaultsForBlanks($table, $data);
@@ -1773,6 +1856,9 @@ class CodesController extends Controller {
         } catch (\Illuminate\Database\QueryException $e) {
             if ($this->isDuplicateKeyException($e)) {
                 flash('新增失敗：主鍵或唯一值已存在。', 'error');
+                // 這個衝突可能是落地替換自己造成的（使用者輸入的是自認為不同的字形），
+                // 不附上通知的話使用者無從得知系統改了字。
+                $this->flashVariantNotices($variantReplaced);
 
                 return redirect()->back()
                     ->withInput()
@@ -1784,6 +1870,7 @@ class CodesController extends Controller {
                 // 友善訊息會吞掉例外，仍記一筆 warning 以保留可觀測性（非預期 FK/NOT NULL bug 才好追）。
                 \Illuminate\Support\Facades\Log::warning('Codes 新增完整性違規', ['table' => $table, 'error' => $e->getMessage()]);
                 flash('新增失敗：必填欄位未填寫或關聯值不存在。', 'error');
+                $this->flashVariantNotices($variantReplaced);
 
                 return redirect()->back()
                     ->withInput()
@@ -1800,6 +1887,10 @@ class CodesController extends Controller {
         $id = $this->buildCompositeId($keyColumns, $rowData);
 
         flash('Store success @ '.Carbon::now(), 'success');
+        // 讓錄入者知道系統改了字（落地替換是無條件套用、沒有「保留」選項，所以用非阻塞
+        // 的 flash 而不是要使用者做決定的彈窗）。
+        $this->flashVariantNotices($variantReplaced);
+        $this->resetVariantMapCacheIfNeeded($table);
 
         return redirect()->route($editRoute, ['table_name' => $table, 'id' => $id]);
     }
@@ -1841,10 +1932,23 @@ class CodesController extends Controller {
             $originalRow
         );
         $payload = $this->normalizeCodeTablePinyin($table, $payload);
+        // 異體字落地替換：在 diff 之前，讓提案記錄的是替換後的值（核准端會照樣落庫）。
+        [$payload, $variantReplaced] = $this->applyVariantReplacement($table, $payload);
+        // $conditions 在本方法上方已無條件賦值（不需要 ?? 兜底——加了反而會在日後重構時
+        // 靜默退化成 excludeId = null，也就是「更新既有對照被誤報成環」那個 bug）。
+        if ($guardError = $this->guardCharVariantMapWrite($table, $payload, $conditions)) {
+            flash($guardError, 'error');
+
+            return redirect()->back()->withInput();
+        }
 
         $diff = $this->operationRepository->getArrDiff($payload, $originalRow, $originalRow);
         if ($diff === null) {
             flash('提案失敗：未偵測到任何修改內容。', 'warning');
+            // 這個結果可能是落地替換造成的：使用者打的是變體字形、被換成參考字形之後
+            // 才撞上既有列（或才變成「沒有修改」）。少了通知，加上 withInput() 回填的是
+            // **替換前**的原始輸入，使用者會完全無從理解為什麼。
+            $this->flashVariantNotices($variantReplaced);
 
             return redirect()->back()->withInput();
         }
@@ -1862,6 +1966,10 @@ class CodesController extends Controller {
         if ($operation) {
             flash('已提交修改提案，等待管理員審核 @ '.Carbon::now(), 'info');
         }
+        // 提案路徑同樣要告知：D6 之下既有列保留變體字形，所以使用者只要打開一列
+        // 含異體字的資料再原樣送出，替換就會產生 diff、記成一筆他自己沒察覺的提案。
+        // 至少要讓他看到「系統把字改了」。
+        $this->flashVariantNotices($variantReplaced);
 
         return redirect()->route($editRoute, ['table_name' => $table, 'id' => $id]);
     }
@@ -1972,10 +2080,28 @@ class CodesController extends Controller {
         return $this->getTableColumns($table);
     }
 
+    /**
+     * getKeyColumns() 的主鍵欄快取。
+     *
+     * 原本是方法內的 `static $cache`，改成類別屬性是為了**能在測試間清掉**：
+     * schema 在同一個 process 內不會變，所以生產環境快取整個 process 是安全的；
+     * 但測試會為同一個表名建不同的合成 schema（甚至完全不建），
+     * 一旦某個測試把某表快取成錯的主鍵欄，後面的測試就會拿到污染值
+     * （症狀是「請確認主鍵欄位已填寫完整」這種與該測試無關的失敗）。
+     * TestCase::setUp() 會呼叫 resetKeyColumnCache()。
+     *
+     * @var array<string,array<int,string>>
+     */
+    private static array $keyColumnCache = [];
+
+    /** 清主鍵欄快取（測試用；見 $keyColumnCache 的說明）。 */
+    public static function resetKeyColumnCache(): void {
+        self::$keyColumnCache = [];
+    }
+
     protected function getKeyColumns(string $table): array {
-        static $cache = [];
-        if (isset($cache[$table])) {
-            return $cache[$table];
+        if (isset(self::$keyColumnCache[$table])) {
+            return self::$keyColumnCache[$table];
         }
 
         $upperTable = strtoupper($table);
@@ -1984,7 +2110,7 @@ class CodesController extends Controller {
         if (isset($this->tablePrimaryKeyOverrides[$upperTable])) {
             $overrideKeys = array_values(array_unique(array_filter($this->tablePrimaryKeyOverrides[$upperTable])));
             if (!empty($overrideKeys)) {
-                return $cache[$table] = $overrideKeys;
+                return self::$keyColumnCache[$table] = $overrideKeys;
             }
         }
 
@@ -2026,7 +2152,7 @@ class CodesController extends Controller {
             }
         }
 
-        return $cache[$table] = array_values(array_unique(array_filter($keys)));
+        return self::$keyColumnCache[$table] = array_values(array_unique(array_filter($keys)));
     }
 
     /**
@@ -2302,6 +2428,304 @@ class CodesController extends Controller {
      * @param array<string, mixed> $data
      * @return array<string, mixed>
      */
+    /**
+     * 異體字落地替換（計畫 S2）：Codes UI 的 5 條寫入路徑共用這個收口。
+     *
+     * 範圍與模式全由 VariantReplaceScope 決定（型別導向、預設 lenient、人名欄 strict、
+     * 代碼鍵與對照表自身排除），呼叫端不需要知道哪些欄位該替換。
+     *
+     * **只能替換「要寫入的值」，不可替換「用來定位既有列的條件」**：
+     * performUpdate 的 $conditions 來自 URL 主鍵、在此之前就組好了，所以這裡只碰 $data；
+     * 提案路徑的 dup 檢查是拿 $payload 的主鍵值去查，所以替換必須發生在那個檢查之前
+     * （本方法的呼叫點都在 normalizeCodeTablePinyin 之後、dup 檢查之前，順序正確）。
+     *
+     * @param array<string,mixed> $data
+     * @return array{0: array<string,mixed>, 1: array<string,string|array<int,string>>} [替換後的 data, replaced]
+     */
+    protected function applyVariantReplacement(string $table, array $data): array {
+        $result = CharVariantMapService::replaceRow($data, $table);
+
+        return [$result['data'], $result['replaced']];
+    }
+
+    /**
+     * 主鍵欄位分成「在替換範圍內的文本欄」與「其餘」。
+     *
+     * @param array<int,string> $keyColumns
+     * @return array{0: array<int,string>, 1: array<int,string>} [替換範圍內的, 其餘的]
+     */
+    protected function splitKeyColumnsByVariantScope(string $table, array $keyColumns): array {
+        $inScope = [];
+        $fixed = [];
+
+        foreach ($keyColumns as $column) {
+            if (VariantReplaceScope::modeFor($table, $column) === null) {
+                $fixed[] = $column;
+            } else {
+                $inScope[] = $column;
+            }
+        }
+
+        return [$inScope, $fixed];
+    }
+
+    /**
+     * D7「兩形並存」的去重：找出**歸一後與本次輸入相同**的既有列。
+     *
+     * D6 不做回溯校正，所以既有列的文本主鍵可能還是任一個變體形；而對照是**多對一**
+     * （多個變體可指向同一參考字），所以「歸一後相同」的字形可能很多。
+     * 只用替換後的值查重會錯過那些列，鑄出語義重複的列——而資料庫唯一鍵擋不住
+     * （不同字形是不同鍵值），**比不替換更糟**。
+     *
+     * 做法：**把不在替換範圍內的主鍵欄固定在 SQL 條件裡，取回那一小群候選列，
+     * 再在 PHP 端把它們的文本主鍵歸一後比對**。這樣是**精確**的（不管對照表是什麼形狀）、
+     * 而且只要**一次查詢**。
+     *
+     * 早期版本改用「列舉所有等價字形再逐一查」，那個做法有兩個缺點：查詢次數是等價字形數
+     * （最壞可達數十次），而且為了避免組合爆炸設的上限本身是**正確性缺口**——超過上限就
+     * 退回只比對正規形，等於完全失去這道去重。
+     *
+     * @param array<int,string> $keyColumns
+     * @param array<string,mixed> $after 替換後的資料
+     * @return mixed 既有列（stdClass）或 null
+     */
+    protected function findExistingRowInEitherVariantForm(string $table, array $keyColumns, array $after) {
+        [$inScope, $fixed] = $this->splitKeyColumnsByVariantScope($table, $keyColumns);
+
+        // 主鍵沒有任何可替換的文本欄 ⇒ 一般查重就夠，零額外成本。
+        if ($inScope === []) {
+            return null;
+        }
+
+        // 全部主鍵欄都可替換 ⇒ 沒有能收斂候選集的 SQL 條件，會變成全表掃描。
+        // 目前沒有這種表（ALTNAME_DATA 是 3 鍵、只有 1 個文本欄可替換），
+        // 真的出現時記 warning 並跳過，不要靜默做全表掃描。
+        if ($fixed === []) {
+            \Illuminate\Support\Facades\Log::warning('D7 去重跳過：主鍵全部在替換範圍內，無法收斂候選集', [
+                'table' => $table,
+                'key_columns' => $keyColumns,
+            ]);
+
+            return null;
+        }
+
+        $query = DB::table($table);
+        foreach ($fixed as $column) {
+            if (!array_key_exists($column, $after)) {
+                return null;
+            }
+            $query->where($column, $after[$column]);
+        }
+
+        foreach ($query->get() as $row) {
+            if ($this->rowMatchesAfterNormalization($table, $inScope, (array) $row, $after)) {
+                return $row;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * D7：待審的新增提案裡有沒有「歸一後與本次輸入相同」的一筆。
+     *
+     * `hasActiveCreateProposalConflict()` 是拿 `resource_id` 做完全相等比對，
+     * 所以 S2 之前留下的 pending 提案（帶變體形 resource_id）不會與新提案（帶歸一後
+     * resource_id）衝突 ⇒ 兩筆並存、依序核准就落成兩種字形的兩筆列。
+     *
+     * @param array<int,string> $keyColumns
+     * @param array<string,mixed> $after
+     */
+    protected function hasVariantEquivalentCreateProposalConflict(
+        string $table,
+        array $keyColumns,
+        array $after,
+        ?int $excludeOperationId = null
+    ): bool {
+        [$inScope] = $this->splitKeyColumnsByVariantScope($table, $keyColumns);
+        if ($inScope === []) {
+            return false;
+        }
+
+        if (!Schema::hasTable('operations')) {
+            return false;
+        }
+
+        $query = DB::table('operations')
+            ->where('resource', $table)
+            ->where('op_type', Operation::TYPE_PROPOSAL_CREATE);
+        if ($excludeOperationId !== null) {
+            $query->where('id', '!=', $excludeOperationId);
+        }
+
+        // 用「前導的非替換範圍主鍵欄」組出 resource_id 前綴來收斂候選集。
+        // resource_id 是 buildCompositeId() 以 '_._' 串起來的複合主鍵，所以前導欄可以做
+        // 前綴 LIKE，而 operations 上的 (resource, resource_id, op_type) 索引吃得到。
+        // 少了這個條件就會把該表**所有歷史** create proposal（含已核准／已取消）全部撈回來
+        // 反序列化，集合隨歷史無上限成長。
+        if (($pattern = $this->variantProposalResourceIdPattern($keyColumns, $inScope, $after)) !== null) {
+            $query->where('resource_id', 'like', $pattern);
+        }
+
+        // 分批而非一次載入：候選集理論上無上限（**不能用 limit 截斷**——截斷會重現
+        // 「漏抓重複」的正確性缺口）。用 lazyById() 而不是 cursor()：PDO MySQL 預設是
+        // buffered query（config/database.php 沒關掉 MYSQL_ATTR_USE_BUFFERED_QUERY），
+        // cursor() 仍會把整個結果集先讀進 PHP 記憶體；lazyById() 以 id 分頁，
+        // 每批大小固定，記憶體才真的有界。
+        foreach ($query->lazyById(500) as $operation) {
+            $payload = json_decode((string) $operation->resource_data, true);
+            if (!is_array($payload)) {
+                continue;
+            }
+            if (!in_array($payload['__review_status'] ?? null, ['pending', 'rejected'], true)) {
+                continue;
+            }
+            // 其餘主鍵欄必須相同，文本主鍵欄則比對歸一後的值
+            foreach ($keyColumns as $column) {
+                if (in_array($column, $inScope, true)) {
+                    continue;
+                }
+                if ((string) ($payload[$column] ?? '') !== (string) ($after[$column] ?? '')) {
+                    continue 2;
+                }
+            }
+            if ($this->rowMatchesAfterNormalization($table, $inScope, $payload, $after)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * 用「非替換範圍的主鍵欄」組出 `resource_id` 的 LIKE 樣式，把候選集收斂在 SQL 層。
+     *
+     * `resource_id` 是 `buildCompositeId()` 以 `'_._'` 串起的**位置式**序列化，所以可以
+     * 逐位置組樣式：在替換範圍內的欄位放 `%`、其餘放實際值。
+     *
+     * **不能只做「前導前綴」**：production 的 `ALTNAME_DATA` 主鍵順序是
+     * `(c_alt_name_chn, c_alt_name_type_code, c_personid)`——第一欄正是可替換的文字欄，
+     * 前導前綴會直接失效而退回全掃。位置式樣式在任何順序下都能收斂。
+     *
+     * 這個樣式是**寬鬆的預篩**（分隔符裡的 `_` 本身是 LIKE 單字元通配、且值含 `%`／`_`
+     * 時會退成 `%`），只會多撈不會少撈——精確比對在 PHP 端由
+     * `rowMatchesAfterNormalization()` 完成，所以寬鬆是安全的。
+     *
+     * @param array<int,string> $keyColumns
+     * @param array<int,string> $inScope 在替換範圍內的主鍵欄
+     * @param array<string,mixed> $after
+     * @return string|null null = 無法收斂（所有主鍵欄都是通配），呼叫端就別加這個條件
+     */
+    protected function variantProposalResourceIdPattern(array $keyColumns, array $inScope, array $after): ?string {
+        $parts = [];
+        $hasLiteral = false;
+
+        foreach ($keyColumns as $column) {
+            if (in_array($column, $inScope, true)) {
+                $parts[] = '%';
+
+                continue;
+            }
+
+            $value = array_key_exists($column, $after) && $after[$column] !== null
+                ? (string) $after[$column]
+                : '';
+
+            // 值本身含 LIKE 通配字元時退成 '%'：跨 driver 的 ESCAPE 語法不一致
+            // （SQLite 需要顯式 ESCAPE），而寬鬆預篩本來就安全。
+            if ($value === '' || strpbrk($value, '%_') !== false) {
+                $parts[] = '%';
+
+                continue;
+            }
+
+            $parts[] = $value;
+            $hasLiteral = true;
+        }
+
+        if (!$hasLiteral) {
+            return null;
+        }
+
+        return implode('_._', $parts);
+    }
+
+    /**
+     * 候選列的文本主鍵歸一後是否與本次輸入相同。
+     *
+     * @param array<int,string> $inScope 在替換範圍內的主鍵欄
+     * @param array<string,mixed> $candidate
+     * @param array<string,mixed> $after 替換後的資料
+     */
+    protected function rowMatchesAfterNormalization(string $table, array $inScope, array $candidate, array $after): bool {
+        foreach ($inScope as $column) {
+            $candidateValue = $candidate[$column] ?? null;
+            if (!is_string($candidateValue)) {
+                return false;
+            }
+
+            $normalized = CharVariantMapService::replaceFor($table, $column, $candidateValue)['text'];
+            if ($normalized !== (string) ($after[$column] ?? '')) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * 把落地替換的結果 flash 給使用者（direct 寫入路徑用）。
+     *
+     * **不要自己組字**：replaced 的值在衝突時會是 list（同一變體在 strict 欄與 lenient 欄
+     * 的閉包終點可以不同），implode 會拋 "Array to string conversion"。一律走 buildNotices()。
+     *
+     * @param array<string,string|array<int,string>> $replaced
+     */
+    protected function flashVariantNotices(array $replaced): void {
+        foreach (CharVariantMapService::buildNotices($replaced) as $notice) {
+            flash($notice, 'info');
+        }
+    }
+
+    /**
+     * char_variant_map 的結構把關（單一 codepoint、不成環）＋寫入後清快取。
+     *
+     * 這張表是所有落地替換的資料來源，寫進一筆壞對照會讓全站的替換降級
+     * （載入時只能丟掉環上的邊求生）。所以在應用層擋住，而不是等載入端降級。
+     *
+     * @param array<string,mixed> $data
+     * @param array<string,mixed> $conditions 更新時用來定位既有列；用於取得要排除的舊邊
+     * @return string|null null = 通過；非 null = 錯誤訊息
+     */
+    protected function guardCharVariantMapWrite(string $table, array $data, array $conditions = []): ?string {
+        if (strtolower($table) !== 'char_variant_map') {
+            return null;
+        }
+
+        // 主鍵欄名刻意寫死 'id'，與 CharVariantMapService::assertWritable() 內部的
+        // where('id', …) 保持一致。早期版本改成從 getKeyColumns() 取，但那是**半套的**
+        // ——服務端仍寫死 'id'，所以主鍵若改名，這裡會拿新欄的值去查舊的 id 欄，
+        // 比兩邊都寫死更難查。要改就兩邊一起改（把欄名一路傳進服務）。
+        $excludeId = isset($conditions['id']) ? (int) $conditions['id'] : null;
+
+        try {
+            CharVariantMapService::assertWritable($data, $excludeId);
+        } catch (VariantMappingException $e) {
+            // 只 catch 專屬型別：QueryException 繼承 PDOException 繼承 RuntimeException，
+            // 用 \RuntimeException 會把資料庫錯誤變成「驗證失敗」並把原始 SQL flash 出去。
+            return $e->getMessage();
+        }
+
+        return null;
+    }
+
+    /** 寫入 char_variant_map 之後清行程內快取，讓下次替換讀到新的對照。 */
+    protected function resetVariantMapCacheIfNeeded(string $table): void {
+        if (strtolower($table) === 'char_variant_map') {
+            CharVariantMapService::reset();
+        }
+    }
+
     /**
      * §D-6 保存止血：對本表的 **Tier 1** 拼音欄（config/code_table_mutations.php）靜默套 v→ü 歸一化。
      *

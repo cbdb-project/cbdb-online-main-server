@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use App\Http\Controllers\CodesController;
 use App\Services\CharVariantMapService;
 use App\Support\VariantReplaceScope;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
@@ -19,6 +20,11 @@ abstract class TestCase extends BaseTestCase {
         // 測試結果會依檔案順序漂移。
         CharVariantMapService::reset();
         VariantReplaceScope::reset();
+
+        // CodesController 的主鍵欄快取同理：測試會為同一個表名建不同的合成 schema，
+        // 一旦被某個測試快取成錯的主鍵欄，後面的測試就會拿到污染值（症狀是
+        // 「請確認主鍵欄位已填寫完整」這類與該測試無關的失敗）。
+        CodesController::resetKeyColumnCache();
     }
 
     /**

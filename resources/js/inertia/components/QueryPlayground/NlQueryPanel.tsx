@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import ToolTracePanel, { type ToolCallTrace, type ToolResultSummary } from './ToolTracePanel';
+import { Markdown } from '../ui/Markdown';
 import { useTranslation } from '../../hooks/useTranslation';
 
 interface Props {
@@ -366,7 +367,7 @@ export default function NlQueryPanel({ nlModel, generateFromNlEndpoint, generate
                     </pre>
                     {explanation && (
                         <div style={{ marginTop: 12, fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>
-                            <strong>{t('nl_explanation')}</strong> {explanation}
+                            <strong>{t('nl_explanation')}</strong> <Markdown inline source={explanation} />
                         </div>
                     )}
                 </div>

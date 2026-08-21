@@ -86,7 +86,7 @@
 - 送出追問時，前端組裝 `conversation_history`：取 `turns` 中已完成（`status==='done'`）的輪次，依序輸出 `[{question, summary}, ...]`（**只取 `summary`，不送完整 `answer_markdown`**——`summary` 本來就是模型自己在既有 response contract 中已經回傳的精簡摘要欄位，不需要新增欄位、也不需要前端自己做截斷/摘要）。首輪請求（`turns.length === 0`）不帶 `conversation_history` 欄位，與現行單輪 request 完全相同。
 - SSE 事件處理（`handleStreamEvent`）需要知道「目前是在更新哪一個 turn」——用 `turns` 陣列最後一筆（狀態為 `pending`/`streaming`）作為目標，沿用現有的 `tool_execution_start`/`tool_execution_complete`/`complete`/`error` 事件語意，只是寫入位置從單一 state 改為 `turns[lastIndex]`。
 - `ToolTracePanel` 需要能夠按 turn 分組顯示（目前是單一陣列平鋪），建議每個 turn 各自渲染一個 `ToolTracePanel` 實例（改動面小）。**注意**：`tool_execution_start`/`tool_execution_complete` 這兩個 SSE 事件目前是直接對單一扁平陣列 `setToolCalls` 做 append/尋找更新；改成 `turns[]` 後，每次事件都要先定位「目前進行中的 turn」（`turns` 中 `status==='streaming'` 的那一筆），再對該 turn 的 `toolCalls` 子陣列做不可變更新（immutable update），實作時要留意巢狀 state 更新寫法。
-- Markdown 渲染沿用既有 `renderMarkdown()`（hand-rolled regex），不需更換。
+- ~~Markdown 渲染沿用既有 `renderMarkdown()`（hand-rolled regex），不需更換。~~ 已於 2026-08-21 改用共用元件 `components/ui/Markdown.tsx`（marked + DOMPurify）；手刻 regex renderer 無法處理有序清單／連結／巢狀清單，且會把 `</p><p>` 插進程式碼區塊內，已刪除。
 - 輸入框行為：
   - 首次提問維持現有隱私同意勾選 + textarea + 送出鈕。
   - 第一輪送出後，追問輸入框精簡為「Ask anything」樣式（textarea + 送出鈕），不重複顯示同意勾選；`use_tools`/`use_streaming` 兩個選項是否每輪重新顯示交由實作時的 UI 判斷（後端不對 `use_tools` 做任何跨輪次的一致性檢查或記憶，純屬前端呈現選擇，沒有 precedence 問題需要解決）。

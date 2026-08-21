@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { useTranslation } from '../../hooks/useTranslation';
 import { getCsrfToken } from '../PersonBrowser/shared/csrf';
 import AiPrivacyNotice from './AiPrivacyNotice';
+import { Markdown } from '../ui/Markdown';
 
 /**
  * 共享的「AI 智能識別代碼」面板（assoc / statuses 等 code-lookup 編輯器共用），
@@ -130,7 +131,7 @@ export default function AiCodeLookupPanel({
                                 </div>
                             </div>
                         ) : null}
-                        {summary ? <div style={summaryStyle}>{summary}</div> : null}
+                        {summary ? <Markdown source={summary} style={summaryStyle} /> : null}
                     </div>
                 ) : null}
             </div>

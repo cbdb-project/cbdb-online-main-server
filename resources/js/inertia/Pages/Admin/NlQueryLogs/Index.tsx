@@ -12,6 +12,8 @@ import type { SharedProps } from '../../../types/page';
 import { cn } from '../../../lib/utils';
 import { LOG_TONE, LOG_CARD_BASE, LOG_HEADER_BASE, LOG_PILL_BASE } from '../logCardStyles';
 import { LogCollapsible } from '../LogCollapsible';
+import { Markdown } from '../../../components/ui/Markdown';
+import { classifyLogFieldRendering } from '../../../utils/nlLogMarkdownFields';
 
 interface LlmSummary {
     model: string | null;
@@ -29,6 +31,8 @@ interface NlLogRow {
     execution_time_ms: number | null;
     success: boolean;
     question: string;
+    /** 後端依 question 的 '[QA] ' 前綴判定；決定無 key 的回應原文要不要當 Markdown 渲染。 */
+    is_qa: boolean;
     generated_sql: string | null;
     explanation: string | null;
     error_message: string | null;
@@ -84,7 +88,7 @@ function tryParseJsonContainer(text: string): unknown {
     }
 }
 
-function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
+function JsonValue({ value, depth = 0, fieldKey, isQa }: { value: unknown; depth?: number; fieldKey?: string; isQa: boolean }) {
     if (value === null || value === undefined) {
         return <span className="text-muted-foreground">null</span>;
     }
@@ -93,7 +97,17 @@ function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
             return <span className="text-muted-foreground">""</span>;
         }
         const nested = depth < MAX_JSON_RENDER_DEPTH ? tryParseJsonContainer(value) : undefined;
-        return nested !== undefined ? <JsonValue value={nested} depth={depth + 1} /> : <MultilineText value={value} />;
+        if (nested !== undefined) {
+            return <JsonValue value={nested} depth={depth + 1} fieldKey={fieldKey} isQa={isQa} />;
+        }
+        const rendering = classifyLogFieldRendering(fieldKey, isQa);
+        if (rendering === 'block-markdown') {
+            return <Markdown source={value} />;
+        }
+        if (rendering === 'inline-markdown') {
+            return <Markdown inline source={value} />;
+        }
+        return <MultilineText value={value} />;
     }
     if (typeof value !== 'object') {
         return <>{String(value)}</>;
@@ -105,14 +119,14 @@ function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
         return value.length === 0 ? (
             <span className="text-muted-foreground">[]</span>
         ) : (
-            <JsonTable rows={value.map((item, i) => [`#${i}`, item] as [string, unknown])} depth={depth + 1} />
+            <JsonTable rows={value.map((item, i) => [`#${i}`, item] as [string, unknown])} depth={depth + 1} isQa={isQa} />
         );
     }
     const entries = Object.entries(value as Record<string, unknown>);
-    return entries.length === 0 ? <span className="text-muted-foreground">{'{}'}</span> : <JsonTable rows={entries} depth={depth + 1} />;
+    return entries.length === 0 ? <span className="text-muted-foreground">{'{}'}</span> : <JsonTable rows={entries} depth={depth + 1} isQa={isQa} />;
 }
 
-function JsonTable({ rows, depth }: { rows: [string, unknown][]; depth: number }) {
+function JsonTable({ rows, depth, isQa }: { rows: [string, unknown][]; depth: number; isQa: boolean }) {
     return (
         <table className="w-full table-fixed rounded border border-border/60 text-xs">
             <tbody>
@@ -120,7 +134,7 @@ function JsonTable({ rows, depth }: { rows: [string, unknown][]; depth: number }
                     <tr key={key} className="border-b border-border/60 align-top last:border-b-0">
                         <th className="w-28 whitespace-nowrap break-words px-2 py-1 text-left font-medium text-muted-foreground">{key}</th>
                         <td className="break-words px-2 py-1">
-                            <JsonValue value={value} depth={depth} />
+                            <JsonValue value={value} depth={depth} fieldKey={key} isQa={isQa} />
                         </td>
                     </tr>
                 ))}
@@ -242,7 +256,7 @@ function extractFinalResult(fullParsed: unknown): unknown {
     return parsedContent !== undefined ? parsedContent : content;
 }
 
-function LlmResponseBlock({ raw, tableLabel, rawLabel }: { raw: string; tableLabel: string; rawLabel: string }) {
+function LlmResponseBlock({ raw, tableLabel, rawLabel, isQa }: { raw: string; tableLabel: string; rawLabel: string; isQa: boolean }) {
     const [showRaw, setShowRaw] = useState(false);
 
     const fullParsed = useMemo(() => {
@@ -269,7 +283,18 @@ function LlmResponseBlock({ raw, tableLabel, rawLabel }: { raw: string; tableLab
                 </Button>
             </div>
             <div className="max-h-[32rem] overflow-auto rounded border border-border bg-muted/40 p-2">
-                {showRaw ? <pre className="text-xs">{JSON.stringify(fullParsed, null, 2)}</pre> : <JsonValue value={finalResult} />}
+                {showRaw ? (
+                    <pre className="text-xs">{JSON.stringify(fullParsed, null, 2)}</pre>
+                ) : typeof finalResult === 'string' ? (
+                    // content 解析不出 JSON 時的原文：QA 模式對應 parseQaResponse 最後的
+                    // 'answer_markdown' => $content fallback（確實是 Markdown 回答）；NL→SQL
+                    // 模式則可能是模型直接吐出的裸 SQL，故不渲染。判斷集中在 classifyLogFieldRendering。
+                    classifyLogFieldRendering(undefined, isQa) === 'block-markdown'
+                        ? <Markdown source={finalResult} />
+                        : <MultilineText value={finalResult} />
+                ) : (
+                    <JsonValue value={finalResult} isQa={isQa} />
+                )}
             </div>
         </div>
     );
@@ -426,7 +451,7 @@ export default function NlQueryLogsIndex() {
                                                 <h6 className="mb-1 font-medium">
                                                     <i className="fas fa-info-circle mr-1 text-blue-600" aria-hidden /> {t('log_explanation')}
                                                 </h6>
-                                                <p className="text-sm text-muted-foreground">{log.explanation}</p>
+                                                <Markdown className="text-sm text-muted-foreground" source={log.explanation} />
                                             </div>
                                         )}
                                     </>
@@ -464,6 +489,7 @@ export default function NlQueryLogsIndex() {
                                     <LogCollapsible label={t('log_llm_response')}>
                                         <LlmResponseBlock
                                             raw={log.llm_response}
+                                            isQa={log.is_qa}
                                             tableLabel={t('log_llm_response_table')}
                                             rawLabel={t('log_llm_response_raw')}
                                         />

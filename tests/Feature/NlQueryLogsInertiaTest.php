@@ -127,6 +127,34 @@ class NlQueryLogsInertiaTest extends TestCase {
                 ->where('logs.data.1.llm_summary', null));
     }
 
+    /**
+     * QA 與 NL→SQL 共用同一張 nl_query_logs，唯一的區別是 answerFromNL 寫入時給 question
+     * 加了 '[QA] ' 前綴。前端靠這個旗標決定「解析不出 JSON 的回應原文」要不要當成 Markdown
+     * 渲染——NL→SQL 的同一條路徑可能是模型直接吐出的裸 SQL，渲染後單獨一行 `---` 會把前一行
+     * 變成標題、成對的 `*` 會變斜體。判定寫錯的症狀是靜默的內容失真，故在此釘住。
+     */
+    #[Test]
+    public function it_flags_qa_logs_via_question_prefix(): void {
+        $admin = $this->makeSuperAdmin();
+        // 列表按 created_at DESC；四筆若共用同一個時間戳，先後順序取決於未定義的 tiebreak，
+        // 斷言就會變成碰運氣。這裡給遞減的時間戳，讓下方的索引順序是確定的。
+        $this->seedLog($admin->id, ['question' => '[QA] 李白是誰？', 'created_at' => now()]);
+        $this->seedLog($admin->id, ['question' => '誰是宋朝宰相？', 'created_at' => now()->subMinute()]);
+        // 前綴出現在中段不算 QA，避免用 str_contains 之類的寬鬆比對。
+        $this->seedLog($admin->id, ['question' => '請問 [QA] 是什麼意思？', 'created_at' => now()->subMinutes(2)]);
+        $this->seedLog($admin->id, ['question' => null, 'created_at' => now()->subMinutes(3)]);
+
+        $this->actingAs($admin)->get(route('app.query-playground.nl-query-logs'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('logs.data', 4)
+                ->where('logs.data.0.question', '[QA] 李白是誰？')
+                ->where('logs.data.0.is_qa', true)
+                ->where('logs.data.1.is_qa', false)
+                ->where('logs.data.2.is_qa', false)
+                ->where('logs.data.3.is_qa', false));
+    }
+
     #[Test]
     public function non_super_admin_gets_403(): void {
         $expert = User::forceCreate([

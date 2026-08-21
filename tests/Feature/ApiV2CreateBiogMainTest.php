@@ -159,6 +159,7 @@ class ApiV2CreateBiogMainTest extends TestCase {
             $table->integer('c_dy')->nullable();
             $table->integer('c_death_age')->nullable();
             $table->text('c_notes')->nullable();
+            $table->string('c_tribe')->nullable();
             $table->string('c_created_by')->nullable();
             $table->dateTime('c_created_date')->nullable();
             $table->string('c_modified_by')->nullable();
@@ -337,6 +338,35 @@ class ApiV2CreateBiogMainTest extends TestCase {
             'c_mingzi_chn' => '清',
             'c_name_chn' => '張清',
         ]);
+    }
+
+    /**
+     * 同一列裡兩套規則並存：姓名欄 strict（`峯` 保留原形），其餘文本欄 lenient（`峯`→`峰`）。
+     *
+     * 這是 plan S3 把三處手掛姓名欄改成整列 `replaceRow('BIOG_MAIN')` 的核心回歸——
+     * 舊碼只替換 c_surname_chn／c_mingzi_chn，c_notes／c_tribe 等文本欄全漏。
+     */
+    #[Test]
+    public function testDirectBiogMainCreateAppliesStrictToNameAndLenientToOtherTextColumns(): void {
+        $this->actingAs($this->makeUser(email: 'create-biog-variant-mixed@example.com'));
+
+        $response = $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => [
+                'c_surname_chn' => '張',
+                'c_mingzi_chn' => '峯',
+                'c_notes' => '峯下人',
+                'c_tribe' => '峯部',
+            ],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('BIOG_MAIN', [
+            'c_personid' => 2000,
+            'c_mingzi_chn' => '峯',      // strict：峯 不替換
+            'c_name_chn' => '張峯',
+            'c_notes' => '峰下人',       // lenient：峯→峰
+            'c_tribe' => '峰部',
+        ]);
+        $this->assertNotEmpty($response->json('notices'), 'lenient 欄發生替換也要回通知');
     }
 
     #[Test]

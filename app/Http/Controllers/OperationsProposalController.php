@@ -6,6 +6,7 @@ use App\Models\Operation;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
+use App\Services\CharVariantMapService;
 use App\Services\NameSearchIndexService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
@@ -754,7 +755,20 @@ class OperationsProposalController extends Controller {
             throw new \RuntimeException('資料已存在，無法再次新增。');
         }
 
+        // char_variant_map 走這條通用核准路徑（不在 HANDLER_ROUTED_RESOURCES）：落庫前必須
+        // 驗結構。提交端的守衛（AbstractCodeTableMutationHandler）擋不到**歷史待審提案**，
+        // 也擋不到任何不經該 handler 建立的提案；成環的對照一旦落庫，dropCycleEdges() 會把
+        // 環上兩條邊一起丟掉、只留 Log::error，該組字的落地替換在全站靜默停止。
+        if (strtolower($table) === 'char_variant_map') {
+            CharVariantMapService::assertWritable($data);
+        }
+
         DB::table($table)->insert($data);
+
+        // 落庫後重置快取，否則新對照在該 process 的剩餘生命週期內不生效。
+        if (strtolower($table) === 'char_variant_map') {
+            CharVariantMapService::reset();
+        }
 
         $row = DB::table($table)->where($this->buildKeyConditions($keyColumns, $data))->first();
         if (!$row) {
@@ -794,8 +808,21 @@ class OperationsProposalController extends Controller {
             }
         }
 
+        // char_variant_map 走的是這條通用核准路徑（不在 HANDLER_ROUTED_RESOURCES）：
+        // 落庫前必須驗結構（單一 codepoint、不成環），否則成環的對照核准後會讓
+        // CharVariantMapService::dropCycleEdges() 把環上兩條邊一起丟掉、只留 Log::error，
+        // 該組字的落地替換在全站靜默停止（提案階段的守衛見 AbstractCodeTableMutationHandler）。
+        if (strtolower($table) === 'char_variant_map' && !empty($updatePayload)) {
+            CharVariantMapService::assertWritable($updatePayload, isset($original['id']) ? (int) $original['id'] : null);
+        }
+
         if (!empty($updatePayload)) {
             DB::table($table)->where($conditions)->update($updatePayload);
+        }
+
+        // 落庫後重置對照表快取，否則核准後的對照在該 process 的剩餘生命週期內不生效。
+        if (strtolower($table) === 'char_variant_map') {
+            CharVariantMapService::reset();
         }
 
         $readKeyRow = $this->resolveReadbackKeyRow($keyColumns, $original, $updatePayload);

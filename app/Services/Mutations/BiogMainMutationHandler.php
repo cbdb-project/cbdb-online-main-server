@@ -102,15 +102,20 @@ class BiogMainMutationHandler extends AbstractMutationHandler {
         }
 
         try {
-            $result = $this->biogMainRepository->updateById($proxy, $personId);
+            $result = $this->biogMainRepository->updateById($proxy, $personId, $updatedFields);
         } catch (\Throwable $e) {
             return $this->errorResponse('更新失敗：'.$e->getMessage(), 500);
         }
 
         if (($result['no_changes'] ?? false) === true) {
-            return $this->errorResponse('未偵測到任何修改內容', 422, [
-                'changes' => ['no_effective_changes'],
-            ]);
+            // 使用者輸入被落地替換歸一成與現值相同時，422 也要帶 notices，
+            // 否則「未偵測到任何修改內容」看起來毫無道理（對齊子資源 handler）。
+            return CharVariantMapService::withNotices(
+                $this->errorResponse('未偵測到任何修改內容', 422, [
+                    'changes' => ['no_effective_changes'],
+                ]),
+                $result['variant_replaced'] ?? []
+            );
         }
 
         $updated = BiogMain::find($personId);
@@ -140,7 +145,7 @@ class BiogMainMutationHandler extends AbstractMutationHandler {
     }
 
     protected function handleProposalUpdate(int $personId, array $updatedFields, array $merged, BiogMain $original, array $meta): JsonResponse {
-        ['payload' => $proposalData, 'replaced' => $variantReplaced] = $this->prepareProposalPayload($merged);
+        ['payload' => $proposalData, 'replaced' => $variantReplaced] = $this->prepareProposalPayload($merged, $updatedFields);
         $validator = Validator::make($proposalData, $this->validationRules($original), $this->validationMessages());
         if ($validator->fails()) {
             return $this->errorResponse('參數校驗失敗', 422, $validator->errors()->toArray());
@@ -209,19 +214,34 @@ class BiogMainMutationHandler extends AbstractMutationHandler {
     }
 
     /**
+     * @param array<int,string>|null $variantFields 只對這些欄位做落地替換；null＝整列。
      * @return array{payload: array, replaced: array<string,string>}
      */
-    protected function prepareProposalPayload(array $payload): array {
-        // 異體字落地替換（嚴格模式）：先替換姓／名分欄，再組出 c_name_chn，維持
-        // c_name_chn === c_surname_chn.c_mingzi_chn 的既有 invariant（見
-        // docs/CHAR_VARIANT_MAP_CALL_SITE_WIRING_PLAN.md 待決事項 1）。
-        $surnameReplaced = CharVariantMapService::replaceStrict((string) ($payload['c_surname_chn'] ?? ''));
-        $mingziReplaced = CharVariantMapService::replaceStrict((string) ($payload['c_mingzi_chn'] ?? ''));
-        $variantReplaced = CharVariantMapService::mergeReplaced($surnameReplaced['replaced'], $mingziReplaced['replaced']);
-        $payload['c_surname_chn'] = $surnameReplaced['text'];
-        $payload['c_mingzi_chn'] = $mingziReplaced['text'];
+    protected function prepareProposalPayload(array $payload, ?array $variantFields = null): array {
+        // 異體字落地替換（姓名欄 strict、其餘文本欄 lenient，由 VariantReplaceScope
+        // 按「表.欄位」決定）。
+        //
+        // 這裡**不能**只改 BiogMainRepository 就算了：提案 payload 不經 repository，
+        // 若漏掉此處，非姓名文本欄在審核畫面看到的字形會與核准後落庫的不一致。
+        //
+        // $payload 是「原列 ∪ changes」的整列，所以替換範圍要收在「本次實際變更的欄」——
+        // 否則審核者會在 diff 裡看到提案人根本沒改過的欄位被歸一（D6 不做回溯校正）。
+        $variantScope = $variantFields === null
+            ? $payload
+            : array_intersect_key($payload, array_flip($variantFields));
+        $variantResult = CharVariantMapService::replaceRow($variantScope, 'BIOG_MAIN');
+        $payload = array_replace($payload, $variantResult['data']);
+        $variantReplaced = $variantResult['replaced'];
 
-        $payload['c_name_chn'] = $surnameReplaced['text'].$mingziReplaced['text'];
+        // 組 c_name_chn 一律讀**替換後**的 $payload（維持 c_name_chn === 姓.名 的 invariant）；
+        // 兩個分欄都空時不重組，否則沒有明確姓氏的歷史人物（分欄 NULL、c_name_chn 存完整
+        // 姓名）會在任何一次更新提案裡被清成空字串（與 BiogMainRepository::updateById()
+        // 及 store() 的保護一致）。
+        $payload['c_surname_chn'] = (string) ($payload['c_surname_chn'] ?? '');
+        $payload['c_mingzi_chn'] = (string) ($payload['c_mingzi_chn'] ?? '');
+        if ($payload['c_surname_chn'] !== '' || $payload['c_mingzi_chn'] !== '') {
+            $payload['c_name_chn'] = $payload['c_surname_chn'].$payload['c_mingzi_chn'];
+        }
         $payload['c_name'] = trim(($payload['c_surname'] ?? '').' '.($payload['c_mingzi'] ?? ''));
         $payload['c_name_proper'] = trim(($payload['c_mingzi_proper'] ?? '').' '.($payload['c_surname_proper'] ?? ''));
         $payload['c_name_rm'] = trim(($payload['c_mingzi_rm'] ?? '').' '.($payload['c_surname_rm'] ?? ''));

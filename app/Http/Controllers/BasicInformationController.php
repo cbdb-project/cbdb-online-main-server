@@ -1758,7 +1758,7 @@ class BasicInformationController extends Controller {
             }
 
             // 非阻塞提示：異體字落地替換（嚴格模式），比照既有 flash(..., 'info') 慣例。
-            foreach (CharVariantMapService::buildNotices($storeResult['replaced']) as $notice) {
+            foreach (CharVariantMapService::buildNotices($storeResult['variant_replaced'] ?? []) as $notice) {
                 flash($notice.' @ '.Carbon::now(), 'info');
             }
 

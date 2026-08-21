@@ -1695,8 +1695,35 @@ class FakeSchemaBuilder {
         return array_key_exists($table, $this->schemaColumns);
     }
 
+    /**
+     * `VariantReplaceScope` 以 `Schema::getColumns()` 的 type_name 判斷哪些欄是文本型。
+     *
+     * 假 driver 一律回 varchar：這些代碼表欄位在真實庫都是 varchar／text。落地替換在本
+     * harness 下實際仍是 no-op（沒有 char_variant_map 表，服務會降級不替換），所以這個
+     * 方法只是讓型別查詢不炸——**不能**靠 loadColumnTypes() 吞掉 Error 來達成：那個
+     * catch 已收窄成「只有表確實不存在才降級」，否則一次瞬時錯誤會讓整個 process 之後
+     * 都不替換（見 plan S3 補記第 3 點）。
+     */
+    public function getColumns($table) {
+        return array_map(
+            static fn ($name) => ['name' => $name, 'type_name' => 'varchar'],
+            $this->getColumnListing($table)
+        );
+    }
+
     public function getIndexes($table) {
         return $this->schemaIndexes[$table] ?? [];
+    }
+
+    /**
+     * `CodesController::personFkColumns()` 用 `Schema::getForeignKeys()` 找指向 BIOG_MAIN
+     * 的欄位（人物選擇器與 -999 哨兵正規化靠它）。缺這個方法時該處的
+     * `catch (\Throwable)` 會吞掉 Error 並回 []，於是那段邏輯在本 harness 下**從未被驗證**，
+     * 每個寫入請求還會多噴一次 testing.ERROR。假 driver 沒有外鍵資訊，回空陣列即可
+     * ——需要驗證 FK 行為的測試應自己覆寫這個回傳值。
+     */
+    public function getForeignKeys($table) {
+        return [];
     }
 }
 
@@ -1822,6 +1849,14 @@ class FakeQueryBuilder {
         }, $this->applyConditions()));
     }
 
+    /**
+     * D7 兩形並存查重掃待審提案時用 lazyById() 分批（見 VariantEquivalentLookup）。
+     * 假 driver 的資料集本來就在記憶體裡，直接回 get() 的結果即可（語義上等價於單一批次）。
+     */
+    public function lazyById($chunkSize = 1000, $column = 'id', $alias = null) {
+        return $this->get();
+    }
+
     public function orderBy($column, $direction = 'asc') {
         $normalizedDir = strtolower((string) $direction) === 'desc' ? 'desc' : 'asc';
         $this->manager->recordedOrderBys[] = [(string) $column, $normalizedDir];
@@ -1941,6 +1976,13 @@ class FakeQueryBuilder {
             $needle = trim((string) $expected, '%');
 
             return stripos((string) $value, $needle) !== false;
+        }
+
+        // '!=' 必須明確處理：落到最後的等值比較會讓語義**反過來**（原本要排除的那列
+        // 變成唯一命中的列）。D7 兩形並存查重就是用 where('id','!=',$excludeId) 排除
+        // 「核准重放時自己那一筆」，靜默當成等值會讓它自擋。
+        if (in_array($condition['operator'], ['!=', '<>'], true)) {
+            return (string) $value !== (string) $expected;
         }
 
         if ($condition['operator'] === '<') {

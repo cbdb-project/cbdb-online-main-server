@@ -31,6 +31,7 @@ use Illuminate\Support\Facades\DB;
  * 配發 c_possession_record_id 並寫主表 + POSSESSION_ADDR。
  */
 class PossessionCreateHandler extends AbstractMutationHandler {
+    use \App\Services\Mutations\Concerns\AppliesVariantReplacement;
     protected BiogMainRepository $biogMainRepository;
     protected AuditLogService $auditLogService;
     protected OperationRepository $operationRepository;
@@ -69,6 +70,16 @@ class PossessionCreateHandler extends AbstractMutationHandler {
     }
 
     public function handle(string $resource, string $mode, string $operation, int $personId, array $targetPk, array $changes, array $meta = []): JsonResponse {
+        // 異體字落地替換的通知統一在此掛上（成功與 409／422 皆帶）。
+        $this->resetVariantReplaced();
+
+        return $this->withVariantNotices(
+            $this->handleAfterVariantReset($resource, $mode, $operation, $personId, $targetPk, $changes, $meta)
+        );
+    }
+
+    /** handle() 的原始流程；異體字通知由 handle() 統一掛上。 */
+    protected function handleAfterVariantReset(string $resource, string $mode, string $operation, int $personId, array $targetPk, array $changes, array $meta = []): JsonResponse {
         $authorizationError = $mode === 'proposal' ? $this->authorizeProposal() : $this->authorizeDirect();
         if ($authorizationError) {
             return $authorizationError;
@@ -91,6 +102,11 @@ class PossessionCreateHandler extends AbstractMutationHandler {
                 $writable[$f] = '0';
             }
         }
+
+        // 異體字落地替換（型別驅動；POSSESSION_DATA 全文本欄走 lenient）。放在白名單化與
+        // 哨兵正規化之後、direct／proposal 分派之前，兩條路徑寫的都是替換後的 $writable。
+        // c_possession_record_id 是數值 surrogate PK，沒有文本型 PK 成員要顧。
+        $writable = $this->applyVariantReplacement($writable, 'POSSESSION_DATA');
 
         $addr = $changes['c_addr_id'] ?? [];
         if (!is_array($addr)) {

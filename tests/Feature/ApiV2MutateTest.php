@@ -156,6 +156,8 @@ class ApiV2MutateTest extends TestCase {
             $table->integer('c_dy_intercalary')->default(0);
             $table->integer('c_index_year')->nullable();
             $table->integer('c_death_age')->nullable();
+            $table->text('c_notes')->nullable();
+            $table->string('c_tribe')->nullable();
             $table->string('c_created_by')->nullable();
             $table->dateTime('c_created_date')->nullable();
             $table->string('c_modified_by')->nullable();
@@ -619,6 +621,167 @@ class ApiV2MutateTest extends TestCase {
         $this->assertSame('張清', $payload['c_name_chn']);
         // 提案未核准前，BIOG_MAIN 本身不應變更。
         $this->assertDatabaseHas('BIOG_MAIN', ['c_personid' => 138841, 'c_mingzi_chn' => '忠']);
+    }
+
+    /**
+     * 只替換「使用者本次實際變更的欄」，不對他沒碰過的既有欄做回溯校正（D6）。
+     *
+     * BIOG_MAIN 是唯一在伺服器端把「原列 ∪ changes」合成整列再送進 repository 的資源，
+     * 若整列替換會有三個後果：(1) 回溯改寫使用者沒送的欄；(2) updated_fields 與實際落庫
+     * 不一致，提案審核 diff 會出現提案人沒改過的欄；(3) 某個舊欄被歸一會讓「完全沒改」
+     * 的存檔變成一筆真實 UPDATE。
+     */
+    #[Test]
+    public function testDirectBiogMainUpdateOnlyReplacesVariantsInSubmittedFields() {
+        $this->actingAs($this->makeUser(email: 'biog-scoped-variant@example.com'));
+        // 既有列的 c_notes 存著變體形（D6：既有資料不做回溯校正）。
+        $this->seedBiogMain(['c_notes' => '淸流舊注']);
+
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'basicinformation',
+            'person_id' => 138841,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_personid' => 138841]],
+            'changes' => ['c_death_age' => 61],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('BIOG_MAIN', [
+            'c_personid' => 138841,
+            'c_death_age' => 61,
+            'c_notes' => '淸流舊注', // 使用者沒送 c_notes ⇒ 不得被歸一
+        ]);
+    }
+
+    /** 送出的欄本身有變體字時照樣替換（與上一條互補，確保收窄沒有把機制關掉）。 */
+    #[Test]
+    public function testDirectBiogMainUpdateStillReplacesVariantsInTheFieldUserSubmitted() {
+        $this->actingAs($this->makeUser(email: 'biog-scoped-variant-on@example.com'));
+        $this->seedBiogMain(['c_notes' => '舊注']);
+
+        $response = $this->postJson('/api/v2/mutate', [
+            'resource' => 'basicinformation',
+            'person_id' => 138841,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_personid' => 138841]],
+            'changes' => ['c_notes' => '峯下人'],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('BIOG_MAIN', ['c_personid' => 138841, 'c_notes' => '峰下人']);
+        $this->assertNotEmpty($response->json('notices'));
+    }
+
+    /**
+     * 使用者送的字被歸一成與現值相同 ⇒ 422「未偵測到任何修改內容」，
+     * 這條回應也必須帶 notices，否則訊息看起來毫無道理。
+     */
+    #[Test]
+    public function testDirectBiogMainUpdateNoChangesResponseCarriesVariantNotices() {
+        $this->actingAs($this->makeUser(email: 'biog-nochange-notice@example.com'));
+        $this->seedBiogMain(['c_notes' => '清流']);
+
+        $response = $this->postJson('/api/v2/mutate', [
+            'resource' => 'basicinformation',
+            'person_id' => 138841,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_personid' => 138841]],
+            'changes' => ['c_notes' => '淸流'],
+        ]);
+
+        $response->assertStatus(422);
+        $this->assertNotEmpty($response->json('notices'), '422 也要帶異體字通知');
+        $this->assertDatabaseHas('BIOG_MAIN', ['c_personid' => 138841, 'c_notes' => '清流']);
+    }
+
+    /**
+     * 沒有明確姓氏的歷史人物（c_surname_chn／c_mingzi_chn 皆 NULL、c_name_chn 存完整姓名）：
+     * 對他做任何更新都不得把 c_name_chn 清成空字串。
+     *
+     * 舊碼在 updateById()／prepareProposalPayload() 無條件 `c_name_chn = 姓 . 名`，
+     * 而 v2 的 payload 是「原列 ∪ changes」⇒ 兩個 NULL 分欄相加＝''，姓名靜默消失。
+     * store() 早就有等價保護。
+     */
+    #[Test]
+    public function testDirectBiogMainUpdateDoesNotClearNameChnWhenPartsAreNull() {
+        $this->actingAs($this->makeUser(email: 'biog-unsplit-name@example.com'));
+        $this->seedBiogMain([
+            'c_name_chn' => '完顏阿骨打',
+            'c_surname_chn' => null,
+            'c_mingzi_chn' => null,
+        ]);
+
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'basicinformation',
+            'person_id' => 138841,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_personid' => 138841]],
+            'changes' => ['c_death_age' => 61],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('BIOG_MAIN', ['c_personid' => 138841, 'c_name_chn' => '完顏阿骨打', 'c_death_age' => 61]);
+    }
+
+    /** 提案路徑同理（payload 不經 repository）。 */
+    #[Test]
+    public function testProposalBiogMainUpdateDoesNotClearNameChnWhenPartsAreNull() {
+        $this->actingAs($this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'biog-unsplit-proposal@example.com'));
+        $this->seedBiogMain([
+            'c_name_chn' => '完顏阿骨打',
+            'c_surname_chn' => null,
+            'c_mingzi_chn' => null,
+        ]);
+
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'basicinformation',
+            'person_id' => 138841,
+            'mode' => 'proposal',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_personid' => 138841]],
+            'changes' => ['c_death_age' => 61],
+            'meta' => ['comment' => '只改卒年'],
+        ])->assertOk();
+
+        $operation = DB::table('operations')->where('resource', 'BIOG_MAIN')->first();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('完顏阿骨打', $payload['c_name_chn'], '提案 payload 不得把未分欄的姓名清空');
+    }
+
+    /**
+     * 提案 payload 也必須套用「姓名 strict、其餘文本欄 lenient」——這條路徑不經
+     * BiogMainRepository，而是 BiogMainMutationHandler::prepareProposalPayload()。
+     * 漏掉它會讓審核畫面看到的字形與核准後落庫的不一致（plan S3）。
+     */
+    #[Test]
+    public function testProposalBiogMainUpdateAppliesLenientRuleToNonNameTextColumns() {
+        $user = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'biog-proposal-lenient@example.com');
+        $this->actingAs($user);
+        $this->seedBiogMain();
+
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'basicinformation',
+            'person_id' => 138841,
+            'mode' => 'proposal',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_personid' => 138841]],
+            'changes' => [
+                'c_mingzi_chn' => '峯',
+                'c_notes' => '峯下人',
+            ],
+            'meta' => ['comment' => '提案：名用嚴格規則、備註用全量規則'],
+        ])->assertOk();
+
+        $operation = DB::table('operations')
+            ->where('resource', 'BIOG_MAIN')
+            ->where('op_type', Operation::TYPE_PROPOSAL_UPDATE)
+            ->first();
+        $payload = json_decode($operation->resource_data, true);
+
+        $this->assertSame('峯', $payload['c_mingzi_chn'], '名字欄 strict：峯 不替換');
+        $this->assertSame('張峯', $payload['c_name_chn']);
+        $this->assertSame('峰下人', $payload['c_notes'], '備註欄 lenient：峯→峰');
     }
 
     #[Test]

@@ -47,7 +47,11 @@ class PostingMutationHandler extends AbstractPersonSubresourceMutationHandler {
 
         try {
             // 僅改地址（無任何官名欄位變更）：父類會因 changes 空而 422，故獨立處理。
+            // 這條路徑不經 parent::handle()，所以自己重置替換紀錄（它只寫數值 addr id，
+            // 沒有文本欄要替換，但不重置會把上一筆 mutate 的通知帶進來）。
             if ($this->pendingIncomingAddr !== null && $changes === []) {
+                $this->resetVariantReplaced();
+
                 return $mode === 'proposal'
                     ? $this->handleAddressOnlyProposal($personId, $targetPk, $meta)
                     : $this->handleAddressOnlyDirect($personId, $targetPk);
@@ -59,7 +63,11 @@ class PostingMutationHandler extends AbstractPersonSubresourceMutationHandler {
             $errors = $e->errors();
             $msg = collect($errors)->flatten()->first() ?? '地址資料衝突';
 
-            return $this->errorResponse($msg, 409, $errors !== [] ? $errors : ['c_office_id' => ['conflict']]);
+            // 例外會穿過 parent::handle() 裡的 withVariantNotices()，所以這條 409 要自己補
+            // 通知——使用者的字被正規化後才撞到衝突，看不到通知會覺得 409 毫無道理。
+            return $this->withVariantNotices(
+                $this->errorResponse($msg, 409, $errors !== [] ? $errors : ['c_office_id' => ['conflict']])
+            );
         } finally {
             $this->pendingIncomingAddr = null;
         }

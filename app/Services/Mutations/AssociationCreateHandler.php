@@ -108,6 +108,12 @@ class AssociationCreateHandler extends AbstractPersonSubresourceCreateHandler {
 
         // 反向碼為哨兵 0：無有效反向可定位／偵測疑似 → 退回 legacy 無條件 insert（parity）。
         if ((int) $reverseAssocCode === 0) {
+            // D7：即使沒有有效反向碼可定位，插入的 c_text_title 已是歸一後字形；
+            // 對面若已有同一組固定 PK、書名為歷史變體形的列，這一插就造成兩形並存
+            // （唯一鍵擋不住不同字形）。拋例外由基底轉 409 並回滾整筆。
+            app(BiogMainRepository::class)
+                ->assertMirrorRenameHasNoVariantEquivalentRow('ASSOC_DATA', collect([]), $mirror);
+
             DB::table('ASSOC_DATA')->insert($mirror);
             $this->auditLogService->write(
                 'ASSOC_DATA',

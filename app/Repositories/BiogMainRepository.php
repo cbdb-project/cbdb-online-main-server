@@ -252,7 +252,7 @@ class BiogMainRepository {
         // docs/CHAR_VARIANT_MAP_CALL_SITE_WIRING_PLAN.md 待決事項 1）。
         $surnameReplaced = CharVariantMapService::replaceStrict((string) $request->c_surname_chn);
         $mingziReplaced = CharVariantMapService::replaceStrict((string) $request->c_mingzi_chn);
-        $variantReplaced = array_merge($surnameReplaced['replaced'], $mingziReplaced['replaced']);
+        $variantReplaced = CharVariantMapService::mergeReplaced($surnameReplaced['replaced'], $mingziReplaced['replaced']);
         $data['c_surname_chn'] = $surnameReplaced['text'];
         $data['c_mingzi_chn'] = $mingziReplaced['text'];
 
@@ -378,7 +378,7 @@ class BiogMainRepository {
         if (array_key_exists('c_surname_chn', $data) || array_key_exists('c_mingzi_chn', $data)) {
             $surnameReplaced = CharVariantMapService::replaceStrict((string) ($data['c_surname_chn'] ?? ''));
             $mingziReplaced = CharVariantMapService::replaceStrict((string) ($data['c_mingzi_chn'] ?? ''));
-            $variantReplaced = array_merge($surnameReplaced['replaced'], $mingziReplaced['replaced']);
+            $variantReplaced = CharVariantMapService::mergeReplaced($surnameReplaced['replaced'], $mingziReplaced['replaced']);
             $data['c_surname_chn'] = $surnameReplaced['text'];
             $data['c_mingzi_chn'] = $mingziReplaced['text'];
             $data['c_name_chn'] = $surnameReplaced['text'].$mingziReplaced['text'];

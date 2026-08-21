@@ -615,12 +615,13 @@ class AdminBatchLoadBookTitlesController extends Controller {
     protected function standardizeTitleVariants(string $title): array {
         $result = CharVariantMapService::replaceLenient($title);
 
-        $variantReplacements = [];
-        foreach ($result['replaced'] as $from => $to) {
-            $variantReplacements[] = ['from' => $from, 'to' => $to];
-        }
-
-        return ['title' => $result['text'], 'variant_replacements' => $variantReplacements];
+        // 用 flattenReplaced() 而不是自己 foreach：replaced 的值在衝突時會是 list
+        // （見 CharVariantMapService::mergeReplaced()），直接 foreach 會讓 'to' 變成陣列、
+        // JSON 化後打壞批次結果頁的契約（Pages/Admin/BatchLoadBookTitles/Index.tsx）。
+        return [
+            'title' => $result['text'],
+            'variant_replacements' => CharVariantMapService::flattenReplaced($result['replaced']),
+        ];
     }
 
     /**

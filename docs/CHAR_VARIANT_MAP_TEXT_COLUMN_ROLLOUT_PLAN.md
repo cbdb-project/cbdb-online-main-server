@@ -248,11 +248,21 @@ D3 已內嵌一份已查證的代碼鍵清單，直接進排除常數。本步�
   - 哨兵值不變式：`[n/a]`／`-9999`／`<待删除>` 與 `c_variant_char` 集合無交集（今天成立是資料巧合）。
   - 淺層掃描：嵌套陣列值原樣保留。
 
+> **S1 已完成的實作約定（S2–S7 必讀）**：`replaced` 的值在衝突時**會是 list** ——
+> 同一個變體在 strict 欄與 lenient 欄的閉包終點可以不同（`龴→峯`(excluded=0) +
+> `峯→峰`(excluded=1)：strict 得「峯」、lenient 得「峰」）。因此：
+> - **只能經 `CharVariantMapService::buildNotices()`／`withNotices()`／`flattenReplaced()` 消費**，
+>   **不可直接 `foreach` 取值或 `implode`**（會拋 "Array to string conversion"，或把陣列
+>   JSON 化進前端 payload 而打壞契約）。
+> - 合併兩份 `replaced` 一律用 `CharVariantMapService::mergeReplaced()`，
+>   **不可用 `+=` 或 `array_merge`**（兩者都會靜默丟掉一個參考字，讓通知與實際落庫的字形不一致）。
+> - 需要結構化 payload（例如批次匯入結果頁的 `variant_replacements`）時用 `flattenReplaced()`。
+
 ### S2：Codes UI 全表串接（G1）
 
 5 條路徑在現有 `normalizeCodeTablePinyin()` 呼叫的**下一行**插入 `replaceRow($data, $table)`：`:1766`（`performStore`）、`:1349`（`performUpdate`）、`:1512`（`performProposalStore`）、`:1843`（`performProposalUpdate`）、`:1624`（`proposalUpdateExisting`）。
 
-- direct 兩條：`replaced` 非空時 `flash(...,'info')`；它們之後才呼叫 `applyColumnDefaultsForBlanks()`（`:1769`／`:1352`），**三條提案路徑不呼叫它**，只需在記 operation 之前。
+- direct 兩條：`replaced` 非空時把 `buildNotices()` 的每則訊息 `flash(...,'info')`（**不要自己組字**，見上方 S1 約定）；它們之後才呼叫 `applyColumnDefaultsForBlanks()`（`:1769`／`:1352`），**三條提案路徑不呼叫它**，只需在記 operation 之前。
 - 提案三條：替換後的值進 `operations.resource_data`（`$table` 傳**目標表**，不是 `operations`）。
 - 同時涵蓋 Blade 與 React（共用 `perform*`）。
 - **`char_variant_map` 的 guard**：`performStore()`／`performUpdate()` 落庫前呼叫 `CharVariantMapService::assertWritable($data, $id)`（違反回 flash error 且不寫入），成功後呼叫 `CharVariantMapService::reset()`。三條提案路徑寫的是 `operations`、不改對照表，**不需要** reset，但仍建議在提案建立時先跑 `assertWritable()` 提早拒絕。

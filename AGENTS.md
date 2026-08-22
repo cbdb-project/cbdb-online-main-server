@@ -35,6 +35,64 @@
 - 提案 payload／operation 快照裡的稽核欄是「審計事實」可保留；但任何寫入路徑（handler 重放、
   通用核准、restore）落庫前必須剔除或覆蓋，不可原樣回寫。
 
+### 1.3 文本寫入一律經異體字落地替換
+- 任何**會把文本寫進資料庫**的新路徑，落庫前必須經過
+  [CharVariantMapService](./app/Services/CharVariantMapService.php) 的
+  `replaceRow($data, $table)`（整列）或 `replaceFor($table, $column, $value)`（單值）。
+- **範圍由欄位型別決定**（見 [VariantReplaceScope](./app/Support/VariantReplaceScope.php)）：
+  呼叫端**不需**自己判斷「這欄有沒有中文」，也**不要**自己維護欄位清單。未知表 fail-closed
+  （一律不替換），所以 `$table` 要傳**目標資料表**、永遠不要傳 `operations`。
+- **模式不由呼叫端選，預設是寬鬆（全量規則）**。strict 是逐欄位的例外（人名／別名欄），
+  **不要假設「人物相關的表就該用 strict」**——同一列裡姓名欄 strict、`c_notes` lenient 是刻意的。
+- **掛鉤位置是硬性要求**：必須早於 **PK 計算、查重／去重鍵查詢、拼音派生、以及
+  `operations.resource_id`／`audit_log.row_pk` 的組裝**。否則會出現「查重用替換前的值、
+  落庫用替換後的值」，或稽核鏈指向一個不存在的鍵。
+  已知的文本型 PK 成員：`ALTNAME_DATA.c_alt_name_chn`、`ASSOC_DATA.c_text_title`、
+  `BIOG_SOURCE_DATA.c_pages`；已知去重鍵：`SOCIAL_INSTITUTION_NAME_CODES.c_inst_name_hz`；
+  已知標籤→代碼鍵：`DYNASTIES.c_dynasty_chn`、`SOCIAL_INSTITUTION_TYPES.c_inst_type_hz`／`_py`、
+  `NIAN_HAO.c_nianhao_chn`；已知由中文派生：`OFFICE_CODES`／`TEXT_CODES`／機構名的拼音欄。
+- **精確比對必須處理「兩形並存」**：既有列在 D6 之下保留變體形、新列是參考形，所以查重／
+  去重／重用查詢要**兩形都探**（或走
+  [VariantEquivalentLookup](./app/Support/VariantEquivalentLookup.php)）。少了這道，替換會
+  **製造**新的重複列，而唯一鍵擋不住（不同字形＝不同鍵值）——**那比完全不替換更糟**。
+  改鍵時要排除「正在編輯的那一列自己」，而且**只在真的改鍵時檢查**（否則歷史上就已兩形並存的
+  資料會變成任何更新都做不了）。
+- **繼承既有基底類別就自動生效**（`AbstractPersonSubresourceCreateHandler`／
+  `AbstractPersonSubresourceMutationHandler`／`AbstractCodeTableMutationHandler` 都掛了
+  `Concerns\AppliesVariantReplacement`，且在 `handle()` 裡實際呼叫）；只有**不繼承**的新寫入
+  路徑才需要自己掛。兩個常被忽略的邊界：
+  - 繼承了基底、但**額外**自己寫副表／鏡像／聚合列的 handler，那些額外寫入**不在**基底掛鉤的
+    覆蓋範圍內，要自己再掛一次（傳該副表的表名）。
+  - `applyVariantReplacement($data)` 省略表名時取 `$this->tableName()`；**沒有那個方法的
+    handler 必須顯式傳表名**，否則是 runtime fatal 而非靜態錯誤。
+  機械化把關見 `tests/Unit/VariantReplaceHookCoverageTest.php`：繞過基底又沒登記例外時它會紅；
+  清冊分成三本，**已經掛上 trait 的類別不可列進 EXEMPT／EXEMPT_DELEGATES**：
+  「確實不需要掛」（`EXEMPT`，每筆要寫理由）、「寫入委派給下層」（`EXEMPT_DELEGATES`，要指名
+  下層檔案與掛鉤數、會被機械檢查）、「繼承基底但自己另有寫入」（`SUBCLASS_EXTRA_WRITES`，
+  只認**寫在自己檔案裡**的額外寫入；委派給下層方法的鏡像同步偵測不到，要人工判斷）。
+  該測試同時逐檔記數鎖住 handler 體系之外的掛鉤點（controller／repository／import service），
+  掛鉤變少也會紅。**但它不是全庫掃描**：在 `app/Services/Mutations` 以外新開一個檔案直接落庫，
+  只有 code review 擋得住。
+- **替換發生了就要讓使用者知道**：handler 內用 `withVariantNotices()` 把通知掛上回應，
+  **成功、409、422 都要掛**——被擋下來時使用者更需要知道「我輸入的字被正規化了」。
+  累積器在每次 `handle()` 開頭重置；基底一律用 `mergeReplaced()` 而非 assign（直接 assign 會把
+  上游收集到的通知靜默吃掉）。
+- **不該替換的地方一律不掛**（見 `VariantReplaceScope` 的三組排除清單）：
+  - 本身做文本替換／字形對照的表（`char_variant_map` 自己替換自己等於自我吞噬）；
+  - 語義上必須保留原字的欄位：稽核署名、URL、跨表 join／查表鍵、拉丁人名與拼音欄、
+    唯讀派生索引（`CBDB__NAME_FTS`）、以及**紀錄類**表（`operations`／`audit_log`：
+    快照的語義是「當時實際發生什麼」，改寫等於偽造紀錄）。
+  - **新增任何對照／映射性質的表，或任何需保留原始字形的欄位時，必須同步加進排除清單。**
+  - 同理：`restore`（還原歷史快照）與「只刪不寫」的分支**不做內容替換**；
+    鏡像的**定位鍵**不可單邊歸一（會讓偵測永遠找不到、修復工具失去幂等）。
+- **新增對照時要評估搜尋端**：該字的新舊資料會互相搜不到，需評估姓名搜尋與
+  `CBDB__NAME_FTS` 的建索引。**不要去改 `VariantCharNormalizer`**——它做的是拼音派生，
+  與落地替換是兩件事。
+- 「不要再改舊 Blade」的**例外**：資料完整性規則（§1.1／§1.2／§1.3）適用於所有**仍在服役**的
+  寫入路徑，不分新舊（例如 `saveas()`／`Duplicate_Collateral_Info()`／v1 token API／
+  眾包回填都還活著）。只有已被閘門下架**且**有替代品的路徑才豁免。
+- 背景與逐步執行紀錄：[docs/CHAR_VARIANT_MAP_TEXT_COLUMN_ROLLOUT_PLAN.md](./docs/CHAR_VARIANT_MAP_TEXT_COLUMN_ROLLOUT_PLAN.md)。
+
 ### 2. 複合主鍵
 - Laravel Eloquent 不支援複合主鍵。
 - 複合主鍵表請使用 Query Builder，不要建立仰賴 Eloquent 主鍵行為的模型。
@@ -115,6 +173,7 @@ php artisan cbdb:fetch-chgis-map        # 下載 CHGIS 底圖（缺檔才下載�
 - 跑過受影響測試；若改動面大，跑 `./vendor/bin/phpunit`
 - 改了前端資源時，跑 `npm run build`
 - **改了 API（路由／請求回應欄位／授權／錯誤碼／resource 別名或白名單）時，同步更新 `API.md`**（見「文檔維護原則」）
+- **新增或修改「把文本寫進資料庫」的路徑時，確認已掛上異體字落地替換**（§1.3；繼承既有基底類別即自動生效，不繼承的要自己掛；只有「確實不需要掛」或「寫入委派給下層」才登記進 `tests/Unit/VariantReplaceHookCoverageTest.php` 的例外清冊，並跑該測試確認沒紅）
 - commit message 使用繁體中文
 
 ## 高風險區域備忘

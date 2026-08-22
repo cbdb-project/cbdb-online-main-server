@@ -407,3 +407,22 @@ php artisan tinker
 - `database/migrations/` - 所有數據庫結構定義
 - `docs/DATABASE_SCHEMA.md` - 由 `php artisan cbdb:generate-schema-docs` 自動生成的 schema 總覽（MySQL + SQLite）
 - `docs/SCHEMA_DOCS_GENERATION.md` - schema 文件生成指令的完整使用說明
+
+## 新增欄位／表格時：異體字落地替換的範圍
+
+替換範圍是**型別驅動**的（見 `app/Support/VariantReplaceScope.php`），所以：
+
+- **新增任何文本型欄位（varchar／char／text 系列）＝自動進入替換範圍**，不需要註冊。
+  這是刻意的（避免「漏掉某欄」的清單維護），但也意味著：**若那一欄語義上必須保留原始字形，
+  必須主動加進排除清單**。
+- **新增對照／映射性質的表**（內容就是字形本身、或作為跨表查表鍵）**必須加進
+  `VariantReplaceScope::EXCLUDED_TABLES`**——否則它會被自己的規則改寫（`char_variant_map`
+  就是這個理由被整表排除）。
+- 常見要排除的欄位型態：稽核署名、URL／識別碼、跨表 join 或查表鍵（替換會打斷關聯）、
+  拉丁人名與拼音欄、唯讀派生索引、紀錄類表（`operations`／`audit_log` 的快照是審計事實）。
+- 新增表若沒登記在 `config/codes.php`／`CompositePrimaryKey::SCHEMAS`／
+  `config/code_table_writes.php`／`config/code_table_mutations.php` 之一，會被 fail-closed
+  當成未知表而**完全不替換**——`tests/Feature/VariantReplaceRegistryDriftTest.php` 會在有
+  未分類的表時變紅，順著它的訊息把新表歸類。
+
+規則全文見 AGENTS.md §1.3。

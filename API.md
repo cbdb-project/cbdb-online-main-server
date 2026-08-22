@@ -1560,6 +1560,9 @@ v2 提案流程上線前的舊機制，仍在線但**建議一律改用 `/api/v2
 
 - 這條通道寫入的是 `operations` 表且 `crowdsourcing_status = 2`，**與 v2 的提案（`op_type` 8／9／10、`__review_status`）是兩套不同的機制**，也不會出現在 `GET /api/v2/operations`（該端點只回 `crowdsourcing_status = 0`）。此處的 `op_type` 1／3／4 與第三章「一般操作」的編碼相同，但語義是「待處理的眾包投稿」，不是已落庫的操作。
 - 它不做欄位白名單、不驗證複合主鍵，寫入 `add`／`update`／`delete` 時也不寫 `audit_log`（只有 `token` 端點會記安全審計）；`json` 是整包字串。
+- **`json` 裡的文本值會先做異體字落地替換才存進 `operations.resource_data`**（與 v2 同一套規則：人名／別名欄 strict、其餘文本欄用全量規則 lenient；`resource` 必須是註冊表內的**精確拼寫**，大小寫或前後空白不符時**整包不替換**）。
+- `resource_original`（`update` 與 `delete` 會寫，`add` 不寫；部分 delete 分支寫 `null`）是**寫入前的既有列快照**，不是使用者送出的內容，且刻意不替換——那是「當時實際長什麼樣」的事實。由於既有資料不做回溯校正，既有列仍保留原字形，因此審核畫面的 diff 會多出「字形被改寫」那幾行，這是預期現象。
+- 眾包核准回填（`confirm()`）**會再替換一次**：舊提案可能早於落地替換上線，所以那裡是最後一道；重複套用是幂等的（對照表以閉包終點儲存），不會二次漂移。
 - token 是**長期有效且無到期機制**的憑證（帳號的 `confirmation_token`），與 14.2 的 Sanctum token 不同，請勿外流。
 - 回應形狀不一致且**狀態碼不可靠**：`add` 成功回 JSON `{"status_code":200,"message":"..."}`，`update`／`delete` 成功回裸字串 `'200'`；權限不足回 `'403'`（HTTP 403），但**參數缺漏回裸字串 `'500'` 而 HTTP 狀態碼其實是 200**——只看狀態碼會把失敗當成功。
 

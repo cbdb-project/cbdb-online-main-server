@@ -5,6 +5,54 @@
 >
 > **文件結構約定**：「決策」只寫**規則**；所有要做的事都在「實作步驟」。同一件事不重複兩處。
 
+## 執行狀態：**已完成**（2026-08-21）
+
+S0～S9 全部完成，逐步 rebase merge 進 `develop`（線性歷史）：
+
+| 步驟 | commit | 內容 |
+|---|---|---|
+| S0＋S1 | `a821dea0` | varchar 代碼鍵補充掃描、`VariantReplaceScope`／`replaceRow()`／`replaceFor()`／`assertWritable()` |
+| S2 | `8fe1a8cb` | Codes UI 全表串接（含提案） |
+| S3 | `45e701a8` | 人物子資源與 BIOG_MAIN 全面串接，補上兩形並存查重 |
+| S4 | `d6381042` | 官職／社會機構聚合串接，標籤對照表兩側歸一 |
+| S5 | `fb9b76db` | token API 代碼表 create／update |
+| S6 | `c1ffa4a4` | 提案核准的直接寫庫分支，補上核准端的兩形並存守衛 |
+| S7 | `9f16c24c` | 眾包回填、v1 端點、複製與修復工具 |
+| S8 | `b0dde593` | 規則（`AGENTS.md` §1.3、兩份 skill）與機械化把關測試 |
+| S9 | 本次 | 文件收尾：`API.md`／`docs/openapi/openapi.yaml`／`CHANGELOG.md`／本文件狀態 |
+
+### 與原計畫的偏差（逐條）
+
+- **D7（兩形並存）的份量被嚴重低估**。原計畫把它寫成一條決策；實作中它是**每一步都要重做一次**
+  的工作：v2 create 的查重、mutation 的改鍵偵測、ASSOC 鏡像改名、機構名去重鍵、標籤→代碼查表、
+  提案核准的落庫前檢查，每一處都要嘛兩形都探、要嘛顯式排除。為此抽出
+  `app/Support/VariantEquivalentLookup.php`（原計畫沒有這個檔案）與 `app/Support/VariantLabelMap.php`。
+  多數 review／codex 的 HIGH 都落在這一類：**替換把原本乾淨的 409／1062 變成靜默的重複列**。
+- **「只在真的改鍵時檢查」是後來才明確的**。無條件做兩形並存檢查會讓「歷史上就已兩形並存」的
+  資料變成任何更新都做不了（false 409）。鏡像那一側還要進一步只看**在範圍內**的 PK 欄，
+  因為鏡像同步本來就會重寫數值型的 `c_kin_id`／`c_assoc_kin_id`。
+- **稽核鏈的字形一致性比預期難**。除了「替換要早於 `resource_id`／`row_pk` 組裝」，S6／S7 還發現
+  刪除路徑必須用**實際被刪的那一列**去組 `resource_id` **與兩份快照**——否則同一筆稽核的 id 與
+  內容字形互相矛盾，還原會重建一列從未存在過的資料。
+- **`VariantReplaceScope` 的表名要正規化兩次**。fail-closed 閘門對大小寫／空白不敏感，但查 schema
+  時若用原字串，會把空的欄位集**快取住**、讓該表在整個 process 之後都不替換（靜默失效）。
+  因此補了 `canonicalTableName()`；而在兩個外部入口（v1 token API、眾包回填）**刻意要求精確拼寫**，
+  不做正規化派發——那會擴大未經信任的輸入能寫到的表。
+- **BIOG_MAIN 的替換必須只針對「使用者這次真的改的欄位」**。原計畫的整列 `replaceRow()` 在 v2
+  等於偷偷做 D6 明文排除的回溯校正，因此 `updateById()` 多了 `$variantFields` 參數。
+- **`Duplicate_Collateral_Info()` 需要 per-table 去重**。歸一可能把兩列塌到同一個文本型 PK 上，
+  整份複製會因 1062 全數回滾；改為跳過並 `Log::warning`。
+- **修復工具只替換非主鍵欄**。鏡像的定位鍵單邊歸一會讓偵測永遠找不到那一對、修復失去幂等。
+  同理 pair-only 鏡像修復刻意整列照抄既有列。
+- **通知（notices）的覆蓋面比原計畫大**：成功之外，409／422 也要帶——被擋下來時使用者更需要
+  知道「我輸入的字被正規化了」。基底一律用 `mergeReplaced()`（直接 assign 會把上游通知靜默吃掉）。
+- **S8 的把關做得比原計畫重**。原計畫只要求「列舉 handler + 例外清冊」；實測那樣有四個假綠管道
+  （例外條目短路掉真實檢查、只 `use` 不呼叫、字串字面值冒充掛鉤、把寫入搬進非 handler 檔案），
+  因此改成全體 handler 都要交代、比對走 PHP tokenizer、掛鉤點逐檔**記數**。
+- **不做的維持不做**：D6（回溯校正）、`restore` 的內容替換、D9（搜尋端歸一）、
+  `MergePreviewController` 產生的帶外 SQL、已被閘門下架的 legacy 寫入路徑。
+- **`docs/openapi/openapi.yaml` 原本完全沒有 `notices`**（不只是沒同步這次的擴張），S9 一併補上。
+
 ## 背景與現況
 
 第一階段的目標宣告是把 `TITLE_VARIANT_MAP` 擴充成「所有表的錄入端都能查詢的通用對照」。第二階段採**逐點手掛**，因此目前全庫只有這些生產呼叫：

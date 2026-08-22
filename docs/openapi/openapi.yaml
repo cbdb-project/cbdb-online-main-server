@@ -13,6 +13,15 @@ info:
 
     `POST /api/v2/get` is the recommended way to read a single record because it supports
     nested `target.pk` payloads naturally. `GET /api/v2/get` is kept for compatibility.
+
+    Variant-character replacement: every text column is normalized against `char_variant_map`
+    before it is written (name/alias columns use the strict rule set, all other text columns
+    use the full set). When a replacement happened the response carries a top-level `notices`
+    array - on success responses as well as on 409/422 failures. If the replaced column is
+    part of the primary key (e.g. `ALTNAME_DATA.c_alt_name_chn`), `result.pk` in the response
+    is the key that was actually written; do not reuse the submitted value. Other silent
+    rewrites (pinyin `v` normalized to `ü`, bracket normalization, sentinel
+    normalization) produce no `notices`.
 servers:
   - url: /
 tags:
@@ -355,6 +364,8 @@ components:
         result:
           type: object
           additionalProperties: true
+        notices:
+          $ref: '#/components/schemas/Notices'
       additionalProperties: true
     GetSuccessResponse:
       type: object
@@ -402,4 +413,22 @@ components:
                 - type: number
                 - type: boolean
                 - type: 'null'
+        notices:
+          $ref: '#/components/schemas/Notices'
       additionalProperties: true
+    Notices:
+      type: array
+      description: |
+        Human-readable notes about server-side rewrites that the client did not ask for.
+        Present only when a variant-character replacement happened; appears on success
+        responses and on 409/422 failures alike (a "primary key already exists" or
+        "no effective changes" message is confusing without it).
+      items:
+        type: string
+      example:
+        - 異體字：「淸」已正規化為「清」
+      x-note: |
+        One notice covers every column in the request; the message lists the
+        variant/reference pairs that were applied and does not attribute them to
+        individual columns.
+

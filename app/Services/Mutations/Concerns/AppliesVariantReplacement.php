@@ -34,8 +34,12 @@ trait AppliesVariantReplacement {
      * 別名替換通知就消失了）。
      *
      * @param array<string,mixed> $data
-     * @param string|null $table 目標資料表；省略時取 `$this->tableName()`（基底體系內的
-     *                           子資源都有這個方法，體系外的三個例外 handler 沒有，需明給）
+     * @param string|null $table 目標資料表；省略時取 `$this->tableName()`。
+     *                           **沒有 `tableName()` 的 handler 必須顯式傳表名**，否則會
+     *                           runtime fatal（不是靜態錯誤）。目前顯式傳表名的四個：
+     *                           `CodeTableCreateHandler`（表由請求決定）、
+     *                           `PossessionCreateHandler`、`PostingCreateHandler`、
+     *                           `SourceMutationHandler`。
      * @return array<string,mixed>
      */
     protected function applyVariantReplacement(array $data, ?string $table = null): array {

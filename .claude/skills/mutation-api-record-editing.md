@@ -120,6 +120,60 @@ CBDB prod 的維基／維基數據關聯存在 **`BIOG_SOURCE_DATA`**（不是 `
 
 參考實作：`cbdb-dbs/d1_build_*/round3/sync_zhwiki_sources.py`（dry-run 預設、`--only`/`--limit`/`--offset` 分批、`--operator`、`--renote`、429 退避、結果 CSV 存 operation_id）。流程總覽見 `docs/ZHWIKI_SOURCE_SYNC.md`。
 
+## 新增／修改寫入路徑：異體字落地替換（必掛）
+
+見 AGENTS.md §1.3。這裡是**實作步驟**與踩過的坑。
+
+### 掛哪個 hook
+
+| 情況 | 做法 |
+| ------ | ------ |
+| 繼承 `AbstractPersonSubresourceCreateHandler`／`AbstractPersonSubresourceMutationHandler`／`AbstractCodeTableMutationHandler` | **什麼都不用做**，基底的 `handle()` 已掛 `Concerns\AppliesVariantReplacement` |
+| 不繼承上述基底（例如自己組 payload 的聚合 handler、repository 方法、controller） | 自己 `use Concerns\AppliesVariantReplacement`，在**落庫前**呼叫 `$data = $this->applyVariantReplacement($data)`；沒有 `tableName()` 的類別要顯式傳表名 `applyVariantReplacement($data, $table)`（省略會 fallback 到不存在的方法而 **runtime fatal**，不是靜態錯誤） |
+| 不是 handler（controller／service／repository） | 直接 `CharVariantMapService::replaceRow($data, $table)['data']`；單值用 `replaceFor($table, $column, $value)['text']`（`$input` 的鍵是「輸入欄名」而不是資料表欄名時，`replaceRow()` 會全部判成非文本欄而跳過——這種情況一定要用 `replaceFor()` 逐欄呼叫） |
+
+### 掛鉤位置（順序錯了就是 bug）
+
+必須早於：**PK 計算 → 查重／去重鍵查詢 → 拼音派生 → `operations.resource_id`／`audit_log.row_pk` 組裝**。
+
+- 早於 PK 計算：`ALTNAME_DATA.c_alt_name_chn`、`ASSOC_DATA.c_text_title`、`BIOG_SOURCE_DATA.c_pages`
+  都是**文本型 PK 成員**，替換等於改鍵。
+- 早於變更偵測：否則「送變體形、現值已是參考形」會被判成有變更而寫一次無意義的 UPDATE。
+- 早於拼音派生：拼音逐字查 `pinyin.c_chn`（**該欄**在 `EXCLUDED_COLUMNS`——不是整張 `pinyin` 表——所以異體字保有自己的讀音），先替換才會拿到
+  參考字的讀音，中文欄與拼音欄才不會各說各話。
+- 早於 `resource_id`／`row_pk`：否則同一筆稽核的 id 與內容字形矛盾，還原時會重建一列從未存在
+  過的資料。
+
+### 通知（notices）怎麼接
+
+- handler 內：`replaced` 由 trait 收在 `$this->variantReplaced`，回應用 `withVariantNotices($response)`
+  掛上（**成功、409、422 都要掛**——被擋下來時使用者才知道「我輸入的字被正規化了」）。
+- 非 handler：`CharVariantMapService::buildNotices($replaced)` 取字串陣列；批次頁用
+  `flattenReplaced()` 取 `[{from,to}]`。
+- ⚠️ **不要自己 implode `replaced`**：衝突時值會是 list（同一變體在 strict 與 lenient 欄的閉包
+  終點可以不同），直接字串串接會拋 "Array to string conversion"。
+- ⚠️ **子類不要再呼叫一次 `replace*()`**：通用掛鉤先跑過、值已是參考形，再呼叫一次的 `replaced`
+  恆為 `[]`；若又 assign 回 `$this->variantReplaced`，**通知會靜默消失**（S3 修掉的失效模式）。
+  基底一律用 `mergeReplaced()` 而非 assign。
+- 累積器記得重置：同一個 service／handler 實例在批次中逐列被呼叫，不重置會把上一列的通知帶到
+  下一列（S4 修過一次）。
+
+### 測試該斷言什麼
+
+1. **落庫值**是參考形（不只看回應）。
+2. **回應回落庫值**，而不是使用者原輸入（S4 抓到的缺陷：DB 寫參考形、回應回變體形，
+   前端畫面與資料庫不一致）。
+3. **notices 存在**；失敗回應（409／422）也要有。
+4. **同一列 strict／lenient 並存**：姓名欄的 `峯` 不替換、同列 `c_notes` 的 `峯`→`峰`。
+   （種子只放 `淸→清` 是測不出模式分流的——它的 `c_strict_excluded = 0`。）
+5. **兩形並存查重**：既有列是變體形、新增參考形 ⇒ 409 而不是鑄出第二列；改鍵同理；
+   而「只改非 PK 欄」在歷史上就已兩形並存時**不可**被誤擋。
+6. **提案 payload** 存的是替換後的值，且核准落庫與 payload 一致。
+7. 負向：`restore`／「只刪不寫」的快照**不替換**（並在同一支測試裡加一句正向對照，
+   例如 `assertSame('清', CharVariantMapService::replaceFor($t, $c, '淸')['text'])`，
+   否則機制整體死掉時負向斷言會假綠）。
+8. 鑑別力：把掛鉤中和掉（改成 `return $data;`）跑一次，確認**真的會紅**。
+
 ## 相關檔案
 
 - `app/Http/Controllers/Api/MutationController.php`（store／create／delete／get）

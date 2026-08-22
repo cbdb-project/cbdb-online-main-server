@@ -4,6 +4,21 @@
 
 ## 2026-08
 
+### 異體字落地替換擴張到「所有文本型別欄位」（行為擴張，非修 bug）
+
+- **這是行為擴張**：先前只有 BIOG_MAIN 姓名、ALTNAME_DATA 別名、書名批次匯入三處會做落地替換；現在**所有經應用層寫入的文本欄**（含 `c_notes` 這類自由文字）落庫前都會依 `char_variant_map` 把變體字改寫成參考字。使用者送 `淸` 存進去會變成 `清`。
+- **範圍由欄位型別決定，不由呼叫端維護清單**（`app/Support/VariantReplaceScope.php`）：`Schema::getColumns()` 的型別是 char/varchar/text 系列就在範圍內；未知表 **fail-closed**（一律不替換），所以 `$table` 必須傳目標資料表、永遠不要傳 `operations`。預設用**全量規則（lenient）**，人名／別名欄才用 strict（`c_strict_excluded` 那組例外，例如 `峯` 在姓名欄不替換、在 `c_notes` 會）。
+- **不替換的地方**（節錄；完整清單是 `VariantReplaceScope` 的三組排除常數）：字形對照表自身、拼音字典鍵 `pinyin.c_chn`、稽核署名、URL、跨表 join／查表鍵、拉丁人名與拼音欄、派生／唯讀索引（`ADDRESSES`、`CBDB__NAME_FTS`、兩個 view），以及**紀錄與帳號類**表（`operations`／`audit_log`／`users`／`nl_query_logs`／`ai_fill_logs`——快照的語義是「當時實際發生什麼」，改寫等於偽造紀錄）。`restore`（還原歷史快照）與「只刪不寫」的分支同理不做內容替換。
+- **不做既有資料的回溯校正**（D6）：既有列保留原字形。因此**「兩形並存」是常態**，任何做精確比對的地方（查重、去重鍵、標籤→代碼查表、鏡像定位）都必須**兩形都探**（`app/Support/VariantEquivalentLookup.php`）。少了這道，替換會**製造**新的重複列而唯一鍵擋不住（不同字形＝不同鍵值）——**那比完全不替換更糟**，這是整個階段最容易做錯的地方。
+- **文本型主鍵成員替換＝改列身分**：`ALTNAME_DATA.c_alt_name_chn`、`ASSOC_DATA.c_text_title`、`BIOG_SOURCE_DATA.c_pages`。因此掛鉤位置是硬性要求——必須早於 PK 計算、查重、拼音派生，以及 `operations.resource_id`／`audit_log.row_pk` 的組裝；否則稽核鏈會指向一個不存在的鍵，還原時會重建一列從未存在過的資料。
+- **搜尋端完全沒有異體字歸一化**（D9，已知落差、列為下一階段候選）：新寫入的資料是參考形、既有資料是變體形，**兩者互相搜不到**。以 `淸`／`清` 為例，用變體形搜不到新資料、用參考形搜不到舊資料；`CBDB__NAME_FTS` 也不對變體字做歸一（它刻意同時保存繁簡兩形，但那是繁簡轉換、與異體字對照是兩件事）。新增對照時要一併評估這件事。
+- 涵蓋的寫入路徑：Codes CRUD（含提案）、13 個人物子資源的 v2 create／update、官職與社會機構聚合匯入、token API 代碼表寫入、**提案核准的直接寫庫分支**、眾包回填 `confirm()`、v1 token API 的 `add`／`update`、`saveas()` 與 `Duplicate_Collateral_Info()`、單向關係修復工具（僅非主鍵欄）；以及**與 v2 共用 `BiogMainRepository` 的 legacy Blade 人物編輯寫入**（BIOG_MAIN／KIN_DATA／ASSOC_DATA／ALTNAME_DATA）與前階段就有的書名批次匯入。年號與官名的**查表**（`PostingAutofillService`）不是寫入，但也改成兩形都探。
+- **v1 token API 的已知現象**：提案的 `resource_data` 存替換後的值，而 `resource_original`（更新前的**既有列**快照，不是使用者送出的內容）刻意不替換——快照的語義是「當時實際長什麼樣」。既有列在 D6 之下保留原字形，所以審核畫面的 diff 會多出「字形被改寫」的那幾行，這是預期現象、不是 bug。眾包核准回填會再替換一次（舊提案可能早於本次上線），依 D8 幂等。
+- **批次匯入與 token API create 之間仍有非字形的行為差異**（欄位白名單、必填檢查），與本階段無關、未一併收斂。
+- `notices`：發生替換時回應會多一個頂層 `notices` 陣列，**成功、409、422 都會帶**——被擋下來時使用者更需要知道「我輸入的字被正規化了」。詳見 `API.md`。
+- **常規化**：`AGENTS.md` §1.3 訂為資料完整性規則，`tests/Unit/VariantReplaceHookCoverageTest.php` 機械化把關（繞過掛鉤又沒登記例外時會紅）。
+- 逐步執行紀錄見 [docs/CHAR_VARIANT_MAP_TEXT_COLUMN_ROLLOUT_PLAN.md](./docs/CHAR_VARIANT_MAP_TEXT_COLUMN_ROLLOUT_PLAN.md)。
+
 ### LLM 產出的 Markdown 統一改用共用渲染器（Query Playground QA／NL 查詢／NL 查詢日誌／AI 代碼查詢）
 - 起因：`/app/query-playground?mode=qa` 的回答與 `/app/query-playground/nl-query-logs` 的 LLM Response 都是 Markdown，但前者靠 `HistoricalQaPanel.tsx` 裡一個手刻的正則渲染器、後者根本沒渲染。實測手刻版對一段典型回答的輸出：有序清單 `1. ` 原樣輸出（只認 `^[-*] `）、`[文字](網址)` 完全不處理、巢狀清單的子項會**漏到 `<ul>` 外面**變成裸文字，最嚴重的是「`
 

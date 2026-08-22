@@ -266,7 +266,8 @@ class CharVariantMapService {
 - `VariantCharNormalizer` 類別本身的刪除清理（見前一份文件「不在本次範圍內」，依賴條件已滿足但屬於獨立任務）。
 - `CBDB__TRAD_SIMP_MAP` 繁簡轉換機制（與本表功能層次不同，見前一份文件）。
 - 對既有資料庫裡「已經含有這些異體字」的既有人物/書名記錄做批次回溯更新——本階段只處理「往後新增/修改時」的落地替換，不做歷史資料的批次校正（批次校正若有需要，屬於另一個獨立任務，且需要更謹慎的影響評估，不應該隨這次呼叫點串接一併做）。
-- **本階段只涵蓋 BIOG_MAIN 姓名欄、ALTNAME_DATA 別名欄、TITLE_VARIANT_MAP（書名）三類欄位，未涵蓋其他任意文本錄入入口**（使用者於 goal 執行中途提出、待下一階段評估，本階段刻意不處理）：
+- **本階段只涵蓋 BIOG_MAIN 姓名欄、ALTNAME_DATA 別名欄、TITLE_VARIANT_MAP（書名）三類欄位，未涵蓋其他任意文本錄入入口**（使用者於 goal 執行中途提出、待下一階段評估，本階段刻意不處理）。
+  ✅ **已由第三階段完成**：見 [CHAR_VARIANT_MAP_TEXT_COLUMN_ROLLOUT_PLAN.md](./CHAR_VARIANT_MAP_TEXT_COLUMN_ROLLOUT_PLAN.md)——範圍改由**欄位型別**推斷（不再逐點手掛也不維護欄位清單），`c_notes` 等自由文字欄依使用者決定一律替換，掛鉤集中在少數基底類別與掛鉤點，並有 `tests/Unit/VariantReplaceHookCoverageTest.php` 機械化把關。以下三小點記錄的是**當時**的狀態：
   - Codes UI（`/codes/{table}`、`/app/codes/{table}`）對「所有」代碼表的「所有」文本欄位——目前落地替換只掛在 `char_variant_map` 本身被查詢的三個特定呼叫點，並未掛在 `CodesController` 通用的 `store()`/`update()` 寫入路徑上，也就是說透過 Codes UI 編輯任何其他代碼表（例如 `TEXT_CODES.c_title`、`OFFICE_CODES.c_office_chn` 等）時，若使用者輸入了這 7 個異體字之一，**不會**被落地替換。
   - 各人物子資源 editor（複合主鍵子資源，如 `BIOG_SOURCE_DATA`／`POSTING_DATA`／`EVENTS_DATA`／`KIN_DATA` 等）中泛用的 `c_notes`／`c_pages` 等自由文字欄位——這些欄位目前完全沒有掛任何落地替換邏輯，使用者若在筆記或頁碼欄位輸入這些異體字，會原樣存入。
   - 下一階段若要處理，需要先盤點：(1) 哪些欄位屬於「應該落地替換」的範疇（人名/書名等有明確歸一化需求的欄位）vs.「不應該替換」的範疇（例如 `c_notes` 這類引用原始文獻用字、逐字抄錄的欄位，替換後可能反而扭曲史料原貌，需要另外評估是否該用寬鬆或嚴格模式、甚至完全不替換）；(2) 是否要在 `CodesController`／各子資源 mutation handler 的通用寫入路徑上加一個「按欄位類型套用替換」的機制，而非像本階段一樣為每個呼叫點個別手動掛鉤（如果欄位範圍擴大到「所有代碼表所有文本欄位」的量級，個別手動掛鉤的作法會難以維護，值得重新評估是否要換一個更通用的機制，例如寫入前置中介層）。

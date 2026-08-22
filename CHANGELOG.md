@@ -4,6 +4,19 @@
 
 ## 2026-08
 
+### 錄入端加上 Unicode NFC 正規化：相容表意文字折疊為統一表意文字
+- **修的是一個獨立於異體字的真缺陷**：CJK 相容表意文字（U+F900–U+FAFF 與補充區）與統一表意文字在資料庫層是**不同位元組**，唯一鍵擋不住、精確比對找不到、搜尋互不可見。生產庫實測：`ALTNAME_DATA.c_alt_name_chn` 107 列、`OFFICE_CODES.c_office_chn` 23 列、`BIOG_MAIN.c_name_chn` 17 列、`TEXT_CODES.c_title_chn` 16 列含相容碼位。最具體的一例——`c_personid=551931`「李晄」的「李」是 U+F9E1，而其他人的「李」是 U+674E，**用「李」搜尋找不到這個人**。
+- **與異體字落地替換是兩件不同性質的事**，新增的 `App\Support\UnicodeNfc` 類註有完整對照：NFC 折疊的兩個碼位在 Unicode 定義上**就是同一個字**（canonical equivalence，相容碼位存在的目的只是與舊編碼往返轉換），不涉及任何編輯判斷；而 愼→慎 那類異體字 Unicode **刻意不折疊**（統一表意文字永不給 canonical decomposition），那是應用層的策管決定。實測 `char_variant_map` 的 7 筆種子變體字**全部 NFC 不變**——兩套機制作用域不重疊。
+- **掛在 `CharVariantMapService::replaceUsing()`**，是 `replaceLenient`／`replaceStrict`／`replaceFor`／`replaceRow` 四個公開入口的共同匯流點（含 7 個直接呼叫 strict／lenient 的姓名路徑），一處掛上即全覆蓋。順序上**必須早於對照表查詢**——對照表的鍵全是統一表意文字，未正規化的相容碼位一個都對不上；也**必須早於 `empty($map)` 早退**——NFC 與對照表無關，缺表時照樣要做。
+- **不記進 `replaced`、不產生 `notices`**：折疊前後字形一模一樣，列進通知只是雜訊。連帶修掉 `replaceRow()` 的一個整合缺陷——它原本以 `replaced === []` 當「要不要寫回」的閘門，會把只有 NFC 改動的值整個丟掉；改為以「文字是否改變」判斷（測試先抓到這個）。
+- **作用域沿用 `VariantReplaceScope`**：排除欄（對照表自身、代碼鍵／join 鍵、拼音字典鍵等）同樣不做 NFC。理由與 D3 相同——單邊正規化會打斷關聯。實測前述 4 個受影響欄位全都在範圍內，所以這個保守作用域不影響修復效果。
+- **不需要 `ext-intl`**：`Normalizer` 由既有相依 `symfony/polyfill-intl-normalizer` 提供（隨 Laravel 進來）；日後若裝了 ext-intl 會自動讓位給原生實作。用 **NFC 而非 NFKC**——NFKC 會抹掉全形字母、羅馬數字等有意義的區別，有測試釘住。
+- 效能：一般中文 2.4µs／次，純 ASCII 走快速路徑 0.065µs／次（拼音、代碼、URL 欄）；批次匯入 1000 列 × 20 欄約 48ms，可忽略。
+- **已知取捨**：少數相容碼位在來源編碼裡帶讀音資訊（U+F9E1 李 來自 KS X 1001 的「이」讀音），NFC 會抹掉該區別。對 CBDB 不構成損失——讀音存在獨立的拼音欄，不靠碼位承載；且庫中這些字出現在漢人姓名與官名裡，來源是輸入法／舊編碼轉換的意外。
+- **範圍**：本次只做**寫入端**。既有 163 列的回填、以及搜尋端的 NFC（讓既有資料被找到）是獨立工作，尚未進行。
+- 測試：`tests/Unit/UnicodeNfcTest.php`（9 tests，含「不得碰異體字」與「不得退化成 NFKC」兩道界線）＋ `ApiV2MutateVariantReplacementTest` 的端到端一條。
+
+
 ### 文獻（Text）收斂為第三個實體聚合：TEXT_CODES ＋ TEXT_INSTANCE_DATA 版本層級
 - 依 `docs/ENTITY_AGGREGATE_ARCHITECTURE.md` §6 的四步路線把文獻做到 step 3（聚合根＋實體級 API＋專屬前端頁），office／social-institution 之後的第三個聚合。**resource＝`text-entity`**（別名 `book`／`books`；不叫 `text`——那是人物著述子資源 BIOG_TEXT_DATA 的既有 mutation 別名，不可重載）。
 - 聚合根 `TextImportService`：把散在 `AdminBatchLoadBookTitlesController::store()` 的存儲過程（`c_textid` max+1 配號、書名空白／括號／冒號正規化、字形標準化、去卷冊註記＋異體字歸一化的拼音派生、稽核）抽成單一真源，批量匯入表單與 mutation API 共用；批次控制器只剩解析／批前校驗／batch 標記／撤回。TEXT_CODES 主列稽核欄經 AuditActor 蓋章（create 蓋 created、update 只蓋 modified）；operations 的 resource_id 沿用既有「純數字 c_textid」慣例，批次撤回與 /operations 還原鏈路不受影響。

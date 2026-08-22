@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Exceptions\VariantMappingException;
+use App\Support\UnicodeNfc;
 use App\Support\VariantReplaceScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -93,12 +94,16 @@ class CharVariantMapService {
             }
 
             $result = self::replaceFor($table, (string) $column, $value);
-            if ($result['replaced'] === []) {
-                continue;
-            }
 
-            $data[$column] = $result['text'];
-            $replaced = self::mergeReplaced($replaced, $result['replaced']);
+            // 以**文字是否改變**判斷要不要寫回，不能用 `replaced === []` 當條件：
+            // NFC 正規化（相容表意文字折疊）刻意不記進 replaced，用後者當閘門會把
+            // 已正規化的值整個丟掉。replaced 仍只累積**異體字**替換，供通知使用。
+            if ($result['text'] !== $value) {
+                $data[$column] = $result['text'];
+            }
+            if ($result['replaced'] !== []) {
+                $replaced = self::mergeReplaced($replaced, $result['replaced']);
+            }
         }
 
         return ['data' => $data, 'replaced' => $replaced];
@@ -326,6 +331,18 @@ class CharVariantMapService {
      * @return array{text: string, replaced: array<string,string>}
      */
     protected static function replaceUsing(string $text, array $map): array {
+        // Unicode NFC：把相容表意文字折疊成統一表意文字（慎 U+FA87 → 慎 U+614E）。
+        //
+        // **必須在查對照表之前**：對照表的鍵全是統一表意文字，未正規化的相容碼位一個都
+        // 對不上，會原樣落庫（而它在資料庫層是不同位元組 ⇒ 唯一鍵擋不住、搜尋互不可見）。
+        //
+        // **也必須在 empty($map) 早退之前**：NFC 與對照表無關，缺表／空表時照樣要做。
+        //
+        // 這不是「改寫使用者錄入的字」——canonical equivalence 下兩個碼位是同一個字，
+        // 與異體字替換的性質不同，見 UnicodeNfc 類註的對照表。因此**不記進 $replaced**：
+        // 通知欄會顯示成「慎 → 慎」兩個一模一樣的字形，對使用者只是雜訊。
+        $text = UnicodeNfc::normalize($text);
+
         if ($text === '' || empty($map)) {
             return ['text' => $text, 'replaced' => []];
         }

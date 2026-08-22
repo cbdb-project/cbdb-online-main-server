@@ -164,6 +164,39 @@ class ApiV2MutateVariantReplacementTest extends TestCase {
         );
     }
 
+    // ── 1b. Unicode NFC：相容表意文字折疊（與異體字替換是兩件事）──────────
+
+    /**
+     * 相容表意文字（U+F900–U+FAFF）在寫入端要被折疊成統一表意文字。
+     *
+     * 這修的是一個獨立於異體字的真缺陷：生產庫 c_personid=551931 的「李」是 U+F9E1、
+     * 其他人的是 U+674E，資料庫層是不同位元組 ⇒ 用「李」搜尋找不到前者。
+     *
+     * 用**別名欄（strict）**驗證，因為 strict 是最保守的模式：連它都要做 NFC——
+     * NFC 不是「改寫錄入的字」，canonical equivalence 下兩個碼位本來就是同一個字。
+     */
+    #[Test]
+    public function testCompatibilityIdeographIsFoldedOnWrite(): void {
+        $this->actingAs($this->makeUser('altname-nfc@example.com'));
+
+        $response = $this->postJson('/api/v2/mutate', [
+            'resource' => 'altnames',
+            'person_id' => 1000,
+            'mode' => 'direct',
+            'operation' => 'create',
+            // 「李」以相容碼位 U+F9E1 送入（比照生產庫實際存在的形狀）
+            'target' => ['pk' => ['c_personid' => 1000, 'c_alt_name_chn' => "\u{F9E1}齋", 'c_alt_name_type_code' => 4]],
+            'changes' => ['c_notes' => "\u{FA1D}忠"],
+        ])->assertOk();
+
+        $row = DB::table('ALTNAME_DATA')->first();
+        $this->assertSame("\u{674E}齋", $row->c_alt_name_chn, '別名欄（strict）的相容表意文字要折疊成統一形');
+        $this->assertSame("\u{7CBE}忠", $row->c_notes, '一般文本欄同樣折疊');
+
+        // NFC 不產生使用者通知：折疊前後字形一模一樣，列出來只是雜訊。
+        $this->assertEmpty($response->json('notices') ?? [], 'NFC 折疊不應產生 notices');
+    }
+
     // ── 2. strict／lenient 分流 ──────────────────────────────
 
     /** 同一列：別名欄 strict（峯 保留），c_notes lenient（峯→峰）。 */

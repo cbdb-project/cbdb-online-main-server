@@ -17,7 +17,7 @@
     "axios": "^1.19.0",
     "husky": "^9.1.7",
     "jquery": "^4.0.0",
-    "jsdom": "^29.1.1",
+    "jsdom": "^30.0.1",
     "laravel-vite-plugin": "^3.2.0",
     "lodash": "^4.17.23",
     "sass": "^1.102.0",

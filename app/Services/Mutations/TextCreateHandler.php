@@ -41,8 +41,6 @@ class TextCreateHandler extends AbstractPersonSubresourceCreateHandler {
             'c_source',
             'c_pages',
             'c_notes',
-            // ⚠️ 移除幻影 c_supplement／c_text_year（#1284：BIOG_TEXT_DATA 無此二欄，prod 已確認）。
-            // c_text_year 屬於 TEXT_CODES，走 text-codes 聚合端（ResolvesTextAggregateInput），不在此。
         ];
     }
 

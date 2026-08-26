@@ -265,7 +265,6 @@ class KinshipMutationHandler extends AbstractPersonSubresourceMutationHandler {
             'c_source',
             'c_pages',
             'c_notes',
-            // Task 27 補回：c_autogen_notes 為 KIN_DATA 真實欄；移除幻影 c_supplement（KIN_DATA 無此欄）。
             'c_autogen_notes',
         ];
     }

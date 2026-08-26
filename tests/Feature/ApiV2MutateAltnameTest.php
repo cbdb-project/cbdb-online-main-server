@@ -338,8 +338,8 @@ class ApiV2MutateAltnameTest extends TestCase {
     }
 
     /**
-     * ALTNAME_DATA 沒有後端 Tier 1 拼音欄（#1284）：唯一的別名羅馬字欄是 c_alt_name，
-     * 它可能含西文別名（Denver 之類），一律交前端 Tier 2 互動確認，後端**不轉**。
+     * ALTNAME_DATA 沒有後端 Tier 1 拼音欄：唯一的別名羅馬字欄是 c_alt_name，它可能含
+     * 西文別名（Denver 之類），一律交前端 Tier 2 互動確認，後端**不轉**。
      */
     #[Test]
     public function testDirectAltnameUpdateDoesNotConvertAltNameVToUmlaut(): void {
@@ -358,9 +358,8 @@ class ApiV2MutateAltnameTest extends TestCase {
     }
 
     /**
-     * #1284：c_alt_name_pinyin／_pinyin2／_pinyin3／c_alt_name_role 資料庫從來沒有這四欄
-     * （baseline migration 的 ALTNAME_DATA 就是 12 欄）。它們曾誤列在白名單裡，於是放行後
-     * 一路走到 SQL 層才炸成 500。移出白名單後必須是乾淨的 422。
+     * ALTNAME_DATA 沒有 c_alt_name_pinyin／_pinyin2／_pinyin3／c_alt_name_role 這幾欄
+     * （baseline migration 就是 12 欄）。白名單外的欄位必須擋在 422，不可以放行到 SQL 層炸成 500。
      */
     #[Test]
     public function testAltnameUpdateRejectsColumnsThatDoNotExist(): void {

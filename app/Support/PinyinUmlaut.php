@@ -28,21 +28,10 @@ class PinyinUmlaut {
      *
      * 僅列**定義上即漢語拼音**的欄：`c_surname`/`c_mingzi`（其他羅馬化另存於 `c_*_rm`／`c_*_proper`）、
      * 以及由二者組出的 `c_name`。**刻意不含** `c_*_rm`（Wade-Giles）／`c_*_proper`（母語拉丁名，
-     * 可能含真 `v`）。設計見 docs/PINYIN_SAVE_NORMALIZE_DESIGN.md。
+     * 可能含真 `v`）。ALTNAME_DATA 沒有 Tier 1 欄位——其唯一的別名羅馬字欄 `c_alt_name` 可能含
+     * 西文別名（如 Denver），走前端 Tier 2 互動確認。設計見 docs/PINYIN_SAVE_NORMALIZE_DESIGN.md。
      */
     public const BIOG_MAIN_PINYIN_V_FIELDS = ['c_surname', 'c_mingzi', 'c_name'];
-
-    /*
-     * ALTNAME_DATA 沒有 Tier 1 欄位（#1284）。
-     *
-     * 原本的 ALTNAME_PINYIN_V_FIELDS 列的 `c_alt_name_pinyin`／`2`／`3` 三欄，migration 從未
-     * 建立、prod 也不存在（baseline `import_cbdb_schema.php` 的 ALTNAME_DATA 就是 12 欄），
-     * 是照著同樣有誤的 v2 白名單挑出來的。這裡刻意不留空常數：留著會讓下一個人以為
-     * 「只是暫時沒有欄位」而重新填進去。
-     *
-     * ALTNAME_DATA 唯一的別名羅馬字欄是 `c_alt_name`，它可能含西文別名（如 Denver），
-     * 一律走前端 Tier 2 互動確認（AltnameEditor 的 detectUmlautConversions），後端不轉。
-     */
 
     /** 將字串中作為 ü 代寫的 v 正規化為 ü。null/空字串原樣返回。 */
     public static function normalize(?string $value): string {

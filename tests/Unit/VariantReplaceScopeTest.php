@@ -245,8 +245,7 @@ class VariantReplaceScopeTest extends TestCase {
             );
         }
 
-        // ALTNAME_DATA 只有 c_alt_name 一個拉丁人名欄（#1284：c_alt_name_pinyin／_pinyin2／
-        // _pinyin3／c_alt_name_role 這四欄資料庫從來沒有，已一併從白名單與排除清單移除）。
+        // ALTNAME_DATA 只有 c_alt_name 一個拉丁人名欄。
         $this->assertSame(['c_alt_name'], VariantReplaceScope::EXCLUDED_COLUMNS['ALTNAME_DATA']);
 
         // 存在於合成表的那幾個，實際查一次 modeFor()

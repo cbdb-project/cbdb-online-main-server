@@ -145,7 +145,7 @@ S0～S9 全部完成，逐步 rebase merge 進 `develop`（線性歷史）：
 | **預設：所有文本欄** | **lenient（全量 7 筆）** |
 | `BIOG_MAIN.c_name_chn`／`c_surname_chn`／`c_mingzi_chn` | strict（6 筆，排除「峯→峰」） |
 | `ALTNAME_DATA.c_alt_name_chn` | strict |
-| `BIOG_MAIN` 的 `c_surname`／`c_mingzi`／`c_name`／`c_surname_proper`／`c_mingzi_proper`／`c_name_proper`／`c_surname_rm`／`c_mingzi_rm`／`c_name_rm`，`ALTNAME_DATA` 的 `c_alt_name` | **排除**（共 10 欄）<br>原記 13 欄，含 `ALTNAME_DATA` 的 `c_alt_name_pinyin`／`_pinyin2`／`_pinyin3`——那三欄不存在，已於 #1284 移除 |
+| `BIOG_MAIN` 的 `c_surname`／`c_mingzi`／`c_name`／`c_surname_proper`／`c_mingzi_proper`／`c_name_proper`／`c_surname_rm`／`c_mingzi_rm`／`c_name_rm`，`ALTNAME_DATA` 的 `c_alt_name` | **排除**（共 10 欄，使用者確認） |
 
 - `modeFor()` 的**預設回傳是 `'lenient'`**；只有命中 strict 清單才 `'strict'`，命中排除／未知表／非文本欄才 `null`。**不得**寫成「查不到就 strict」或「整張 BIOG_MAIN／ALTNAME_DATA 都 strict」。
 - strict／lenient 是**逐欄位**：同一列 BIOG_MAIN 裡姓名欄 strict、`c_notes` lenient；ALTNAME_DATA 裡 `c_alt_name_chn` strict、`c_notes` lenient。
@@ -282,8 +282,6 @@ D3 已內嵌一份已查證的代碼鍵清單，直接進排除常數。本步�
 注意 (a) 單獨不足以判定排除——`ALTNAME_DATA.c_alt_name_chn`／`ASSOC_DATA.c_text_title`／`BIOG_SOURCE_DATA.c_pages` 都是 PK 成員但屬內容、必須替換。三個條件只是**篩出候選**。
 
 **另跑一次 prod schema 欄位比對**（不是 migrations）：型別導向的範圍會靜默納入 **prod-only 文本欄**，而 `TEXT_TYPES` 守衛與已知表守衛都看不到它們（D2 的 caveat 只涵蓋 prod-only 的**表**）。
-
-> ⚠️ **更正（#1284）**：本段原本把 `ALTNAME_DATA.c_alt_name_pinyin`／`_pinyin2`／`_pinyin3`／`c_alt_name_role` 記為「已知 prod-only」。**那是錯的**——這四欄 migration 未曾建立、prod 也不存在，只出現在 v2 `allowedFields()` 白名單與**測試自建的合成表**裡。本段自己記下的線索（「只在合成測試表出現」「結構式掃描碰不到它」）其實正指向這個結論，只是當時下成了 prod-only。四欄已從白名單與 `VariantReplaceScope` 排除清單移除；`tests/Feature/MutationAllowedFieldsSchemaDriftTest.php` 是防復發的機械化守衛。
 
 ### S1：基礎設施
 

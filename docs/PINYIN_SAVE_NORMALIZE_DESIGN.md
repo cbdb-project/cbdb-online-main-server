@@ -4,6 +4,23 @@
 > **精確的欄位範圍**與**掛點**，確保「**只歸一化真正的漢語拼音欄位**」——避免把 `v` 誤改進 Wade-Giles
 > 羅馬字或母語拉丁名等**合法含 `v`** 的欄位（Hongsu 明確要求：只替換拼音，以防錯誤替換）。
 
+> ---
+>
+> ⚠️ **修訂（#1284）：ALTNAME_DATA 沒有 Tier 1 欄位。**
+>
+> 本文件原本把 `c_alt_name_pinyin`／`_pinyin2`／`_pinyin3` 列為 ALTNAME 的 Tier 1 範圍，
+> 那是錯的——這三欄（連同 `c_alt_name_role`）**資料庫從來沒有**：migration 未曾建立
+> （baseline `import_cbdb_schema.php` 的 `ALTNAME_DATA` 就是 12 欄），prod 也查不到。
+> 當時是照著同樣有誤的 v2 `allowedFields()` 白名單挑欄位，而相關測試各自在合成表裡把它們
+> 建了出來，所以一直沒被發現。
+>
+> **現況**：`PinyinUmlaut::ALTNAME_PINYIN_V_FIELDS` 已移除，兩個 altname handler 不再呼叫
+> `normalizeFields()`。ALTNAME 唯一的別名羅馬字欄是 `c_alt_name`，一律走 **Tier 2 前端互動確認**
+> ——這一半的設計不受影響、照舊有效。Tier 1 現在只剩 BIOG_MAIN 的
+> `c_surname`／`c_mingzi`／`c_name`。
+>
+> 下文凡提到 ALTNAME Tier 1／`_pinyin` 欄的段落，均以本註記為準。
+
 ## 1. 背景與缺口
 
 - **止血 1.0（M1，已上線）**：只掛在**生成路徑**——由中文自動生成拼音（`BiogMainRepository::auto_pinyin()`、
@@ -36,7 +53,7 @@
 |------|------|-------|
 | `c_surname`、`c_mingzi` | 漢語拼音（`c_*_rm`/`_proper` 另存其他羅馬化，故此二欄定義上即拼音） | ✅ **Tier 1** 後端靜默轉 |
 | `c_name` | 由上兩者組出的全名 | ✅ **Tier 1**（與分量一致） |
-| `c_alt_name_pinyin`、`c_alt_name_pinyin2`、`c_alt_name_pinyin3` | 明確標為「拼音」的別名拼音欄 | ✅ **Tier 1** 後端靜默轉 |
+| ~~`c_alt_name_pinyin`、`c_alt_name_pinyin2`、`c_alt_name_pinyin3`~~ | ~~明確標為「拼音」的別名拼音欄~~ | ❌ **欄位不存在**（#1284，見開頭修訂） |
 | `c_alt_name` | 別名羅馬化——**可能含西文別名**（如 Denver/Silver，`nve/lve` 為真實西文拼法） | ⚠️ **Tier 2** 前端偵測＋彈窗由使用者決定；後端**不**靜默轉 |
 | `c_surname_rm`、`c_mingzi_rm`、`c_name_rm` | Wade-Giles／M-R 羅馬字（`ü` 用法不同） | ❌ **不轉**（不偵測、不彈窗） |
 | `c_surname_proper`、`c_mingzi_proper`、`c_name_proper` | 母語拉丁原名（可能含**真** `v`，如 Silva） | ❌ **不轉** |
@@ -47,8 +64,9 @@
 
 ### 兩層機制（依 Hongsu 定案）
 
-- **Tier 1｜後端靜默自動轉**——欄位**定義上即漢語拼音**、不可能含西文（BIOG `c_surname`/`c_mingzi`/`c_name`、
-  ALTNAME `c_alt_name_pinyin`/`2`/`3`）。保存前套 `PinyinUmlaut::normalize()`，無需詢問。
+- **Tier 1｜後端靜默自動轉**——欄位**定義上即漢語拼音**、不可能含西文（BIOG `c_surname`/`c_mingzi`/`c_name`；
+  ALTNAME 側原列的 `_pinyin`/`2`/`3` 欄位不存在，已移除，見開頭修訂）。保存前套
+  `PinyinUmlaut::normalize()`，無需詢問。
 - **Tier 2｜前端互動確認**——欄位**可能含西文別名**（目前僅 ALTNAME `c_alt_name`）。React 編輯器於保存時，
   **用我們的規則**（`l/n`+`v` 且後非 a/i/o/u；**不是** naive「凡 v／u↔ü」對應）掃描該欄；**唯有規則命中**時
   跳出彈窗，逐處列出「`Lv`→`Lü`？」交使用者「轉換／保留」。使用者若保留（西文名如 Denver），值原樣送出。
@@ -71,13 +89,12 @@ flag 已翻 `new`、真正在用的 React／`/api/v2` 人工輸入寫入面**。
 | 1 | `BiogMainRepository::updateById()` L259 | normalizeBiogMain | BIOG | `/api/v2/mutate` direct（`BiogMainMutationHandler` L103 委派此處）＝React basic-info 直改 |
 | 2 | `BiogMainMutationHandler::prepareProposalPayload()` L201 | normalizeBiogMain | BIOG | `/api/v2/mutate` proposal（提交時歸一化；核准時逐字套用，故提交時歸一化為必要且充分） |
 | 3 | `BiogMainRepository::store()` L355 | normalizeBiogMain | BIOG | **active** 新建人物落點：v2 `BiogMainCreateHandler`（`Create.tsx`→`api.v2.create.web`）委派此處（BiogMainCreateHandler L151），舊 Blade `store` 亦共用。`auto_pinyin` 已先歸一化 `c_surname/c_mingzi`，故此處為**冪等防禦**（防未來生成邏輯變動） |
-| 4 | `AltnameMutationHandler::preprocessUpdateData()` L62 | normalizeAltname | ALTNAME（**僅 `_pinyin/2/3`**） | React 別名編輯 / `/api/v2/mutate`（direct + proposal 皆經此 handler） |
-| 5 | `AltnameCreateHandler::preprocessCreateData()` L61 | normalizeAltname | ALTNAME（**僅 `_pinyin/2/3`**） | React 別名新增 / `/api/v2/create` |
+| ~~4~~ | ~~`AltnameMutationHandler::preprocessUpdateData()`~~ | — | **已移除**（#1284：欄位不存在） |
+| ~~5~~ | ~~`AltnameCreateHandler::preprocessCreateData()`~~ | — | **已移除**（#1284：欄位不存在） |
 
-> **#4/#5 的 allowlist 不含 `c_alt_name`**（走 Tier 2 前端，見 §3、§4.2）；後端只靜默轉三個 `_pinyin` 欄。
-> 註：`c_alt_name_pinyin/2/3` **未在 `AltnameEditor.tsx` 前端表單暴露**（該編輯器可手打的別名羅馬字欄
-> 只有 `c_alt_name`；`NON_PK` 雖另含 `c_source/c_pages/c_notes/c_sequence`，但無 `_pinyin/2/3`），
-> 故其 Tier 1 後端歸一化屬「冪等防禦」（涵蓋 API-direct 與未來 UI 擴充），非保護當前手動輸入面；
+> #4/#5 當初的 allowlist 就不含 `c_alt_name`（走 Tier 2 前端，見 §3、§4.2），而它要轉的三個
+> `_pinyin` 欄根本不存在，所以這兩個掛點自始就是 no-op；#1284 已一併移除。當時那條
+> 「`_pinyin/2/3` 未在 `AltnameEditor.tsx` 暴露、屬冪等防禦」的註記，其實正是欄位不存在的徵兆。
 > 目前 React 唯一可手打的別名羅馬字欄就是走 Tier 2 的 `c_alt_name`。
 
 > 說明：#1/#3 雖是共用 repository 方法（舊 Blade direct 也會路過、順帶受惠），但它們**同時是** active v2
@@ -104,8 +121,8 @@ flag 已翻 `new`、真正在用的 React／`/api/v2` 人工輸入寫入面**。
   - 無命中 → 照舊直接提交（絕大多數情況，零打擾）。
   - 有命中 → 彈出確認框，列出每處 `Lv → Lü`，預設**建議轉換**（多數別名確為拼音），但提供
     「保留原樣」；使用者確認後以其選擇的字串提交。**取消**則留在編輯器不提交。
-- **後端配合**：`c_alt_name` **不在** #4/#5 的後端 allowlist；後端對其值原樣寫入，故使用者「保留西文」的
-  決定不會被後端覆寫。（`c_alt_name_pinyin/2/3` 仍由後端 Tier 1 靜默轉，無需前端彈窗。）
+- **後端配合**：後端對 `c_alt_name` 的值原樣寫入，故使用者「保留西文」的決定不會被後端覆寫。
+  （ALTNAME 已無任何後端 Tier 1 欄位，見開頭修訂。）
 - **API-direct 例外**：不經前端、直接打 `/api/v2` 的腳本呼叫，`c_alt_name` 不會被轉也不會彈窗——屬進階
   用法、自負其責；靜默轉才會有誤傷西文之虞，故以「原樣保留」為安全預設。
 
@@ -170,7 +187,6 @@ allowlist 以常數集中定義（置於 `PinyinUmlaut`，與規則同源，避�
 ```php
 // Tier 1（後端靜默）allowlist——皆為定義上的漢語拼音欄，不含可能含西文的 c_alt_name。
 public const BIOG_MAIN_PINYIN_V_FIELDS = ['c_surname', 'c_mingzi', 'c_name'];
-public const ALTNAME_PINYIN_V_FIELDS   = ['c_alt_name_pinyin', 'c_alt_name_pinyin2', 'c_alt_name_pinyin3'];
 ```
 
 > `c_alt_name` **刻意不在**任何後端 allowlist——它走 Tier 2 前端互動（§4.2）。前端 TS 移植規則同源於此
@@ -186,7 +202,6 @@ public const ALTNAME_PINYIN_V_FIELDS   = ['c_alt_name_pinyin', 'c_alt_name_pinyi
 **後端（PHP，Tier 1）**
 - **正向**：手打 `Lv`／`lv`／`Nve` 保存後讀回為 `Lü`／`lü`／`nüe`。
   - BIOG：`c_surname='Lv'` → 讀回 `Lü`，且 `c_name` 同步為 `Lü …`。
-  - ALTNAME：`c_alt_name_pinyin='lv...'` → 讀回 `lü...`（證明覆蓋了 BracketNormalizer 未覆蓋的數字拼音欄）。
 - **不誤傷（核心保護）**：
   - `c_surname_rm='Lv'`、`c_surname_proper='Silva'`、`c_name_proper` 含 `v` → 保存後**不變**。
   - **`c_alt_name` 後端不轉**：送 `c_alt_name='Lv Meng'`（未經前端）→ 後端**原樣寫入**（Tier 2 由前端負責）。

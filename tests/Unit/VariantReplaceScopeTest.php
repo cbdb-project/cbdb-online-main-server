@@ -50,7 +50,6 @@ class VariantReplaceScopeTest extends TestCase {
             $table->integer('c_personid');
             $table->string('c_alt_name_chn', 255)->nullable();
             $table->string('c_alt_name', 255)->nullable();
-            $table->string('c_alt_name_pinyin', 255)->nullable();
             $table->text('c_notes')->nullable();
         });
 
@@ -246,21 +245,15 @@ class VariantReplaceScopeTest extends TestCase {
             );
         }
 
-        foreach (['c_alt_name', 'c_alt_name_pinyin', 'c_alt_name_pinyin2', 'c_alt_name_pinyin3'] as $column) {
-            $this->assertContains(
-                $column,
-                VariantReplaceScope::EXCLUDED_COLUMNS['ALTNAME_DATA'],
-                "ALTNAME_DATA.{$column} 必須登記為排除"
-            );
-        }
+        // ALTNAME_DATA 只有 c_alt_name 一個拉丁人名欄（#1284：c_alt_name_pinyin／_pinyin2／
+        // _pinyin3／c_alt_name_role 這四欄資料庫從來沒有，已一併從白名單與排除清單移除）。
+        $this->assertSame(['c_alt_name'], VariantReplaceScope::EXCLUDED_COLUMNS['ALTNAME_DATA']);
 
         // 存在於合成表的那幾個，實際查一次 modeFor()
         foreach (['c_name', 'c_surname', 'c_mingzi', 'c_name_proper', 'c_name_rm'] as $column) {
             $this->assertNull(VariantReplaceScope::modeFor('BIOG_MAIN', $column), "BIOG_MAIN.{$column} 不該被替換");
         }
-        foreach (['c_alt_name', 'c_alt_name_pinyin'] as $column) {
-            $this->assertNull(VariantReplaceScope::modeFor('ALTNAME_DATA', $column), "ALTNAME_DATA.{$column} 不該被替換");
-        }
+        $this->assertNull(VariantReplaceScope::modeFor('ALTNAME_DATA', 'c_alt_name'), 'ALTNAME_DATA.c_alt_name 不該被替換');
     }
 
     // ─────────────────────── 大小寫與 fail-closed ───────────────────────

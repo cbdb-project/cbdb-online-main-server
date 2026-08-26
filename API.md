@@ -957,14 +957,13 @@ Authorization: Bearer <token>
 ### 9.2 altnames（ALTNAME_DATA，別名）
 
 - `target.pk`：`c_personid`、`c_alt_name_chn`、`c_alt_name_type_code`（3-key，**不含** `c_sequence`）
-- **update** 白名單：`c_alt_name_chn`、`c_alt_name`、`c_alt_name_type_code`、`c_source`、`c_pages`、`c_notes`、`c_sequence`、`c_alt_name_pinyin`、`c_alt_name_pinyin2`、`c_alt_name_pinyin3`、`c_alt_name_role`
+- **update** 白名單：`c_alt_name_chn`、`c_alt_name`、`c_alt_name_type_code`、`c_source`、`c_pages`、`c_notes`、`c_sequence`
 - **create** 白名單：同上再加 `c_personid`
 - 哨兵欄：`c_source`（另 `c_alt_name_type_code` 的 `-999` 會轉 `0`）
 - 特殊行為（都會靜默改寫送出的值）：
   - `c_alt_name_chn` 與 `c_alt_name` 都會做括號正規化（全角轉半角、括號前後補空格）。
   - `c_alt_name_chn` 另會做**異體字嚴格替換**（strict：人名／別名欄專用的較少規則集，允許保留較多異體字）；因為它同時是主鍵欄，替換後的值才是落庫主鍵——**請以回應的 `result.pk` 為準**。
   - 同一列的其他文本欄（例如 `c_notes`、`c_pages`）走**全量規則**（lenient），所以會有 `c_alt_name_chn` 保留某個異體字、而 `c_notes` 裡同一個字被替換的情形——這是刻意的。
-  - `c_alt_name_pinyin`／`2`／`3` 的 `v` 會轉成 `ü`（靜默，無 `notices`）。
   - 若正規化後與同類型的既有別名撞主鍵，回 409（訊息會說明需先手動整理）。
   - 寫入成功後會同步重建姓名全文檢索索引（`CBDB__NAME_FTS`），這是預期的副作用。
 
@@ -1032,7 +1031,7 @@ Authorization: Bearer <token>
 ### 9.10 texts（BIOG_TEXT_DATA，著述）
 
 - `target.pk`：`c_personid`、`c_textid`、`c_role_id`
-- **update** 白名單：`c_textid`、`c_role_id`、`c_source`、`c_pages`、`c_notes`、`c_supplement`、`c_text_year`
+- **update** 白名單：`c_textid`、`c_role_id`、`c_source`、`c_pages`、`c_notes`
 - **create** 白名單：同上再加 `c_personid`
 - 哨兵欄：`c_textid`、`c_source`
 - `c_textid` 對應 `TEXT_CODES`，可用 `GET /api/v2/texts?ids=...` 查詢（見〈其他開放端點〉）。

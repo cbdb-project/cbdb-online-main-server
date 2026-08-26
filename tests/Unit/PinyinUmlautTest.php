@@ -138,24 +138,6 @@ class PinyinUmlautTest extends TestCase {
     }
 
     #[Test]
-    public function normalize_fields_altname_covers_pinyin_columns_but_not_c_alt_name(): void {
-        $data = [
-            'c_alt_name' => 'Lv Meng',     // 走前端 Tier 2，後端不在此轉
-            'c_alt_name_pinyin' => 'lv',
-            'c_alt_name_pinyin2' => 'Nve',
-            'c_alt_name_pinyin3' => 'Silva', // 西文：no-op
-            'c_alt_name_chn' => '呂蒙',       // 中文：不轉
-        ];
-        $out = PinyinUmlaut::normalizeFields($data, PinyinUmlaut::ALTNAME_PINYIN_V_FIELDS);
-
-        $this->assertSame('Lv Meng', $out['c_alt_name']); // 後端刻意不轉
-        $this->assertSame('lü', $out['c_alt_name_pinyin']);
-        $this->assertSame('Nüe', $out['c_alt_name_pinyin2']);
-        $this->assertSame('Silva', $out['c_alt_name_pinyin3']);
-        $this->assertSame('呂蒙', $out['c_alt_name_chn']);
-    }
-
-    #[Test]
     public function normalize_fields_skips_missing_null_and_non_string(): void {
         $data = ['c_mingzi' => null, 'c_name' => 123, 'other' => 'Lv'];
         $out = PinyinUmlaut::normalizeFields($data, PinyinUmlaut::BIOG_MAIN_PINYIN_V_FIELDS);

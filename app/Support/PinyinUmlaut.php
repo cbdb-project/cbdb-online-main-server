@@ -32,13 +32,17 @@ class PinyinUmlaut {
      */
     public const BIOG_MAIN_PINYIN_V_FIELDS = ['c_surname', 'c_mingzi', 'c_name'];
 
-    /**
-     * 保存時「靜默」歸一化的 ALTNAME_DATA 拼音欄（Tier 1）。
+    /*
+     * ALTNAME_DATA 沒有 Tier 1 欄位（#1284）。
      *
-     * 僅列明確標為「拼音」的欄。**刻意不含** `c_alt_name`——後者為泛用別名羅馬字、可能含西文別名
-     * （如 Denver），改由前端 Tier 2 互動確認（見設計文件 §3/§4.2）。
+     * 原本的 ALTNAME_PINYIN_V_FIELDS 列的 `c_alt_name_pinyin`／`2`／`3` 三欄，migration 從未
+     * 建立、prod 也不存在（baseline `import_cbdb_schema.php` 的 ALTNAME_DATA 就是 12 欄），
+     * 是照著同樣有誤的 v2 白名單挑出來的。這裡刻意不留空常數：留著會讓下一個人以為
+     * 「只是暫時沒有欄位」而重新填進去。
+     *
+     * ALTNAME_DATA 唯一的別名羅馬字欄是 `c_alt_name`，它可能含西文別名（如 Denver），
+     * 一律走前端 Tier 2 互動確認（AltnameEditor 的 detectUmlautConversions），後端不轉。
      */
-    public const ALTNAME_PINYIN_V_FIELDS = ['c_alt_name_pinyin', 'c_alt_name_pinyin2', 'c_alt_name_pinyin3'];
 
     /** 將字串中作為 ü 代寫的 v 正規化為 ü。null/空字串原樣返回。 */
     public static function normalize(?string $value): string {
@@ -56,7 +60,7 @@ class PinyinUmlaut {
     /**
      * 對 $data 中列於 $fields 的字串欄套用 normalize()；非字串／缺欄／null 原樣略過。
      *
-     * 保存前歸一化用：搭配 self::BIOG_MAIN_PINYIN_V_FIELDS／ALTNAME_PINYIN_V_FIELDS。冪等。
+     * 保存前歸一化用：搭配 self::BIOG_MAIN_PINYIN_V_FIELDS。冪等。
      *
      * @param array<string,mixed> $data
      * @param list<string>        $fields

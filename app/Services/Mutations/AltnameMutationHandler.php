@@ -6,7 +6,6 @@ use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
 use App\Services\BracketNormalizer;
 use App\Services\NameSearchIndexService;
-use App\Support\PinyinUmlaut;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -52,19 +51,12 @@ class AltnameMutationHandler extends AbstractPersonSubresourceMutationHandler {
             'c_pages',
             'c_notes',
             'c_sequence',
-            'c_alt_name_pinyin',
-            'c_alt_name_pinyin2',
-            'c_alt_name_pinyin3',
-            'c_alt_name_role',
         ];
     }
 
     protected function preprocessUpdateData(array $data): array {
         // 括號正規化
         $data = BracketNormalizer::normalizeAltname($data);
-
-        // 保存時拼音 v→ü 歸一化（Tier 1；僅 c_alt_name_pinyin/2/3。c_alt_name 走前端 Tier 2、不在此轉）
-        $data = PinyinUmlaut::normalizeFields($data, PinyinUmlaut::ALTNAME_PINYIN_V_FIELDS);
 
         // -999 → 0 轉換
         $data = $this->normalizeSentinelValues($data, ['c_alt_name_type_code', 'c_source']);

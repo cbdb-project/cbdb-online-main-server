@@ -111,10 +111,6 @@ class ApiV2DeleteAltnameTest extends TestCase {
             $table->string('c_pages', 255)->nullable();
             $table->text('c_notes')->nullable();
             $table->integer('c_sequence')->default(0);
-            $table->string('c_alt_name_pinyin', 255)->nullable();
-            $table->string('c_alt_name_pinyin2', 255)->nullable();
-            $table->string('c_alt_name_pinyin3', 255)->nullable();
-            $table->string('c_alt_name_role', 50)->nullable();
             $table->string('c_created_by', 255)->nullable();
             $table->string('c_created_date', 255)->nullable();
             $table->string('c_modified_by', 255)->nullable();

@@ -14,6 +14,16 @@ import { useTranslation } from '../../../hooks/useTranslation';
 import { Button } from '../../ui/Button';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 
+/**
+ * 出處顯示：優先書名（中／英），沒有對應 TEXT_CODES 列時退回 `#id`，
+ * 哨兵 0 與 null 一律視為「未填」。
+ */
+function formatSourceLabel(item: AltNameItem): string | null {
+    const label = formatBilingualLabel(item.source_title_chn, item.source_title);
+    if (label) return label;
+    return item.source_id ? `#${item.source_id}` : null;
+}
+
 interface AltNameItem {
     pk: {
         c_personid: number;
@@ -27,6 +37,8 @@ interface AltNameItem {
     type_label_chn: string | null;
     type_label: string | null;
     source_id: number | null;
+    source_title_chn: string | null;
+    source_title: string | null;
     pages: string | null;
     notes: string | null;
 }
@@ -131,6 +143,11 @@ export default function AltNamesTab({
                     { header: tb('altname_pinyin_label'), render: (item) => item.name },
                     { header: tb('altname_chinese'), render: (item) => item.name_chn },
                     { header: t('alt_name_type'), render: (item) => formatBilingualLabel(item.type_label_chn, item.type_label) },
+                    // 出處／頁碼／備註：AltnameMutationHandler 的 allowedFields 允許提案修改，
+                    // 卻只在編輯器裡看得到——列表不顯示會讓使用者以為沒存進去。
+                    { header: tb('source_field'), render: (item) => formatSourceLabel(item) },
+                    { header: tb('pages_entries'), render: (item) => item.pages },
+                    { header: tb('notes_field'), render: (item) => (item.notes ? <div style={notesCellStyle}>{item.notes}</div> : null) },
                 ]}
                 actions={(canEdit || canPropose) ? (item) => (useReactEditor ? (
                     <span style={actionCellStyle}>
@@ -164,6 +181,13 @@ export default function AltNamesTab({
         </div>
     );
 }
+
+// 備註可能很長：限寬並保留換行，避免把整張表撐爆（外層 SubresourceTable 已有橫向捲動）。
+const notesCellStyle: React.CSSProperties = {
+    maxWidth: 360,
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word',
+};
 
 const containerStyle: React.CSSProperties = {
     display: 'flex',

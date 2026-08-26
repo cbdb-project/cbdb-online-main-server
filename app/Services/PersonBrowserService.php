@@ -649,8 +649,13 @@ class PersonBrowserService {
                 'ALTNAME_DATA.c_source',
                 'ALTNAME_DATA.c_pages',
                 'ALTNAME_DATA.c_notes',
+                // 出處以書名顯示（與 AltnameEditor 的 c_source label 同源）；c_source 的哨兵 0
+                // 在 TEXT_CODES 沒有對應列，leftJoin 自然落空、不需另外過濾。
+                'TC.c_title_chn AS source_title_chn',
+                'TC.c_title AS source_title',
             ])
             ->leftJoin('ALTNAME_CODES AS ATC', 'ATC.c_name_type_code', '=', 'ALTNAME_DATA.c_alt_name_type_code')
+            ->leftJoin('TEXT_CODES AS TC', 'TC.c_textid', '=', 'ALTNAME_DATA.c_source')
             ->where('ALTNAME_DATA.c_personid', $personId)
             ->orderBy('ALTNAME_DATA.c_alt_name_type_code')
             ->get();
@@ -670,6 +675,8 @@ class PersonBrowserService {
                 'type_label_chn' => $r->c_name_type_desc_chn,
                 'type_label' => $r->c_name_type_desc,
                 'source_id' => $r->c_source,
+                'source_title_chn' => $r->source_title_chn,
+                'source_title' => $r->source_title,
                 'pages' => $r->c_pages,
                 'notes' => $r->c_notes,
             ])->values()->all(),

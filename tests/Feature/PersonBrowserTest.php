@@ -654,7 +654,8 @@ class PersonBrowserTest extends TestCase {
 
         DB::table('ALTNAME_DATA')->insert([
             ['c_personid' => 1, 'c_sequence' => 1, 'c_alt_name_chn' => '太白', 'c_alt_name' => 'Taibai', 'c_alt_name_type_code' => 4, 'c_source' => null, 'c_pages' => null, 'c_notes' => null],
-            ['c_personid' => 1, 'c_sequence' => 2, 'c_alt_name_chn' => '青蓮居士', 'c_alt_name' => 'Qinglian Jushi', 'c_alt_name_type_code' => 5, 'c_source' => null, 'c_pages' => null, 'c_notes' => null],
+            // 出處／頁碼／備註在這一列填滿，釘住 alt_names 分頁確實把「提案可改欄位」送到前端。
+            ['c_personid' => 1, 'c_sequence' => 2, 'c_alt_name_chn' => '青蓮居士', 'c_alt_name' => 'Qinglian Jushi', 'c_alt_name_type_code' => 5, 'c_source' => 1, 'c_pages' => '卷一', 'c_notes' => '測試備註'],
             ['c_personid' => 3, 'c_sequence' => 1, 'c_alt_name_chn' => '子瞻', 'c_alt_name' => 'Zizhan', 'c_alt_name_type_code' => 4, 'c_source' => null, 'c_pages' => null, 'c_notes' => null],
             ['c_personid' => 3, 'c_sequence' => 2, 'c_alt_name_chn' => '東坡居士', 'c_alt_name' => 'Dongpo Jushi', 'c_alt_name_type_code' => 5, 'c_source' => null, 'c_pages' => null, 'c_notes' => null],
         ]);
@@ -1149,6 +1150,28 @@ class PersonBrowserTest extends TestCase {
         $this->assertCount(2, $response->json('items'));
         $response->assertJsonPath('items.0.type_label_chn', '字');
         $response->assertJsonPath('items.0.type_label', 'Zi');
+    }
+
+    /**
+     * 出處／頁碼／備註同樣是 AltnameMutationHandler 允許提案修改的欄位，必須送到前端
+     * （以前撈了卻沒進 UI，看起來像「沒存進去」）。出處以 TEXT_CODES 書名顯示。
+     */
+    #[Test]
+    public function test_tab_alt_names_exposes_source_pages_and_notes(): void {
+        $response = $this->actingAs($this->user)
+            ->getJson(route('app.person-browser.tab', ['personId' => 1, 'tabKey' => 'alt_names']));
+
+        $response->assertOk();
+        $response->assertJsonPath('items.1.name_chn', '青蓮居士');
+        $response->assertJsonPath('items.1.source_id', 1);
+        $response->assertJsonPath('items.1.source_title_chn', '新唐書');
+        $response->assertJsonPath('items.1.source_title', 'New Tang Book');
+        $response->assertJsonPath('items.1.pages', '卷一');
+        $response->assertJsonPath('items.1.notes', '測試備註');
+
+        // 沒有出處的列不可因 leftJoin 落空而多出／少掉欄位。
+        $response->assertJsonPath('items.0.source_title_chn', null);
+        $response->assertJsonPath('items.0.notes', null);
     }
 
     #[Test]

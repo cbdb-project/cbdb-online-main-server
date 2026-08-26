@@ -9,18 +9,15 @@ use ReflectionClass;
 use Tests\TestCase;
 
 /**
- * v2 mutation 白名單與實際 schema 的漂移守衛（#1284）。
+ * v2 mutation 白名單與實際 schema 的漂移守衛。
  *
  * **為什麼需要**：`allowedFields()` 只是一份手寫清單，與資料表的實際欄位之間沒有任何
  * 保證。列進去的欄位若不存在，白名單會照樣放行，錯誤要到 `DB::table()->update()`／
  * `->insert()` 才發生 ⇒ 使用者拿到的是 **500 而不是 422**。
  *
- * `ALTNAME_DATA` 就這樣帶了四個幻影欄（`c_alt_name_pinyin`／`_pinyin2`／`_pinyin3`／
- * `c_alt_name_role`）將近半年沒被發現，因為每支相關測試都**自己在合成表裡把那四欄建了
- * 出來**——測試永遠綠，prod 永遠打不到。
- *
- * 掛 `RefreshDatabase` 讓 schema 真的來自 `database/migrations`，守衛才有意義
- * （同 VariantReplaceRegistryDriftTest 的理由）。
+ * **必須掛 `RefreshDatabase`**，schema 才真的來自 `database/migrations`；不掛的話
+ * `Schema` 只看得到各測試自己建的合成表，而合成表要什麼欄有什麼欄 ⇒ 守衛永遠假綠。
+ * （同 VariantReplaceRegistryDriftTest 的理由。）
  *
  * **邊界**：抓的是「白名單列了 migration 沒有的欄」。抓不到反向的
  * 「prod 有、migration 沒有」——那需要對 live schema 比對，不在單元測試能及的範圍。

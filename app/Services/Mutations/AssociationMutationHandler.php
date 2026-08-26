@@ -332,10 +332,8 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
             'c_source',
             'c_pages',
             'c_notes',
-            // ⚠️ 移除幻影 c_supplement（ASSOC_DATA 無此欄）。
             'c_sequence',
             'c_assoc_count',
-            // Task 27：補回舊表單可錄入欄位（皆 ASSOC_DATA 真實欄）。
             'c_topic_code',
             'c_occasion_code',
             'c_tertiary_personid',

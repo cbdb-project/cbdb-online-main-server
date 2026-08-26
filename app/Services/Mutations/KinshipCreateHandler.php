@@ -179,8 +179,6 @@ class KinshipCreateHandler extends AbstractPersonSubresourceCreateHandler {
             'c_source',
             'c_pages',
             'c_notes',
-            // Task 27 補回：c_autogen_notes 為 KIN_DATA 真實欄（舊表單以 textarea 暴露為可錄入）；
-            // 移除幻影 c_supplement（KIN_DATA 無此欄，SHOW COLUMNS 確認）。
             'c_autogen_notes',
         ];
     }

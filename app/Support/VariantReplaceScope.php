@@ -91,10 +91,6 @@ final class VariantReplaceScope {
             // 跨表代碼鍵 → INDEXYEAR_TYPE_CODES.c_index_year_type_code（varchar PK）。
             'c_index_year_type_code',
         ],
-        // ALTNAME_DATA 只有 c_alt_name 一個拉丁人名欄。原本這裡還列了 c_alt_name_pinyin／
-        // _pinyin2／_pinyin3／c_alt_name_role，並註記為「prod-only」——那是錯的（#1284）：
-        // 四欄 migration 從未建立、prod 也不存在，只出現在 v2 白名單與測試合成表裡。
-        // 型別導向的範圍本來就看不到不存在的欄，排除它們是純粹的雜訊。
         'ALTNAME_DATA' => ['c_alt_name'],
 
         // ── 跨表 join／樹狀關聯的「代碼鍵」（D3）。

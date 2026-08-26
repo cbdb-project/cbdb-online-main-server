@@ -8,6 +8,7 @@ use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
 use App\Services\CharVariantMapService;
 use App\Services\NameSearchIndexService;
+use App\Support\CompositePrimaryKey;
 use App\Support\VariantEquivalentLookup;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
@@ -1181,7 +1182,7 @@ class OperationsProposalController extends Controller {
             $hasKeys = $keyColumns !== [] && !array_diff($keyColumns, array_keys($appliedRow));
             $resourceIdRow = $hasKeys ? $appliedRow : $original;
         }
-        $resourceId = $this->buildCompositeId($keyColumns, $resourceIdRow);
+        $resourceId = $this->buildCompositeId($keyColumns, $resourceIdRow, $proposal->resource);
 
         // 對於 BiogMain 相關提案，使用實際的 c_personid；對於 Codes 提案使用 0
         $personId = $proposal->c_personid ?? 0;
@@ -1249,15 +1250,29 @@ class OperationsProposalController extends Controller {
 
         $proposal->resource_data = json_encode($payload, JSON_UNESCAPED_UNICODE);
         if ($status === 'approved' && $appliedRow !== null && $updateResourceId && !empty($keyColumns)) {
-            $proposal->resource_id = $this->buildCompositeId($keyColumns, $appliedRow);
+            $proposal->resource_id = $this->buildCompositeId($keyColumns, $appliedRow, $proposal->resource);
         }
         $proposal->save();
     }
 
-    protected function buildCompositeId(array $keyColumns, array $row): string {
+    /**
+     * 核准／落帳時用的 `_._` 位置式主鍵字串。
+     *
+     * 格式刻意維持位置式（不換成 CompositePrimaryKey::buildStoredResourceId() 的 query-string）：
+     * 代碼表的查閱連結會把它塞進 codes 編輯頁的 path，而 CodesController::buildNamedConditionsFromId()
+     * 只認**純數字**主鍵值，含文字主鍵的代碼表換格式後會從「查得到」變成「查不到」。
+     *
+     * 但欄序必須對齊 CompositePrimaryKey::SCHEMAS：位置式在解析端（parseStoredResourceId()）
+     * 是按 SCHEMAS 欄序還原，而 $keyColumns 來自提案的 __key_columns（人物子資源取自 handler
+     * 的 keyColumns()、代碼表取自 CodesController::getKeyColumns()），兩者不保證同序。
+     * 錯位不會報錯，只會**靜默指到別的資料列**——所以有 schema 且欄位集合相同時一律照 schema 排。
+     */
+    protected function buildCompositeId(array $keyColumns, array $row, ?string $table = null): string {
         if (empty($keyColumns)) {
             return '';
         }
+
+        $keyColumns = $this->alignKeyColumnsToSchema($keyColumns, $table);
 
         $parts = [];
         foreach ($keyColumns as $column) {
@@ -1265,6 +1280,32 @@ class OperationsProposalController extends Controller {
         }
 
         return implode('_._', $parts);
+    }
+
+    /**
+     * 把 __key_columns 重排成 CompositePrimaryKey::SCHEMAS 的欄序。
+     * 沒有 schema、或欄位集合對不上（歷史 4-key ALTNAME 等）時原樣回傳——
+     * 這種情況下重排只是換一種錯法，不如維持既有行為。
+     *
+     * @param array<int,string> $keyColumns
+     * @return array<int,string>
+     */
+    protected function alignKeyColumnsToSchema(array $keyColumns, ?string $table): array {
+        if ($table === null || trim($table) === '') {
+            return $keyColumns;
+        }
+
+        $schema = CompositePrimaryKey::getSchema($table);
+        if (!is_array($schema) || $schema === []) {
+            return $keyColumns;
+        }
+
+        $given = array_values(array_filter($keyColumns, 'is_string'));
+        if (count($given) !== count($schema) || array_diff($given, $schema) !== [] || array_diff($schema, $given) !== []) {
+            return $keyColumns;
+        }
+
+        return $schema;
     }
 
     protected function assignAutoKeyIfNeeded(string $table, array $keyColumns, array $data): array {

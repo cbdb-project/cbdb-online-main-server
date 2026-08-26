@@ -855,17 +855,22 @@ class OperationsController extends Controller {
         $showPerPersonResourceButtons = in_array(strtoupper($resourceName), ['KIN_DATA', 'ASSOC_DATA'], true) && $personRowspan > 1;
 
         // 主資源連結（非 per-person 模式）。
+        // 不可直接用 $rawResourceId：提案的 resource_id 是「提案完成後」的主鍵，先於現實寫入，
+        // 拿去開 edit-v2 會 404。見 resolveLinkResourceId()。
         $id = $item->c_personid;
+        $linkResourceId = $this->resolveLinkResourceId($item, is_array($resourceDataParsed) ? $resourceDataParsed : null);
         $resourceSpecificLink = null;
-        if ((int) $id !== 0 && $opType !== 4) {
-            $resourceSpecificLink = CompositePrimaryKey::buildResourceEditUrl($resourceName, $rawResourceId, $id);
+        if ((int) $id !== 0 && $opType !== 4 && $linkResourceId !== null) {
+            $resourceSpecificLink = CompositePrimaryKey::buildResourceEditUrl($resourceName, $linkResourceId, $id);
         }
         $hasPersonLink = (int) $id !== 0 && !empty($biogmain);
         $resourceLink = null;
         if ($hasPersonLink && $resourceSpecificLink) {
             $resourceLink = $resourceSpecificLink;
-        } elseif ($isCodeResource && $opType !== 4) {
-            $codeRouteId = CompositePrimaryKey::normalizeSingleKeyResourceIdForCodeRoute($resourceName, $rawResourceId);
+        } elseif ($isCodeResource && $opType !== 4 && $linkResourceId !== null) {
+            // 同樣用 $linkResourceId：ALTNAME_DATA 這類「既是人物子資源、也在 codes.tables 裡」的表，
+            // 提案在上面的分支被擋掉後會落到這裡，若沿用 $rawResourceId 等於換一條路徑撞同一個 404。
+            $codeRouteId = CompositePrimaryKey::normalizeSingleKeyResourceIdForCodeRoute($resourceName, $linkResourceId);
             // flag-aware：codes flag=new 時開 React 版編輯頁，不要從 React 操作紀錄掉回舊 Blade 頁。
             $resourceLink = code_table_edit_url($resourceName, $codeRouteId);
         }
@@ -1083,6 +1088,73 @@ class OperationsController extends Controller {
         }
 
         return route('codes.proposals.edit', ['table_name' => $resourceName, 'operation' => $item->id], false);
+    }
+
+    /**
+     * 「資源」連結該指向哪一個 resource_id（null＝此刻沒有可指向的實體列，不出連結）。
+     *
+     * operations.resource_id 對提案存的是「提案完成後」的主鍵，是**先於現實**寫進去的：
+     * - create 提案：核准前那一列根本不存在；
+     * - update 提案：只要改到任一主鍵成員（ALTNAME_DATA.c_alt_name_chn、ASSOC_DATA.c_text_title、
+     *   BIOG_SOURCE_DATA.c_pages 這類文本型，或 c_addr_type／c_kin_code 這類代碼型都算），
+     *   resource_id 就是尚不存在的新鍵；
+     * - delete 提案：核准後舊鍵那一列已被刪掉。
+     * 直接拿它開 edit-v2，編輯器以主鍵查不到列就 abort(404)——這是所有複合主鍵子資源共通的問題，
+     * 不限別名。
+     *
+     * 未核准的 update 提案改以 resource_original 的主鍵指向「現存那一列」，與核准路徑
+     * （OperationsProposalController::applyViaMutationHandler() 一律以 original 定位）同一套語義。
+     */
+    protected function resolveLinkResourceId($item, ?array $payload = null): ?string {
+        $rawResourceId = (string) ($item->resource_id ?? '');
+        $opType = (int) ($item->op_type ?? 0);
+
+        $proposalTypes = [
+            Operation::TYPE_PROPOSAL_CREATE,
+            Operation::TYPE_PROPOSAL_UPDATE,
+            Operation::TYPE_PROPOSAL_DELETE,
+        ];
+        if (!in_array($opType, $proposalTypes, true)) {
+            return $rawResourceId;
+        }
+
+        if ($payload === null) {
+            $decoded = json_decode((string) ($item->resource_data ?? ''), true);
+            $payload = is_array($decoded) ? $decoded : [];
+        }
+        $applied = (string) ($payload['__review_status'] ?? 'pending') === 'approved';
+
+        // create：核准後 resource_id 已被 updateProposalStatus() 改指實際建立的列；核准前無實體。
+        if ($opType === Operation::TYPE_PROPOSAL_CREATE) {
+            return $applied ? $rawResourceId : null;
+        }
+
+        // delete：核准前 resource_id 即現存列；核准後該列已刪除。
+        if ($opType === Operation::TYPE_PROPOSAL_DELETE) {
+            return $applied ? null : $rawResourceId;
+        }
+
+        // update：核准後 resource_id（新鍵）即現況；核准前指向原列。
+        if ($applied) {
+            return $rawResourceId;
+        }
+
+        $keyColumns = is_array($payload['__key_columns'] ?? null) ? $payload['__key_columns'] : [];
+        $original = json_decode((string) ($item->resource_original ?? ''), true);
+        if (empty($keyColumns) || !is_array($original)) {
+            return null;
+        }
+
+        $originalPk = [];
+        foreach ($keyColumns as $column) {
+            if (!is_string($column) || !array_key_exists($column, $original)) {
+                // 原始快照缺主鍵欄 → 無從定位；寧可不出連結，也不要送使用者去撞 404。
+                return null;
+            }
+            $originalPk[$column] = $original[$column];
+        }
+
+        return CompositePrimaryKey::buildStoredResourceId($originalPk);
     }
 
     /**
@@ -1849,7 +1921,10 @@ class OperationsController extends Controller {
             return [];
         }
 
-        $allowEditLink = (int) ($item->op_type ?? 0) !== Operation::TYPE_DELETE;
+        // linkResourceId 為 null＝此刻沒有實體列可指（未核准的 create 提案、已核准的 delete 提案），
+        // 連 audit 推導出的 per-person 連結也一併不出——已核准的刪除提案有 audit 卻沒有列。
+        $linkResourceId = $this->resolveLinkResourceId($item);
+        $allowEditLink = (int) ($item->op_type ?? 0) !== Operation::TYPE_DELETE && $linkResourceId !== null;
         $targets = [];
         $auditLogs = is_array($item->audit_logs ?? null) ? $item->audit_logs : [];
         foreach ($auditLogs as $audit) {
@@ -1886,8 +1961,10 @@ class OperationsController extends Controller {
             ];
         }
 
+        // 提案沒有 audit_logs（尚未落庫），會落到這個回退分支；resource_id 是「提案完成後」的
+        // 主鍵，未核准時指向不存在的列 ⇒ 與主資源連結同一個 404，這裡套同一套解析。
         $primaryId = $item->c_personid ?? null;
-        $primaryResourceId = trim((string) ($item->resource_id ?? ''));
+        $primaryResourceId = trim((string) ($linkResourceId ?? ''));
         if (is_numeric($primaryId) && (int) $primaryId > 0 && $primaryResourceId !== '') {
             $primaryId = (int) $primaryId;
             if (!isset($targets[$primaryId])) {

@@ -77,7 +77,7 @@ final class VariantReplaceScope {
         // 替換這欄會直接破壞該設計（「峯」的讀音條目會變成「峰」）。
         'pinyin' => ['c_chn'],
 
-        // ── 拉丁人名欄（共 13 欄，D4）：排除而非 strict。
+        // ── 拉丁人名欄（共 10 欄，D4）：排除而非 strict。
         // 理由 1：strict 仍會套那 6 筆規則，真有人填漢字時 愼→慎／靑→青 照樣被改；
         //         只有排除能真正不碰。
         // 理由 2：排除順帶消掉組合欄失步——BiogMainRepository::updateById() 的
@@ -91,15 +91,11 @@ final class VariantReplaceScope {
             // 跨表代碼鍵 → INDEXYEAR_TYPE_CODES.c_index_year_type_code（varchar PK）。
             'c_index_year_type_code',
         ],
-        'ALTNAME_DATA' => [
-            'c_alt_name', 'c_alt_name_pinyin', 'c_alt_name_pinyin2', 'c_alt_name_pinyin3',
-            // c_alt_name_role：prod-only varchar(50)（不在 migrations／DATABASE_SCHEMA.md，
-            // 只出現在 allowedFields 白名單與測試合成表），全庫**零**應用邏輯讀它。
-            // 語義無法從程式判定，所以刻意選保守側排除：漏一次替換是可回復的
-            // （日後歸類清楚再放進範圍），而誤改一個代碼／角色鍵是不可回復的。
-            // 若日後確認它是散文性質的說明文字，再移出這份清單。
-            'c_alt_name_role',
-        ],
+        // ALTNAME_DATA 只有 c_alt_name 一個拉丁人名欄。原本這裡還列了 c_alt_name_pinyin／
+        // _pinyin2／_pinyin3／c_alt_name_role，並註記為「prod-only」——那是錯的（#1284）：
+        // 四欄 migration 從未建立、prod 也不存在，只出現在 v2 白名單與測試合成表裡。
+        // 型別導向的範圍本來就看不到不存在的欄，排除它們是純粹的雜訊。
+        'ALTNAME_DATA' => ['c_alt_name'],
 
         // ── 跨表 join／樹狀關聯的「代碼鍵」（D3）。
         // 判準是「這個值是用來跟別表對上的代碼」，**不是**「是不是 varchar PK 成員」——

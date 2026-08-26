@@ -142,10 +142,6 @@ class ApiV2MutateAltnameTest extends TestCase {
             $table->string('c_pages', 255)->nullable();
             $table->text('c_notes')->nullable();
             $table->integer('c_sequence')->default(0);
-            $table->string('c_alt_name_pinyin', 255)->nullable();
-            $table->string('c_alt_name_pinyin2', 255)->nullable();
-            $table->string('c_alt_name_pinyin3', 255)->nullable();
-            $table->string('c_alt_name_role', 50)->nullable();
             $table->string('c_created_by', 255)->nullable();
             $table->string('c_created_date', 255)->nullable();
             $table->string('c_modified_by', 255)->nullable();
@@ -341,51 +337,44 @@ class ApiV2MutateAltnameTest extends TestCase {
         ]);
     }
 
+    /**
+     * ALTNAME_DATA 沒有後端 Tier 1 拼音欄（#1284）：唯一的別名羅馬字欄是 c_alt_name，
+     * 它可能含西文別名（Denver 之類），一律交前端 Tier 2 互動確認，後端**不轉**。
+     */
     #[Test]
-    public function testDirectAltnameUpdateNormalizesPinyinVToUmlaut(): void {
-        $user = $this->makeUser(email: 'altname-umlaut@example.com');
-        $this->actingAs($user);
+    public function testDirectAltnameUpdateDoesNotConvertAltNameVToUmlaut(): void {
+        $this->actingAs($this->makeUser(email: 'altname-umlaut@example.com'));
         $this->seedAltname();
 
-        // Tier 1：後端靜默轉 c_alt_name_pinyin/2/3；Tier 2：c_alt_name 交前端、後端不轉。
-        $response = $this->postJson('/api/v2/mutate', $this->altnamePayload([
-            'changes' => [
-                'c_alt_name' => 'Lv Meng',
-                'c_alt_name_pinyin' => 'lv',
-                'c_alt_name_pinyin2' => 'Nve',
-                'c_alt_name_pinyin3' => 'Silva',
-            ],
-        ]));
-
-        $response->assertOk();
-
-        $this->assertDatabaseHas('ALTNAME_DATA', [
-            'c_personid' => 1000,
-            'c_alt_name_chn' => '子美',
-            'c_alt_name_pinyin' => 'lü',   // Tier 1 靜默轉
-            'c_alt_name_pinyin2' => 'Nüe',
-            'c_alt_name_pinyin3' => 'Silva', // 西文 no-op
-            'c_alt_name' => 'Lv Meng',     // 後端刻意不轉（Tier 2 前端負責）
-        ]);
-    }
-
-    #[Test]
-    public function testDirectAltnameUpdatePinyinNormalizationIsIdempotent(): void {
-        $user = $this->makeUser(email: 'altname-umlaut-idem@example.com');
-        $this->actingAs($user);
-        // 已是 ü 的資料再保存一次，值不變、不因重複套用而損壞。
-        $this->seedAltname(['c_alt_name_pinyin' => 'lü']);
-
         $this->postJson('/api/v2/mutate', $this->altnamePayload([
-            'changes' => ['c_alt_name_pinyin' => 'lü', 'c_sequence' => 9],
+            'changes' => ['c_alt_name' => 'Lv Meng'],
         ]))->assertOk();
 
         $this->assertDatabaseHas('ALTNAME_DATA', [
             'c_personid' => 1000,
             'c_alt_name_chn' => '子美',
-            'c_alt_name_pinyin' => 'lü', // 冪等：仍為 lü，未被二次轉換破壞
-            'c_sequence' => 9,
+            'c_alt_name' => 'Lv Meng',
         ]);
+    }
+
+    /**
+     * #1284：c_alt_name_pinyin／_pinyin2／_pinyin3／c_alt_name_role 資料庫從來沒有這四欄
+     * （baseline migration 的 ALTNAME_DATA 就是 12 欄）。它們曾誤列在白名單裡，於是放行後
+     * 一路走到 SQL 層才炸成 500。移出白名單後必須是乾淨的 422。
+     */
+    #[Test]
+    public function testAltnameUpdateRejectsColumnsThatDoNotExist(): void {
+        $this->actingAs($this->makeUser(email: 'altname-phantom@example.com'));
+        $this->seedAltname();
+
+        foreach (['c_alt_name_pinyin', 'c_alt_name_pinyin2', 'c_alt_name_pinyin3', 'c_alt_name_role'] as $column) {
+            $response = $this->postJson('/api/v2/mutate', $this->altnamePayload([
+                'changes' => [$column => 'x'],
+            ]));
+
+            $response->assertStatus(422);
+            $this->assertStringContainsString($column, (string) $response->json('errors.changes.0'));
+        }
     }
 
     #[Test]

@@ -81,7 +81,7 @@
 - **前置**：`App\Support\PinyinUmlaut::normalize()`（規則 `l/n`+`v` 且後非 a/i/o/u → `lü/nü/lüe/nüe`）由 M1 建於 develop；本項新增 `PinyinUmlaut::normalizeFields()` + 兩組 allowlist 常數統一套用。
 - **⚠️ 修正舊草稿的欄位錯誤**：本節原列 `c_name_rm`／`c_surname_rm`／`c_mingzi_rm`／`c_*_proper` 為歸一化目標——**錯誤**。這些是 Wade-Giles 羅馬字與母語拉丁名（可能含**真** `v`，如 Silva），**一律不轉**（與 §4「不轉換的欄位」一致）。v→ü 專用 allowlist **不可沿用 `BracketNormalizer` 欄位列**（後者含 `_rm`／`_proper`）。
 - **兩層機制（Hongsu 定案）**：
-  - **Tier 1｜後端靜默轉**——定義上即漢語拼音的欄：BIOG `c_surname`／`c_mingzi`／`c_name`、ALTNAME `c_alt_name_pinyin`/`2`/`3`。
+  - **Tier 1｜後端靜默轉**——定義上即漢語拼音的欄：BIOG `c_surname`／`c_mingzi`／`c_name`。（原列的 ALTNAME `c_alt_name_pinyin`/`2`/`3` 欄位不存在，已於 #1284 移除。）
   - **Tier 2｜前端互動確認**——可能含西文別名的 `c_alt_name`（如 Denver，`nve` 為真實西文）：React `AltnameEditor` 保存時用同一規則偵測，命中才彈窗由使用者「轉換／保留」；後端**不**靜默轉 `c_alt_name`。
 - **實作掛點（僅 active React／`/api/v2` 人工輸入面）**：`BiogMainRepository::updateById`／`store`、`BiogMainMutationHandler::prepareProposalPayload`、`AltnameMutationHandler`／`AltnameCreateHandler` 的 `preprocess*`；前端 `resources/js/inertia/utils/pinyinUmlaut.ts` + `AltnameEditor` 彈窗。
 - **範圍決策**：Code 表（`CodesController`／書名內聯）留 **Phase B**（需先建「表→漢語拼音欄」白名單，避免誤傷 Wade-Giles／譯名欄）；舊 Blade 控制器不改（遵 AGENTS.md）；提案核准落庫為有意排除的殘留（legacy `/api/v1` 已於資安加固 P2-8 整組刪除，不再是殘留）。詳見設計文件 §5／§9。

@@ -4,6 +4,14 @@
 
 ## 2026-08
 
+### 清掉 v2 mutation 白名單裡 6 個資料庫不存在的欄位，並加上機械化守衛
+
+- **問題**：`allowedFields()` 是手寫清單，與資料表實際欄位之間沒有任何保證。列進去卻不存在的欄會被白名單**放行**，錯誤要到 `DB::table()->update()`／`->insert()` 才發生 ⇒ 使用者拿到 **500 而不是 422**；`API.md` 也照著白名單把這些欄位公布為對外契約，外部協作者照文件實作就會撞 500。
+- **清掉的 6 欄**：`ALTNAME_DATA` 的 `c_alt_name_pinyin`／`_pinyin2`／`_pinyin3`／`c_alt_name_role`（#1284），以及守衛順手抓到的 `BIOG_TEXT_DATA.c_supplement`／`c_text_year`。六欄 migration 均未曾建立（baseline `import_cbdb_schema.php` 的 `ALTNAME_DATA` 就是 12 欄）、prod 也查不到。`c_text_year` 屬於 `TEXT_CODES`，走 text-codes 聚合端，本來就不該出現在 `BIOG_TEXT_DATA` 的白名單裡。
+- **為什麼半年沒被發現**：每支相關測試都**自己在合成表裡把那幾欄建了出來**（6 支測試檔），於是整條 PinyinUmlaut Tier 1 的 ALTNAME 分支是對著一個現實中不存在的表形在測——測試永遠綠，prod 永遠打不到。同一類的「幻影 `c_supplement`」先前已在 ASSOC／KIN／POSSESSION 三個 handler 逐一手工清掉過，BIOG_TEXT_DATA 這筆漏網。
+- **連帶效應**：`PinyinUmlaut::ALTNAME_PINYIN_V_FIELDS` 隨之移除（刻意不留空常數，免得下一個人以為只是暫時沒欄位而重新填回），兩個 altname handler 不再呼叫 `normalizeFields()`。**Tier 2 不受影響**——ALTNAME 唯一的別名羅馬字欄 `c_alt_name` 照舊走前端互動確認、後端不轉。`VariantReplaceScope::EXCLUDED_COLUMNS['ALTNAME_DATA']` 從 4 欄縮為 `['c_alt_name']`；那裡「`c_alt_name_role` 是 prod-only」的註解與 `docs/CHAR_VARIANT_MAP_TEXT_COLUMN_ROLLOUT_PLAN.md` 的同旨段落都寫反了，一併更正。
+- **防復發**：新增 `tests/Feature/MutationAllowedFieldsSchemaDriftTest.php`，掛 `RefreshDatabase` 讓 schema 真的來自 `database/migrations`（同 `VariantReplaceRegistryDriftTest` 的理由），逐一比對全部人物子資源 handler 的 `allowedFields()` ＋ `keyColumns()`。這支守衛正是抓出 `BIOG_TEXT_DATA` 那兩欄的來源。**邊界**：它抓「白名單列了 migration 沒有的欄」，抓不到反向的「prod 有、migration 沒有」。
+
 ### 錄入端加上 Unicode NFC 正規化：相容表意文字折疊為統一表意文字
 - **修的是一個獨立於異體字的真缺陷**：CJK 相容表意文字（U+F900–U+FAFF 與補充區）與統一表意文字在資料庫層是**不同位元組**，唯一鍵擋不住、精確比對找不到、搜尋互不可見。生產庫實測：`ALTNAME_DATA.c_alt_name_chn` 107 列、`OFFICE_CODES.c_office_chn` 23 列、`BIOG_MAIN.c_name_chn` 17 列、`TEXT_CODES.c_title_chn` 16 列含相容碼位。最具體的一例——`c_personid=551931`「李晄」的「李」是 U+F9E1，而其他人的「李」是 U+674E，**用「李」搜尋找不到這個人**。
 - **與異體字落地替換是兩件不同性質的事**，新增的 `App\Support\UnicodeNfc` 類註有完整對照：NFC 折疊的兩個碼位在 Unicode 定義上**就是同一個字**（canonical equivalence，相容碼位存在的目的只是與舊編碼往返轉換），不涉及任何編輯判斷；而 愼→慎 那類異體字 Unicode **刻意不折疊**（統一表意文字永不給 canonical decomposition），那是應用層的策管決定。實測 `char_variant_map` 的 7 筆種子變體字**全部 NFC 不變**——兩套機制作用域不重疊。

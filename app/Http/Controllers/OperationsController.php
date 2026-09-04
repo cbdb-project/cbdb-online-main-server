@@ -11,6 +11,7 @@ use App\Repositories\OperationRepository;
 use App\Services\CharVariantMapService;
 use App\Support\BasicInformationHistory;
 use App\Support\CompositePrimaryKey;
+use App\Support\EntityAggregateRegistry;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -870,9 +871,12 @@ class OperationsController extends Controller {
         } elseif ($isCodeResource && $opType !== 4 && $linkResourceId !== null) {
             // 同樣用 $linkResourceId：ALTNAME_DATA 這類「既是人物子資源、也在 codes.tables 裡」的表，
             // 提案在上面的分支被擋掉後會落到這裡，若沿用 $rawResourceId 等於換一條路徑撞同一個 404。
-            $codeRouteId = CompositePrimaryKey::normalizeSingleKeyResourceIdForCodeRoute($resourceName, $linkResourceId);
-            // flag-aware：codes flag=new 時開 React 版編輯頁，不要從 React 操作紀錄掉回舊 Blade 頁。
-            $resourceLink = code_table_edit_url($resourceName, $codeRouteId);
+            $resourceLink = $this->codeResourceLink(
+                $resourceName,
+                $linkResourceId,
+                is_array($resourceDataParsed) ? $resourceDataParsed : null,
+                $item
+            );
         }
 
         // 每位受影響人物附上編輯連結與資源描述。
@@ -1155,6 +1159,89 @@ class OperationsController extends Controller {
         }
 
         return CompositePrimaryKey::buildStoredResourceId($originalPk);
+    }
+
+    /**
+     * 代碼表資源的「查閱」連結。
+     *
+     * 已被實體聚合封寫的下層表（OFFICE_CODES、SOCIAL_INSTITUTION_*）**不能**再指向泛用
+     * codes 編輯頁：那條路徑早在 #1174 就被 `CodesController::isReadOnlyTable()` 擋死，
+     * 點進去只會吃到「該代碼表為只讀，禁止編輯。」再被彈回列表。封寫時只改了守衛、沒改
+     * 這個連結出口，就是這個 bug 的全部成因。
+     *
+     * 三種結果：
+     *  - 未封寫的表：維持原本 flag-aware 的 codes 編輯頁連結。
+     *  - 已封寫且使用者打得開實體表單：改指實體聚合編輯頁。
+     *  - 已封寫但打不開（訪客／權限不足），或識別鍵無從定位：不出連結。前端會顯示
+     *    「無資源頁面」，比一條必然 403／必然撞牆的連結誠實。
+     *
+     * @param array<string, mixed>|null $payload 已解碼的 resource_data
+     */
+    protected function codeResourceLink(string $resource, string $linkResourceId, ?array $payload, $item): ?string {
+        if (EntityAggregateRegistry::isClosedByEntity($resource)) {
+            if (!EntityAggregateRegistry::canReachEditForm($resource)) {
+                return null;
+            }
+
+            return EntityAggregateRegistry::editUrl(
+                $resource,
+                $linkResourceId,
+                $this->entityPkFromOperationPayload($resource, $payload, $item)
+            );
+        }
+
+        // flag-aware：codes flag=new 時開 React 版編輯頁，不要從 React 操作紀錄掉回舊 Blade 頁。
+        $codeRouteId = CompositePrimaryKey::normalizeSingleKeyResourceIdForCodeRoute($resource, $linkResourceId);
+
+        return code_table_edit_url($resource, $codeRouteId);
+    }
+
+    /**
+     * 從該筆 operation 的快照取實體識別鍵（resource_id 解不出來時的補救）。
+     *
+     * 為什麼非有不可：codes UI 封寫前寫進 operations 的 resource_id 用的是
+     * `CodesController::buildCompositeId()` 的位置式格式，欄序來自
+     * `$tablePrimaryKeyOverrides`，與 `CompositePrimaryKey::SCHEMAS` 不同源——
+     * SOCIAL_INSTITUTION_CODES 存成裸值 `3983`、SOCIAL_INSTITUTION_ADDR 存成 `3983-5348`，
+     * 兩者都解不出 `c_inst_code`。而**壞掉的連結正是這批**（封寫後由實體頁寫入的那些
+     * 反而解得出來），所以少了這一步等於沒修到票上說的情境。
+     *
+     * 一般情況先看 resource_data 再看 resource_original：update 的 `$data` 只有被改的欄、
+     * 未必含主鍵，但 `$original` 是完整原始列。
+     *
+     * **未核准的更新提案例外，只看 resource_original**：`resolveLinkResourceId()` 對這種
+     * operation 刻意回「原列」的主鍵（提案還沒套用，新鍵在現實中不存在）。若這裡照一般順序
+     * 先讀 resource_data，就會拿到提案「想改成」的識別鍵——例如一筆把 c_inst_code 從 3983
+     * 改成 5000 的待審提案，連結會指向 5000，而現存的列其實還是 3983。那與同一段程式碼
+     * 上游的定位語義自相矛盾，且送出去的是一條 404。
+     *
+     * 兩邊都沒有就回 null——例如 SOCIAL_INSTITUTION_NAME_CODES 的快照只有
+     * (c_inst_name_code, c_inst_name_hz, c_inst_name_py)，而名稱碼跨機構共用、本來就不唯一
+     * 決定一個機構，猜一個送使用者過去比不出連結糟得多。
+     *
+     * @param array<string, mixed>|null $payload 已解碼的 resource_data
+     */
+    protected function entityPkFromOperationPayload(string $resource, ?array $payload, $item): ?string {
+        $entity = EntityAggregateRegistry::entityForClosedTable($resource);
+        $pkColumn = (string) ($entity['pk'] ?? '');
+        if ($pkColumn === '') {
+            return null;
+        }
+
+        $original = json_decode((string) ($item->resource_original ?? ''), true);
+        $original = is_array($original) ? $original : null;
+
+        $pendingProposalUpdate = (int) ($item->op_type ?? 0) === Operation::TYPE_PROPOSAL_UPDATE
+            && (string) ($payload['__review_status'] ?? 'pending') !== 'approved';
+        $sources = $pendingProposalUpdate ? [$original] : [$payload, $original];
+
+        foreach ($sources as $source) {
+            if (is_array($source) && isset($source[$pkColumn]) && is_scalar($source[$pkColumn])) {
+                return (string) $source[$pkColumn];
+            }
+        }
+
+        return null;
     }
 
     /**

@@ -167,10 +167,26 @@ filter／sort／guard 機制，封閉永遠是「認領下層表＋換側欄＋�
 據此抽出五件套，後續實體不再整套重寫：
 
 1. **實體註冊表 `config/entity_aggregates.php`（單一真源）**：每個聚合聲明
-   resource／Service／`definition`／識別鍵／認領表／`closed_code_tables`／側欄 nav。往下推導：
+   resource／Service／`definition`／識別鍵／認領表／`closed_code_tables`／`edit_route`／
+   `form_capability`／側欄 nav。往下推導：
    - codes UI 封寫：`CodesController::isReadOnlyTable()` 對 `closed_code_tables` 內
      的表一律唯讀——**實體上線即自動封寫，不再手維護清單**；回退＝改 config。
-   - 側欄節點：`Navigation::entityNavItem()` 依 nav 設定把裸表節點改指實體頁。
+     判定本身委派給 `App\Support\EntityAggregateRegistry::isClosedByEntity()`。
+   - **封寫表的編輯連結改指**：指向被封寫下層表的「查閱／編輯」連結（`/app/operations`）
+     改導向該實體的 `edit_route`，由 `EntityAggregateRegistry::editUrl()` 解析。
+     **封寫與連結解析必須同源**——#1174 只改了守衛、沒改連結出口，於是每一條
+     `/app/codes/{封寫表}/{id}/edit` 都變成「點進去吃唯讀警告、再被彈回列表」的死連結。
+     **呼叫端一律要準備好 fallback 識別鍵**：operations 的 `resource_id` 有多種歷史格式
+     （具名 query-string、裸值、`_._`、`-`），解析採三級優先序——具名格式 → 呼叫端從
+     `resource_data`／`resource_original` 取的識別欄 → 單鍵表位置式的第一段。位置式那級
+     只是推測（缺識別鍵時 `{c_office_id}_._{c_dy}` 會塌成單獨的朝代碼），所以排在 payload 之後。
+     兩邊都取不到（如 `SOCIAL_INSTITUTION_NAME_CODES`——名稱碼跨機構共用、payload 也不含
+     `c_inst_code`）就不出連結，**不猜**：導向一個存在但錯誤的實體，比沒有連結糟得多。
+     **連結也要看權限**：`/operations` 是公開頁，實體編輯頁卻一律 `abort(403)`，所以由
+     `form_capability` 宣告該實體表單需要的能力（office＝`canPropose`、其餘＝`canWriteDirectly`），
+     打不開就不出連結，不要發一條必然 403 的「查閱」。
+   - 側欄節點：`Navigation::entityNavItem()` 依 nav 設定把裸表節點改指實體頁
+     （`nav.route` 是**列表頁**路由，與 `edit_route` 各司其職）。
    - mutation 分派：`EntityAggregateDefinitionRegistry` 依 `definition` 建 resource 索引。
 2. **`EntityAggregateService` 介面**＋Service 共用基元（`SharesImportHelpers`）：
    `allocateNextId()`（lockForUpdate max+1）、`countReferences()`（護欄計數）、
@@ -246,7 +262,9 @@ direct 與 proposal 天然對等（§7 原則），不必每實體各接一遍�
 
 ## 8. 相關文件與程式碼
 
-- `config/entity_aggregates.php`（實體註冊表：封寫／側欄接線的單一真源，§6.5）
+- `config/entity_aggregates.php`（實體註冊表：封寫／連結／側欄接線的單一真源，§6.5）
+- `app/Support/EntityAggregateRegistry.php`＋`tests/Unit/EntityAggregateRegistryTest.php`（註冊表查詢介面：封寫判定與封寫表的編輯連結解析，§6.5）
+- `app/Http/Controllers/OperationsController.php`＋`tests/Feature/OperationsIndexLinksTest.php`（操作紀錄的「查閱」連結：封寫表改指實體編輯頁，§6.5）
 - `app/Services/Import/EntityAggregateService.php`（聚合根介面）
 - `app/Services/Mutations/EntityAggregate*Handler.php`＋`EntityAggregate/`（通用 mutation handler、definition 契約與分派 registry，§6.5）
 - `app/Services/Import/Concerns/SharesImportHelpers.php`（配號／護欄計數／集合對賬／審計基元）

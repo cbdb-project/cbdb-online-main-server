@@ -10,6 +10,7 @@ use App\Services\AuditLogService;
 use App\Services\CharVariantMapService;
 use App\Support\ColumnFilterExpression;
 use App\Support\ColumnFilterParseException;
+use App\Support\EntityAggregateRegistry;
 use App\Support\PinyinUmlaut;
 use App\Support\VariantEquivalentLookup;
 use App\Support\VariantReplaceScope;
@@ -68,6 +69,9 @@ class CodesController extends Controller {
         'CBDB__NAME_FTS',
         'DYNASTIES',
         'GANZHI_CODES',
+        // 這三張表的共同點是**沒有替代寫入入口**（派生索引／全域字典），唯讀是終態，
+        // 所以也不會有「連結該改指哪裡」的問題——EntityAggregateRegistry 不管它們。
+        //
         // 被實體聚合認領的下層表（OFFICE_CODES、SOCIAL_INSTITUTION_* 等）不列在此——
         // 由 config/entity_aggregates.php 的 closed_code_tables 推導（見 isReadOnlyTable()）：
         // 實體上線即自動封寫，回退＝改 config。裸表 proposal 一併封閉為實體級提案（§4.5）
@@ -2372,13 +2376,11 @@ class CodesController extends Controller {
 
         // 實體聚合認領的下層表一律唯讀（docs/ENTITY_AGGREGATE_ARCHITECTURE.md §4.4／§6.5）：
         // 寫入路徑由實體頁（/app/office、/app/social-institution…）獨佔，讀取／匯出開放。
-        foreach (config('entity_aggregates.entities', []) as $entity) {
-            if (in_array($upper, array_map('strtoupper', $entity['closed_code_tables'] ?? []), true)) {
-                return true;
-            }
-        }
-
-        return false;
+        //
+        // 判定**必須**委派給 EntityAggregateRegistry，不可在此另抄一份 config 迴圈：
+        // 這道守衛與「封寫表的編輯連結該指向哪」是同一個問題的兩面，#1174 當初只改了守衛、
+        // 沒改連結，才留下 /app/operations 點「查閱」必吃唯讀警告的死連結。一份推導才不會再漂移。
+        return EntityAggregateRegistry::isClosedByEntity($upper);
     }
 
     /**

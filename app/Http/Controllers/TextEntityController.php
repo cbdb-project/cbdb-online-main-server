@@ -18,7 +18,8 @@ use Inertia\Inertia;
  * 故此 controller 不自帶寫入路徑。
  *
  * 這是「上層聚合入口」：把 TEXT_CODES ＋ TEXT_INSTANCE_DATA（版本層級）當作單一文獻實體
- * 管理，有別於 /app/codes/TEXT_CODES 的裸單表 CRUD（已封寫）。實體識別＝c_textid 單鍵。
+ * 管理，有別於 /app/codes/TEXT_CODES 的裸單表 CRUD（**尚未**封寫——見 config/entity_aggregates.php
+ * 的 closed_code_tables 註解：parity 補齊前兩條路徑刻意並存）。實體識別＝c_textid 單鍵。
  *
  * 列表與 Office／SocialInstitution EntityController 同構（EntityTableBrowser 描述子驅動），
  * 另加聚合特有的版本數與子文獻數（c_source 自引用樹）計算欄。

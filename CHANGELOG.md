@@ -4,6 +4,21 @@
 
 ## 2026-09
 
+### 人物主檔 create 補齊生卒年月日六欄，並加上 create／update 對稱守衛
+
+（上一輪 `b1f4bf44` 把這 6 欄判為「擴張對外 API 契約、留待產品決定」而未動；本輪經裁定補齊。）
+
+- **問題**：`BiogMainCreateHandler::ALLOWED_FIELDS` 收不下 `c_birthyear`／`c_deathyear`／`c_by_month`／`c_dy_month`／`c_by_day`／`c_dy_day`，但 `mutate` 寫得進去（update 端的可寫集合是「BIOG_MAIN 實際欄位扣掉 BLOCKED_FIELDS」）。送進 `create` 的這些值被 `array_intersect_key()` **靜默丟棄**——呼叫端拿到 200、人物建好了、生卒年月日是 NULL，沒有任何錯誤或警告。比 500 更難發現。
+- **不是設計取捨，是抄錯**：這 6 欄的位置上，原本站著 `c_by_yymm`／`c_by_yymm_day`／`c_dy_yymm`／`c_dy_yymm_day`（本庫從無此組欄名，已於上一輪當幻影欄清掉），年則一併漏抄。同一組出生欄位裡 `c_by_intercalary`／`c_by_nh_code`／`c_by_nh_year`／`c_by_range`／`c_by_day_gz` 全都在，獨缺年月日；「衍生欄不給客戶端設」也解釋不了這個缺口——被收下的 `c_index_year` 反而是 `IndexYearRebuildService` 整表重算時會**拿 `c_birthyear` 去填**的（那是一支手動批次命令 `cbdb:rebuild-index-year` 的第一條規則，不是逐列即時推導；create 與 update 都不會重算它，這點兩端一致）。整份白名單顯然是照著別份欄位表謄的，沒有與 `BIOG_MAIN` 對帳過（同一份清單裡還躺過 `c_self_bio`）。
+- **影響面**：兩條路徑。(1) `/api/v2/create` 的呼叫端（外部協作者、眾包提交者、腳本）。(2) **人物新增提案的核准重放**——`OperationsProposalController` 在 `TYPE_PROPOSAL_CREATE` 分支把整份提案快照當 `changes` 丟回 `BiogMainCreateHandler`（`$changes = array_merge($data, $addressAux)`），所以核准一筆「新增人物」提案時，這 6 欄同樣會被靜默丟棄。這條路徑是讀碼確認的；生產形狀的本地庫目前 `BIOG_MAIN` 的 `TYPE_PROPOSAL_CREATE` 提案數為 **0**，因此沒有已知的待審積壓受影響。React 建立頁只送 `c_name_chn` 就跳編輯頁、編輯走 update，UI 使用者不受影響；`saveas()` 是整列複製，也不受影響。
+- **修法**：6 欄補進白名單（51 欄；白名單本身是**語意分組**而非物理欄序，新欄插在各自的生／卒欄組裡），`API.md` 的清單本次由 handler 白名單一次性產生（不是手抄），並移除「請 create 後再 mutate 補寫」的變通說明。文檔與程式碼日後的同步改由 `tests/Feature/ApiDocCreateFieldListDriftTest.php` 釘住——那份清單是手打 Markdown，兩個漂移方向都會咬人（文檔多列 ⇒ 客戶端照送卻被靜默丟棄；文檔少列 ⇒ 沒人知道可以送），改白名單不同步改 API.md 就會紅。
+- **防復發**：新增 `tests/Feature/MutationCreateUpdateParityTest.php`（掛 `RefreshDatabase`）：
+  - `nothing_writable_by_update_is_rejected_by_create()`——同一張表凡 update 寫得進的欄，create 都要收得下；
+  - `create_only_fields_match_the_registered_exceptions()`——反方向（create 有、update 沒有）**逐筆登記**且完整比對，多一個少一個都紅。目前合法例外只有各子資源的 `c_personid`（create 要帶人物，update 靠 PK 定位、不得改掛他人）與 BIOG_MAIN 的姓名合併欄（update 一律由分欄重組）。
+  另補 `ApiV2CreateBiogMainTest::testDirectBiogMainCreatePersistsBirthAndDeathDateFields()` 端到端釘住，並把該測試的合成 BIOG_MAIN 補上這 6 欄。
+- **全庫排查結果**：以「同表 create 與 update 兩份白名單對比」掃過全部 mutation handler，**`BIOG_MAIN` 是唯一一張 update 寫得進、create 寫不進的表**。守衛實際做到兩端比對的是 12 張表；其餘 create 路徑逐一登記了不比對的理由（`SourceMutationHandler` 與代碼表兩端共用同一份欄位來源，結構上不可能不對稱；實體聚合的鍵是領域鍵而非欄名、兩端**刻意**不同，需另立守衛），單邊表（`MERGED_PERSON_DATA`）亦登記在案——比對張數與跳過清單都是完整比對，覆蓋範圍縮水會紅。其餘 9 張表的不對稱全是 `c_personid` 這個方向相反、且正確的例外。另有一批「兩端都沒收」的欄（`BIOG_ADDR_DATA.c_delete`、`ASSOC_DATA.c_litgenre_code`、`ENTRY_DATA.c_entry_dy`、`EVENTS_DATA.c_addr_id`、`POSTED_TO_OFFICE_DATA.c_office_id_backup`、`BIOG_TEXT_DATA` 的 `c_year`／`c_nh_code`／`c_nh_year`／`c_range_code` 等）——那是「未開放」不是「兩端不一致」，屬產品決定，本次不動，記錄於此備查。
+- `c_self_bio` 已在上一輪（`b1f4bf44`）從 BIOG_MAIN 白名單移除，本次僅在註解中保留為歷史說明。
+
 ### 修 /app/office 按「搜尋」必 500：官職實體列表列了 5 個資料庫已移除的欄位
 
 - **症狀**：`https://input.cbdb.fas.harvard.edu/app/office` 輸入任何關鍵字（回報案例是「中書令」）按「搜尋」，回 `500 Server Error`；列表首頁本身正常。頁面 2026-07-16 上線起就是壞的（欄位清單照著 migration 移除**之前**的表形抄）。已在本地以生產形狀的 MariaDB 復現：`SQLSTATE[42S22] 1054 Unknown column 'c_category_1' in 'WHERE'`。

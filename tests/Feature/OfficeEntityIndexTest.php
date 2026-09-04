@@ -49,6 +49,9 @@ class OfficeEntityIndexTest extends TestCase {
             $table->timestamps();
         });
         // 生產 OFFICE_CODES 全欄位（appIndex 關鍵字搜尋會掃全部實體欄位，schema 須齊全）。
+        // ⚠ 只能建「migration 之後真的還在」的欄：多建一欄，搜尋／排序／篩選在 prod 會 1054
+        // Unknown column（500），這裡卻照樣綠。c_category_1..4 與 c_office_id_old 就是這樣
+        // 一路綠到生產爆炸；欄位清單的漂移守衛見 EntityBrowseColumnsSchemaDriftTest。
         Schema::create('OFFICE_CODES', function (Blueprint $table) {
             $table->integer('c_office_id')->primary();
             $table->integer('c_dy')->nullable();
@@ -61,11 +64,6 @@ class OfficeEntityIndexTest extends TestCase {
             $table->integer('c_source')->nullable();
             $table->string('c_pages')->nullable();
             $table->text('c_notes')->nullable();
-            $table->string('c_category_1')->nullable();
-            $table->string('c_category_2')->nullable();
-            $table->string('c_category_3')->nullable();
-            $table->string('c_category_4')->nullable();
-            $table->integer('c_office_id_old')->nullable();
         });
         Schema::create('OFFICE_CODE_TYPE_REL', function (Blueprint $table) {
             $table->integer('c_office_id');
@@ -124,9 +122,9 @@ class OfficeEntityIndexTest extends TestCase {
                 ->where('can_write', false)
                 ->where('key_columns', ['c_office_id'])
                 ->where('computed_columns', ['type_count'])
-                ->has('thead', 17)
+                ->has('thead', 12)
                 ->where('thead.0', 'c_office_id')
-                ->where('thead.16', 'type_count')
+                ->where('thead.11', 'type_count')
                 ->has('rows', 3)
                 // 預設 ID 倒序；type_count 為 OFFICE_CODE_TYPE_REL 關聯數
                 ->where('rows.0.c_office_id', 3)

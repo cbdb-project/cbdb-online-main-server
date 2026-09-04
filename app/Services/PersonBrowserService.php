@@ -1407,7 +1407,9 @@ class PersonBrowserService {
             return (string) $code;
         }
 
-        return trim(($row->c_nianhao_chn ?? '') . ' / ' . ($row->c_nianhao ?? ''), ' /');
+        // 羅馬字欄名是 c_nianhao_pin；曾誤寫 c_nianhao（NIAN_HAO 沒有這個欄），
+        // 因為有 ?? 兜底所以不報錯，只是標籤永遠只剩中文那半邊。
+        return trim(($row->c_nianhao_chn ?? '') . ' / ' . ($row->c_nianhao_pin ?? ''), ' /');
     }
 
     private function lookupYearRange($code): string {

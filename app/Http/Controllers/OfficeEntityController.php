@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\Import\OfficeImportService;
+use App\Support\BrowsesEntityTable;
 use App\Support\EntityTableBrowser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -19,10 +20,16 @@ use Inertia\Inertia;
  * 這是「上層聚合入口」：把 OFFICE_CODES + OFFICE_CODE_TYPE_REL 當作單一官職實體編輯，
  * 有別於 /app/codes/OFFICE_CODES 的裸單表 CRUD（後者為待收斂的下層洩漏路徑）。
  */
-class OfficeEntityController extends Controller {
+class OfficeEntityController extends Controller implements BrowsesEntityTable {
     /**
      * OFFICE_CODES 實體欄位（物理欄序，與 codes 裸表頁一致）。
      * 列表 thead ＝ 此清單 ＋ 計算欄位 type_count（見 COMPUTED_COLUMNS）。
+     *
+     * 必須與資料表實際欄位完全一致：關鍵字搜尋會對此清單每一欄下 LIKE，
+     * 列了不存在的欄就是 1054 Unknown column ⇒ 使用者按「搜尋」拿到 500
+     * （c_category_1..4 與 c_office_id_old 在本清單寫成之前就已被 migration 移除，
+     * 清單卻照著移除前的表形抄，一出生就是壞的）。
+     * 漂移守衛見 tests/Feature/EntityBrowseColumnsSchemaDriftTest.php。
      *
      * @var array<int, string>
      */
@@ -30,7 +37,6 @@ class OfficeEntityController extends Controller {
         'c_office_id', 'c_dy', 'c_office_pinyin', 'c_office_chn',
         'c_office_pinyin_alt', 'c_office_chn_alt', 'c_office_trans', 'c_office_trans_alt',
         'c_source', 'c_pages', 'c_notes',
-        'c_category_1', 'c_category_2', 'c_category_3', 'c_category_4', 'c_office_id_old',
     ];
 
     /**
@@ -106,6 +112,16 @@ class OfficeEntityController extends Controller {
         ];
     }
 
+    /** 瀏覽描述子（見 BrowsesEntityTable：提出來供漂移守衛逐欄比對 migration schema）。 */
+    public function browseDescriptor(): array {
+        return [
+            'table' => 'OFFICE_CODES',
+            'columns' => self::OFFICE_COLUMNS,
+            'computed' => self::COMPUTED_COLUMNS,
+            'key_column' => 'c_office_id',
+        ];
+    }
+
     /**
      * 官職列表：與 app/codes/OFFICE_CODES 裸表頁 feature parity（全欄位、任意欄排序＋主鍵
      * tie-breaker、逐欄篩選含布林模式、關鍵字搜尋、朝代標籤、公開可讀），另加聚合特有的
@@ -118,12 +134,7 @@ class OfficeEntityController extends Controller {
             return $guardRedirect;
         }
 
-        $payload = $this->browser->payload($request, [
-            'table' => 'OFFICE_CODES',
-            'columns' => self::OFFICE_COLUMNS,
-            'computed' => self::COMPUTED_COLUMNS,
-            'key_column' => 'c_office_id',
-        ]);
+        $payload = $this->browser->payload($request, $this);
 
         return Inertia::render('Office/Index', array_merge($payload, [
             'can_write' => Auth::check() && Auth::user()->canWriteDirectly(),

@@ -30,6 +30,15 @@ class BiogMainCreateHandler extends AbstractMutationHandler {
      * 與 update handler（BiogMainMutationHandler::BLOCKED_FIELDS）相反，create 允許
      * 設定 c_personid / c_name*（因為人物主檔在新增時必須帶入主鍵與姓名），
      * 但仍禁止稽核欄位（由 ToolsRepository::timestamp 維護）。
+     *
+     * **每一欄都必須真的存在於 BIOG_MAIN**：白名單外的欄位由 `array_intersect_key()`
+     * 靜默丟棄，但列進白名單卻不存在的欄會一路帶到 `BiogMain::create()`（模型
+     * `$guarded = []`，攔不住），錯誤要到 INSERT 才發生 ⇒ 使用者拿到 **500 而不是 422**，
+     * 錯誤訊息還會把 SQL 與主機／資料庫名回吐給呼叫端。
+     * 曾誤列 5 欄：`c_by_yymm`／`c_by_yymm_day`／`c_dy_yymm`／`c_dy_yymm_day`（本庫從來沒有
+     * 這組欄名，實際是 `c_by_month`／`c_by_day`／`c_dy_month`／`c_dy_day`）與 `c_self_bio`
+     * （2026_03_13 已從 BIOG_MAIN 移除；同名欄只存在於 `BIOG_SOURCE_DATA`）。
+     * 漂移守衛見 tests/Feature/MutationAllowedFieldsSchemaDriftTest.php。
      */
     protected const ALLOWED_FIELDS = [
         'c_personid',
@@ -56,15 +65,11 @@ class BiogMainCreateHandler extends AbstractMutationHandler {
         'c_by_nh_code',
         'c_by_nh_year',
         'c_by_range',
-        'c_by_yymm',
-        'c_by_yymm_day',
         'c_by_day_gz',
         'c_dy_intercalary',
         'c_dy_nh_code',
         'c_dy_nh_year',
         'c_dy_range',
-        'c_dy_yymm',
-        'c_dy_yymm_day',
         'c_dy_day_gz',
         'c_death_age',
         'c_death_age_range',
@@ -81,7 +86,6 @@ class BiogMainCreateHandler extends AbstractMutationHandler {
         'c_tribe',
         'c_choronym_code',
         'c_notes',
-        'c_self_bio',
     ];
 
     protected const BLOCKED_FIELDS = [

@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\DB;
  * 訪問模型（與 codes 頁一致）：讀取公開；排序／篩選需登入且已激活
  * （guard()；見 docs/CODES_SORT_FILTER_AUTH_GATE.md 的成本理由）。
  *
- * 描述子（descriptor）鍵：
+ * 描述子（descriptor）由呼叫端的 `BrowsesEntityTable::browseDescriptor()` 提供，鍵為：
  *  - table: string             主表名
  *  - columns: string[]         實體欄位（物理欄序）
  *  - computed: array<string, array{expression: string, match_mode: 'contains'|'exact'}>
@@ -71,10 +71,24 @@ class EntityTableBrowser {
     /**
      * 組列表 props（thead/rows/meta/filters/sort/boolean…；呼叫端補 can_write、urls、翻譯）。
      *
-     * @param array{table: string, columns: array<int, string>, computed: array<string, array{expression: string, match_mode: string}>, key_column: string, search_expressions?: array<int, string>} $d
+     * **刻意收 `BrowsesEntityTable` 而不是描述子陣列**：描述子的 `columns` 是手寫清單，
+     * 唯一擋得住「列了資料表沒有的欄 ⇒ 搜尋 500」的是
+     * `tests/Feature/EntityBrowseColumnsSchemaDriftTest.php`，而它只看得到
+     * `browseDescriptor()` 回傳的東西。若這裡收陣列，呼叫端大可傳一份就地寫死的字面
+     * 陣列，描述子照樣乾淨、守衛照樣全綠，而生產環境照樣 500——這正是本引擎踩過的坑。
+     *
+     * 型別擋掉的是**字面陣列**這條繞道；「傳另一個 `BrowsesEntityTable` 實作」
+     * （例如就地 new 一個匿名類別）型別擋不住，由該守衛的
+     * `every_entity_controller_passes_itself_to_the_browser()` 以 PHP tokenizer 逐一比對
+     * 清冊上 controller 的每一處 `payload()`／`?->payload()` 呼叫，語義上必須是
+     * `payload($request, $this)`，並禁止動態方法分派（那會讓方法名不是字面 token）。
+     * 兩者合起來，日常改動要繞過去就得是刻意的了——但那終究是**防無意漂移**的守衛，
+     * 不是安全邊界。
+     *
      * @return array<string, mixed>
      */
-    public function payload(Request $request, array $d): array {
+    public function payload(Request $request, BrowsesEntityTable $source): array {
+        $d = $source->browseDescriptor();
         $computed = $d['computed'] ?? [];
         $thead = array_merge($d['columns'], array_keys($computed));
 

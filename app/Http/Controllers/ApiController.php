@@ -168,7 +168,10 @@ class ApiController extends Controller {
             } else {
                 $word = '';
             }
-            $item['text'] = $item->c_textid." ".$item->c_title." ".$item->c_title_chn." ".$item->c_period." ".$word;
+            // c_period 不是 TEXT_CODES 的欄位（全庫無此欄名，模型也沒有 accessor），
+            // Eloquent 一律回 null ⇒ 標籤中間永遠是一個多餘空格。同「手寫欄名漂移」一類，
+            // 只是這條走 Eloquent 屬性、不進 SQL，所以不會 500、只是安靜地沒東西。
+            $item['text'] = $item->c_textid." ".$item->c_title." ".$item->c_title_chn." ".$word;
         }
 
         return $data;

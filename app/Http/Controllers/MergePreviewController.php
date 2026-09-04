@@ -186,7 +186,9 @@ class MergePreviewController extends Controller {
         if (!empty($person->c_dy)) {
             $dynasty = Dynasty::find($person->c_dy);
             if ($dynasty) {
-                $dynastyName = $dynasty->c_dynasty_chn ?: $dynasty->c_dynasty_name;
+                // 羅馬字欄名是 c_dynasty；曾誤寫 c_dynasty_name（DYNASTIES 沒有這個欄，
+                // Eloquent 對未知屬性回 null ⇒ 這條兜底等於沒有）。
+                $dynastyName = $dynasty->c_dynasty_chn ?: $dynasty->c_dynasty;
             }
         }
 

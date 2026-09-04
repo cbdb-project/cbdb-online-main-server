@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\Import\SocialInstituteImportService;
+use App\Support\BrowsesEntityTable;
 use App\Support\EntityTableBrowser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -23,7 +24,7 @@ use Inertia\Inertia;
  * 列表與 OfficeEntityController::appIndex 同構：與裸表頁 feature parity（全欄位、排序、
  * 逐欄／布林篩選、公開讀、排序篩選登入門檻），另加聚合特有的名稱（joined）與地址數計算欄。
  */
-class SocialInstitutionEntityController extends Controller {
+class SocialInstitutionEntityController extends Controller implements BrowsesEntityTable {
     /**
      * SOCIAL_INSTITUTION_CODES 實體欄位（物理欄序，與 codes 裸表頁一致）。
      * 列表 thead ＝ 此清單 ＋ 計算欄位（見 COMPUTED_COLUMNS）。
@@ -106,6 +107,18 @@ class SocialInstitutionEntityController extends Controller {
             ->all();
     }
 
+    /** 瀏覽描述子（見 BrowsesEntityTable：提出來供漂移守衛逐欄比對 migration schema）。 */
+    public function browseDescriptor(): array {
+        return [
+            'table' => 'SOCIAL_INSTITUTION_CODES',
+            'columns' => self::INST_COLUMNS,
+            'computed' => self::COMPUTED_COLUMNS,
+            'key_column' => 'c_inst_code',
+            // 關鍵字搜尋額外命中機構名（joined 運算式）。
+            'search_expressions' => [self::COMPUTED_COLUMNS['c_inst_name_hz']['expression']],
+        ];
+    }
+
     /**
      * 機構列表：與 app/codes/SOCIAL_INSTITUTION_CODES 裸表頁 feature parity（全欄位、任意欄
      * 排序＋主鍵 tie-breaker、逐欄篩選含布林模式、關鍵字搜尋、朝代標籤、公開可讀），另加
@@ -118,14 +131,7 @@ class SocialInstitutionEntityController extends Controller {
             return $guardRedirect;
         }
 
-        $payload = $this->browser->payload($request, [
-            'table' => 'SOCIAL_INSTITUTION_CODES',
-            'columns' => self::INST_COLUMNS,
-            'computed' => self::COMPUTED_COLUMNS,
-            'key_column' => 'c_inst_code',
-            // 關鍵字搜尋額外命中機構名（joined 運算式）。
-            'search_expressions' => [self::COMPUTED_COLUMNS['c_inst_name_hz']['expression']],
-        ]);
+        $payload = $this->browser->payload($request, $this);
 
         return Inertia::render('SocialInstitution/Index', array_merge($payload, [
             'can_write' => Auth::check() && Auth::user()->canWriteDirectly(),

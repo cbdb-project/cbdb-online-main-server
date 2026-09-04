@@ -2,6 +2,27 @@
 
 本檔案改為維護近階段的重要變更與產品方向，不再保留完整歷史流水帳。較舊的大型升級請參考 `docs/` 下專門文檔。
 
+## 2026-09
+
+### 修 /app/office 按「搜尋」必 500：官職實體列表列了 5 個資料庫已移除的欄位
+
+- **症狀**：`https://input.cbdb.fas.harvard.edu/app/office` 輸入任何關鍵字（回報案例是「中書令」）按「搜尋」，回 `500 Server Error`；列表首頁本身正常。頁面 2026-07-16 上線起就是壞的（欄位清單照著 migration 移除**之前**的表形抄）。已在本地以生產形狀的 MariaDB 復現：`SQLSTATE[42S22] 1054 Unknown column 'c_category_1' in 'WHERE'`。
+- **成因**：`OfficeEntityController::OFFICE_COLUMNS` 是手寫欄位清單，仍列著 `c_category_1..4`（`2026_04_24_000000_drop_category_columns_from_office_codes` 已移除）與 `c_office_id_old`（`2025_12_29_172644_drop_unused_old_id_columns` 已移除）。列表首頁用 `select OFFICE_CODES.*`，碰不到這 5 欄所以看不出問題；但 `EntityTableBrowser::payload()` 的關鍵字搜尋會對清單**每一欄**下 `LIKE`，排序／篩選也以它為白名單 ⇒ 一搜尋就撞 1054。同一份清單也讓列表多長出 5 個永遠空白的欄。
+- **為什麼測試沒抓到**：`OfficeEntityIndexTest` 自己在 SQLite 合成表裡把那 5 欄建了出來（註解還寫著「生產 OFFICE_CODES 全欄位」），於是搜尋測試是對著一個現實中不存在的表形在測——永遠綠。與 2026-08「v2 白名單幻影欄」同一個失敗模式。
+- **修法**：`OFFICE_COLUMNS` 移除該 5 欄；測試合成表同步對齊生產（thead 17→12）。`/app/social-institution`、`/app/text` 兩個同構列表頁的欄位清單已逐欄核對，與生產 schema 一致、不受影響。
+- **防復發**：新增 `app/Support/BrowsesEntityTable.php` 契約，三個實體 controller 把描述子從 `appIndex()` 的字面陣列提到 `browseDescriptor()`；新增 `tests/Feature/EntityBrowseColumnsSchemaDriftTest.php`（掛 `RefreshDatabase`，schema 真的來自 `database/migrations`），逐一比對描述子欄位＋識別鍵，並機械檢查「注入 `EntityTableBrowser` 的 controller 一律 implement 該契約」，新列表頁漏掛會紅。**邊界**：抓「descriptor 列了 migration 沒有的欄」，不驗證 computed 運算式，也抓不到反向的「prod 有、migration 沒有」。
+- **守衛只看得到描述子，所以描述子必須是唯一入口**：`EntityTableBrowser::payload()` 一併改為收 `BrowsesEntityTable` 實作物件、不再收描述子陣列。否則呼叫端大可就地傳一份寫死的字面陣列——描述子乾乾淨淨、守衛全綠，生產環境照樣 500（審查時實測過這條繞道）。改簽名後同樣的繞道會直接 `TypeError`；型別擋不住的「改傳另一個實作」則由守衛以 PHP tokenizer 檢查每一處 `payload()` 呼叫語義上都是 `payload($request, $this)`。這條守衛本身被審查連續攻破四次才站穩：regex 版本擋不住「參數展開」與「補一個沒人用的合格呼叫當誘餌」，改 tokenizer 後漏了 `?->`，補上後又漏了動態分派（`$m = 'payload'; $this->browser->$m(…)`），期間一度嚴格到會誤擋具名引數與尾逗號這類等價重構。現版本：`->`／`?->` 都認、逐一比對每一處呼叫、做**語義**比對（具名引數與尾逗號合格）、並全面禁止動態方法分派。**這是防無意漂移的守衛，不是安全邊界**——存心規避的寫法列舉不完，改這三個 controller 時 code review 仍要看一眼描述子有沒有真的被用上。
+- 已在真 MariaDB 上逐條驗證修後路徑：關鍵字搜尋、任意欄排序、計算欄 `type_count` 排序／篩選、逐欄篩選、布林篩選、分頁，三個實體頁全數 200。
+
+### 順帶清掉同一類的兩處欄位漂移（同一輪排查抓到）
+
+- **`BiogMainCreateHandler::ALLOWED_FIELDS` 的 5 個幻影欄（HIGH，真的會 500）**：`c_by_yymm`／`c_by_yymm_day`／`c_dy_yymm`／`c_dy_yymm_day`（本庫從來沒有這組欄名，實際是 `c_by_month`／`c_by_day`／`c_dy_month`／`c_dy_day`）與 `c_self_bio`（`2026_03_13_000000_drop_c_self_bio_from_biog_main` 已移除；同名欄只存在於 `BIOG_SOURCE_DATA`）。白名單**外**的欄位由 `array_intersect_key()` 靜默丟棄，白名單**內**卻不存在的欄則一路帶到 `BiogMain::create()`（模型 `$guarded = []` 攔不住）⇒ `POST /api/v2/create`（`resource=basicinformation`）帶其中任一欄就是 1054 ⇒ 500，且錯誤訊息把完整 SQL（含綁定值）回吐給呼叫端——這條 `catch` 直接把 `QueryException::getMessage()` 串進回應，繞過 `APP_DEBUG`。`API.md` 更把這 5 欄公布為對外契約，外部／眾包客戶端照文件實作必撞。已在生產形狀的 MariaDB 上以回滾交易實測 INSERT 確認。
+- **為什麼 2026-08 的守衛沒抓到**：`MutationAllowedFieldsSchemaDriftTest` 只掃兩個人物子資源基底的子類，而 `BiogMainCreateHandler` 直接繼承 `AbstractMutationHandler`，整個不在掃描範圍內。本次補上第二條線（`EXTRA_HANDLER_TABLES` 明列 class→表→常數）＋一條**完備性檢查**：任何直系 handler 只要自帶「看起來是欄位清單」的常數（陣列且含 `c_` 開頭字串）卻沒登記，就判紅。
+- **`config/nl_query.php` 的 `BIOG_ADDR_CODES.display_columns`（MEDIUM，安靜地壞掉）**：列著 `c_addr_id`（該表沒有；這個欄名屬於 `ADDR_CODES` 等 12 張地名／地址表）與 `c_firstlevel_desc`（全庫任何表都沒有）。`display_columns` 直接進 `select()`，1054 被 `DatabaseSchemaService::getLookupTableData()` 的 `catch` 吞成空陣列並只記一行 warning——**不會 500，但自然語言查詢的提示詞從此靜默少了這張對照表**，地址類問題生出來的 SQL 因而變差。改為實際存在的 `c_addr_type`／`c_addr_desc`／`c_addr_desc_chn`（該表是「地址類型」代碼表，不是地名表），實測從 0 列變成正常回資料；新增 `tests/Feature/NlQueryLookupSchemaDriftTest.php` 守住。
+- **兩處「讀不存在的欄位屬性」（LOW／MEDIUM，都是安靜地沒東西）**：`PersonBrowserService::lookupNianHao()` 讀 `$row->c_nianhao`，但 `NIAN_HAO` 的羅馬字欄叫 `c_nianhao_pin` ⇒ 人物瀏覽器的年號標籤永遠只剩中文那半邊；`MergePreviewController` 的朝代名兜底讀 `$dynasty->c_dynasty_name`，但 `DYNASTIES` 的羅馬字欄叫 `c_dynasty` ⇒ 那條兜底等於不存在。兩者都走屬性讀取而非 SQL（`??` 與 Eloquent 對未知屬性回 null），所以不會 500、只會靜默少東西——這是本 bug 類最難發現的一種。兩者都補了會紅的回歸測試：`PersonBrowserTest` 的合成 `NIAN_HAO` 同步改成生產欄名並真的餵資料、斷言年號標籤中文與羅馬字兩半都在（原本建表就寫著 `c_nianhao`，又從不塞資料，所以怎麼寫都測不出來）；`MergePreviewDynastyLabelTest` 掛 `RefreshDatabase` 直接對 migration schema 驗兜底。
+- **`ApiController::searchText()` 的 `c_period`（LOW，只是安靜地沒東西）**：`/api/select/search/text` 的顯示標籤串接了 `$item->c_period`，但 `TEXT_CODES` 沒有這個欄、模型也沒有 accessor，全庫僅此一處出現該欄名。走的是 Eloquent 屬性而非 SQL，所以不會 500，只是標籤中間永遠多一個空格。順手移除。
+- **本次刻意不做的事**：`c_birthyear`／`c_deathyear`／`c_by_month`／`c_by_day`／`c_dy_month`／`c_dy_day` 這 6 個**真實存在**的 BIOG_MAIN 欄從來不在 create 白名單裡，送了會被 `array_intersect_key()` 靜默丟棄。**只影響 create**——`mutate` 的白名單是從實際欄位反推的（`BiogMainMutationHandler::buildMergedPayload()`），這 6 欄照樣寫得進去，React 基本資料編輯器走的正是 update 這條路，不受影響。把它們補進 create 白名單是**擴張對外 API 契約**、不是修 bug，留待產品決定；`API.md` 已註明現況與變通做法。惟需留意：那 4 個 `yymm` 幻影欄先前**被 API.md 公布為可寫**，對外部客戶端而言這次是「文件上寫得了出生月、實際上一送就 500」變成「文件上明說 create 不收」，值得單獨開票追蹤。
+
 ## 2026-08
 
 ### 清掉 v2 mutation 白名單裡 6 個資料庫不存在的欄位，並加上機械化守衛

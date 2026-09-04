@@ -189,6 +189,25 @@ filter／sort／guard 機制，封閉永遠是「認領下層表＋換側欄＋�
    parity 列表引擎（全欄搜尋、逐欄＋布林篩選、排序＋tie-breaker、排序篩選登入門檻）。
    刻意**不合併** `CodesController::buildShowPayload`（裸表頁帶 cursor 分頁、JOIN config
    等專屬包袱）。
+   ⚠ 描述子的 `columns` 是**手寫欄位清單**，而關鍵字搜尋會對其中每一欄下 `LIKE`、
+   排序／篩選也以它為白名單：列了資料表沒有的欄，列表首頁看不出來（`select TABLE.*`
+   不碰它），使用者一按「搜尋」就是 `1054 Unknown column` ⇒ **500 而不是空結果**
+   （`/app/office` 曾因 `c_category_1..4`／`c_office_id_old` 早被 migration 移除而壞掉）。
+   故：**凡是碰到 `EntityTableBrowser` 的類別**一律 `implement App\Support\BrowsesEntityTable`
+   並把描述子放進 `browseDescriptor()`，交由
+   `tests/Feature/EntityBrowseColumnsSchemaDriftTest.php` 逐欄比對 migration schema
+   （該守衛以原始碼掃描判定「誰碰了引擎」，涵蓋子命名空間與非建構子注入，
+   並用 `EXPECTED_CONTROLLERS` 清冊釘住現行列表頁——新增列表頁要一併補上）。
+   `payload()` **收契約物件、不收描述子陣列**：否則呼叫端可以就地傳一份字面陣列，
+   描述子乾淨、守衛全綠，生產環境照樣 500。型別擋不住「改傳另一個實作」，
+   那半邊由守衛的 `every_entity_controller_passes_itself_to_the_browser()` 補上：
+   以 PHP tokenizer 檢查清冊上 controller 的每一處 `payload()`／`?->payload()` 呼叫，
+   語義上都是 `payload($request, $this)`（具名引數與尾逗號算合格，不誤擋等價重構），
+   並禁止動態方法分派。這是**防無意漂移**的守衛而非安全邊界，改這三個 controller 時
+   code review 仍要看一眼描述子有沒有真的被用上；
+   對應的列表測試**只能建 migration 之後真的還在的欄**：那些測試自己建合成表，多建一欄，
+   該支測試就會對著一個現實中不存在的表形測到假綠（漂移守衛本身掛 `RefreshDatabase`、
+   看的是 migration schema，不受影響）。
 5. **前端 `components/EntityBrowser/EntityIndexPage`**：與 browser 成對的通用列表組件；
    各實體 Index 頁縮成注入 `{i18nGroup, resource, pkField, dynastyColumns}` 的薄殼。
    **表單不抽象**：Create／Edit 是真領域 UI，通用表單生成器會在聚合層重演
@@ -232,6 +251,7 @@ direct 與 proposal 天然對等（§7 原則），不必每實體各接一遍�
 - `app/Services/Mutations/EntityAggregate*Handler.php`＋`EntityAggregate/`（通用 mutation handler、definition 契約與分派 registry，§6.5）
 - `app/Services/Import/Concerns/SharesImportHelpers.php`（配號／護欄計數／集合對賬／審計基元）
 - `app/Support/EntityTableBrowser.php`＋`resources/js/inertia/components/EntityBrowser/EntityIndexPage.tsx`（parity 列表引擎，前後端成對）
+- `app/Support/BrowsesEntityTable.php`＋`tests/Feature/EntityBrowseColumnsSchemaDriftTest.php`（描述子契約與欄位漂移守衛）
 - `app/Services/Import/OfficeImportService.php`（聚合根實作：官職）
 - `app/Services/Import/SocialInstituteImportService.php`（聚合根實作：社會機構）
 - `app/Services/Mutations/MutationHandlerRegistry.php`（實體→handler 分派）

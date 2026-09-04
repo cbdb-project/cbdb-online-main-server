@@ -495,7 +495,7 @@ class PersonBrowserTest extends TestCase {
         DB::statement('
             CREATE TABLE IF NOT EXISTS NIAN_HAO (
                 c_nianhao_id INTEGER PRIMARY KEY,
-                c_nianhao VARCHAR(255),
+                c_nianhao_pin VARCHAR(255),
                 c_nianhao_chn VARCHAR(255)
             )
         ');
@@ -556,6 +556,13 @@ class PersonBrowserTest extends TestCase {
         DB::table('GANZHI_CODES')->insert([
             ['c_ganzhi_code' => 1, 'c_ganzhi_chn' => '甲子', 'c_ganzhi_py' => 'jia zi'],
             ['c_ganzhi_code' => 2, 'c_ganzhi_chn' => '乙丑', 'c_ganzhi_py' => 'yi chou'],
+        ]);
+
+        // 年號：羅馬字欄名曾誤寫成 c_nianhao（NIAN_HAO 沒這欄），因為有 ?? 兜底所以不報錯，
+        // 標籤只是靜默少了羅馬字那半邊。這裡真的餵資料並斷言兩半都在，才擋得住回歸。
+        DB::table('NIAN_HAO')->insert([
+            ['c_nianhao_id' => 1, 'c_nianhao_chn' => '長安', 'c_nianhao_pin' => 'Changan'],
+            ['c_nianhao_id' => 2, 'c_nianhao_chn' => '寶應', 'c_nianhao_pin' => 'Baoying'],
         ]);
 
         DB::table('HOUSEHOLD_STATUS_CODES')->insert([
@@ -1096,6 +1103,10 @@ class PersonBrowserTest extends TestCase {
         $this->assertSame('enum', $response->json('form.fields.c_by_nh_code.input'));
         $this->assertFalse($response->json('form.fields.c_index_year.editable'));
         $this->assertFalse($response->json('form.fields.c_index_year.send_on_save'));
+
+        // 年號標籤必須是「中文 / 羅馬字」兩半：只剩中文那半代表羅馬字欄名又寫錯了。
+        $this->assertSame('長安 / Changan', $this->basicInfoFieldValue($sections->get('生卒年'), '出生年號'));
+        $this->assertSame('寶應 / Baoying', $this->basicInfoFieldValue($sections->get('生卒年'), '死亡年號'));
 
         $this->assertSame('漢', $this->basicInfoFieldValue($sections->get('基本屬性'), '族裔（中文）'));
         $this->assertSame('Han', $this->basicInfoFieldValue($sections->get('基本屬性'), '族裔（英文）'));

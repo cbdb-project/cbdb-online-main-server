@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\Import\TextImportService;
+use App\Support\BrowsesEntityTable;
 use App\Support\EntityTableBrowser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -22,7 +23,7 @@ use Inertia\Inertia;
  * 列表與 Office／SocialInstitution EntityController 同構（EntityTableBrowser 描述子驅動），
  * 另加聚合特有的版本數與子文獻數（c_source 自引用樹）計算欄。
  */
-class TextEntityController extends Controller {
+class TextEntityController extends Controller implements BrowsesEntityTable {
     /**
      * TEXT_CODES 實體欄位（物理欄序，與 codes 裸表頁一致）。
      *
@@ -103,6 +104,16 @@ class TextEntityController extends Controller {
             ->all();
     }
 
+    /** 瀏覽描述子（見 BrowsesEntityTable：提出來供漂移守衛逐欄比對 migration schema）。 */
+    public function browseDescriptor(): array {
+        return [
+            'table' => 'TEXT_CODES',
+            'columns' => self::TEXT_COLUMNS,
+            'computed' => self::COMPUTED_COLUMNS,
+            'key_column' => 'c_textid',
+        ];
+    }
+
     /**
      * 文獻列表：與 app/codes/TEXT_CODES 裸表頁 feature parity（全欄位、任意欄排序＋主鍵
      * tie-breaker、逐欄篩選含布林模式、關鍵字搜尋、朝代標籤、公開可讀），另加版本數與
@@ -114,12 +125,7 @@ class TextEntityController extends Controller {
             return $guardRedirect;
         }
 
-        $payload = $this->browser->payload($request, [
-            'table' => 'TEXT_CODES',
-            'columns' => self::TEXT_COLUMNS,
-            'computed' => self::COMPUTED_COLUMNS,
-            'key_column' => 'c_textid',
-        ]);
+        $payload = $this->browser->payload($request, $this);
 
         return Inertia::render('Text/Index', array_merge($payload, [
             'can_write' => Auth::check() && Auth::user()->canWriteDirectly(),

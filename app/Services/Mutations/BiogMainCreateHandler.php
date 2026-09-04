@@ -39,6 +39,17 @@ class BiogMainCreateHandler extends AbstractMutationHandler {
      * 這組欄名，實際是 `c_by_month`／`c_by_day`／`c_dy_month`／`c_dy_day`）與 `c_self_bio`
      * （2026_03_13 已從 BIOG_MAIN 移除；同名欄只存在於 `BIOG_SOURCE_DATA`）。
      * 漂移守衛見 tests/Feature/MutationAllowedFieldsSchemaDriftTest.php。
+     *
+     * **與 update 端對稱**：`BiogMainMutationHandler` 的可寫集合是「BIOG_MAIN 實際欄位
+     * 扣掉 BLOCKED_FIELDS」，凡是它寫得進去的欄，create 也要收得下。生卒年月日六欄
+     * （`c_birthyear`／`c_deathyear`／`c_by_month`／`c_dy_month`／`c_by_day`／`c_dy_day`）
+     * 一度只有 update 收，呼叫端得先 create 再 mutate 補寫——那不是刻意的設計，是上面那
+     * 4 個幻影欄名把月／日的位置佔掉、年又一併漏抄的結果：同一組出生欄位裡
+     * `c_by_intercalary`／`c_by_nh_code`／`c_by_nh_year`／`c_by_range`／`c_by_day_gz`
+     * 全都在，獨缺年月日。「衍生欄不給客戶端設」也解釋不了這個缺口——被收下的
+     * `c_index_year` 反而是 `IndexYearRebuildService` 的整表重算會**拿 `c_birthyear` 去填**
+     * 的（那是一支手動批次命令的第一條規則，不是逐列即時推導）。
+     * 兩端**對稱**由 tests/Feature/MutationCreateUpdateParityTest.php 機械把關。
      */
     protected const ALLOWED_FIELDS = [
         'c_personid',
@@ -62,14 +73,20 @@ class BiogMainCreateHandler extends AbstractMutationHandler {
         'c_index_addr_type_code',
         'c_dy',
         'c_by_intercalary',
+        'c_birthyear',
         'c_by_nh_code',
         'c_by_nh_year',
         'c_by_range',
+        'c_by_month',
+        'c_by_day',
         'c_by_day_gz',
         'c_dy_intercalary',
+        'c_deathyear',
         'c_dy_nh_code',
         'c_dy_nh_year',
         'c_dy_range',
+        'c_dy_month',
+        'c_dy_day',
         'c_dy_day_gz',
         'c_death_age',
         'c_death_age_range',

@@ -155,6 +155,15 @@ class ApiV2CreateBiogMainTest extends TestCase {
             $table->integer('c_female')->nullable();
             $table->integer('c_by_intercalary')->default(0);
             $table->integer('c_dy_intercalary')->default(0);
+            // 生卒年月日：create 白名單原本漏收這 6 欄（只有 update 寫得進去），
+            // 合成表也就一直沒建。六欄在生產都是 smallint(6) NULL，此處型別照抄
+            // （SQLite 不分整數寬度，但合成表與生產對不上正是上一輪要根治的毛病）。
+            $table->smallInteger('c_birthyear')->nullable();
+            $table->smallInteger('c_deathyear')->nullable();
+            $table->smallInteger('c_by_month')->nullable();
+            $table->smallInteger('c_dy_month')->nullable();
+            $table->smallInteger('c_by_day')->nullable();
+            $table->smallInteger('c_dy_day')->nullable();
             $table->integer('c_index_year')->nullable();
             $table->integer('c_dy')->nullable();
             $table->integer('c_death_age')->nullable();
@@ -253,6 +262,37 @@ class ApiV2CreateBiogMainTest extends TestCase {
         $this->assertDatabaseHas('BIOG_MAIN', [
             'c_personid' => 2000,
             'c_name_chn' => '張三',
+        ]);
+    }
+
+    #[Test]
+    public function testDirectBiogMainCreatePersistsBirthAndDeathDateFields(): void {
+        // 這 6 欄一度只有 update 收得下，create 會被 array_intersect_key() 靜默丟棄：
+        // 呼叫端拿到 200、人物建好了、生卒年月日卻是 NULL，而且完全沒有跡象。
+        $user = $this->makeUser(email: 'create-biog-dates@example.com');
+        $this->actingAs($user);
+
+        $response = $this->postJson('/api/v2/create', $this->createPayload([
+            'changes' => [
+                'c_birthyear' => 1021,
+                'c_deathyear' => 1086,
+                'c_by_month' => 11,
+                'c_by_day' => 6,
+                'c_dy_month' => 4,
+                'c_dy_day' => 20,
+            ],
+        ]));
+
+        $response->assertOk()->assertJson(['ok' => true]);
+
+        $this->assertDatabaseHas('BIOG_MAIN', [
+            'c_personid' => 2000,
+            'c_birthyear' => 1021,
+            'c_deathyear' => 1086,
+            'c_by_month' => 11,
+            'c_by_day' => 6,
+            'c_dy_month' => 4,
+            'c_dy_day' => 20,
         ]);
     }
 

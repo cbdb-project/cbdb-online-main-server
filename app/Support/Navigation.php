@@ -361,7 +361,10 @@ class Navigation {
      * @return array<string, mixed>
      */
     protected static function entityNavItem(string $table, string $fallbackKey, string $fallbackLabel, string $fallbackIcon): array {
-        foreach (config('entity_aggregates.entities', []) as $entity) {
+        // 走 EntityAggregateRegistry::entities() 而非直接 config()：config 的預設值只在 key
+        // 不存在時生效，key 被設成 null／字串時直接 foreach 會 fatal——側欄是每一頁都渲染的，
+        // 那等於整站 500。
+        foreach (EntityAggregateRegistry::entities() as $entity) {
             $nav = $entity['nav'] ?? null;
             if (!$nav || strtoupper((string) ($nav['table'] ?? '')) !== strtoupper($table)) {
                 continue;

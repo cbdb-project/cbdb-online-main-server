@@ -2,6 +2,7 @@
 
 namespace App\Services\Mutations\EntityAggregate;
 
+use App\Support\EntityAggregateRegistry;
 use Illuminate\Contracts\Container\Container;
 
 /**
@@ -25,7 +26,8 @@ class EntityAggregateDefinitionRegistry {
             return;
         }
 
-        foreach (config('entity_aggregates.entities', []) as $entity) {
+        // 註冊表讀取一律經 EntityAggregateRegistry::entities()（防 config 被設成非陣列）。
+        foreach (EntityAggregateRegistry::entities() as $entity) {
             $class = $entity['definition'] ?? null;
             if (!$class) {
                 continue;

@@ -4,6 +4,19 @@
 
 ## 2026-09
 
+### 修 /app/operations 的「查閱」連結指向已封寫的代碼表，點進去必吃唯讀警告
+
+- **症狀**：`https://input.cbdb.fas.harvard.edu/app/operations` 上，凡是 `OFFICE_CODES`、`SOCIAL_INSTITUTION_CODES`／`NAME_CODES`／`ADDR` 這幾張表的操作紀錄，按「查閱」都會被導到 `/app/codes/{表}/{id}/edit`，然後吃到「該代碼表為只讀，禁止編輯。」再被彈回列表頁。使用者從操作紀錄根本走不到那筆資料。
+- **成因**：#1174（`0e8c4334`）把官職實體推進到 step 4 時，把 `OFFICE_CODES` 加進 `CodesController::$readOnlyTables`（`ca601b0d` 之後改由 `config/entity_aggregates.php` 的 `closed_code_tables` 推導），寫入入口收歸 `/app/office`、`/app/social-institution`。**但只改了守衛、沒改任何連結出口**——`OperationsController::serializeOperationRow()` 仍無條件呼叫 `code_table_edit_url()`，而它只做 codes flag 的新舊分流、不知道有「封寫」這回事。封寫判定與連結解析分兩處推導，是這個 bug 的全部成因。
+- **為什麼測試沒抓到**：`OperationsIndexLinksTest::test_code_resource_link_generation_logic` 拿 `OFFICE_CODES` 當樣本，把 `/app/codes/OFFICE_CODES/803819/edit` **釘成期望值**。它只斷言 helper 產出的字串、從不驗證那個 URL 打不打得開，所以測試不但沒抓到，還在替一條死連結背書。
+- **修法**：新增 `app/Support/EntityAggregateRegistry.php` 作為 `config/entity_aggregates.php` 的唯一查詢介面，**封寫判定與連結解析同源**——`CodesController::isReadOnlyTable()` 改為委派過來，`OperationsController` 則在該表被封寫時改指實體聚合編輯頁（config 新增 `edit_route`）。日後任何新的封寫只要登記進 `closed_code_tables`，守衛與連結就同步生效，不會再出現只能撞牆的連結。
+- **識別鍵解析採三級優先序**，因為 operations 的 `resource_id` 有多種歷史格式（本機全量 76 列實測）：具名 query-string（`buildStoredResourceId()`）→ 呼叫端從 `resource_data`／`resource_original` 取的識別欄 → 單鍵表位置式的第一段。位置式排最後是因為它只是推測：codes UI 的 `buildCompositeId()` 會濾掉空值段，缺識別鍵時 `{c_office_id}_._{c_dy}` 會塌成單獨的朝代碼。**壞掉的正是封寫前由 codes UI 寫入的那批**（`SOCIAL_INSTITUTION_CODES` 存成裸值 `3983`、`ADDR` 存成 `3983-5348`，欄序來自 `$tablePrimaryKeyOverrides`，與 `CompositePrimaryKey::SCHEMAS` 不同源），少了 payload 那一級等於沒修到票上說的情境。
+- **解不出就不出連結，不猜**：`SOCIAL_INSTITUTION_NAME_CODES` 的名稱碼跨機構共用（`resolveNameCode()` 同名複用既有碼），`resource_id` 與 payload 都不含 `c_inst_code`——導向一個**存在但錯誤**的機構，比沒有連結糟得多。同一次機構新增／改名一定會伴隨一筆 `SOCIAL_INSTITUTION_CODES` 的 operation，那筆有連結。
+- **連結要看權限**：`/operations` 是公開頁，但實體編輯頁一律 `abort(403)`（泛用 codes 編輯頁沒有授權閘門）。不看權限就改指，等於發一條必然 403 的連結給訪客——按鈕文案還是「查閱」。各實體要求的能力**不一致**（office 是 `canPropose()`、social-institution 與 text-entity 是 `canWriteDirectly()`），故由 config 的 `form_capability` 宣告、不寫死。
+- **防復發**：新增 `tests/Unit/EntityAggregateRegistryTest.php`（16 案例）兩條 fail-closed 不變量——(1) `CodesController::isReadOnlyTable()` 與 Registry 逐表一致，不得各自再抄一份 config 迴圈；(2) 每張被封寫的表要嘛 `resource_id` 解得出識別鍵，要嘛**逐筆登記**進 `UNRESOLVABLE_FROM_RESOURCE_ID` 並寫明呼叫端補不補得到，多一個少一個都紅。另釘住 `edit_route` 必須存在且是單一 `{id}` 參數（`route()` 不驗證 `whereNumber`，參數名不符會拋 `UrlGenerationException` 把整頁打成 500）、無表被兩實體認領。`OperationsIndexLinksTest` 新增 9 條端到端案例：office 案例**把連結真的打開來驗**（`assertInertia` 拿 `resource_link`，再 GET 它斷言渲染出 `Office/Edit`）——只斷言字串形狀正是當初沒抓到這個 bug 的原因；其餘覆蓋機構 payload 補救、名稱碼無連結、未封寫表不得被改指、訪客不得拿到必然 403 的連結，用眾包帳號釘住 `form_capability` 的 propose／write 差異（那是唯一能分辨兩者的身分——少了它，config 三個值互換都不會有測試變紅），以及**未核准的更新提案必須指向現存的那一列而非提案想改成的新鍵**（`resolveLinkResourceId()` 對這種 operation 刻意回原列主鍵，payload 補救若照一般順序先讀 `resource_data` 就會與它自相矛盾）。同時把上述那條替死連結背書的舊測試改用未封寫的表，並加一條「樣本表被封寫了就紅」的自我檢查。
+- **順帶收斂**：`Navigation::entityNavItem()` 與 `EntityAggregateDefinitionRegistry::boot()` 原本直接 `foreach config('entity_aggregates.entities', [])`——`config()` 的預設值只在 key **不存在**時生效，被設成 null／字串時仍會原樣回傳並 fatal，而側欄是每一頁都渲染的（等於整站 500）。兩處一併改走 Registry 的防禦性讀取。
+- **範圍**：只處理**有實體頁可去**的封寫表。`DYNASTIES`／`GANZHI_CODES`／`CBDB__NAME_FTS` 唯讀是終態、沒有替代入口，連結行為維持現狀。舊 Blade 版 `/operations` 未動（React 版已上線；該路徑同樣的連結問題留在原地）。`TEXT_CODES` 目前刻意「暫不封寫」，連結維持走泛用 codes 頁。
+
 ### 人物主檔 create 補齊生卒年月日六欄，並加上 create／update 對稱守衛
 
 （上一輪 `b1f4bf44` 把這 6 欄判為「擴張對外 API 契約、留待產品決定」而未動；本輪經裁定補齊。）

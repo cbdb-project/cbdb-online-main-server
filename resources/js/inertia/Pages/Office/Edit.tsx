@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { usePage, router } from '@inertiajs/react';
 import DashboardLayout from '../../Layouts/DashboardLayout';
+import { Overlay, ResubmitInfo } from '../../components/EntityBrowser/entityForm';
 import { getCsrfToken } from '../../components/PersonBrowser/shared/csrf';
 import { Button } from '../../components/ui/Button';
 import { useTranslation } from '../../hooks/useTranslation';
@@ -27,11 +28,15 @@ interface Props {
     urls: OfficeUrls;
     can_edit?: boolean;
     can_propose?: boolean;
+    /** 修改提案模式（?proposal={id}）：提案內容與 resubmit 端點；否則為空物件。 */
+    proposal_overlay: Overlay;
+    resubmit: ResubmitInfo;
     [key: string]: unknown;
 }
 
 export default function OfficeEdit() {
-    const { office, initial_labels, urls, can_edit = true, can_propose = false } = usePage<Props>().props;
+    const { office, initial_labels, urls, can_edit = true, can_propose = false, proposal_overlay, resubmit } = usePage<Props>().props;
+    const isResubmit = !!resubmit?.resubmit_proposal_id;
     const t = useTranslation('office');
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState<string | null>(null);
@@ -92,8 +97,10 @@ export default function OfficeEdit() {
                     urls={urls}
                     canEdit={can_edit}
                     canPropose={can_propose}
+                    overlay={proposal_overlay}
+                    resubmit={resubmit}
                 />
-                {can_edit && (
+                {can_edit && !isResubmit && (
                     <div className="border-t border-border pt-3">
                         <Button type="button" variant="destructive" disabled={busy} onClick={del}>
                             {t('btn_delete')}

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Operation;
 use App\Models\User;
 use App\Services\CharVariantMapService;
 use App\Services\Import\TextImportService;
@@ -204,13 +205,13 @@ class ApiV2MutateTextEntityTest extends TestCase {
         parent::tearDown();
     }
 
-    protected function makeUser(string $email = 'te@example.com'): User {
+    protected function makeUser(string $email = 'te@example.com', int $role = User::ROLE_REGULAR): User {
         return User::forceCreate([
             'name' => 'Text Tester',
             'email' => $email,
             'confirmation_token' => 'tok',
             'is_active' => User::STATUS_ACTIVE,
-            'is_admin' => User::ROLE_REGULAR,
+            'is_admin' => $role,
         ]);
     }
 
@@ -228,6 +229,100 @@ class ApiV2MutateTextEntityTest extends TestCase {
                 'instances' => [['edition_id' => 1, 'instance_id' => 1, 'title_chn' => '初刻本', 'publisher' => '某書坊']],
             ], $changes),
         ];
+    }
+
+    // ── 實體級提案（§4.5）：mode=proposal 存聚合意圖、核准時以 direct 重放同一 handler ──
+
+    /**
+     * create 提案：眾包帳號 direct 403、proposal 200；存的是原始輸入（峯 未替換）、不落庫；
+     * 核准時走同一 service ⇒ 書名標準化、拼音派生、版本列、稽核蓋章、__applied_operation_id 全都生效。
+     */
+    #[Test]
+    public function testCreateProposalStoresRawIntentAndApprovalAppliesTheAggregate(): void {
+        $this->actingAs($this->makeUser('te-p-create@example.com', User::ROLE_CROWDSOURCING));
+        $body = [
+            'resource' => 'text-entity', 'person_id' => 0, 'target' => ['pk' => []],
+            'changes' => [
+                'title' => '玉峯詩集', 'dynasty_code' => 19, 'source_id' => 7596,
+                'instances' => [['edition_id' => 1, 'instance_id' => 1, 'title_chn' => '甲本']],
+            ],
+        ];
+
+        $this->postJson('/api/v2/create', $body)->assertStatus(403);
+        $res = $this->postJson('/api/v2/create', $body + ['mode' => 'proposal'])
+            ->assertOk()
+            ->assertJson(['resource' => 'text-entity', 'mode' => 'proposal', 'operation' => 'create', 'result' => ['pk' => null]]);
+
+        $operation = Operation::findOrFail($res->json('result.operation_id'));
+        $stored = json_decode($operation->resource_data, true);
+        $this->assertSame('玉峯詩集', $stored['changes']['title'], '提案存原始輸入，替換發生在核准當下');
+        $this->assertSame(2, DB::table('TEXT_CODES')->count());
+
+        $this->actingAs($this->makeUser('te-p-reviewer@example.com'));
+        $this->post(route('operations.proposals.approve', $operation))->assertRedirect();
+
+        $row = DB::table('TEXT_CODES')->where('c_title_chn', '玉峰詩集')->first();
+        $this->assertNotNull($row, '核准落庫的書名應為參考形');
+        $this->assertSame(19, (int) $row->c_text_dy);
+        $this->assertDoesNotMatchRegularExpression('/\p{Han}/u', (string) $row->c_title);
+        // 稽核欄由核准當下蓋章（提案 payload 本來就不含稽核欄）；雙人名署名規則另由 ProposalAuditFieldSemanticsTest 釘住。
+        $this->assertSame('Text Tester', $row->c_created_by);
+        $this->assertDatabaseHas('TEXT_INSTANCE_DATA', ['c_textid' => $row->c_textid, 'c_text_edition_id' => 1, 'c_instance_title_chn' => '甲本']);
+
+        $payload = json_decode($operation->fresh()->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status']);
+        $this->assertSame((int) $row->c_textid, (int) $payload['c_textid']);
+        $appliedId = DB::table('operations')->where('resource', 'TEXT_CODES')->where('op_type', Operation::TYPE_CREATE)->value('id');
+        $this->assertSame((string) $appliedId, $payload['__applied_operation_id']);
+    }
+
+    /** update／delete 提案：核准前不動，核准後與 direct 同語義（版本列對賬、隨聚合刪除）。 */
+    #[Test]
+    public function testUpdateAndDeleteProposalsAreAppliedOnlyOnApproval(): void {
+        $proposer = $this->makeUser('te-p-mut@example.com', User::ROLE_CROWDSOURCING);
+        $reviewer = $this->makeUser('te-p-mut-reviewer@example.com');
+
+        $this->actingAs($proposer);
+        $update = Operation::findOrFail($this->postJson('/api/v2/mutate', $this->updatePayload([
+            'notes' => '提案備註',
+            'instances' => [['edition_id' => 1, 'instance_id' => 1, 'title_chn' => '初刻本'], ['edition_id' => 2, 'instance_id' => 1, 'title_chn' => '重刻本']],
+        ]) + ['mode' => 'proposal'])->assertOk()->json('result.operation_id'));
+        $this->assertDatabaseMissing('TEXT_CODES', ['c_textid' => 10, 'c_notes' => '提案備註']);
+
+        $this->actingAs($reviewer);
+        $this->post(route('operations.proposals.approve', $update))->assertRedirect();
+        $this->assertDatabaseHas('TEXT_CODES', ['c_textid' => 10, 'c_notes' => '提案備註']);
+        $this->assertSame(2, DB::table('TEXT_INSTANCE_DATA')->where('c_textid', 10)->count());
+
+        $this->actingAs($proposer);
+        $delete = Operation::findOrFail($this->postJson('/api/v2/delete', [
+            'resource' => 'text-entity', 'mode' => 'proposal', 'person_id' => 0, 'target' => ['pk' => ['c_textid' => 10]],
+        ])->assertOk()->json('result.operation_id'));
+        $this->assertDatabaseHas('TEXT_CODES', ['c_textid' => 10]);
+
+        $this->actingAs($reviewer);
+        $this->post(route('operations.proposals.approve', $delete))->assertRedirect();
+        $this->assertSame(0, DB::table('TEXT_CODES')->where('c_textid', 10)->count());
+        $this->assertSame(0, DB::table('TEXT_INSTANCE_DATA')->where('c_textid', 10)->count());
+    }
+
+    /** 修改提案預填：編輯頁以 ?proposal 拿到提案 changes，朝代標籤照提案值（19 明）查而非聚合現值（15 宋）。 */
+    #[Test]
+    public function testEditPagePrefillsTheProposalIntentAndLooksUpLabelsForIt(): void {
+        $this->actingAs($this->makeUser('te-p-prefill@example.com', User::ROLE_CROWDSOURCING));
+        $proposalId = (int) $this->postJson('/api/v2/mutate', $this->updatePayload(['dynasty_code' => 19]) + ['mode' => 'proposal'])
+            ->assertOk()->json('result.operation_id');
+
+        $this->get("/app/text/10/edit?proposal={$proposalId}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Text/Edit')
+                ->where('can_propose', true)
+                ->where('can_edit', false)
+                ->where('text.dynasty_code', 15)
+                ->where('proposal_overlay.dynasty_code', 19)
+                ->where('initial_labels.dynasties.19', '明')
+                ->where('resubmit.resubmit_proposal_id', $proposalId));
     }
 
     // ── create ──────────────────────────────

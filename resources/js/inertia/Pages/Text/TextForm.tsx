@@ -1,7 +1,14 @@
 import React, { useState } from 'react';
 import { router } from '@inertiajs/react';
 import CodeAutocomplete from '../../components/PersonBrowser/shared/CodeAutocomplete';
-import { getCsrfToken } from '../../components/PersonBrowser/shared/csrf';
+import {
+    EntityFormFooter,
+    EntityFormNotices,
+    Overlay,
+    ResubmitInfo,
+    overlayReader,
+    useEntityFormSubmit,
+} from '../../components/EntityBrowser/entityForm';
 import { Button } from '../../components/ui/Button';
 import { FormField } from '../../components/ui/FormField';
 import { useTranslation } from '../../hooks/useTranslation';
@@ -88,6 +95,13 @@ interface Props {
     initialLabels: TextInitialLabels;
     extantOptions: ExtantOption[];
     urls: TextUrls;
+    /** 可直接寫入（active 專家）；false 時只能提交建議。 */
+    canEdit?: boolean;
+    /** 可提交建議（active 使用者，含眾包）。 */
+    canPropose?: boolean;
+    /** 修改提案模式：提案的 changes（覆蓋 initial）與 resubmit 端點。 */
+    overlay?: Overlay;
+    resubmit?: ResubmitInfo;
 }
 
 const inputCls =
@@ -101,40 +115,38 @@ const smallInputCls =
  * (edition_id, instance_id) 定位、集合對賬），寫入走 mutation API（resource=text-entity）。
  * 拼音留空由後端自動派生（去卷冊註記＋異體字歸一化）；書名落庫前經字形標準化。
  */
-export default function TextForm({ mode, textId, initial, initialLabels, extantOptions, urls }: Props) {
+export default function TextForm({ mode, textId, initial, initialLabels, extantOptions, urls, canEdit = true, canPropose = false, overlay, resubmit }: Props) {
     const t = useTranslation('text_entity');
+    // 修改提案模式：提案的 changes 鍵名就是本表單送出的鍵名，逐欄覆蓋初始值。
+    const ov = overlayReader(overlay);
 
-    const [title, setTitle] = useState(initial?.title ?? '');
-    const [titlePinyin, setTitlePinyin] = useState(initial?.title_pinyin ?? '');
-    const [titleTrans, setTitleTrans] = useState(initial?.title_trans ?? '');
-    const [titleAltChn, setTitleAltChn] = useState(initial?.title_alt_chn ?? '');
-    const [typeId, setTypeId] = useState(initial?.type_id ?? '01');
-    const [dynasty, setDynasty] = useState(initial?.dynasty_code != null ? String(initial.dynasty_code) : '');
-    const [source, setSource] = useState(initial?.source_id != null ? String(initial.source_id) : '');
+    const [title, setTitle] = useState(ov.str('title', initial?.title));
+    const [titlePinyin, setTitlePinyin] = useState(ov.str('title_pinyin', initial?.title_pinyin));
+    const [titleTrans, setTitleTrans] = useState(ov.str('title_trans', initial?.title_trans));
+    const [titleAltChn, setTitleAltChn] = useState(ov.str('title_alt_chn', initial?.title_alt_chn));
+    const [typeId, setTypeId] = useState(ov.str('type_id', initial?.type_id ?? '01'));
+    const [dynasty, setDynasty] = useState(ov.num('dynasty_code', initial?.dynasty_code));
+    const [source, setSource] = useState(ov.num('source_id', initial?.source_id));
     const [sourceLabel, setSourceLabel] = useState<string | null>(initialLabels.source);
-    const [extant, setExtant] = useState(initial?.extant != null ? String(initial.extant) : '');
-    const [pages, setPages] = useState(initial?.pages ?? '');
-    const [notes, setNotes] = useState(initial?.notes ?? '');
+    const [extant, setExtant] = useState(ov.num('extant', initial?.extant));
+    const [pages, setPages] = useState(ov.str('pages', initial?.pages));
+    const [notes, setNotes] = useState(ov.str('notes', initial?.notes));
     // 固定次序呼叫 useState 的小工具（僅頂層依序使用，符合 hooks 規則）。
     const numField = (key: keyof TextAggregate) =>
-        useState(initial?.[key] != null ? String(initial[key]) : '');
+        useState(ov.num(key, initial?.[key] as number | null | undefined));
     const [year, setYear] = numField('year');
     const [nhCode, setNhCode] = numField('nh_code');
     const [nhYear, setNhYear] = numField('nh_year');
     const [rangeCode, setRangeCode] = numField('range_code');
     const [biblCat, setBiblCat] = numField('bibl_cat_code');
     const [country, setCountry] = numField('country');
-    const [urlApi, setUrlApi] = useState(initial?.url_api ?? '');
-    const [urlApiCoda, setUrlApiCoda] = useState(initial?.url_api_coda ?? '');
-    const [urlHomepage, setUrlHomepage] = useState(initial?.url_homepage ?? '');
+    const [urlApi, setUrlApi] = useState(ov.str('url_api', initial?.url_api));
+    const [urlApiCoda, setUrlApiCoda] = useState(ov.str('url_api_coda', initial?.url_api_coda));
+    const [urlHomepage, setUrlHomepage] = useState(ov.str('url_homepage', initial?.url_homepage));
 
     const [instances, setInstances] = useState<InstanceRowState[]>(
-        () => (initial?.instances ?? []).map((r) => ({ ...r, _uid: nextInstanceUid() }))
+        () => ov.list<InstanceRow>('instances', initial?.instances ?? []).map((r) => ({ ...r, _uid: nextInstanceUid() }))
     );
-
-    const [busy, setBusy] = useState(false);
-    const [errors, setErrors] = useState<Record<string, string>>({});
-    const [serverError, setServerError] = useState<string | null>(null);
 
     const setInst = (uid: string, patch: Partial<InstanceRow>) =>
         setInstances((prev) => prev.map((r) => (r._uid === uid ? { ...r, ...patch } : r)));
@@ -162,95 +174,70 @@ export default function TextForm({ mode, textId, initial, initialLabels, extantO
         return `${field}: ${code}`;
     };
 
-    const submit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setBusy(true);
-        setErrors({});
-        setServerError(null);
-
-        const nn = (s: string) => (s.trim() === '' ? null : s);
-        const ni = (s: string) => (s.trim() === '' ? null : Number(s));
-
-        const changes: Record<string, unknown> = {
-            title,
-            title_pinyin: nn(titlePinyin),
-            type_id: nn(typeId),
-            dynasty_code: ni(dynasty),
-            source_id: ni(source),
-        };
-        if (mode === 'edit') {
-            Object.assign(changes, {
-                title_trans: nn(titleTrans),
-                title_alt_chn: nn(titleAltChn),
-                year: ni(year),
-                nh_code: ni(nhCode),
-                nh_year: ni(nhYear),
-                range_code: ni(rangeCode),
-                bibl_cat_code: ni(biblCat),
-                extant: ni(extant),
-                country: ni(country),
-                pages: nn(pages),
-                url_api: nn(urlApi),
-                url_api_coda: nn(urlApiCoda),
-                url_homepage: nn(urlHomepage),
-                notes: nn(notes),
-                instances: instances.map((r) => ({
-                    edition_id: r.edition_id,
-                    instance_id: r.instance_id,
-                    title_chn: r.title_chn,
-                    title_pinyin: r.title_pinyin,
-                    publisher: r.publisher,
-                    pub_loc: r.pub_loc,
-                    pub_year: r.pub_year,
-                    pub_dy: r.pub_dy,
-                    pub_nh_code: r.pub_nh_code,
-                    pub_nh_year: r.pub_nh_year,
-                    source_id: r.source_id,
-                    pages: r.pages,
-                    extant: r.extant,
-                    notes: r.notes,
-                })),
-            });
-        }
-
-        const body: Record<string, unknown> =
-            mode === 'create'
+    const nn = (s: string) => (s.trim() === '' ? null : s);
+    const ni = (s: string) => (s.trim() === '' ? null : Number(s));
+    const form = useEntityFormSubmit({
+        mode,
+        createEndpoint: urls.api_create,
+        mutateEndpoint: urls.api_mutate,
+        canEdit,
+        canPropose,
+        resubmit,
+        buildBody: () => {
+            const changes: Record<string, unknown> = {
+                title,
+                title_pinyin: nn(titlePinyin),
+                type_id: nn(typeId),
+                dynasty_code: ni(dynasty),
+                source_id: ni(source),
+            };
+            if (mode === 'edit') {
+                Object.assign(changes, {
+                    title_trans: nn(titleTrans),
+                    title_alt_chn: nn(titleAltChn),
+                    year: ni(year),
+                    nh_code: ni(nhCode),
+                    nh_year: ni(nhYear),
+                    range_code: ni(rangeCode),
+                    bibl_cat_code: ni(biblCat),
+                    extant: ni(extant),
+                    country: ni(country),
+                    pages: nn(pages),
+                    url_api: nn(urlApi),
+                    url_api_coda: nn(urlApiCoda),
+                    url_homepage: nn(urlHomepage),
+                    notes: nn(notes),
+                    instances: instances.map((r) => ({
+                        edition_id: r.edition_id,
+                        instance_id: r.instance_id,
+                        title_chn: r.title_chn,
+                        title_pinyin: r.title_pinyin,
+                        publisher: r.publisher,
+                        pub_loc: r.pub_loc,
+                        pub_year: r.pub_year,
+                        pub_dy: r.pub_dy,
+                        pub_nh_code: r.pub_nh_code,
+                        pub_nh_year: r.pub_nh_year,
+                        source_id: r.source_id,
+                        pages: r.pages,
+                        extant: r.extant,
+                        notes: r.notes,
+                    })),
+                });
+            }
+            return mode === 'create'
                 ? { resource: 'text-entity', person_id: 0, target: { pk: [] }, changes }
                 : { resource: 'text-entity', operation: 'update', person_id: 0, target: { pk: { c_textid: textId } }, changes };
-
-        try {
-            const res = await fetch(mode === 'create' ? urls.api_create : urls.api_mutate, {
-                method: 'POST',
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': getCsrfToken(),
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-                credentials: 'same-origin',
-                body: JSON.stringify(body),
-            });
-            const json = await res.json().catch(() => ({}));
-            if (!res.ok) {
-                if (res.status === 422 && json?.errors && typeof json.errors === 'object') {
-                    const mapped: Record<string, string> = {};
-                    for (const [field, codes] of Object.entries(json.errors)) {
-                        mapped[field.startsWith('instances') ? 'instances' : field] = mapError(field, Array.isArray(codes) ? codes : []);
-                    }
-                    setErrors(mapped);
-                } else {
-                    setServerError(json?.message ?? t('save_failed'));
-                }
-                setBusy(false);
-                return;
-            }
+        },
+        mapError,
+        errorKey: (field) => (field.startsWith('instances') ? 'instances' : field),
+        onSaved: (json) => {
             const newId = json?.result?.pk?.c_textid ?? textId;
             router.visit(urls.edit_template.replace('__ID__', String(newId)));
-        } catch (err) {
-            setServerError(String(err));
-            setBusy(false);
-        }
-    };
+        },
+        fallbackError: t('save_failed'),
+    });
+    const { errors } = form;
 
     const numInput = (label: string, value: string, set: React.Dispatch<React.SetStateAction<string>>, id: string, error?: string) => (
         <FormField label={label} htmlFor={id} error={error}>
@@ -259,10 +246,8 @@ export default function TextForm({ mode, textId, initial, initialLabels, extantO
     );
 
     return (
-        <form onSubmit={submit} className="space-y-4">
-            {serverError && (
-                <div className="rounded border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-800">{serverError}</div>
-            )}
+        <form onSubmit={form.submit} className="space-y-4">
+            <EntityFormNotices form={form} indexUrl={urls.index} t={t} />
 
             <FormField label={t('field_title')} htmlFor="text-title" error={errors.title}>
                 <input id="text-title" className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -291,7 +276,7 @@ export default function TextForm({ mode, textId, initial, initialLabels, extantO
                         idKey="c_dy"
                         labelKeys={['c_dynasty_chn', 'c_dynasty']}
                         value={dynasty}
-                        initialLabel={initial?.dynasty_code != null ? (initialLabels.dynasties[String(initial.dynasty_code)] ?? null) : null}
+                        initialLabel={dynasty ? (initialLabels.dynasties[dynasty] ?? null) : null}
                         placeholder={t('dynasty_placeholder')}
                         onChange={(v) => setDynasty(v)}
                     />
@@ -456,14 +441,7 @@ export default function TextForm({ mode, textId, initial, initialLabels, extantO
             )}
             {mode === 'create' && <p className="text-xs text-muted-foreground">{t('create_more_hint')}</p>}
 
-            <div className="flex gap-2 pt-2">
-                <Button type="submit" disabled={busy}>
-                    {t('btn_save')}
-                </Button>
-                <a href={urls.index} className="inline-flex items-center rounded-md border border-input px-4 py-2 text-sm hover:bg-muted">
-                    {t('btn_cancel')}
-                </a>
-            </div>
+            <EntityFormFooter form={form} canEdit={canEdit} canPropose={canPropose} indexUrl={urls.index} idPrefix="text" t={t} />
         </form>
     );
 }

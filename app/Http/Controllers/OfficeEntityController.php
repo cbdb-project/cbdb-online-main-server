@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\EntityFormController;
 use App\Services\Import\OfficeImportService;
 use App\Support\BrowsesEntityTable;
 use App\Support\EntityTableBrowser;
@@ -21,6 +22,8 @@ use Inertia\Inertia;
  * 有別於 /app/codes/OFFICE_CODES 的裸單表 CRUD（後者為待收斂的下層洩漏路徑）。
  */
 class OfficeEntityController extends Controller implements BrowsesEntityTable {
+    use EntityFormController;
+
     /**
      * OFFICE_CODES 實體欄位（物理欄序，與 codes 裸表頁一致）。
      * 列表 thead ＝ 此清單 ＋ 計算欄位 type_count（見 COMPUTED_COLUMNS）。
@@ -59,32 +62,8 @@ class OfficeEntityController extends Controller implements BrowsesEntityTable {
     ) {
     }
 
-    /** 新增／編輯需直接寫入權限（與 mutation API authorizeDirect 對齊）。 */
-    protected function ensureWrite(): void {
-        if (!Auth::check() || !Auth::user()->canWriteDirectly()) {
-            abort(403);
-        }
-    }
-
-    /**
-     * 表單頁（新增／編輯）門檻：可直接寫或可提案者皆可進（active 使用者，含眾包）。
-     * 實際寫入由 mutation API 各自授權（direct→authorizeDirect、proposal→authorizeProposal），
-     * 前端依 can_edit／can_propose 顯示對應按鈕。
-     */
-    protected function ensureCanReachForm(): void {
-        if (!Auth::check() || !Auth::user()->canPropose()) {
-            abort(403);
-        }
-    }
-
-    /** 前端表單能力旗標（與人物子資源頁一致）。 */
-    protected function formCapabilities(): array {
-        $user = Auth::user();
-
-        return [
-            'can_edit' => $user ? $user->canWriteDirectly() : false,
-            'can_propose' => $user ? $user->canPropose() : false,
-        ];
+    protected function entityResource(): string {
+        return 'office';
     }
 
     /** 前端共用的 API 端點與路由。 */
@@ -143,17 +122,21 @@ class OfficeEntityController extends Controller implements BrowsesEntityTable {
         ]));
     }
 
-    /** 新增官職表單頁。 */
-    public function appCreate() {
+    /** 新增官職表單頁（?proposal={id} 時預填該筆新增提案，送出走 resubmit）。 */
+    public function appCreate(Request $request) {
         $this->ensureCanReachForm();
+        [$overlay, $resubmit] = $this->proposalResubmitProps($request, 'create');
 
         return Inertia::render('Office/Create', array_merge($this->formCapabilities(), [
+            'initial_labels' => $this->initialLabels($overlay),
+            'proposal_overlay' => (object) $overlay,
+            'resubmit' => (object) $resubmit,
             'urls' => $this->urls(),
             'page_translations' => $this->translations(),
         ]));
     }
 
-    /** 編輯官職表單頁：載入聚合 + 預備 picker 初始標籤。 */
+    /** 編輯官職表單頁：載入聚合 + 預備 picker 初始標籤（?proposal={id} 時以修改提案覆蓋）。 */
     public function appEdit(Request $request, int $id) {
         $this->ensureCanReachForm();
 
@@ -161,24 +144,45 @@ class OfficeEntityController extends Controller implements BrowsesEntityTable {
         if ($aggregate === null) {
             abort(404);
         }
+        [$overlay, $resubmit] = $this->proposalResubmitProps($request, 'update', $id);
 
-        $dynastyLabel = $aggregate['dynasty_code'] !== null
-            ? DB::table('DYNASTIES')->where('c_dy', $aggregate['dynasty_code'])->value('c_dynasty_chn')
+        return Inertia::render('Office/Edit', array_merge($this->formCapabilities(), [
+            'office' => $aggregate,
+            // 標籤要對「表單實際會顯示的值」算：修改提案模式下 picker 顯示的是提案值。
+            'initial_labels' => $this->initialLabels(array_merge($aggregate, $overlay)),
+            'proposal_overlay' => (object) $overlay,
+            'resubmit' => (object) $resubmit,
+            'urls' => $this->urls(),
+            'page_translations' => $this->translations(),
+        ]));
+    }
+
+    /**
+     * picker 初始標籤（朝代／來源／類型節點），依給定的聚合值查對照表。
+     *
+     * @param array<string, mixed> $values 聚合形狀（dynasty_code／source_id／type_ids），缺鍵視為空
+     * @return array{dynasty: ?string, source: ?string, types: array<string, string>}
+     */
+    protected function initialLabels(array $values): array {
+        $dynastyCode = $values['dynasty_code'] ?? null;
+        $dynastyLabel = $dynastyCode !== null
+            ? DB::table('DYNASTIES')->where('c_dy', $dynastyCode)->value('c_dynasty_chn')
             : null;
 
         $sourceLabel = null;
-        if ($aggregate['source_id'] !== null) {
-            $src = DB::table('TEXT_CODES')->where('c_textid', $aggregate['source_id'])->first();
+        $sourceId = $values['source_id'] ?? null;
+        if ($sourceId !== null) {
+            $src = DB::table('TEXT_CODES')->where('c_textid', $sourceId)->first();
             if ($src) {
-                $title = trim((string) ($src->c_title ?? ''));
-                $sourceLabel = trim($aggregate['source_id'].' '.$title);
+                $sourceLabel = trim($sourceId.' '.trim((string) ($src->c_title ?? '')));
             }
         }
 
         $typeLabels = [];
-        if (!empty($aggregate['type_ids'])) {
+        $typeIds = is_array($values['type_ids'] ?? null) ? $values['type_ids'] : [];
+        if ($typeIds !== []) {
             $typeRows = DB::table('OFFICE_TYPE_TREE')
-                ->whereIn('c_office_type_node_id', $aggregate['type_ids'])
+                ->whereIn('c_office_type_node_id', $typeIds)
                 ->get(['c_office_type_node_id', 'c_office_type_desc_chn']);
             foreach ($typeRows as $tr) {
                 $nid = (string) $tr->c_office_type_node_id;
@@ -187,15 +191,6 @@ class OfficeEntityController extends Controller implements BrowsesEntityTable {
             }
         }
 
-        return Inertia::render('Office/Edit', array_merge($this->formCapabilities(), [
-            'office' => $aggregate,
-            'initial_labels' => [
-                'dynasty' => $dynastyLabel,
-                'source' => $sourceLabel,
-                'types' => $typeLabels,
-            ],
-            'urls' => $this->urls(),
-            'page_translations' => $this->translations(),
-        ]));
+        return ['dynasty' => $dynastyLabel, 'source' => $sourceLabel, 'types' => $typeLabels];
     }
 }

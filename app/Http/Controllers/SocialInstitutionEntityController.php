@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\EntityFormController;
 use App\Services\Import\SocialInstituteImportService;
 use App\Support\BrowsesEntityTable;
 use App\Support\EntityTableBrowser;
@@ -25,6 +26,8 @@ use Inertia\Inertia;
  * 逐欄／布林篩選、公開讀、排序篩選登入門檻），另加聚合特有的名稱（joined）與地址數計算欄。
  */
 class SocialInstitutionEntityController extends Controller implements BrowsesEntityTable {
+    use EntityFormController;
+
     /**
      * SOCIAL_INSTITUTION_CODES 實體欄位（物理欄序，與 codes 裸表頁一致）。
      * 列表 thead ＝ 此清單 ＋ 計算欄位（見 COMPUTED_COLUMNS）。
@@ -64,11 +67,8 @@ class SocialInstitutionEntityController extends Controller implements BrowsesEnt
     ) {
     }
 
-    /** 新增／編輯需直接寫入權限（與 mutation API authorizeDirect 對齊）。 */
-    protected function ensureWrite(): void {
-        if (!Auth::check() || !Auth::user()->canWriteDirectly()) {
-            abort(403);
-        }
+    protected function entityResource(): string {
+        return 'social-institution';
     }
 
     /** 前端共用的 API 端點與路由。 */
@@ -140,46 +140,81 @@ class SocialInstitutionEntityController extends Controller implements BrowsesEnt
         ]));
     }
 
-    /** 新增機構表單頁。 */
-    public function appCreate() {
-        $this->ensureWrite();
+    /** 新增機構表單頁（?proposal={id} 時預填該筆新增提案，送出走 resubmit）。 */
+    public function appCreate(Request $request) {
+        $this->ensureCanReachForm();
+        [$overlay, $resubmit] = $this->proposalResubmitProps($request, 'create');
 
-        return Inertia::render('SocialInstitution/Create', [
+        return Inertia::render('SocialInstitution/Create', array_merge($this->formCapabilities(), [
+            'initial_labels' => $this->initialLabels($overlay),
+            'proposal_overlay' => (object) $overlay,
+            'resubmit' => (object) $resubmit,
             'type_options' => $this->typeOptions(),
             'urls' => $this->urls(),
             'page_translations' => $this->translations(),
-        ]);
+        ]));
     }
 
-    /** 編輯機構表單頁：載入聚合 + 預備 picker 初始標籤 + 改名護欄狀態。 */
+    /** 編輯機構表單頁：載入聚合 + 預備 picker 初始標籤 + 改名護欄狀態（?proposal={id} 時以修改提案覆蓋）。 */
     public function appEdit(Request $request, int $id) {
-        $this->ensureWrite();
+        $this->ensureCanReachForm();
 
         $aggregate = $this->service->load($id);
         if ($aggregate === null) {
             abort(404);
         }
+        [$overlay, $resubmit] = $this->proposalResubmitProps($request, 'update', $id);
 
+        return Inertia::render('SocialInstitution/Edit', array_merge($this->formCapabilities(), [
+            'institution' => $aggregate,
+            // 改名護欄（見 SocialInstitutionAggregateDefinition::guardWrite）：被人物資料引用時後端會擋改名，
+            // 前端據此預先鎖名稱欄並提示，避免使用者改完才被 409。
+            'reference_count' => $this->service->referenceCount($id),
+            // 標籤要對「表單實際會顯示的值」算：修改提案模式下 picker 顯示的是提案值。
+            'initial_labels' => $this->initialLabels(array_merge($aggregate, $overlay)),
+            'proposal_overlay' => (object) $overlay,
+            'resubmit' => (object) $resubmit,
+            'type_options' => $this->typeOptions(),
+            'urls' => $this->urls(),
+            'page_translations' => $this->translations(),
+        ]));
+    }
+
+    /**
+     * picker 初始標籤（朝代／來源／地址），依給定的值查對照表。
+     *
+     * 同時認聚合形狀（begin_dy／addresses[].addr_id）與提案 changes 形狀（dynasty_code／
+     * addr_id）——修改提案模式下表單顯示的是提案值，標籤也得照提案值查。
+     *
+     * @param array<string, mixed> $values 缺鍵視為空
+     * @return array{dynasties: array<int|string, string>, source: ?string, addresses: array<string, string>}
+     */
+    protected function initialLabels(array $values): array {
         $dynastyLabels = [];
         $dyCodes = array_values(array_unique(array_filter([
-            $aggregate['begin_dy'], $aggregate['floruit_dy'], $aggregate['end_dy'],
+            $values['begin_dy'] ?? null, $values['dynasty_code'] ?? null,
+            $values['floruit_dy'] ?? null, $values['end_dy'] ?? null,
         ], fn ($v) => $v !== null)));
-        if (!empty($dyCodes)) {
+        if ($dyCodes !== []) {
             $dynastyLabels = DB::table('DYNASTIES')->whereIn('c_dy', $dyCodes)
                 ->pluck('c_dynasty_chn', 'c_dy')->all();
         }
 
         $sourceLabel = null;
-        if ($aggregate['source_id'] !== null) {
-            $src = DB::table('TEXT_CODES')->where('c_textid', $aggregate['source_id'])->first();
+        $sourceId = $values['source_id'] ?? null;
+        if ($sourceId !== null) {
+            $src = DB::table('TEXT_CODES')->where('c_textid', $sourceId)->first();
             if ($src) {
-                $sourceLabel = trim($aggregate['source_id'].' '.trim((string) ($src->c_title ?? '')));
+                $sourceLabel = trim($sourceId.' '.trim((string) ($src->c_title ?? '')));
             }
         }
 
         $addrLabels = [];
-        $addrIds = array_values(array_unique(array_map(fn ($a) => $a['addr_id'], $aggregate['addresses'])));
-        if (!empty($addrIds)) {
+        $addresses = is_array($values['addresses'] ?? null) ? $values['addresses'] : [];
+        $addrIds = array_map(fn ($a) => is_array($a) ? ($a['addr_id'] ?? null) : null, $addresses);
+        $addrIds[] = $values['addr_id'] ?? null;
+        $addrIds = array_values(array_unique(array_filter($addrIds, fn ($v) => $v !== null)));
+        if ($addrIds !== []) {
             $addrRows = DB::table('ADDR_CODES')->whereIn('c_addr_id', $addrIds)
                 ->get(['c_addr_id', 'c_name_chn', 'c_name']);
             foreach ($addrRows as $a) {
@@ -188,19 +223,6 @@ class SocialInstitutionEntityController extends Controller implements BrowsesEnt
             }
         }
 
-        return Inertia::render('SocialInstitution/Edit', [
-            'institution' => $aggregate,
-            // 改名護欄（見 SocialInstitutionAggregateDefinition::guardWrite）：被人物資料引用時後端會擋改名，
-            // 前端據此預先鎖名稱欄並提示，避免使用者改完才被 409。
-            'reference_count' => $this->service->referenceCount($id),
-            'initial_labels' => [
-                'dynasties' => $dynastyLabels,
-                'source' => $sourceLabel,
-                'addresses' => $addrLabels,
-            ],
-            'type_options' => $this->typeOptions(),
-            'urls' => $this->urls(),
-            'page_translations' => $this->translations(),
-        ]);
+        return ['dynasties' => $dynastyLabels, 'source' => $sourceLabel, 'addresses' => $addrLabels];
     }
 }

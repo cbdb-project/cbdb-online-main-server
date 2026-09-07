@@ -10,6 +10,8 @@
  *  - 封寫表的編輯連結改指：operations 等處指向被封寫下層表的連結，改導向該實體的
  *    edit_route（App\Support\EntityAggregateRegistry）。封寫與連結解析同源，不會再出現
  *    「點進去只吃到唯讀警告」的死連結。
+ *  - 實體級提案的連結：operations 列表對 resource＝聚合名的提案列，「資源」與「修改提案」
+ *    連結依 create_route／edit_route 解析、依 form_capability 判斷該不該出連結。
  *  - 側欄節點：Navigation 依 nav 設定把對應 codes 子表節點改指實體聚合頁。
  *
  * 領域邏輯（派生、去重、護欄、校驗）不進 config——留在各實體的
@@ -24,14 +26,18 @@ return [
             // 通用 mutation handler 依此分派（EntityAggregate*Handler → definition）。
             'definition' => \App\Services\Mutations\EntityAggregate\OfficeAggregateDefinition::class,
             'pk' => 'c_office_id',
-            // 實體聚合編輯頁路由：封寫下層表後，operations 等處的「查閱」連結改指這裡
-            // （EntityAggregateRegistry::editUrl()）。不由 resource 推導——text-entity 的
+            // 實體聚合表單頁路由：封寫下層表後，operations 等處的「查閱」連結改指 edit_route；
+            // 實體級提案的「修改提案」連結依提案是新增或修改分別指 create_route／edit_route
+            // （EntityAggregateRegistry::formUrl()）。不由 resource 推導——text-entity 的
             // resource 與路由前綴刻意不同名。
+            'create_route' => 'app.office.create',
             'edit_route' => 'app.office.edit',
-            // 該實體的編輯表單需要什麼能力（'propose'＝canPropose、'write'＝canWriteDirectly）。
-            // 必須與該實體 Controller 的守衛一致，否則連結解析會發出一條必然 403 的連結。
-            // office 是 OfficeEntityController::ensureCanReachForm()＝canPropose；
-            // social-institution／text-entity 是 ensureWrite()＝canWriteDirectly。
+            // 該實體的表單頁需要什麼能力（'propose'＝canPropose、'write'＝canWriteDirectly）。
+            // 表單頁的守衛（EntityFormController::ensureCanReachForm()）與連結解析
+            // （EntityAggregateRegistry::userCanReachForm()）都由此推導，兩者不可能分歧。
+            // 三個實體都支援實體級提案（§4.5），故一律 propose：可提案者（含眾包）進得了
+            // 表單頁，實際寫入由 mutation API 各自授權（direct→authorizeDirect、
+            // proposal→authorizeProposal）。
             'form_capability' => 'propose',
             // 聚合認領的下層表（文件化用；封寫範圍以 closed_code_tables 為準——
             // 僅列 codes UI 實際可瀏覽的表）。
@@ -52,8 +58,9 @@ return [
             'service' => \App\Services\Import\SocialInstituteImportService::class,
             'definition' => \App\Services\Mutations\EntityAggregate\SocialInstitutionAggregateDefinition::class,
             'pk' => 'c_inst_code',
+            'create_route' => 'app.social-institution.create',
             'edit_route' => 'app.social-institution.edit',
-            'form_capability' => 'write',
+            'form_capability' => 'propose',
             'tables' => ['SOCIAL_INSTITUTION_NAME_CODES', 'SOCIAL_INSTITUTION_CODES', 'SOCIAL_INSTITUTION_ADDR'],
             'closed_code_tables' => ['SOCIAL_INSTITUTION_CODES', 'SOCIAL_INSTITUTION_NAME_CODES', 'SOCIAL_INSTITUTION_ADDR'],
             'nav' => [
@@ -72,8 +79,9 @@ return [
             'service' => \App\Services\Import\TextImportService::class,
             'definition' => \App\Services\Mutations\EntityAggregate\TextAggregateDefinition::class,
             'pk' => 'c_textid',
+            'create_route' => 'app.text.create',
             'edit_route' => 'app.text.edit',
-            'form_capability' => 'write',
+            'form_capability' => 'propose',
             'tables' => ['TEXT_CODES', 'TEXT_INSTANCE_DATA'],
             // step 4（下層直寫封閉）整體暫緩，兩條裸表路徑都仍在役：
             //  - codes UI：裸表編輯頁尚有實體頁未對齊的功能（TEXT_CODES 編輯頁的作者列表

@@ -199,8 +199,10 @@ flag=old 回退窗口（此時 `extractFormData` 的稽核欄剔除仍有效，�
 
 ### 7.3 已有的萌芽與遷移順序
 
-§4.5 實體聚合提案（office 試點）**就是這個原語**：`resource`＝聚合 API 名、payload 存
-`__entity_operation`＋`changes`（意圖非快照）、核准＝同一 handler 以 direct 語義重放。
+§4.5 實體聚合提案（office／social-institution／text-entity，2026-09 三者全部接通表單頁、
+operations 列表連結、修改提案與撤回，見 ENTITY_AGGREGATE_ARCHITECTURE.md §6.6）**就是這個原語**：
+`resource`＝聚合 API 名、payload 存 `__entity_operation`＋`changes`（意圖非快照）、核准＝同一
+handler 以 direct 語義重放、`__applied_operation_id` 記回供「比較」認領。
 段一～段三的 handler 重放也是往此收斂——只是意圖還得從快照反推。
 
 遷移順序（受益排序）：

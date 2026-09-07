@@ -20,7 +20,13 @@ use Illuminate\Support\Facades\Route;
  * 範圍僅限**有實體頁可去**的表。沒有替代入口的唯讀表（DYNASTIES、GANZHI_CODES、
  * CBDB__NAME_FTS）不歸本類管，仍由 CodesController 自己的清單處理、行為不變。
  *
- * 設計參考 docs/ENTITY_AGGREGATE_ARCHITECTURE.md §4.4／§6.5。
+ * 第二個入口是**實體級提案**（§4.5）：那類 operation 的 resource 存的是聚合 API 名
+ * （office／social-institution／text-entity）而非表名，由 entityForResource() 查表，
+ * 表單 URL（新增／編輯頁）同樣由 formUrl() 解析、同樣依 form_capability 決定出不出連結。
+ * 三個實體 controller 的表單守衛也委派到 userCanReachForm()——守衛與連結解析同源，
+ * config 改一處兩邊同步。
+ *
+ * 設計參考 docs/ENTITY_AGGREGATE_ARCHITECTURE.md §4.4／§4.5／§6.5。
  */
 class EntityAggregateRegistry {
     /**
@@ -63,6 +69,29 @@ class EntityAggregateRegistry {
     }
 
     /**
+     * 依聚合 API 名取得實體項；不是註冊的聚合則回 null。
+     *
+     * 實體級提案的 operations.resource 存的是 definition->resourceName()（正規名，不含別名），
+     * 與 config 的 resource 欄同一個值，故這裡只比對正規名。
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function entityForResource(string $resource): ?array {
+        $lower = strtolower(trim($resource));
+        if ($lower === '') {
+            return null;
+        }
+
+        foreach (self::entities() as $entity) {
+            if (strtolower((string) ($entity['resource'] ?? '')) === $lower) {
+                return $entity;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * 單一實體項認領封寫的表名（一律大寫）。
      *
      * @param array<string, mixed> $entity
@@ -86,15 +115,26 @@ class EntityAggregateRegistry {
      * 為什麼需要這道檢查：實體編輯頁**一律 abort(403)**，而泛用 codes 編輯頁沒有授權閘門
      * （唯讀表只是 flash 警告後 redirect）。連結若不看權限就改指實體頁，訪客與眾包帳號按
      * 「查閱」會從「警告＋回列表」變成硬 403——按鈕文案是「查閱」，語義上更不該。
-     *
-     * 各實體要求的能力**不一致**，所以由 config 的 form_capability 宣告、不可寫死：
-     * office 的 `ensureCanReachForm()` 是 `canPropose()`，social-institution 與 text-entity
-     * 的 `ensureWrite()` 是 `canWriteDirectly()`。未宣告時取較嚴的 write（fail-closed）。
      */
     public static function canReachEditForm(string $table): bool {
         $entity = self::entityForClosedTable($table);
+
+        return $entity !== null && self::userCanReachForm($entity);
+    }
+
+    /**
+     * 目前使用者能不能打開該實體的表單頁（新增／編輯）。
+     *
+     * 由 config 的 form_capability 宣告（'propose'＝canPropose、'write'＝canWriteDirectly），
+     * 未宣告時取較嚴的 write（fail-closed）。實體 controller 的表單守衛
+     * （EntityFormController::ensureCanReachForm()）與連結解析都走這裡：守衛若自己另判一套，
+     * 連結就可能發出一條必然 403 的「查閱」／「修改提案」。
+     *
+     * @param array<string, mixed> $entity
+     */
+    public static function userCanReachForm(array $entity): bool {
         $user = Auth::user();
-        if ($entity === null || $user === null) {
+        if ($user === null) {
             return false;
         }
 
@@ -125,14 +165,6 @@ class EntityAggregateRegistry {
             return null;
         }
 
-        $editRoute = (string) ($entity['edit_route'] ?? '');
-        $route = $editRoute === '' ? null : Route::getRoutes()->getByName($editRoute);
-        // 參數名不是 {id} 時 route() 會拋 UrlGenerationException，把整頁打成 500——
-        // 與本類「解不出就回 null」的契約相反。config 漂移由單元測試擋，這裡是執行期兜底。
-        if ($route === null || $route->parameterNames() !== ['id']) {
-            return null;
-        }
-
         // 三級優先序，**刻意**把呼叫端的 payload 值排在位置式解析之前：
         //  1. 具名格式——欄名齊全，最可靠。
         //  2. 呼叫端從 operation payload 取的識別欄——欄名明確，只是不在 resource_id 裡。
@@ -147,7 +179,39 @@ class EntityAggregateRegistry {
             return null;
         }
 
-        return route($editRoute, ['id' => $id], false);
+        return self::formUrl($entity, $id);
+    }
+
+    /**
+     * 實體表單頁 URL：$id 為 null 取 create_route（新增頁），否則取 edit_route（{id}）；
+     * $query 原樣掛成 query string（實體級提案的「修改提案」以 ?proposal={operation} 預填）。
+     * 路由不存在、參數名不符（edit 必須恰是 {id}、create 不得有參數）或識別鍵無效都回 null。
+     *
+     * 為什麼要驗參數名：route() 不驗證 where 約束、也不報參數名不符，只會把值靜默掛成
+     * query string 或直接拋 UrlGenerationException 把整頁打成 500——都與本類
+     * 「解不出就回 null」的契約相反。config 漂移由單元測試擋，這裡是執行期兜底。
+     *
+     * @param array<string, mixed>  $entity
+     * @param int|string|null       $id
+     * @param array<string, scalar> $query
+     */
+    public static function formUrl(array $entity, $id = null, array $query = []): ?string {
+        $params = [];
+        if ($id !== null) {
+            $id = self::normalizePkValue($id);
+            if ($id === null) {
+                return null;
+            }
+            $params['id'] = $id;
+        }
+
+        $routeName = (string) ($entity[$id === null ? 'create_route' : 'edit_route'] ?? '');
+        $route = $routeName === '' ? null : Route::getRoutes()->getByName($routeName);
+        if ($route === null || $route->parameterNames() !== array_keys($params)) {
+            return null;
+        }
+
+        return route($routeName, $params + $query, false);
     }
 
     /**

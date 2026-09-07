@@ -3,8 +3,10 @@
 namespace Tests\Unit;
 
 use App\Http\Controllers\CodesController;
+use App\Models\User;
 use App\Support\CompositePrimaryKey;
 use App\Support\EntityAggregateRegistry;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use PHPUnit\Framework\Attributes\Test;
 use ReflectionMethod;
@@ -137,14 +139,82 @@ class EntityAggregateRegistryTest extends TestCase {
                 $route,
                 "實體 {$resource} 的 edit_route（{$editRoute}）不存在——封寫後連結會靜默消失"
             );
-            // 參數名寫死在 editUrl() 的 ['id' => …]；若哪天路由改成 {office}，
+            // 參數名寫死在 formUrl() 的 ['id' => …]；若哪天路由改成 {office}，
             // route() 不會報錯，只會把 id 掛成 query string，連結靜默壞掉。
             $this->assertSame(
                 ['id'],
                 $route->parameterNames(),
                 "實體 {$resource} 的 edit_route 必須是單一 {id} 參數"
             );
+
+            // 實體級新增提案的「修改提案」指新增頁：create_route 也是連結出口，同樣不得漂移。
+            $createRoute = (string) ($entity['create_route'] ?? '');
+            $this->assertNotSame('', $createRoute, "實體 {$resource} 未宣告 create_route，新增提案的「修改提案」會靜默消失");
+            $route = Route::getRoutes()->getByName($createRoute);
+            $this->assertNotNull($route, "實體 {$resource} 的 create_route（{$createRoute}）不存在");
+            $this->assertSame([], $route->parameterNames(), "實體 {$resource} 的 create_route 不得有路徑參數");
         }
+    }
+
+    // ---------------------------------------------------------------------
+    // 實體級提案的連結：依聚合 API 名查實體、解析表單頁 URL、依 form_capability 決定出不出連結
+    // ---------------------------------------------------------------------
+
+    #[Test]
+    public function test_entity_lookup_by_resource_matches_the_canonical_name_only(): void {
+        // 提案的 operations.resource 存 definition->resourceName()（正規名）；別名不會出現在那裡，
+        // 這裡也刻意不認——認了別名等於讓兩份別名清單（definition 與 config）有機會分歧。
+        $this->assertSame('office', EntityAggregateRegistry::entityForResource('office')['resource']);
+        $this->assertSame('office', EntityAggregateRegistry::entityForResource('Office')['resource']);
+        $this->assertSame('text-entity', EntityAggregateRegistry::entityForResource('text-entity')['resource']);
+        $this->assertNull(EntityAggregateRegistry::entityForResource('offices'));
+        $this->assertNull(EntityAggregateRegistry::entityForResource('OFFICE_CODES'));
+        $this->assertNull(EntityAggregateRegistry::entityForResource(''));
+    }
+
+    #[Test]
+    public function test_form_url_resolves_create_and_edit_pages_and_appends_the_query(): void {
+        $office = EntityAggregateRegistry::entityForResource('office');
+
+        $this->assertSame('/app/office/create', EntityAggregateRegistry::formUrl($office));
+        $this->assertSame('/app/office/create?proposal=42', EntityAggregateRegistry::formUrl($office, null, ['proposal' => 42]));
+        $this->assertSame('/app/office/12304/edit', EntityAggregateRegistry::formUrl($office, 12304));
+        $this->assertSame('/app/office/12304/edit?proposal=42', EntityAggregateRegistry::formUrl($office, '12304', ['proposal' => 42]));
+
+        // 識別鍵白名單與 editUrl() 同一套：非十進位整數一律不出連結。
+        foreach (['abc', '12304/edit', '0012304', '', ' '] as $bad) {
+            $this->assertNull(EntityAggregateRegistry::formUrl($office, $bad), "識別鍵「{$bad}」不該產出連結");
+        }
+    }
+
+    #[Test]
+    public function test_form_url_yields_no_link_when_the_route_is_missing_or_takes_parameters(): void {
+        // create_route 帶了路徑參數：route() 會拋 UrlGenerationException 把整頁打成 500，
+        // 本類契約是「解不出就回 null」。
+        Route::get('test-only/entity/{office}/create', fn () => '')->name('test-only.entity.create');
+        Route::getRoutes()->refreshNameLookups();
+
+        $this->assertNull(EntityAggregateRegistry::formUrl(['create_route' => 'test-only.entity.create']));
+        $this->assertNull(EntityAggregateRegistry::formUrl(['create_route' => 'not-a-route']));
+        $this->assertNull(EntityAggregateRegistry::formUrl([]));
+        $this->assertNull(EntityAggregateRegistry::formUrl(['edit_route' => 'app.office.create'], 12304), 'edit_route 沒有 {id} 參數也不得出連結');
+    }
+
+    #[Test]
+    public function test_user_can_reach_form_follows_the_declared_capability_and_fails_closed(): void {
+        // is_active／is_admin 不在 $fillable（防 mass assignment），要 forceFill；不落庫，guard 只需要一個 User 物件。
+        $crowdsourcer = (new User())->forceFill(['is_active' => User::STATUS_ACTIVE, 'is_admin' => User::ROLE_CROWDSOURCING]);
+        $this->assertTrue($crowdsourcer->canPropose());
+        $this->assertFalse($crowdsourcer->canWriteDirectly());
+
+        Auth::logout();
+        $this->assertFalse(EntityAggregateRegistry::userCanReachForm(['form_capability' => 'propose']), '訪客一律不得');
+
+        $this->actingAs($crowdsourcer);
+        $this->assertTrue(EntityAggregateRegistry::userCanReachForm(['form_capability' => 'propose']));
+        $this->assertFalse(EntityAggregateRegistry::userCanReachForm(['form_capability' => 'write']));
+        $this->assertFalse(EntityAggregateRegistry::userCanReachForm([]), '未宣告取較嚴的 write（fail-closed）');
+        $this->assertFalse(EntityAggregateRegistry::userCanReachForm(['form_capability' => 'typo']));
     }
 
     #[Test]

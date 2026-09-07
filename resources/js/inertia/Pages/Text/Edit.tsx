@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { usePage, router } from '@inertiajs/react';
 import DashboardLayout from '../../Layouts/DashboardLayout';
+import { Overlay, ResubmitInfo } from '../../components/EntityBrowser/entityForm';
 import { getCsrfToken } from '../../components/PersonBrowser/shared/csrf';
 import { Button } from '../../components/ui/Button';
 import { useTranslation } from '../../hooks/useTranslation';
@@ -12,11 +13,17 @@ interface Props {
     initial_labels: TextInitialLabels;
     extant_options: ExtantOption[];
     urls: TextUrls;
+    can_edit?: boolean;
+    can_propose?: boolean;
+    /** 修改提案模式（?proposal={id}）：提案內容與 resubmit 端點；否則為空物件。 */
+    proposal_overlay: Overlay;
+    resubmit: ResubmitInfo;
     [key: string]: unknown;
 }
 
 export default function TextEdit() {
-    const { text, reference_count, initial_labels, extant_options, urls } = usePage<Props>().props;
+    const { text, reference_count, initial_labels, extant_options, urls, can_edit = true, can_propose = false, proposal_overlay, resubmit } = usePage<Props>().props;
+    const isResubmit = !!resubmit?.resubmit_proposal_id;
     const t = useTranslation('text_entity');
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState<string | null>(null);
@@ -66,15 +73,21 @@ export default function TextEdit() {
                     initialLabels={initial_labels}
                     extantOptions={extant_options}
                     urls={urls}
+                    canEdit={can_edit}
+                    canPropose={can_propose}
+                    overlay={proposal_overlay}
+                    resubmit={resubmit}
                 />
-                <div className="border-t border-border pt-3">
-                    <Button type="button" variant="destructive" disabled={busy || deleteLocked} onClick={del}>
-                        {t('btn_delete')}
-                    </Button>
-                    {deleteLocked && (
-                        <p className="mt-1 text-xs text-muted-foreground">{t('delete_locked_hint', { n: String(reference_count) })}</p>
-                    )}
-                </div>
+                {can_edit && !isResubmit && (
+                    <div className="border-t border-border pt-3">
+                        <Button type="button" variant="destructive" disabled={busy || deleteLocked} onClick={del}>
+                            {t('btn_delete')}
+                        </Button>
+                        {deleteLocked && (
+                            <p className="mt-1 text-xs text-muted-foreground">{t('delete_locked_hint', { n: String(reference_count) })}</p>
+                        )}
+                    </div>
+                )}
             </div>
         </DashboardLayout>
     );

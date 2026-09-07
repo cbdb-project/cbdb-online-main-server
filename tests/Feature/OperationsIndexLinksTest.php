@@ -979,18 +979,56 @@ class OperationsIndexLinksTest extends TestCase {
      * 「訪客」那次請求會靜默變成第二次登入請求，斷言就什麼都沒驗到。
      */
     private function firstResourceLink($user = null, string $query = ''): ?string {
-        $link = null;
+        return $this->firstRow($user, $query)['resource_link'];
+    }
+
+    /**
+     * 讀 /app/operations 第一列序列化後的整列（resource_link／urls／can_compare…）。
+     *
+     * @return array<string, mixed>
+     */
+    private function firstRow($user = null, string $query = ''): array {
+        $row = null;
         if ($user === null) {
             Auth::logout();
         }
         $request = $user ? $this->actingAs($user) : $this;
         $request->get('/app/operations' . $query)
             ->assertOk()
-            ->assertInertia(function ($page) use (&$link) {
-                $link = $page->toArray()['props']['lists'][0]['resource_link'];
+            ->assertInertia(function ($page) use (&$row) {
+                $row = $page->toArray()['props']['lists'][0];
             });
 
-        return $link;
+        return $row;
+    }
+
+    /**
+     * 一筆實體級提案（AbstractEntityAggregateHandler::storeProposal() 的 payload 形狀）。
+     */
+    private function entityProposal(User $user, string $resource, string $operation, ?int $pk, array $changes = [], array $extra = []): Operation {
+        $opType = match ($operation) {
+            'create' => Operation::TYPE_PROPOSAL_CREATE,
+            'delete' => Operation::TYPE_PROPOSAL_DELETE,
+            default => Operation::TYPE_PROPOSAL_UPDATE,
+        };
+
+        return Operation::create([
+            'user_id' => $user->id,
+            'c_personid' => 0,
+            'op_type' => $opType,
+            'resource' => $resource,
+            'resource_id' => $pk !== null ? (string) $pk : '',
+            'resource_data' => json_encode(array_merge([
+                '__entity_aggregate' => true,
+                '__entity_resource' => $resource,
+                '__entity_operation' => $operation,
+                '__entity_pk' => $pk,
+                'changes' => $changes,
+                '__proposal_meta' => ['submitted_by' => $user->name, 'submitted_by_id' => $user->id, 'submitted_at' => '2026-09-01 00:00:00'],
+                '__review_status' => 'pending',
+            ], $extra), JSON_UNESCAPED_UNICODE),
+            'crowdsourcing_status' => 0,
+        ]);
     }
 
     #[Test]
@@ -1198,10 +1236,10 @@ class OperationsIndexLinksTest extends TestCase {
 
     #[Test]
     public function test_link_authorization_follows_each_entity_declared_form_capability(): void {
-        // 各實體的表單守衛**不一致**：office 是 canPropose()、social-institution 是
-        // canWriteDirectly()。眾包帳號兩者相異（canPropose 真、canWriteDirectly 假），
-        // 是唯一能分辨這個差異的身分——沒有這條，config 的三個 form_capability 值互換
-        // 都不會有任何測試變紅，那段「不可寫死」的論證就沒有把關。
+        // 表單頁守衛（EntityFormController::ensureCanReachForm()）與連結解析都由 config 的
+        // form_capability 推導。眾包帳號（canPropose 真、canWriteDirectly 假）是唯一能分辨
+        // propose／write 的身分：翻一下 config，連結與 403 必須**一起**翻——沒有這條，
+        // 「守衛與連結同源」就只是註解裡的一句話。
         config(['migration_flags.pages.codes' => 'new']);
         $crowdsourcer = $this->activeUser('capability-crowdsourcing@example.com', User::ROLE_CROWDSOURCING);
         $this->assertTrue($crowdsourcer->canPropose());
@@ -1210,7 +1248,7 @@ class OperationsIndexLinksTest extends TestCase {
         \DB::table('OFFICE_CODES')->insert([
             'c_office_id' => 12304, 'c_office_chn' => '知州', 'c_office_pinyin' => 'zhi zhou', 'c_dy' => 15,
         ]);
-        $office = Operation::create([
+        Operation::create([
             'user_id' => $crowdsourcer->id,
             'c_personid' => 0,
             'op_type' => Operation::TYPE_UPDATE,
@@ -1220,26 +1258,143 @@ class OperationsIndexLinksTest extends TestCase {
             'crowdsourcing_status' => 0,
         ]);
 
-        // office：form_capability=propose ⇒ 眾包帳號拿得到連結，且真的打得開。
+        // 註冊表宣告 propose ⇒ 眾包帳號拿得到連結，且真的打得開。
         $link = $this->firstResourceLink($crowdsourcer);
         $this->assertSame('/app/office/12304/edit', $link);
         $this->actingAs($crowdsourcer)->get($link)->assertOk();
 
-        // social-institution：form_capability=write ⇒ 同一個帳號拿不到連結，
-        // 因為 /app/social-institution/{id}/edit 對它就是 403。
-        $office->delete();
-        Operation::create([
-            'user_id' => $crowdsourcer->id,
-            'c_personid' => 0,
-            'op_type' => Operation::TYPE_UPDATE,
-            'resource' => 'SOCIAL_INSTITUTION_CODES',
-            'resource_id' => '3983',
-            'resource_data' => json_encode(['c_inst_code' => 3983]),
-            'crowdsourcing_status' => 0,
-        ]);
+        // 同一個帳號、同一筆 operation，只把 office 的 form_capability 翻成 write：
+        // 連結消失，而且同一條 URL 現在確實是 403——兩邊都跟著 config 走，不會只翻一半。
+        $entities = config('entity_aggregates.entities');
+        foreach ($entities as &$entity) {
+            if (($entity['resource'] ?? null) === 'office') {
+                $entity['form_capability'] = 'write';
+            }
+        }
+        unset($entity);
+        config(['entity_aggregates.entities' => $entities]);
 
         $this->assertNull($this->firstResourceLink($crowdsourcer));
-        $this->actingAs($crowdsourcer)->get('/app/social-institution/3983/edit')->assertForbidden();
+        $this->actingAs($crowdsourcer)->get('/app/office/12304/edit')->assertForbidden();
+    }
+
+    // =====================================================================
+    // 實體級提案（resource＝聚合名、payload 存聚合意圖，§4.5）：三條連結都不能走表名路徑。
+    // 修復前：「修改提案」與「撤回」都指向 codes.proposals.*，guardTable('office') 必 404；
+    // 「資源」則因 'office' 不是 codes 表而永遠沒有連結。
+    // =====================================================================
+
+    #[Test]
+    public function test_pending_entity_create_proposal_links_to_the_entity_create_page_for_resubmit(): void {
+        $proposer = $this->activeUser('entity-create-proposal@example.com', User::ROLE_CROWDSOURCING);
+        \DB::table('DYNASTIES')->insert(['c_dy' => 15, 'c_dynasty_chn' => '宋']);
+        $proposal = $this->entityProposal($proposer, 'office', 'create', null, [
+            'name' => '知府', 'dynasty_code' => 15, 'type_ids' => ['x01'], 'source_id' => 68942,
+        ]);
+
+        $row = $this->firstRow($proposer, '?proposals_only=1');
+
+        // 核准前實體不存在，沒有「資源」可指；修改提案指新增頁並帶 ?proposal 預填；撤回走與資源無關的端點。
+        $this->assertNull($row['resource_link']);
+        $this->assertSame("/app/office/create?proposal={$proposal->id}", $row['urls']['edit_proposal']);
+        $this->assertSame("/operations/{$proposal->id}/cancel", $row['urls']['cancel_proposal']);
+        $this->assertTrue($row['can_edit_proposal']);
+
+        // 連結要真的打得開、而且預填的是這筆提案：斷言字串形狀正是當初漏掉死連結的原因。
+        $this->actingAs($proposer)->get($row['urls']['edit_proposal'])
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Office/Create')
+                ->where('proposal_overlay.name', '知府')
+                ->where('proposal_overlay.type_ids', ['x01'])
+                ->where('initial_labels.dynasty', '宋')
+                ->where('resubmit.resubmit_proposal_id', $proposal->id)
+                ->where('resubmit.resubmit_endpoint', "/api/v2/proposals/{$proposal->id}/resubmit"));
+    }
+
+    #[Test]
+    public function test_pending_entity_update_proposal_links_to_the_existing_entity_and_its_edit_page(): void {
+        $proposer = $this->activeUser('entity-update-proposal@example.com', User::ROLE_CROWDSOURCING);
+        \DB::table('OFFICE_CODES')->insert(['c_office_id' => 12304, 'c_office_chn' => '知州', 'c_office_pinyin' => 'zhi zhou', 'c_dy' => 15]);
+        \DB::table('DYNASTIES')->insert(['c_dy' => 15, 'c_dynasty_chn' => '宋']);
+        $proposal = $this->entityProposal($proposer, 'office', 'update', 12304, ['name' => '知州事', 'dynasty_code' => 15]);
+
+        $row = $this->firstRow($proposer, '?proposals_only=1');
+
+        $this->assertSame('/app/office/12304/edit', $row['resource_link']);
+        $this->assertSame("/app/office/12304/edit?proposal={$proposal->id}", $row['urls']['edit_proposal']);
+
+        $this->actingAs($proposer)->get($row['urls']['edit_proposal'])
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Office/Edit')
+                ->where('office.office_id', 12304)
+                ->where('proposal_overlay.name', '知州事')
+                ->where('resubmit.resubmit_proposal_id', $proposal->id));
+
+        // 訪客：實體編輯頁對它是 403，所以不出「資源」連結（同封寫表的「查閱」）。
+        $this->assertNull($this->firstResourceLink(null, '?proposals_only=1'));
+    }
+
+    #[Test]
+    public function test_approved_entity_create_proposal_claims_the_applied_audit_and_links_to_the_new_entity(): void {
+        // 核准端把 handler 落庫的 direct operation id 記進 __applied_operation_id、配發的識別鍵記進
+        // payload；列表據此把 audit 認領回提案列（「比較」可用）並指向新建的實體。
+        $proposer = $this->activeUser('entity-approved-create@example.com', User::ROLE_CROWDSOURCING);
+        \DB::table('OFFICE_CODES')->insert(['c_office_id' => 500, 'c_office_chn' => '知府', 'c_office_pinyin' => 'zhi fu']);
+        $proposal = $this->entityProposal($proposer, 'office', 'create', null, ['name' => '知府'], [
+            '__review_status' => 'approved',
+            '__applied_operation_id' => '777',
+            'c_office_id' => 500,
+        ]);
+        \DB::table('audit_log')->insert([
+            'occurred_at' => now(), 'created_at' => now(),
+            'table_name' => 'OFFICE_CODES', 'operation' => 'INSERT',
+            'actor_type' => 'user', 'actor_id' => (string) $proposer->id,
+            'operation_id' => '777',
+            'row_pk' => json_encode(['c_office_id' => 500]), 'row_pk_text' => 'c_office_id=500',
+            'old_data' => null, 'new_data' => json_encode(['c_office_id' => 500, 'c_office_chn' => '知府']),
+        ]);
+
+        $row = $this->firstRow($proposer, '?proposals_only=1');
+
+        $this->assertSame($proposal->id, $row['id']);
+        $this->assertTrue($row['can_compare'], '套用列的 audit 沒被認領回提案列，「比較」會灰掉');
+        $this->assertSame('OFFICE_CODES', $row['audit_logs'][0]['table_name']);
+        $this->assertSame('/app/office/500/edit', $row['resource_link']);
+    }
+
+    #[Test]
+    public function test_entity_delete_proposal_links_to_the_entity_only_while_it_still_exists(): void {
+        $proposer = $this->activeUser('entity-delete-proposal@example.com', User::ROLE_CROWDSOURCING);
+        \DB::table('OFFICE_CODES')->insert(['c_office_id' => 12304, 'c_office_chn' => '知州', 'c_office_pinyin' => 'zhi zhou']);
+        $pending = $this->entityProposal($proposer, 'office', 'delete', 12304);
+
+        // 刪除提案（op_type 10）不列在 proposals_only 裡，直接看全列表。
+        $row = $this->firstRow($proposer);
+        $this->assertSame('/app/office/12304/edit', $row['resource_link']);
+        // 刪除提案沒有可修改的內容：不出「修改提案」（否則只能指向必 404 的 codes 頁），撤回照常。
+        $this->assertNull($row['urls']['edit_proposal']);
+        $this->assertSame("/operations/{$pending->id}/cancel", $row['urls']['cancel_proposal']);
+
+        $payload = json_decode($pending->resource_data, true);
+        $payload['__review_status'] = 'approved';
+        $pending->resource_data = json_encode($payload, JSON_UNESCAPED_UNICODE);
+        $pending->save();
+
+        $this->assertNull($this->firstResourceLink($proposer), '核准後實體已刪除，不得再出連結');
+    }
+
+    #[Test]
+    public function test_entity_proposal_links_resolve_the_entity_by_resource_name_not_by_table(): void {
+        // resource 是聚合名（社會機構的下層有三張表），連結要靠註冊表的 resource 查、不能靠表名。
+        $proposer = $this->activeUser('entity-si-proposal@example.com', User::ROLE_CROWDSOURCING);
+        $proposal = $this->entityProposal($proposer, 'social-institution', 'create', null, ['name' => '新書院']);
+
+        $row = $this->firstRow($proposer, '?proposals_only=1');
+
+        $this->assertSame("/app/social-institution/create?proposal={$proposal->id}", $row['urls']['edit_proposal']);
+        $this->assertStringNotContainsString('/codes/', (string) $row['urls']['cancel_proposal']);
     }
 
     #[Test]

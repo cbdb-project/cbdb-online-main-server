@@ -85,7 +85,8 @@ interface OpRow {
         restore: string;
         approve: string;
         reject: string;
-        edit_proposal: string;
+        /** null＝此提案沒有可修改的編輯頁（如實體級刪除提案），只出撤回。 */
+        edit_proposal: string | null;
         cancel_proposal: string;
     };
 }
@@ -412,9 +413,11 @@ function ValueCell({ row, t, setModal, post, del, openReject }: {
 
             {row.can_edit_proposal && (
                 <div className="flex flex-wrap gap-1.5">
-                    <a href={row.urls.edit_proposal} className="inline-flex items-center rounded-md border border-border px-3 py-1 text-xs hover:bg-muted">
-                        <i className="far fa-pen-to-square mr-1" aria-hidden />{t('edit_proposal')}
-                    </a>
+                    {row.urls.edit_proposal && (
+                        <a href={row.urls.edit_proposal} className="inline-flex items-center rounded-md border border-border px-3 py-1 text-xs hover:bg-muted">
+                            <i className="far fa-pen-to-square mr-1" aria-hidden />{t('edit_proposal')}
+                        </a>
+                    )}
                     <Button size="sm" variant="outline" onClick={() => del(row.urls.cancel_proposal, 'withdraw_confirm')}>
                         <i className="fas fa-ban mr-1" aria-hidden />{t('revoke')}
                     </Button>

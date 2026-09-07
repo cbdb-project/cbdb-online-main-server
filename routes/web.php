@@ -369,6 +369,8 @@ Route::delete('codes/{table_name}/{id}', 'CodesController@destroy')->name('codes
 
 Route::post('operations/{operation}/approve', 'OperationsProposalController@approve')->name('operations.proposals.approve');
 Route::post('operations/{operation}/reject', 'OperationsProposalController@reject')->name('operations.proposals.reject');
+// 提案人撤回（與資源無關）：實體級提案的 resource 是聚合名，codes.proposals.cancel 的表名路徑段對它必 404。
+Route::delete('operations/{operation}/cancel', 'OperationsProposalController@cancel')->name('operations.proposals.cancel');
 
 Route::resource('manage', 'ManagementController', ['name' => [
     'show' => 'manage.show',

@@ -539,6 +539,29 @@ class ApiV2MutateOfficeImportTest extends TestCase {
         $this->get("/app/office/{$officeId}/edit?proposal={$proposal->id}")->assertStatus(409);
     }
 
+    /**
+     * 交易內的狀態重驗（核准／退回進交易後鎖列重讀）撞到已撤回的提案時要回明確的 409，
+     * 不能是會被 approve() 通用 catch 吞成 redirect、或在 reject() 落成 500 的一般例外。
+     * 競爭本身（交易外看到 pending、進交易後已被改掉）在單執行緒測試裡做不出來，
+     * 這裡直接對守衛本體驗證回應型別。
+     */
+    #[Test]
+    public function testInTransactionStatusRecheckRespondsWithConflict(): void {
+        $proposer = $this->makeUser(role: User::ROLE_CROWDSOURCING, email: 'of-recheck@example.com');
+        $this->actingAs($proposer);
+        $proposal = Operation::find($this->postJson('/api/v2/create', $this->payload(['mode' => 'proposal']))->json('result.operation_id'));
+        $this->delete(route('operations.proposals.cancel', $proposal))->assertRedirect();
+
+        $guard = new \ReflectionMethod(\App\Http\Controllers\OperationsProposalController::class, 'lockPendingProposal');
+
+        try {
+            $guard->invoke(app(\App\Http\Controllers\OperationsProposalController::class), $proposal->fresh());
+            $this->fail('已撤回的提案通過了交易內重驗');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            $this->assertSame(409, $e->getStatusCode());
+        }
+    }
+
     /** 撤回走與資源無關的端點：提案人本人可撤、他人 403、已撤回不可再撤；payload 標記與 codes 撤回一致。 */
     #[Test]
     public function testProposerCanCancelAnEntityProposalWithoutATableName(): void {

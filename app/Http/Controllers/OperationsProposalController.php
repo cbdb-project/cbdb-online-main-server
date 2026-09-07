@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class OperationsProposalController extends Controller {
     protected $operationRepository;
@@ -156,6 +157,8 @@ class OperationsProposalController extends Controller {
                     $this->lastAppliedOperationId
                 );
             });
+        } catch (HttpExceptionInterface $e) {
+            throw $e;
         } catch (ValidationException $e) {
             $messages = $e->validator->errors()->all();
             $detail = implode('；', $messages);
@@ -299,6 +302,8 @@ class OperationsProposalController extends Controller {
                     is_scalar($appliedOperationId) ? (string) $appliedOperationId : null
                 );
             });
+        } catch (HttpExceptionInterface $e) {
+            throw $e;
         } catch (ValidationException $e) {
             $detail = implode('；', $e->validator->errors()->all());
             Log::warning('實體聚合提案核准失敗（驗證錯誤）', ['operation_id' => $operation->id, 'resource' => $resource, 'errors' => $detail]);
@@ -414,7 +419,11 @@ class OperationsProposalController extends Controller {
     protected function lockPendingProposal(Operation $operation): void {
         $payload = $this->lockProposal($operation);
         if ((string) ($payload['__review_status'] ?? 'pending') !== 'pending') {
-            throw new \RuntimeException('該提案已審結或撤回，不可再審核。');
+            // 與 ensureCanReview() 同一個 409：DB::transaction 會先回滾再把它拋出來，
+            // approve() 的 catch 鏈對 HttpException 一律先放行，
+            // 競爭到的那一方拿到的是明確的 409，不是被通用 catch 吞成 flash＋redirect、
+            // 或在 reject() 落成 500。
+            abort(409, '該提案已審結或撤回，不可再審核。');
         }
     }
 

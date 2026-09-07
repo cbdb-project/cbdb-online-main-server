@@ -163,7 +163,18 @@ class MutationController extends Controller {
         $handlerResponse = null;
 
         try {
-            DB::transaction(function () use ($operation, $oldPayload, $handler, $resource, $handlerOperation, $personId, $targetPk, $changes, $meta, &$handlerResponse) {
+            DB::transaction(function () use ($operation, $handler, $resource, $handlerOperation, $personId, $targetPk, $changes, $meta, &$handlerResponse) {
+                // 0) 鎖住舊提案列並重驗狀態：上面交易外的檢查可能在進交易前就被撤回／核准／退回
+                //    改掉（OperationsProposalController 同樣以列鎖序列化這些轉移）。不重驗，撤回會
+                //    擋不住重發——舊提案被再標一次 cancelled、卻多出一筆新的待審提案。
+                $locked = \App\Models\Operation::whereKey($operation->getKey())->lockForUpdate()->firstOrFail();
+                $operation->setRawAttributes($locked->getAttributes(), true);
+                $oldPayload = json_decode((string) $operation->resource_data, true);
+                $oldPayload = is_array($oldPayload) ? $oldPayload : [];
+                if (!in_array((string) ($oldPayload['__review_status'] ?? 'pending'), ['pending', 'rejected'], true)) {
+                    throw new \RuntimeException('提案已審結或撤回，無法修改');
+                }
+
                 // 1) 先撤回舊提案，讓 handler 的「同主鍵已有待審核提案則拒」護欄放行。
                 $now = \Carbon\Carbon::now()->format('Y-m-d H:i:s');
                 $cancelledPayload = $oldPayload;

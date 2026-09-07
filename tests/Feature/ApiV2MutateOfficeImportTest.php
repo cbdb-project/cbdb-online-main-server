@@ -89,6 +89,8 @@ class ApiV2MutateOfficeImportTest extends TestCase {
         });
         Schema::create('OFFICE_TYPE_TREE', function (Blueprint $table) {
             $table->string('c_office_type_node_id')->primary();
+            // 表單頁的 picker 標籤查此欄（修改提案預填測試會渲染 /app/office 表單頁）。
+            $table->string('c_office_type_desc_chn')->nullable();
         });
         Schema::create('DYNASTIES', function (Blueprint $table) {
             $table->integer('c_dy')->primary();
@@ -375,7 +377,14 @@ class ApiV2MutateOfficeImportTest extends TestCase {
         $this->assertDatabaseHas('OFFICE_CODE_TYPE_REL', ['c_office_id' => $officeId, 'c_office_tree_id' => 'x01']);
 
         $operation->refresh();
-        $this->assertSame('approved', json_decode($operation->resource_data, true)['__review_status']);
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status']);
+        // handler 落庫的 direct operation id 記回提案（operations 列表據此認領 audit、「比較」才可用）；
+        // 配發的識別鍵也記回，列表的「資源」連結據此指向新建的官職。
+        $appliedId = DB::table('operations')->where('resource', 'OFFICE_CODES')->where('op_type', Operation::TYPE_CREATE)->value('id');
+        $this->assertNotNull($appliedId);
+        $this->assertSame((string) $appliedId, $payload['__applied_operation_id']);
+        $this->assertSame($officeId, (int) $payload['c_office_id']);
     }
 
     /** update 提案：先直建一官職，改名＋改類型提案，核准前不動，核准後聚合套用。 */
@@ -442,6 +451,118 @@ class ApiV2MutateOfficeImportTest extends TestCase {
         $this->postJson('/api/v2/create', $this->payload())->assertStatus(403);
         $this->postJson('/api/v2/create', $this->payload(['mode' => 'proposal']))->assertOk();
         $this->assertSame(1, DB::table('operations')->where('op_type', Operation::TYPE_PROPOSAL_CREATE)->count());
+    }
+
+    // ── 修改提案（resubmit）與撤回：與人物子資源同一套契約，表單預填的是聚合意圖 ──
+
+    /**
+     * 新增提案 → 新增頁以 ?proposal 預填 → 以 resubmit 端點重發：舊提案 cancelled＋superseded_by、
+     * 新提案 pending＋resubmit_of、仍是聚合意圖（__entity_aggregate）且未落庫。
+     */
+    #[Test]
+    public function testCreateProposalCanBePrefilledOnTheCreatePageAndResubmitted(): void {
+        $proposer = $this->makeUser(role: User::ROLE_CROWDSOURCING, email: 'of-resubmit@example.com');
+        $this->actingAs($proposer);
+        $old = Operation::find($this->postJson('/api/v2/create', $this->payload([
+            'mode' => 'proposal', 'meta' => ['comment' => '原始說明'],
+        ]))->json('result.operation_id'));
+
+        $this->get("/app/office/create?proposal={$old->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Office/Create')
+                ->where('can_propose', true)
+                ->where('can_edit', false)
+                ->where('proposal_overlay.name', '知府')
+                ->where('proposal_overlay.dynasty_code', 15)
+                ->where('initial_labels.dynasty', '宋')
+                ->where('resubmit.resubmit_proposal_id', $old->id)
+                ->where('resubmit.initial_comment', '原始說明')
+                ->where('resubmit.resubmit_endpoint', "/api/v2/proposals/{$old->id}/resubmit"));
+
+        // resubmit 端點 create／update 共用、缺 operation 時當 update：新增提案重發要標明 create。
+        $p = $this->payload(['operation' => 'create', 'meta' => ['comment' => '改名']]);
+        $p['changes']['name'] = '知州';
+        $res = $this->postJson("/api/v2/proposals/{$old->id}/resubmit", $p)->assertOk();
+        $newId = (int) $res->json('result.operation_id');
+
+        $oldPayload = json_decode($old->fresh()->resource_data, true);
+        $this->assertSame('cancelled', $oldPayload['__review_status']);
+        $this->assertSame($newId, $oldPayload['__proposal_meta']['superseded_by']);
+
+        $newPayload = json_decode(Operation::findOrFail($newId)->resource_data, true);
+        $this->assertTrue($newPayload['__entity_aggregate']);
+        $this->assertSame('知州', $newPayload['changes']['name']);
+        $this->assertSame('改名', $newPayload['__proposal_meta']['comment']);
+        $this->assertSame($old->id, $newPayload['__proposal_meta']['resubmit_of']);
+        $this->assertSame(0, DB::table('OFFICE_CODES')->count(), 'resubmit 只是重發提案，不得落庫');
+    }
+
+    /** 編輯頁的 ?proposal 預填必須與本頁對得上：同實體、同操作、同識別鍵；身分與狀態同 resubmit 規則。 */
+    #[Test]
+    public function testEditPagePrefillRequiresAMatchingProposalAndAnEligibleViewer(): void {
+        $proposer = $this->makeUser(role: User::ROLE_CROWDSOURCING, email: 'of-prefill@example.com');
+        $this->actingAs($this->makeUser(email: 'of-prefill-writer@example.com'));
+        $this->postJson('/api/v2/create', $this->payload())->assertOk();
+        $this->postJson('/api/v2/create', $this->payload(['changes' => ['name' => '另一官', 'dynasty_code' => 15, 'type_id' => 'x01', 'source_id' => 7596]]))->assertOk();
+        [$officeId, $otherId] = DB::table('OFFICE_CODES')->orderBy('c_office_id')->pluck('c_office_id')->map(fn ($v) => (int) $v)->all();
+
+        $this->actingAs($proposer);
+        $proposal = Operation::find($this->postJson('/api/v2/mutate', [
+            'resource' => 'office', 'mode' => 'proposal', 'operation' => 'update', 'person_id' => 0,
+            'target' => ['pk' => ['c_office_id' => $officeId]],
+            'changes' => ['name' => '知州', 'dynasty_code' => 15, 'type_id' => 'x02', 'source_id' => 7596],
+        ])->json('result.operation_id'));
+
+        // 對得上：以提案值覆蓋（標籤也照提案值查——type x02 不在原聚合裡）。
+        $this->get("/app/office/{$officeId}/edit?proposal={$proposal->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Office/Edit')
+                ->where('office.name', '知府')
+                ->where('proposal_overlay.name', '知州')
+                ->where('resubmit.resubmit_proposal_id', $proposal->id));
+
+        // 對不上一律 404：新增頁收到修改提案、另一個官職的編輯頁收到這筆提案。
+        $this->get("/app/office/create?proposal={$proposal->id}")->assertNotFound();
+        $this->get("/app/office/{$otherId}/edit?proposal={$proposal->id}")->assertNotFound();
+
+        // 非提案人的眾包帳號 403；審核人可以。
+        $this->actingAs($this->makeUser(role: User::ROLE_CROWDSOURCING, email: 'of-prefill-other@example.com'));
+        $this->get("/app/office/{$officeId}/edit?proposal={$proposal->id}")->assertForbidden();
+        $this->actingAs($this->makeUser(email: 'of-prefill-reviewer@example.com'));
+        $this->get("/app/office/{$officeId}/edit?proposal={$proposal->id}")->assertOk();
+
+        // 已審結：409。
+        $this->post(route('operations.proposals.approve', $proposal))->assertRedirect();
+        $this->actingAs($proposer);
+        $this->get("/app/office/{$officeId}/edit?proposal={$proposal->id}")->assertStatus(409);
+    }
+
+    /** 撤回走與資源無關的端點：提案人本人可撤、他人 403、已撤回不可再撤；payload 標記與 codes 撤回一致。 */
+    #[Test]
+    public function testProposerCanCancelAnEntityProposalWithoutATableName(): void {
+        $proposer = $this->makeUser(role: User::ROLE_CROWDSOURCING, email: 'of-cancel@example.com');
+        $this->actingAs($proposer);
+        $proposal = Operation::find($this->postJson('/api/v2/create', $this->payload(['mode' => 'proposal']))->json('result.operation_id'));
+
+        $this->actingAs($this->makeUser(email: 'of-cancel-other@example.com'));
+        $this->delete(route('operations.proposals.cancel', $proposal))->assertForbidden();
+
+        $this->actingAs($proposer);
+        $this->delete(route('operations.proposals.cancel', $proposal), ['reason' => '送錯了'])->assertRedirect();
+
+        $payload = json_decode($proposal->fresh()->resource_data, true);
+        $this->assertSame('cancelled', $payload['__review_status']);
+        $this->assertSame('送錯了', $payload['__proposal_meta']['cancel_reason']);
+        $this->assertSame($proposer->id, $payload['__proposal_meta']['cancelled_by_id']);
+        $this->assertTrue($payload['__entity_aggregate'], '撤回只改狀態，聚合意圖原樣保留');
+
+        $this->delete(route('operations.proposals.cancel', $proposal))->assertForbidden();
+        // 撤回後核准端不再認它是待審提案（409），資料表不得被寫入。
+        $this->actingAs($this->makeUser(email: 'of-cancel-reviewer@example.com'));
+        $this->post(route('operations.proposals.approve', $proposal))->assertStatus(409);
+        $this->assertSame(0, DB::table('OFFICE_CODES')->count());
     }
     // ── 異體字落地替換（plan S4；review 補的 v2／React 覆蓋）──────
 

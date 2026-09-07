@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\EntityFormController;
 use App\Services\Import\TextImportService;
 use App\Support\BrowsesEntityTable;
 use App\Support\EntityTableBrowser;
@@ -25,6 +26,8 @@ use Inertia\Inertia;
  * 另加聚合特有的版本數與子文獻數（c_source 自引用樹）計算欄。
  */
 class TextEntityController extends Controller implements BrowsesEntityTable {
+    use EntityFormController;
+
     /**
      * TEXT_CODES 實體欄位（物理欄序，與 codes 裸表頁一致）。
      *
@@ -63,11 +66,8 @@ class TextEntityController extends Controller implements BrowsesEntityTable {
     ) {
     }
 
-    /** 新增／編輯需直接寫入權限（與 mutation API authorizeDirect 對齊）。 */
-    protected function ensureWrite(): void {
-        if (!Auth::check() || !Auth::user()->canWriteDirectly()) {
-            abort(403);
-        }
+    protected function entityResource(): string {
+        return 'text-entity';
     }
 
     /** 前端共用的 API 端點與路由。 */
@@ -135,57 +135,74 @@ class TextEntityController extends Controller implements BrowsesEntityTable {
         ]));
     }
 
-    /** 新增文獻表單頁。 */
-    public function appCreate() {
-        $this->ensureWrite();
+    /** 新增文獻表單頁（?proposal={id} 時預填該筆新增提案，送出走 resubmit）。 */
+    public function appCreate(Request $request) {
+        $this->ensureCanReachForm();
+        [$overlay, $resubmit] = $this->proposalResubmitProps($request, 'create');
 
-        return Inertia::render('Text/Create', [
+        return Inertia::render('Text/Create', array_merge($this->formCapabilities(), [
+            'initial_labels' => $this->initialLabels($overlay),
+            'proposal_overlay' => (object) $overlay,
+            'resubmit' => (object) $resubmit,
             'extant_options' => $this->extantOptions(),
             'urls' => $this->urls(),
             'page_translations' => $this->translations(),
-        ]);
+        ]));
     }
 
-    /** 編輯文獻表單頁：載入聚合 + 預備 picker 初始標籤 + 刪除護欄狀態。 */
+    /** 編輯文獻表單頁：載入聚合 + 預備 picker 初始標籤 + 刪除護欄狀態（?proposal={id} 時以修改提案覆蓋）。 */
     public function appEdit(Request $request, int $id) {
-        $this->ensureWrite();
+        $this->ensureCanReachForm();
 
         $aggregate = $this->service->load($id);
         if ($aggregate === null) {
             abort(404);
         }
+        [$overlay, $resubmit] = $this->proposalResubmitProps($request, 'update', $id);
 
+        return Inertia::render('Text/Edit', array_merge($this->formCapabilities(), [
+            'text' => $aggregate,
+            // 刪除護欄（見 TextAggregateDefinition::guardWrite）：被出處／著述／子文獻等引用時
+            // 後端會擋刪除，前端據此預先停用刪除鈕並提示。
+            'reference_count' => $this->service->referenceCount($id),
+            // 標籤要對「表單實際會顯示的值」算：修改提案模式下 picker 顯示的是提案值。
+            'initial_labels' => $this->initialLabels(array_merge($aggregate, $overlay)),
+            'proposal_overlay' => (object) $overlay,
+            'resubmit' => (object) $resubmit,
+            'extant_options' => $this->extantOptions(),
+            'urls' => $this->urls(),
+            'page_translations' => $this->translations(),
+        ]));
+    }
+
+    /**
+     * picker 初始標籤（朝代／來源文獻），依給定的聚合值查對照表。
+     *
+     * @param array<string, mixed> $values 聚合形狀（dynasty_code／instances[].pub_dy／source_id），缺鍵視為空
+     * @return array{dynasties: array<int|string, string>, source: ?string}
+     */
+    protected function initialLabels(array $values): array {
+        $instances = is_array($values['instances'] ?? null) ? $values['instances'] : [];
         $dynastyLabels = [];
         $dyCodes = array_values(array_unique(array_filter(array_merge(
-            [$aggregate['dynasty_code']],
-            array_map(fn ($i) => $i['pub_dy'], $aggregate['instances'])
+            [$values['dynasty_code'] ?? null],
+            array_map(fn ($i) => is_array($i) ? ($i['pub_dy'] ?? null) : null, $instances)
         ), fn ($v) => $v !== null)));
-        if (!empty($dyCodes)) {
+        if ($dyCodes !== []) {
             $dynastyLabels = DB::table('DYNASTIES')->whereIn('c_dy', $dyCodes)
                 ->pluck('c_dynasty_chn', 'c_dy')->all();
         }
 
         $sourceLabel = null;
-        if ($aggregate['source_id'] !== null) {
-            $src = DB::table('TEXT_CODES')->where('c_textid', $aggregate['source_id'])->first();
+        $sourceId = $values['source_id'] ?? null;
+        if ($sourceId !== null) {
+            $src = DB::table('TEXT_CODES')->where('c_textid', $sourceId)->first();
             if ($src) {
                 $label = trim((string) ($src->c_title_chn ?? '')) ?: trim((string) ($src->c_title ?? ''));
-                $sourceLabel = trim($aggregate['source_id'].' '.$label);
+                $sourceLabel = trim($sourceId.' '.$label);
             }
         }
 
-        return Inertia::render('Text/Edit', [
-            'text' => $aggregate,
-            // 刪除護欄（見 TextAggregateDefinition::guardWrite）：被出處／著述／子文獻等引用時
-            // 後端會擋刪除，前端據此預先停用刪除鈕並提示。
-            'reference_count' => $this->service->referenceCount($id),
-            'initial_labels' => [
-                'dynasties' => $dynastyLabels,
-                'source' => $sourceLabel,
-            ],
-            'extant_options' => $this->extantOptions(),
-            'urls' => $this->urls(),
-            'page_translations' => $this->translations(),
-        ]);
+        return ['dynasties' => $dynastyLabels, 'source' => $sourceLabel];
     }
 }

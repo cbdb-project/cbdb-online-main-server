@@ -137,10 +137,10 @@ CBDB 目前**只有「人物」做到了這一點**，其餘實體都停在「�
 | 實體 | 下層表 | 聚合根 | 實體級 API | 專屬前端編輯頁 | 下層直寫已封閉 | 實體級提案 |
 |---|---|---|---|---|---|---|
 | 人物 | BIOG_MAIN ＋ 12 子資源 | ✅ | ✅ CRUD | ✅（13 編輯器）| N/A（子資源即實體單位）| ✅ |
-| 書籍／文本 | TEXT_CODES ＋ TEXT_INSTANCE_DATA | ✅ | ✅ CRUD（text-entity，含版本列對賬、成環護欄）| ✅（/app/text；側欄「文獻代碼表」已改指此頁）| ❌（暫緩：codes UI 待 parity——作者面板、instance 專屬欄位；`text-codes` 裸表 create 因 S5 接上落地替換而維持在役）| ❌（同 office／social，走通用 handler 的聚合意圖提案）|
+| 書籍／文本 | TEXT_CODES ＋ TEXT_INSTANCE_DATA | ✅ | ✅ CRUD（text-entity，含版本列對賬、成環護欄）| ✅（/app/text；側欄「文獻代碼表」已改指此頁）| ❌（暫緩：codes UI 待 parity——作者面板、instance 專屬欄位；`text-codes` 裸表 create 因 S5 接上落地替換而維持在役）| ✅（2026-09，見 §6.6）|
 | 地點 | ADDRESSES ＋ ADDR_CODES ＋ … | ❌ | ❌ | ❌ | ❌ | ❌ |
-| 官職 | OFFICE_CODES ＋ TYPE_REL | ✅ | ✅ CRUD | ✅（/app/office，與裸表頁 feature parity 的超集；側欄「任官編碼表」已改指此頁）| ✅（codes 寫入封閉，讀取／匯出開放）| ❌（裸表提案一併封閉、標示未支援，待實體級提案）|
-| 社交機構 | NAME_CODES ＋ CODES ＋ ADDR | ✅ | ✅ CRUD | ✅（/app/social-institution，識別＝c_inst_code；側欄「社會機構編碼表」已改指此頁）| ✅（NAME_CODES／CODES／ADDR 三表 codes 寫入封閉，讀取開放）| ❌（裸表提案一併封閉、標示未支援，待實體級提案）|
+| 官職 | OFFICE_CODES ＋ TYPE_REL | ✅ | ✅ CRUD | ✅（/app/office，與裸表頁 feature parity 的超集；側欄「任官編碼表」已改指此頁）| ✅（codes 寫入封閉，讀取／匯出開放）| ✅（2026-09，見 §6.6；裸表提案維持封閉）|
+| 社交機構 | NAME_CODES ＋ CODES ＋ ADDR | ✅ | ✅ CRUD | ✅（/app/social-institution，識別＝c_inst_code；側欄「社會機構編碼表」已改指此頁）| ✅（NAME_CODES／CODES／ADDR 三表 codes 寫入封閉，讀取開放）| ✅（2026-09，見 §6.6；裸表提案維持封閉）|
 
 （🟡＝進行中／部分；本表隨實作推進更新。）
 
@@ -247,7 +247,36 @@ filter／sort／guard 機制，封閉永遠是「認領下層表＋換側欄＋�
 **§4.5 實體級提案的落地路徑**：提案模型只需針對 `EntityAggregateService` 介面／
 `EntityAggregateDefinition` 契約做一次
 （`resource ＋ pk ＋ 已驗證 input 快照`入庫、審核通過調同一 `create/update`），
-direct 與 proposal 天然對等（§7 原則），不必每實體各接一遍。
+direct 與 proposal 天然對等（§7 原則），不必每實體各接一遍。✅ 已落地，見 §6.6。
+
+### 6.6 實體級提案（§4.5，2026-09 收尾）
+
+三個聚合共用同一條提案管線，形狀就是 PERSON_PROPOSAL_PATHS.md §7 要的「意圖」原語：
+
+- **提交**：`mode=proposal` 時通用 handler 同樣 validate＋guardWrite（壞提案在提交端就擋，
+  如被引用的官職不能發刪除提案），但不呼叫 service，改把聚合意圖存進 `operations`
+  （`resource`＝聚合名、`resource_data`＝`__entity_aggregate`／`__entity_resource`／
+  `__entity_operation`／`__entity_pk`＋原始 `changes`，`AbstractEntityAggregateHandler::storeProposal()`）。
+- **核准**：`OperationsProposalController::approveEntityAggregateProposal()` 以 `mode=direct`
+  重放同一個 handler（validate→guardWrite→service），異體字替換、派生、配套表、稽核蓋章全在
+  核准當下發生；落庫的 direct operation id 記回 `__applied_operation_id`（列表據此把 audit
+  認領回提案列，「比較」可用）、create 配發的識別鍵記回 payload（列表「資源」連結指向新實體）。
+  `ensureCanReview()` 只放行 `pending`：已核准／撤回的提案再核准會把同一份意圖再套用一遍。
+- **operations 列表**：resource 是聚合名、不是表名，三條連結都不能走表名路徑——「資源」依
+  `__entity_pk`（create 核准後改用記回的識別鍵、delete 核准後不出）指實體編輯頁；「修改提案」
+  指 `create_route`／`edit_route` 並帶 `?proposal={id}`；「撤回」走與資源無關的
+  `DELETE operations/{operation}/cancel`。三者與封寫表的「查閱」同一套授權（`form_capability`）。
+- **表單頁**：三個實體 controller 共用 `Concerns\EntityFormController`——表單門檻由 config 的
+  `form_capability` 推導（與連結解析同源，`EntityAggregateRegistry::userCanReachForm()`）、
+  `can_edit`／`can_propose` 旗標、`?proposal={id}` 預填（overlay＝提案的 `changes`，鍵名就是表單
+  送出的鍵名；picker 標籤照提案值查）。前端三個表單共用 `components/EntityBrowser/entityForm.tsx`
+  的提交管線（direct／proposal／resubmit、422／409 錯誤映射、修改說明）；表單欄位本身不抽象。
+- **修改提案**＝撤回舊提案＋同一管線重發（`POST api/v2/proposals/{operation}/resubmit`，與人物
+  子資源同一端點）；新增提案重發時信封要標明 `operation=create`（該端點 create／update 共用，
+  缺 operation 時當 update）。
+- **仍是已知限制**：實體列表頁的「新增」「編輯」按鈕仍只對可直接寫入者顯示（列表的操作欄同時
+  掛著 direct 刪除），可提案者要從 operations 列表或直接開表單頁 URL 進入；提案的 `comment`
+  只在表單頁的「修改說明」欄，批次匯入不帶。
 
 ---
 
@@ -263,8 +292,10 @@ direct 與 proposal 天然對等（§7 原則），不必每實體各接一遍�
 ## 8. 相關文件與程式碼
 
 - `config/entity_aggregates.php`（實體註冊表：封寫／連結／側欄接線的單一真源，§6.5）
-- `app/Support/EntityAggregateRegistry.php`＋`tests/Unit/EntityAggregateRegistryTest.php`（註冊表查詢介面：封寫判定與封寫表的編輯連結解析，§6.5）
-- `app/Http/Controllers/OperationsController.php`＋`tests/Feature/OperationsIndexLinksTest.php`（操作紀錄的「查閱」連結：封寫表改指實體編輯頁，§6.5）
+- `app/Support/EntityAggregateRegistry.php`＋`tests/Unit/EntityAggregateRegistryTest.php`（註冊表查詢介面：封寫判定、依聚合名查實體、表單頁 URL 與 form_capability 授權，§6.5／§6.6）
+- `app/Http/Controllers/OperationsController.php`＋`tests/Feature/OperationsIndexLinksTest.php`（操作紀錄的「查閱」連結：封寫表改指實體編輯頁；實體級提案的資源／修改提案／撤回連結，§6.5／§6.6）
+- `app/Http/Controllers/OperationsProposalController.php`（實體級提案核准：`approveEntityAggregateProposal()`；資源無關的撤回 `cancel()`，§6.6）
+- `app/Http/Controllers/Concerns/EntityFormController.php`＋`resources/js/inertia/components/EntityBrowser/entityForm.tsx`（實體表單頁的授權／能力旗標／修改提案預填，前後端成對，§6.6）
 - `app/Services/Import/EntityAggregateService.php`（聚合根介面）
 - `app/Services/Mutations/EntityAggregate*Handler.php`＋`EntityAggregate/`（通用 mutation handler、definition 契約與分派 registry，§6.5）
 - `app/Services/Import/Concerns/SharesImportHelpers.php`（配號／護欄計數／集合對賬／審計基元）

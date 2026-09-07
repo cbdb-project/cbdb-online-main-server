@@ -2,12 +2,13 @@
 
 本文件說明 `/codes/*` 與人物記錄（`basicinformation`）模組的提案與審核流程**通則**。
 
-- 文檔版本：2.0
-- 最後更新：2026-08-05
+- 文檔版本：2.1
+- 最後更新：2026-09-08
 
 > 人物相關資源逐資源 × 操作的核准路徑矩陣、收斂歷史與後續方向，見
 > **[PERSON_PROPOSAL_PATHS.md](./PERSON_PROPOSAL_PATHS.md)**。
-> 實體聚合（office 等非人物實體）的提案見 [ENTITY_AGGREGATE_ARCHITECTURE.md](./ENTITY_AGGREGATE_ARCHITECTURE.md) §4.5。
+> 實體聚合（office／social-institution／text-entity）的提案見 [ENTITY_AGGREGATE_ARCHITECTURE.md](./ENTITY_AGGREGATE_ARCHITECTURE.md) §6.6：
+> `resource`＝聚合名、`resource_data` 存聚合意圖（`__entity_*`＋`changes`）而非單表行快照，核准以 direct 重放同一 handler。
 > operations 列表「比較」功能的收斂方案見 [OPERATIONS_COMPARE_CONSOLIDATION_PLAN.md](./OPERATIONS_COMPARE_CONSOLIDATION_PLAN.md)。
 
 ## 1. 資料模型
@@ -37,7 +38,7 @@ handler 的 `changes` 是**使用者意圖**——白名單刻意不含稽核欄
 
 | 入口 | 現況 |
 |---|---|
-| **`/api/v2/mutate`（`mode=proposal`）** | **現役唯一的人物記錄提案入口**。React 13 個編輯器全走此路；欄位白名單於提交當下生效，稽核欄等系統欄根本進不了 payload。create／update／delete 三種提案皆支援 |
+| **`/api/v2/mutate`（`mode=proposal`）** | **現役唯一的人物記錄提案入口**。React 13 個編輯器全走此路；欄位白名單於提交當下生效，稽核欄等系統欄根本進不了 payload。create／update／delete 三種提案皆支援。**實體聚合**（office／social-institution／text-entity）的提案也走這裡（`/app/office`、`/app/social-institution`、`/app/text` 三個表單頁的「提交建議」），存的是聚合意圖 |
 | codes 模組（`CodesController@proposalStore/@proposalUpdate`） | 現役（codes 自有流程，不在 LegacyBladeFormGate 範圍） |
 | legacy Blade（`BasicInformationProposalController@proposalStore/@proposalUpdate`） | **已下架**：flag=new 時 `LegacyBladeFormGate` 對這兩條 POST 一律回 410。此入口**沒有欄位白名單**（任何表真實欄位照單全收，含稽核欄），是 2026-08-05 髒提案事故的源頭。flag=old 回退時才放行，且 `extractFormData()` 已加剔除稽核欄的保險帶 |
 
@@ -58,6 +59,7 @@ handler 的 `changes` 是**使用者意圖**——白名單刻意不含稽核欄
 ## 4. 審核流程（`/operations`）
 
 - **核准**（`POST /operations/{operation}/approve`）：
+  - 只放行 `__review_status='pending'` 的提案（已審結／撤回者 409）；退回同。
   - 套用方式依資源分派（`OperationsProposalController::applyProposal()`），三條路徑
     （handler 重放／legacy 委派／通用行覆寫）的逐資源矩陣見 PERSON_PROPOSAL_PATHS.md §2–§3。
     多數人物資源已走 **handler 重放**：把提案還原成一次 direct mutation
@@ -76,13 +78,14 @@ handler 的 `changes` 是**使用者意圖**——白名單刻意不含稽核欄
   `superseded_by`、新提案記 `resubmit_of`；handler 拒絕則整筆回滾、舊提案維持待審。
   改版動機：舊流程復用 codes 通用編輯頁，按 Schema **全欄**渲染並整包回寫 `resource_data`，
   會把稽核欄等系統欄以 null 鍵灌進 payload（op 351725 事故——核准重放撞白名單 422 的實際成因）。
-- **撤回**（提案者）：標記 `cancelled`、記錄撤回者／時間／原因。
+- **撤回**（提案者）：標記 `cancelled`、記錄撤回者／時間／原因。codes 與人物提案走 `codes.proposals.cancel`（以表名為路徑段）；實體聚合提案的 `resource` 是聚合名，走與資源無關的 `DELETE /operations/{operation}/cancel`（`operations.proposals.cancel`），規則相同（登入且啟用、提案人本人、pending／rejected）。
 - 提案列表：`/operations?proposals_only=1`，可按狀態篩選；行內按鈕依身分顯示。
 
 ## 5. 已知限制
 
 - 「修改提案」的 codes 通用編輯頁（`codes.proposals.*`）仍服務：codes 代碼表提案、`BIOG_MAIN`
-  提案與 delete 提案（無對應編輯器）。**人物 12 個子資源已改走各自的 edit-v2 編輯器**（見 §4）。
+  提案與 delete 提案（無對應編輯器）。**人物 12 個子資源已改走各自的 edit-v2 編輯器**（見 §4）；
+  **實體聚合提案改走各實體的新增／編輯頁**（`?proposal={id}` 預填聚合意圖，實體級刪除提案不出「修改提案」）。
 - 修改提案的預填只涵蓋主表使用者欄位：任官／財產／事件的**地址副表意圖**（存於
   `__proposal_aux`）暫不預填，需於編輯器中重新指定；重發後 handler 會照常寫入 aux。
 - kinship／associations 的核准仍走 legacy 委派（路徑 B），其鏡像語義收斂與「比較」支援
@@ -94,6 +97,7 @@ handler 的 `changes` 是**使用者意圖**——白名單刻意不含稽核欄
 
 - 審核：`POST /operations/{operation}/approve`（`operations.proposals.approve`）／
   `POST /operations/{operation}/reject`（`operations.proposals.reject`）
+- 撤回（資源無關，實體聚合提案用）：`DELETE /operations/{operation}/cancel`（`operations.proposals.cancel`）
 - 人物提案（現役）：`POST /api/v2/mutate`（`mode=proposal`）
 - 人物提案（legacy，flag=new 時 410）：`POST /basicinformation/{personid}/{resource}/proposal`／
   `POST /basicinformation/{personid}/{resource}/{id}/proposal`

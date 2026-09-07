@@ -4,6 +4,17 @@
 
 ## 2026-09
 
+### 實體級提案收尾：三個聚合的提案接通表單頁、operations 列表與修改／撤回流程
+
+- **背景**：office／social-institution／text-entity 的提案管線（`mode=proposal` 存聚合意圖、核准以 direct 重放同一 handler，架構文件 §4.5）後端早已落地，但周邊沒接：只有官職表單有「提交建議」按鈕，機構與文獻的表單頁用 `canWriteDirectly()` 擋門、可提案者根本進不了頁；核准端沒把落庫的 operation id 記回提案，「比較」對實體提案永遠灰掉；`/app/operations` 對這類提案列的「修改提案」與「撤回」都指向 `codes.proposals.*`——那條路徑以**表名**為路徑段，`guardTable('office')` 必 404，「資源」則因聚合名不是 codes 表而永遠沒有連結。
+- **核准端**：`approveEntityAggregateProposal()` 把 handler 回報的 `result.operation_id` 傳進 `updateProposalStatus()` 記成 `__applied_operation_id`，列表據此把 audit 認領回提案列。順帶補上 `ensureCanReview()` 的狀態守衛：只有 `pending` 能核准／退回（已核准的實體 create 提案再核准一次會配新 id 建出重複實體），已審結或撤回回 409。
+- **註冊表同源**：`config/entity_aggregates.php` 每個實體加 `create_route`；`EntityAggregateRegistry` 加 `entityForResource()`（依聚合名查實體）、`formUrl()`（新增／編輯頁 URL＋query，路由不存在或參數名不符回 null 而非 500）、`userCanReachForm()`（依 `form_capability`）。三個實體 controller 的表單門檻改為委派到 `userCanReachForm()`——**守衛與列表連結解析同一份推導**，config 翻一處兩邊同步（`OperationsIndexLinksTest` 翻 config 驗證連結與 403 一起翻）。三個實體的 `form_capability` 一律 `propose`。
+- **operations 列表**：`__entity_aggregate` 提案列另有三條分支——「資源」依 `__entity_pk` 指實體編輯頁（create 核准後改用記回的識別鍵、delete 核准後不出連結、打不開表單頁的身分不出連結）；「修改提案」指 `create_route`／`edit_route` 帶 `?proposal={id}`，實體級刪除提案沒有可修改內容則不出按鈕（前端 `edit_proposal` 可為 null）；「撤回」走新增的與資源無關端點 `DELETE operations/{operation}/cancel`（`OperationsProposalController::cancel()`，規則同 `CodesController::ensureProposalEditable()`）。
+- **表單頁**：新增 `Concerns\EntityFormController` trait（三個 controller 共用）：`ensureCanReachForm()`、`can_edit`／`can_propose` 旗標、`?proposal={id}` 預填（overlay＝提案的 `changes`，鍵名就是表單送出的鍵名；提案必須與本頁對得上——同實體、同操作、同識別鍵，否則 404；身分與狀態規則同人物子資源的 `proposalResubmitProps()`）。picker 標籤改為對「表單實際會顯示的值」查（`initialLabels(array $values)`，聚合值 merge overlay），修改提案模式下顯示的是提案值的標籤。
+- **前端**：抽出 `components/EntityBrowser/entityForm.tsx`——三個表單原本各自一份幾乎相同的 fetch／錯誤映射，收斂成 `useEntityFormSubmit()`（direct／proposal／resubmit、422 與 409 的 `errors` 統一映射、修改說明 `meta.comment`）＋ `EntityFormNotices`／`EntityFormFooter`（提交建議、有直接寫入權者的二次確認對話框、修改提案模式下隱藏直接儲存與刪除）。表單欄位本身不抽象。新增提案重發時信封標明 `operation=create`（resubmit 端點 create／update 共用，缺 operation 時當 update）。i18n 六個檔補齊提案相關字串。
+- **測試**：`ApiV2MutateSocialInstituteEntityTest`／`ApiV2MutateTextEntityTest` 各補提案案例（create 存意圖不落庫＋核准三表／版本列落庫＋`__applied_operation_id`、update／delete 只在核准時套用、提交端護欄、表單頁預填與標籤照提案值）；`ApiV2MutateOfficeImportTest` 補新增頁預填＋resubmit 端到端、編輯頁預填的對應與身分規則（404／403／409）、撤回端點；`OperationsIndexLinksTest` 補實體提案五條連結案例（連結真的打開來驗）並重寫 form_capability 案例；`EntityAggregateRegistryTest` 補 create_route 守衛、依 resource 查詢、`formUrl()` 與 `userCanReachForm()`。
+- **已知限制**：實體列表頁的「新增」「編輯」按鈕仍只對可直接寫入者顯示（操作欄同時掛 direct 刪除），可提案者從 operations 列表或直接開表單頁 URL 進入。
+
 ### 修 /app/operations 的「查閱」連結指向已封寫的代碼表，點進去必吃唯讀警告
 
 - **症狀**：`https://input.cbdb.fas.harvard.edu/app/operations` 上，凡是 `OFFICE_CODES`、`SOCIAL_INSTITUTION_CODES`／`NAME_CODES`／`ADDR` 這幾張表的操作紀錄，按「查閱」都會被導到 `/app/codes/{表}/{id}/edit`，然後吃到「該代碼表為只讀，禁止編輯。」再被彈回列表頁。使用者從操作紀錄根本走不到那筆資料。

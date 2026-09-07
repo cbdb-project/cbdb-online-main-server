@@ -1214,7 +1214,7 @@ Authorization: Bearer <token>
 
 與 `/api/v2/mutate`／`/api/v2/create` 相同的信封（`resource`、`operation`、`person_id`、`target.pk`、`changes`、`meta`），但 **`mode` 一律被強制為 `proposal`**（送 `direct` 也不會生效）。
 
-`target.pk`、`changes`、`person_id` **三者都必填**，缺一即 422——`changes` 在此是**無條件必填**，即使重發的是刪除提案也要帶（可為空物件）。
+`target.pk`、`changes`、`person_id` **三者都必填**，缺一即 422——`changes` 在此是**無條件必填**，即使重發的是刪除提案也要帶（可為空物件）。`operation` 缺省為 `update`：重發**新增**提案（含 13.4 聚合的新增提案）必須顯式帶 `"operation": "create"`，否則會被當成 update、以「target.pk 缺主鍵」422。
 
 ### 權限與狀態限制
 
@@ -1240,6 +1240,12 @@ Authorization: Bearer <token>
 - 新提案的 `comment` 取**本次** `meta.comment`，不繼承舊提案的說明。
 
 成功時的回應就是重發那筆提案的回應（形狀同第六／七章的 proposal 回應）。回鏈只在 handler 有回傳 `result.operation_id` 時建立。
+
+### `DELETE /operations/{operation}/cancel`（站內撤回，資源無關）
+
+提案人撤回自己的提案。與 resubmit 同樣**不對外部 Bearer 客戶端開放**（web session＋CSRF），記錄於此是為了說明語義：codes／人物提案的站內撤回走 `codes/{table_name}/proposals/{operation}`（以表名為路徑段），13.4 聚合提案的 `resource` 是聚合名、該路徑對它必 404，故站內對聚合提案改走此端點。規則相同：登入且帳號啟用、提案人本人、提案仍為 `pending`／`rejected`；成功後 `__review_status` 轉 `cancelled`，`__proposal_meta` 記 `cancelled_at`／`cancelled_by`／`cancelled_by_id`／`cancel_reason`（請求的 `reason`，可省略）。
+
+另外，**審核端點（`/operations/{operation}/approve`／`reject`）只接受 `__review_status` 為 `pending` 的提案**，已核准／退回／撤回者回 409——已核准的提案再核准一次會把同一份變更再套用一遍。
 
 ---
 
@@ -1460,8 +1466,9 @@ Authorization: Bearer <token>
   - 社會機構：create 帶 `name_created`，update 帶 `name_changed`／`addr_added`／`addr_removed`，delete 帶 `addr_deleted`。
   - 文獻：create 帶 `instances_added`／`variant_replacements`／`row`，update 帶 `instances_added`／`instances_removed`／`instances_updated`／`row`，delete 帶 `instances_deleted`。
 - 社會機構的 `create` 回應 `result.pk` 有**兩個鍵**（`c_inst_code` + `c_inst_name_code`），與表格所列的單一主鍵欄不同——請以回應為準。
-- `proposal` 模式存的是「聚合意圖」（`__entity_aggregate`、`__entity_resource`、`__entity_operation`、`__entity_pk` 與原始 `changes`），核准時以 `direct` 重放；因此 create 提案的 `result.pk` 為 `null`（主鍵尚未配發）。
-- 聚合提案的 `operations.resource` 存的是**聚合名**（`office`／`social-institution`），不是資料表名——用 `GET /api/v2/operations` 追蹤時要以此篩選。
+- `proposal` 模式存的是「聚合意圖」（`__entity_aggregate`、`__entity_resource`、`__entity_operation`、`__entity_pk` 與原始 `changes`），核准時以 `direct` 重放；因此 create 提案的 `result.pk` 為 `null`（主鍵尚未配發）。核准後提案的 `resource_data` 另記 `__applied_operation_id`（實際落庫的 direct operation id）與配發的識別鍵（create），`__review_status` 轉 `approved`。
+- 聚合提案的 `operations.resource` 存的是**聚合名**（`office`／`social-institution`／`text-entity`），不是資料表名——用 `GET /api/v2/operations` 追蹤時要以此篩選。
+- 聚合提案可用第十一章的 resubmit 端點修改（站內），**新增提案重發時信封要帶 `operation: "create"`**（該端點缺 `operation` 時當 update，會回 422 `c_office_id: required_integer` 之類的「target.pk 缺識別鍵」）。
 - `delete` 的引用護欄在**提案提交當下**就會擋（回 409，不會留下提案），不是等到核准才發現。
 - 稽核足跡：`direct` 的聚合寫入除主表外，**下層資料列的增刪會逐列各寫一筆 `operations` 與 `audit_log`**（官職的每一筆類型關聯、社會機構的每一筆地址增刪都各算一筆，筆數隨關聯列數增加），但回應只回主表那一筆的 `operation_id`。少數欄位是整批更新（例如社會機構改名時同步 `SOCIAL_INSTITUTION_ADDR` 的名碼），那類更新不逐列記。
 - 社會機構改名時，若目標名稱已存在於名稱代碼表，會**複用既有名碼**而不新增；舊名碼不會回收。

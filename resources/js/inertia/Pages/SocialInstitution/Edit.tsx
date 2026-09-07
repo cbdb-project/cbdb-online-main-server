@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { usePage, router } from '@inertiajs/react';
 import DashboardLayout from '../../Layouts/DashboardLayout';
+import { Overlay, ResubmitInfo } from '../../components/EntityBrowser/entityForm';
 import { getCsrfToken } from '../../components/PersonBrowser/shared/csrf';
 import { Button } from '../../components/ui/Button';
 import { useTranslation } from '../../hooks/useTranslation';
@@ -17,11 +18,17 @@ interface Props {
     initial_labels: InstitutionInitialLabels;
     type_options: TypeOption[];
     urls: InstitutionUrls;
+    can_edit?: boolean;
+    can_propose?: boolean;
+    /** 修改提案模式（?proposal={id}）：提案內容與 resubmit 端點；否則為空物件。 */
+    proposal_overlay: Overlay;
+    resubmit: ResubmitInfo;
     [key: string]: unknown;
 }
 
 export default function SocialInstitutionEdit() {
-    const { institution, reference_count, initial_labels, type_options, urls } = usePage<Props>().props;
+    const { institution, reference_count, initial_labels, type_options, urls, can_edit = true, can_propose = false, proposal_overlay, resubmit } = usePage<Props>().props;
+    const isResubmit = !!resubmit?.resubmit_proposal_id;
     const t = useTranslation('social_institution');
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState<string | null>(null);
@@ -70,12 +77,18 @@ export default function SocialInstitutionEdit() {
                     typeOptions={type_options}
                     referenceCount={reference_count}
                     urls={urls}
+                    canEdit={can_edit}
+                    canPropose={can_propose}
+                    overlay={proposal_overlay}
+                    resubmit={resubmit}
                 />
-                <div className="border-t border-border pt-3">
-                    <Button type="button" variant="destructive" disabled={busy} onClick={del}>
-                        {t('btn_delete')}
-                    </Button>
-                </div>
+                {can_edit && !isResubmit && (
+                    <div className="border-t border-border pt-3">
+                        <Button type="button" variant="destructive" disabled={busy} onClick={del}>
+                            {t('btn_delete')}
+                        </Button>
+                    </div>
+                )}
             </div>
         </DashboardLayout>
     );

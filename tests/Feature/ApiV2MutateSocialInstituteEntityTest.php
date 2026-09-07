@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Operation;
 use App\Models\User;
 use App\Services\CharVariantMapService;
 use App\Support\VariantReplaceScope;
@@ -189,13 +190,13 @@ class ApiV2MutateSocialInstituteEntityTest extends TestCase {
         parent::tearDown();
     }
 
-    protected function makeUser(string $email = 'si@example.com'): User {
+    protected function makeUser(string $email = 'si@example.com', int $role = User::ROLE_REGULAR): User {
         return User::forceCreate([
             'name' => 'SI Tester',
             'email' => $email,
             'confirmation_token' => 'tok',
             'is_active' => User::STATUS_ACTIVE,
-            'is_admin' => User::ROLE_REGULAR,
+            'is_admin' => $role,
         ]);
     }
 
@@ -213,6 +214,127 @@ class ApiV2MutateSocialInstituteEntityTest extends TestCase {
                 'addresses' => [['addr_id' => 101]],
             ], $changes),
         ];
+    }
+
+    // ── 實體級提案（§4.5）：mode=proposal 存聚合意圖、核准時以 direct 重放同一 handler ──
+
+    /** create 提案：眾包帳號 direct 403、proposal 200；三張表都不動；核准後三張表一次落庫。 */
+    #[Test]
+    public function testCreateProposalStoresIntentAndApprovalWritesAllThreeTables(): void {
+        $this->actingAs($this->makeUser('si-p-create@example.com', User::ROLE_CROWDSOURCING));
+        $body = [
+            'resource' => 'social-institution', 'person_id' => 0, 'target' => ['pk' => []],
+            'changes' => ['name' => '新書院', 'type_code' => 2, 'dynasty_code' => 19, 'addr_id' => 102, 'source_id' => 8000],
+        ];
+
+        $this->postJson('/api/v2/create', $body)->assertStatus(403);
+        $res = $this->postJson('/api/v2/create', $body + ['mode' => 'proposal'])
+            ->assertOk()
+            ->assertJson(['ok' => true, 'resource' => 'social-institution', 'mode' => 'proposal', 'operation' => 'create', 'result' => ['pk' => null]]);
+
+        $this->assertSame(0, DB::table('SOCIAL_INSTITUTION_NAME_CODES')->where('c_inst_name_hz', '新書院')->count());
+        $this->assertSame(1, DB::table('SOCIAL_INSTITUTION_CODES')->count());
+        $operation = Operation::findOrFail($res->json('result.operation_id'));
+        $stored = json_decode($operation->resource_data, true);
+        $this->assertTrue($stored['__entity_aggregate']);
+        $this->assertSame('social-institution', $stored['__entity_resource']);
+        $this->assertSame(['name' => '新書院', 'type_code' => 2, 'dynasty_code' => 19, 'addr_id' => 102, 'source_id' => 8000], $stored['changes']);
+
+        $this->actingAs($this->makeUser('si-p-reviewer@example.com'));
+        $this->post(route('operations.proposals.approve', $operation))->assertRedirect();
+
+        $nameCode = (int) DB::table('SOCIAL_INSTITUTION_NAME_CODES')->where('c_inst_name_hz', '新書院')->value('c_inst_name_code');
+        $this->assertGreaterThan(0, $nameCode);
+        $this->assertDatabaseHas('SOCIAL_INSTITUTION_CODES', ['c_inst_name_code' => $nameCode, 'c_inst_type_code' => 2, 'c_inst_begin_dy' => 19, 'c_source' => 8000]);
+        $instCode = (int) DB::table('SOCIAL_INSTITUTION_CODES')->where('c_inst_name_code', $nameCode)->value('c_inst_code');
+        $this->assertDatabaseHas('SOCIAL_INSTITUTION_ADDR', ['c_inst_code' => $instCode, 'c_inst_addr_id' => 102]);
+
+        $payload = json_decode($operation->fresh()->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status']);
+        $this->assertSame($instCode, (int) $payload['c_inst_code']);
+        $appliedId = DB::table('operations')->where('resource', 'SOCIAL_INSTITUTION_CODES')->where('op_type', Operation::TYPE_CREATE)->value('id');
+        $this->assertSame((string) $appliedId, $payload['__applied_operation_id'], '核准落庫的 direct operation id 要記回提案，「比較」才認領得到 audit');
+    }
+
+    /** update 提案：核准前資料不動，核准後與 direct update 同一份對賬邏輯（地址增列）。 */
+    #[Test]
+    public function testUpdateProposalIsAppliedOnlyOnApproval(): void {
+        $this->actingAs($this->makeUser('si-p-upd@example.com', User::ROLE_CROWDSOURCING));
+        $res = $this->postJson('/api/v2/mutate', $this->updatePayload([
+            'notes' => '提案備註', 'addresses' => [['addr_id' => 101], ['addr_id' => 102]],
+        ]) + ['mode' => 'proposal'])->assertOk()->assertJson(['mode' => 'proposal', 'operation' => 'update', 'result' => ['pk' => ['c_inst_code' => 10]]]);
+
+        $this->assertDatabaseMissing('SOCIAL_INSTITUTION_CODES', ['c_inst_code' => 10, 'c_notes' => '提案備註']);
+        $this->assertSame(1, DB::table('SOCIAL_INSTITUTION_ADDR')->where('c_inst_code', 10)->count());
+
+        $this->actingAs($this->makeUser('si-p-upd-reviewer@example.com'));
+        $this->post(route('operations.proposals.approve', Operation::findOrFail($res->json('result.operation_id'))))->assertRedirect();
+
+        $this->assertDatabaseHas('SOCIAL_INSTITUTION_CODES', ['c_inst_code' => 10, 'c_inst_name_code' => 5, 'c_notes' => '提案備註']);
+        $this->assertSame(2, DB::table('SOCIAL_INSTITUTION_ADDR')->where('c_inst_code', 10)->count());
+    }
+
+    /** delete 提案：核准後 CODES＋ADDR 隨聚合刪除、名碼不回收（與 direct delete 同語義）。 */
+    #[Test]
+    public function testDeleteProposalIsAppliedOnlyOnApproval(): void {
+        $this->actingAs($this->makeUser('si-p-del@example.com', User::ROLE_CROWDSOURCING));
+        $res = $this->postJson('/api/v2/delete', [
+            'resource' => 'social-institution', 'mode' => 'proposal', 'person_id' => 0,
+            'target' => ['pk' => ['c_inst_code' => 10]],
+        ])->assertOk()->assertJson(['mode' => 'proposal', 'operation' => 'delete']);
+        $this->assertDatabaseHas('SOCIAL_INSTITUTION_CODES', ['c_inst_code' => 10]);
+
+        $this->actingAs($this->makeUser('si-p-del-reviewer@example.com'));
+        $this->post(route('operations.proposals.approve', Operation::findOrFail($res->json('result.operation_id'))))->assertRedirect();
+
+        $this->assertSame(0, DB::table('SOCIAL_INSTITUTION_CODES')->where('c_inst_code', 10)->count());
+        $this->assertSame(0, DB::table('SOCIAL_INSTITUTION_ADDR')->where('c_inst_code', 10)->count());
+        $this->assertDatabaseHas('SOCIAL_INSTITUTION_NAME_CODES', ['c_inst_name_code' => 5]);
+    }
+
+    /** 提案端與 direct 同一道護欄：被引用時改名 409，且不留下提案（不是等到核准才發現）。 */
+    #[Test]
+    public function testProposalIsGuardedAtSubmissionLikeDirect(): void {
+        DB::table('BIOG_INST_DATA')->insert(['c_personid' => 1, 'c_inst_code' => 10, 'c_inst_name_code' => 5]);
+        $this->actingAs($this->makeUser('si-p-guard@example.com', User::ROLE_CROWDSOURCING));
+
+        $this->postJson('/api/v2/mutate', $this->updatePayload(['name' => '改名書院']) + ['mode' => 'proposal'])
+            ->assertStatus(409)
+            ->assertJsonPath('errors.name.0', 'rename_blocked_while_referenced');
+
+        $this->assertSame(0, DB::table('operations')->where('op_type', Operation::TYPE_PROPOSAL_UPDATE)->count());
+    }
+
+    /**
+     * 修改提案預填：新增頁以 ?proposal 拿到提案的 changes（形狀與表單送出一致，起始朝代叫
+     * dynasty_code、地址叫 addr_id），picker 標籤照**提案值**查，不是照聚合現值。
+     */
+    #[Test]
+    public function testCreatePagePrefillsTheProposalIntentAndLooksUpLabelsForIt(): void {
+        $this->actingAs($this->makeUser('si-p-prefill@example.com', User::ROLE_CROWDSOURCING));
+        $res = $this->postJson('/api/v2/create', [
+            'resource' => 'social-institution', 'mode' => 'proposal', 'person_id' => 0, 'target' => ['pk' => []],
+            'changes' => ['name' => '新書院', 'type_code' => 2, 'dynasty_code' => 19, 'addr_id' => 102, 'source_id' => 8000],
+        ])->assertOk();
+        $proposalId = (int) $res->json('result.operation_id');
+
+        $this->get("/app/social-institution/create?proposal={$proposalId}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('SocialInstitution/Create')
+                ->where('can_propose', true)
+                ->where('can_edit', false)
+                ->where('proposal_overlay.name', '新書院')
+                ->where('proposal_overlay.dynasty_code', 19)
+                ->where('proposal_overlay.addr_id', 102)
+                ->where('initial_labels.dynasties.19', '明')
+                ->where('initial_labels.addresses.102', '102 蘇州')
+                ->where('resubmit.resubmit_endpoint', "/api/v2/proposals/{$proposalId}/resubmit"));
+
+        // 沒帶 ?proposal：一般新增頁，眾包帳號（可提案）也進得來，旗標如實。
+        $this->get('/app/social-institution/create')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('proposal_overlay', [])->where('resubmit', [])->where('can_propose', true));
     }
 
     // ── update ──────────────────────────────

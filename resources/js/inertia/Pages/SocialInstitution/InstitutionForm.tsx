@@ -1,7 +1,14 @@
 import React, { useState } from 'react';
 import { router } from '@inertiajs/react';
 import CodeAutocomplete from '../../components/PersonBrowser/shared/CodeAutocomplete';
-import { getCsrfToken } from '../../components/PersonBrowser/shared/csrf';
+import {
+    EntityFormFooter,
+    EntityFormNotices,
+    Overlay,
+    ResubmitInfo,
+    overlayReader,
+    useEntityFormSubmit,
+} from '../../components/EntityBrowser/entityForm';
 import { Button } from '../../components/ui/Button';
 import { FormField } from '../../components/ui/FormField';
 import { useTranslation } from '../../hooks/useTranslation';
@@ -74,6 +81,13 @@ interface Props {
     /** edit 模式：被人物資料引用的筆數；>0 時後端會擋改名，前端預先鎖名稱欄。 */
     referenceCount?: number;
     urls: InstitutionUrls;
+    /** 可直接寫入（active 專家）；false 時只能提交建議。 */
+    canEdit?: boolean;
+    /** 可提交建議（active 使用者，含眾包）。 */
+    canPropose?: boolean;
+    /** 修改提案模式：提案的 changes（覆蓋 initial）與 resubmit 端點。 */
+    overlay?: Overlay;
+    resubmit?: ResubmitInfo;
 }
 
 const inputCls =
@@ -86,21 +100,23 @@ const smallInputCls =
  * 來源，成功後導向編輯頁補其餘欄位）；edit 模式為全欄位超集（SOCIAL_INSTITUTION_CODES 全部
  * 欄位＋多地址列對賬），寫入走 mutation API（resource=social-institution）。
  */
-export default function InstitutionForm({ mode, instCode, initial, initialLabels, typeOptions, referenceCount = 0, urls }: Props) {
+export default function InstitutionForm({ mode, instCode, initial, initialLabels, typeOptions, referenceCount = 0, urls, canEdit = true, canPropose = false, overlay, resubmit }: Props) {
     const t = useTranslation('social_institution');
+    // 修改提案模式：提案的 changes 鍵名就是本表單送出的鍵名（起始朝代在 changes 叫 dynasty_code），逐欄覆蓋初始值。
+    const ov = overlayReader(overlay);
 
-    const [name, setName] = useState(initial?.name ?? '');
-    const [typeCode, setTypeCode] = useState(initial?.type_code != null ? String(initial.type_code) : '');
-    const [beginDy, setBeginDy] = useState(initial?.begin_dy != null ? String(initial.begin_dy) : '');
-    const [floruitDy, setFloruitDy] = useState(initial?.floruit_dy != null ? String(initial.floruit_dy) : '');
-    const [endDy, setEndDy] = useState(initial?.end_dy != null ? String(initial.end_dy) : '');
-    const [source, setSource] = useState(initial?.source_id != null ? String(initial.source_id) : '');
+    const [name, setName] = useState(ov.str('name', initial?.name));
+    const [typeCode, setTypeCode] = useState(ov.num('type_code', initial?.type_code));
+    const [beginDy, setBeginDy] = useState(ov.num('dynasty_code', initial?.begin_dy));
+    const [floruitDy, setFloruitDy] = useState(ov.num('floruit_dy', initial?.floruit_dy));
+    const [endDy, setEndDy] = useState(ov.num('end_dy', initial?.end_dy));
+    const [source, setSource] = useState(ov.num('source_id', initial?.source_id));
     const [sourceLabel, setSourceLabel] = useState<string | null>(initialLabels.source);
-    const [pages, setPages] = useState(initial?.pages ?? '');
-    const [notes, setNotes] = useState(initial?.notes ?? '');
+    const [pages, setPages] = useState(ov.str('pages', initial?.pages));
+    const [notes, setNotes] = useState(ov.str('notes', initial?.notes));
     // 固定次序呼叫 useState 的小工具（僅頂層依序使用，符合 hooks 規則）。
     const numField = (key: keyof InstitutionAggregate) =>
-        useState(initial?.[key] != null ? String(initial[key]) : '');
+        useState(ov.num(key, initial?.[key] as number | null | undefined));
     const [beginYear, setBeginYear] = numField('begin_year');
     const [byNhCode, setByNhCode] = numField('by_nianhao_code');
     const [byNhYear, setByNhYear] = numField('by_nianhao_year');
@@ -113,13 +129,9 @@ export default function InstitutionForm({ mode, instCode, initial, initialLabels
     const [lastKnown, setLastKnown] = numField('last_known_year');
 
     // create 模式：單一地址（create handler 語義）；edit 模式：多地址列對賬。
-    const [createAddr, setCreateAddr] = useState('');
-    const [addresses, setAddresses] = useState<AddressRow[]>(initial?.addresses ?? []);
+    const [createAddr, setCreateAddr] = useState(ov.num('addr_id', null));
+    const [addresses, setAddresses] = useState<AddressRow[]>(ov.list<AddressRow>('addresses', initial?.addresses ?? []));
     const [addrLabels, setAddrLabels] = useState<Record<string, string>>(initialLabels.addresses);
-
-    const [busy, setBusy] = useState(false);
-    const [errors, setErrors] = useState<Record<string, string>>({});
-    const [serverError, setServerError] = useState<string | null>(null);
 
     const renameLocked = mode === 'edit' && referenceCount > 0;
 
@@ -142,104 +154,75 @@ export default function InstitutionForm({ mode, instCode, initial, initialLabels
         return code;
     };
 
-    const submit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setBusy(true);
-        setErrors({});
-        setServerError(null);
-
-        const nn = (s: string) => (s.trim() === '' ? null : s);
-        const ni = (s: string) => (s.trim() === '' ? null : Number(s));
-
-        let body: Record<string, unknown>;
-        if (mode === 'create') {
-            body = {
-                resource: 'social-institution',
-                person_id: 0,
-                target: { pk: [] },
-                changes: {
-                    name,
-                    type_code: typeCode ? Number(typeCode) : null,
-                    dynasty_code: beginDy ? Number(beginDy) : null,
-                    addr_id: createAddr ? Number(createAddr) : null,
-                    source_id: source ? Number(source) : null,
-                },
-            };
-        } else {
-            body = {
-                resource: 'social-institution',
-                operation: 'update',
-                person_id: 0,
-                target: { pk: { c_inst_code: instCode } },
-                changes: {
-                    name,
-                    type_code: typeCode ? Number(typeCode) : null,
-                    dynasty_code: beginDy ? Number(beginDy) : null,
-                    floruit_dy: ni(floruitDy),
-                    end_dy: ni(endDy),
-                    begin_year: ni(beginYear),
-                    by_nianhao_code: ni(byNhCode),
-                    by_nianhao_year: ni(byNhYear),
-                    by_year_range: ni(byRange),
-                    first_known_year: ni(firstKnown),
-                    end_year: ni(endYear),
-                    ey_nianhao_code: ni(eyNhCode),
-                    ey_nianhao_year: ni(eyNhYear),
-                    ey_year_range: ni(eyRange),
-                    last_known_year: ni(lastKnown),
-                    source_id: source ? Number(source) : null,
-                    pages: nn(pages),
-                    notes: nn(notes),
-                    addresses: addresses.map((r) => ({
-                        addr_id: r.addr_id,
-                        addr_type_code: r.addr_type_code,
-                        begin_year: r.begin_year,
-                        end_year: r.end_year,
-                        xcoord: r.xcoord,
-                        ycoord: r.ycoord,
-                        source_id: r.source_id,
-                        pages: r.pages,
-                        notes: r.notes,
-                    })),
-                },
-            };
-        }
-
-        try {
-            const res = await fetch(mode === 'create' ? urls.api_create : urls.api_mutate, {
-                method: 'POST',
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': getCsrfToken(),
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-                credentials: 'same-origin',
-                body: JSON.stringify(body),
-            });
-            const json = await res.json().catch(() => ({}));
-            if (!res.ok) {
-                if (res.status === 422 && json?.errors && typeof json.errors === 'object') {
-                    const mapped: Record<string, string> = {};
-                    for (const [field, codes] of Object.entries(json.errors)) {
-                        mapped[field.startsWith('addresses') ? 'addresses' : field] = mapError(field, Array.isArray(codes) ? codes : []);
-                    }
-                    setErrors(mapped);
-                } else if (res.status === 409 && json?.errors?.name) {
-                    setErrors({ name: t('err_rename_blocked') });
-                } else {
-                    setServerError(json?.message ?? t('save_failed'));
+    const nn = (s: string) => (s.trim() === '' ? null : s);
+    const ni = (s: string) => (s.trim() === '' ? null : Number(s));
+    const form = useEntityFormSubmit({
+        mode,
+        createEndpoint: urls.api_create,
+        mutateEndpoint: urls.api_mutate,
+        canEdit,
+        canPropose,
+        resubmit,
+        buildBody: () =>
+            mode === 'create'
+                ? {
+                    resource: 'social-institution',
+                    person_id: 0,
+                    target: { pk: [] },
+                    changes: {
+                        name,
+                        type_code: typeCode ? Number(typeCode) : null,
+                        dynasty_code: beginDy ? Number(beginDy) : null,
+                        addr_id: createAddr ? Number(createAddr) : null,
+                        source_id: source ? Number(source) : null,
+                    },
                 }
-                setBusy(false);
-                return;
-            }
+                : {
+                    resource: 'social-institution',
+                    operation: 'update',
+                    person_id: 0,
+                    target: { pk: { c_inst_code: instCode } },
+                    changes: {
+                        name,
+                        type_code: typeCode ? Number(typeCode) : null,
+                        dynasty_code: beginDy ? Number(beginDy) : null,
+                        floruit_dy: ni(floruitDy),
+                        end_dy: ni(endDy),
+                        begin_year: ni(beginYear),
+                        by_nianhao_code: ni(byNhCode),
+                        by_nianhao_year: ni(byNhYear),
+                        by_year_range: ni(byRange),
+                        first_known_year: ni(firstKnown),
+                        end_year: ni(endYear),
+                        ey_nianhao_code: ni(eyNhCode),
+                        ey_nianhao_year: ni(eyNhYear),
+                        ey_year_range: ni(eyRange),
+                        last_known_year: ni(lastKnown),
+                        source_id: source ? Number(source) : null,
+                        pages: nn(pages),
+                        notes: nn(notes),
+                        addresses: addresses.map((r) => ({
+                            addr_id: r.addr_id,
+                            addr_type_code: r.addr_type_code,
+                            begin_year: r.begin_year,
+                            end_year: r.end_year,
+                            xcoord: r.xcoord,
+                            ycoord: r.ycoord,
+                            source_id: r.source_id,
+                            pages: r.pages,
+                            notes: r.notes,
+                        })),
+                    },
+                },
+        mapError,
+        errorKey: (field) => (field.startsWith('addresses') ? 'addresses' : field),
+        onSaved: (json) => {
             const newId = json?.result?.pk?.c_inst_code ?? instCode;
             router.visit(urls.edit_template.replace('__ID__', String(newId)));
-        } catch (err) {
-            setServerError(String(err));
-            setBusy(false);
-        }
-    };
+        },
+        fallbackError: t('save_failed'),
+    });
+    const { errors } = form;
 
     const numInput = (label: string, value: string, set: React.Dispatch<React.SetStateAction<string>>, id: string) => (
         <FormField label={label} htmlFor={id}>
@@ -248,10 +231,8 @@ export default function InstitutionForm({ mode, instCode, initial, initialLabels
     );
 
     return (
-        <form onSubmit={submit} className="space-y-4">
-            {serverError && (
-                <div className="rounded border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-800">{serverError}</div>
-            )}
+        <form onSubmit={form.submit} className="space-y-4">
+            <EntityFormNotices form={form} indexUrl={urls.index} t={t} />
 
             <FormField label={t('field_name')} htmlFor="inst-name" error={errors.name}>
                 <input
@@ -285,7 +266,7 @@ export default function InstitutionForm({ mode, instCode, initial, initialLabels
                     idKey="c_dy"
                     labelKeys={['c_dynasty_chn', 'c_dynasty']}
                     value={beginDy}
-                    initialLabel={initial?.begin_dy != null ? (initialLabels.dynasties[String(initial.begin_dy)] ?? null) : null}
+                    initialLabel={beginDy ? (initialLabels.dynasties[beginDy] ?? null) : null}
                     placeholder={t('dynasty_placeholder')}
                     onChange={(v) => setBeginDy(v)}
                 />
@@ -313,6 +294,7 @@ export default function InstitutionForm({ mode, instCode, initial, initialLabels
                         mode="search"
                         endpoint={urls.search_addr}
                         value={createAddr}
+                        initialLabel={createAddr ? (addrLabels[createAddr] ?? null) : null}
                         placeholder={t('addr_placeholder')}
                         onChange={(v) => setCreateAddr(v)}
                     />
@@ -329,7 +311,7 @@ export default function InstitutionForm({ mode, instCode, initial, initialLabels
                                 idKey="c_dy"
                                 labelKeys={['c_dynasty_chn', 'c_dynasty']}
                                 value={floruitDy}
-                                initialLabel={initial?.floruit_dy != null ? (initialLabels.dynasties[String(initial.floruit_dy)] ?? null) : null}
+                                initialLabel={floruitDy ? (initialLabels.dynasties[floruitDy] ?? null) : null}
                                 placeholder={t('dynasty_placeholder')}
                                 onChange={(v) => setFloruitDy(v)}
                             />
@@ -342,7 +324,7 @@ export default function InstitutionForm({ mode, instCode, initial, initialLabels
                                 idKey="c_dy"
                                 labelKeys={['c_dynasty_chn', 'c_dynasty']}
                                 value={endDy}
-                                initialLabel={initial?.end_dy != null ? (initialLabels.dynasties[String(initial.end_dy)] ?? null) : null}
+                                initialLabel={endDy ? (initialLabels.dynasties[endDy] ?? null) : null}
                                 placeholder={t('dynasty_placeholder')}
                                 onChange={(v) => setEndDy(v)}
                             />
@@ -436,14 +418,7 @@ export default function InstitutionForm({ mode, instCode, initial, initialLabels
                 </>
             )}
 
-            <div className="flex gap-2 pt-2">
-                <Button type="submit" disabled={busy}>
-                    {t('btn_save')}
-                </Button>
-                <a href={urls.index} className="inline-flex items-center rounded-md border border-input px-4 py-2 text-sm hover:bg-muted">
-                    {t('btn_cancel')}
-                </a>
-            </div>
+            <EntityFormFooter form={form} canEdit={canEdit} canPropose={canPropose} indexUrl={urls.index} idPrefix="inst" t={t} />
         </form>
     );
 }

@@ -853,6 +853,9 @@ class OperationsController extends Controller {
 
         $opType = (int) $item->op_type;
         $isCodeResource = in_array(strtoupper($resourceName), $codeTables, true);
+        // 實體級提案（§4.5）：resource 是聚合名而非表名，payload 存聚合意圖；三條連結
+        // （資源／修改提案／撤回）都不能走表名路徑，各自另有分支。
+        $isEntityProposal = is_array($resourceDataParsed) && (bool) ($resourceDataParsed['__entity_aggregate'] ?? false);
         $showPerPersonResourceButtons = in_array(strtoupper($resourceName), ['KIN_DATA', 'ASSOC_DATA'], true) && $personRowspan > 1;
 
         // 主資源連結（非 per-person 模式）。
@@ -868,6 +871,8 @@ class OperationsController extends Controller {
         $resourceLink = null;
         if ($hasPersonLink && $resourceSpecificLink) {
             $resourceLink = $resourceSpecificLink;
+        } elseif ($isEntityProposal) {
+            $resourceLink = $this->entityProposalResourceLink($opType, $resourceDataParsed);
         } elseif ($isCodeResource && $opType !== 4 && $linkResourceId !== null) {
             // 同樣用 $linkResourceId：ALTNAME_DATA 這類「既是人物子資源、也在 codes.tables 裡」的表，
             // 提案在上面的分支被擋掉後會落到這裡，若沿用 $rawResourceId 等於換一條路徑撞同一個 404。
@@ -1038,8 +1043,12 @@ class OperationsController extends Controller {
                 'restore' => route('operations.restore', $item->id, false),
                 'approve' => route('operations.proposals.approve', $item->id, false),
                 'reject' => route('operations.proposals.reject', $item->id, false),
-                'edit_proposal' => $this->buildProposalEditUrl($item, $resourceName, $resourceDataParsed),
-                'cancel_proposal' => route('codes.proposals.cancel', ['table_name' => $resourceName, 'operation' => $item->id], false),
+                'edit_proposal' => $isEntityProposal
+                    ? $this->entityProposalEditUrl($item, $resourceDataParsed)
+                    : $this->buildProposalEditUrl($item, $resourceName, $resourceDataParsed),
+                'cancel_proposal' => $isEntityProposal
+                    ? route('operations.proposals.cancel', $item->id, false)
+                    : route('codes.proposals.cancel', ['table_name' => $resourceName, 'operation' => $item->id], false),
             ],
         ];
     }
@@ -1092,6 +1101,55 @@ class OperationsController extends Controller {
         }
 
         return route('codes.proposals.edit', ['table_name' => $resourceName, 'operation' => $item->id], false);
+    }
+
+    /**
+     * 實體級提案的「修改提案」連結：新增提案指實體的新增頁、修改提案指該實體的編輯頁，
+     * 都帶 ?proposal={id} 讓表單預填提案內容、送出改打 resubmit（同人物子資源的 edit-v2 流程）。
+     * 刪除提案沒有可修改的內容、或註冊表解不出路由，一律 null（前端不出按鈕），
+     * 不退回 codes 通用編輯頁——那條路徑以表名為路徑段，對聚合名必 404。
+     *
+     * @param array<string, mixed> $payload 已解碼的 resource_data（含 __entity_aggregate）
+     */
+    protected function entityProposalEditUrl($item, array $payload): ?string {
+        $entity = EntityAggregateRegistry::entityForResource((string) ($payload['__entity_resource'] ?? ''));
+        $opType = (int) ($item->op_type ?? 0);
+        if ($entity === null || !in_array($opType, [Operation::TYPE_PROPOSAL_CREATE, Operation::TYPE_PROPOSAL_UPDATE], true)) {
+            return null;
+        }
+
+        return EntityAggregateRegistry::formUrl(
+            $entity,
+            $opType === Operation::TYPE_PROPOSAL_UPDATE ? ($payload['__entity_pk'] ?? null) : null,
+            ['proposal' => (int) $item->id]
+        );
+    }
+
+    /**
+     * 實體級提案的「資源」連結：指向提案所針對的實體編輯頁；此刻沒有實體可指就回 null。
+     *
+     * 與 resolveLinkResourceId() 同一套語義，只是識別鍵直接取自聚合意圖：
+     *  - create：核准前實體不存在；核准後 updateProposalStatus() 把配發的識別鍵記回 payload。
+     *  - update：識別鍵是實體身分、不隨提案改變，核准前後都指同一個實體。
+     *  - delete：核准後實體已刪除。
+     * 連結同封寫表的「查閱」：打不開表單頁的身分（訪客／能力不足）不出連結。
+     *
+     * @param array<string, mixed> $payload 已解碼的 resource_data（含 __entity_aggregate）
+     */
+    protected function entityProposalResourceLink(int $opType, array $payload): ?string {
+        $entity = EntityAggregateRegistry::entityForResource((string) ($payload['__entity_resource'] ?? ''));
+        if ($entity === null || !EntityAggregateRegistry::userCanReachForm($entity)) {
+            return null;
+        }
+
+        $applied = (string) ($payload['__review_status'] ?? 'pending') === 'approved';
+        $pk = match ($opType) {
+            Operation::TYPE_PROPOSAL_CREATE => $applied ? ($payload[(string) ($entity['pk'] ?? '')] ?? null) : null,
+            Operation::TYPE_PROPOSAL_DELETE => $applied ? null : ($payload['__entity_pk'] ?? null),
+            default => $payload['__entity_pk'] ?? null,
+        };
+
+        return $pk === null ? null : EntityAggregateRegistry::formUrl($entity, $pk);
     }
 
     /**

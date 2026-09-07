@@ -283,14 +283,18 @@ class OperationsProposalController extends Controller {
                 }
 
                 // create：把 handler 配發的新主鍵記回提案（resource_id 指向已建立的實體）。
+                // 同單表核准：handler 落庫的 direct operation id 記回 __applied_operation_id，
+                // operations 列表據此把 audit_log 認領回提案列（「比較」按鈕）。
                 $appliedPk = is_array($body['result']['pk'] ?? null) ? $body['result']['pk'] : null;
+                $appliedOperationId = $body['result']['operation_id'] ?? null;
                 $this->updateProposalStatus(
                     $operation,
                     'approved',
                     $comment,
                     $entityOperation === 'create' ? $appliedPk : null,
                     $entityOperation === 'create' ? [$pkField] : [],
-                    $entityOperation === 'create'
+                    $entityOperation === 'create',
+                    is_scalar($appliedOperationId) ? (string) $appliedOperationId : null
                 );
             });
         } catch (ValidationException $e) {
@@ -329,6 +333,53 @@ class OperationsProposalController extends Controller {
         return redirect()->back();
     }
 
+    /**
+     * 提案人撤回自己的提案（與資源無關）。
+     *
+     * codes.proposals.cancel 以**表名**為路徑段（guardTable），對 resource＝聚合名的實體級提案
+     * （office／social-institution／text-entity）必 404；本端點只認 operation 本身。
+     * 授權與狀態規則同 CodesController::ensureProposalEditable()：登入且啟用、提案人本人、
+     * 提案仍為 pending／rejected。
+     */
+    public function cancel(Request $request, Operation $operation) {
+        if (!Auth::check() || !Auth::user()->isActive()) {
+            abort(403, '請登入後再試。');
+        }
+        $opType = (int) $operation->op_type;
+        if (!in_array($opType, [Operation::TYPE_PROPOSAL_CREATE, Operation::TYPE_PROPOSAL_UPDATE, Operation::TYPE_PROPOSAL_DELETE], true)) {
+            abort(404);
+        }
+
+        $payload = $this->decodeResourceData($operation);
+        $submittedById = $payload['__proposal_meta']['submitted_by_id'] ?? $operation->user_id;
+        if ($submittedById === null || (int) $submittedById !== (int) Auth::id()) {
+            abort(403, '僅提案者本人可撤回該提案。');
+        }
+        if (!in_array((string) ($payload['__review_status'] ?? 'pending'), ['pending', 'rejected'], true)) {
+            abort(403, '該提案目前不可撤回。');
+        }
+
+        $meta = is_array($payload['__proposal_meta'] ?? null) ? $payload['__proposal_meta'] : [];
+        $reason = trim((string) $request->input('reason', ''));
+        unset($meta['cancel_reason']);
+        if ($reason !== '') {
+            $meta['cancel_reason'] = $reason;
+        }
+        $meta['cancelled_at'] = Carbon::now()->format('Y-m-d H:i:s');
+        $meta['cancelled_by'] = Auth::user()->name ?? Auth::id();
+        $meta['cancelled_by_id'] = Auth::id();
+        $payload['__proposal_meta'] = $meta;
+        $payload['__review_status'] = 'cancelled';
+        unset($payload['__review_comment'], $payload['__reviewed_by'], $payload['__reviewed_by_id'], $payload['__reviewed_at']);
+
+        $operation->resource_data = json_encode($payload, JSON_UNESCAPED_UNICODE);
+        $operation->save();
+
+        flash('提案已撤回 @ '.Carbon::now(), 'info');
+
+        return redirect()->back();
+    }
+
     protected function ensureCanReview(Operation $operation): void {
         if (!Auth::check() || !Auth::user()->canReviewProposals()) {
             abort(403, '無權審核提案。');
@@ -337,6 +388,14 @@ class OperationsProposalController extends Controller {
         $opType = (int) $operation->op_type;
         if (!in_array($opType, [Operation::TYPE_PROPOSAL_CREATE, Operation::TYPE_PROPOSAL_UPDATE, Operation::TYPE_PROPOSAL_DELETE], true)) {
             abort(404);
+        }
+
+        // 只有待審提案能核准／退回：已核准的再核准一次會把同一份意圖再套用一遍（實體聚合的
+        // create 會配一個新 id 建出重複實體），已撤回的提案人早已不打算送出。列表只對 pending
+        // 出審核按鈕，這裡是後端的那一半。
+        $status = (string) ($this->decodeResourceData($operation)['__review_status'] ?? 'pending');
+        if ($status !== 'pending') {
+            abort(409, '該提案已審結或撤回，不可再審核。');
         }
     }
 

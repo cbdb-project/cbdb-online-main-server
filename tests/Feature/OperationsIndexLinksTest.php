@@ -1386,6 +1386,22 @@ class OperationsIndexLinksTest extends TestCase {
     }
 
     #[Test]
+    public function test_entity_proposal_links_are_withheld_when_the_target_entity_no_longer_exists(): void {
+        // 提案送出後實體可能被別的操作刪掉：光憑意圖裡的 __entity_pk 會發出必然 404 的「資源」與
+        // 「修改提案」連結（編輯頁以實體為宿主）。實體不在就兩條都不出，撤回照常。
+        $proposer = $this->activeUser('entity-stale-proposal@example.com', User::ROLE_CROWDSOURCING);
+        $proposal = $this->entityProposal($proposer, 'office', 'update', 999999, ['name' => '不存在的官']);
+
+        $row = $this->firstRow($proposer, '?proposals_only=1');
+
+        $this->assertNull($row['resource_link']);
+        $this->assertNull($row['urls']['edit_proposal']);
+        $this->assertSame("/operations/{$proposal->id}/cancel", $row['urls']['cancel_proposal']);
+        // 前提為真：那個實體的編輯頁確實是 404。
+        $this->actingAs($proposer)->get('/app/office/999999/edit')->assertNotFound();
+    }
+
+    #[Test]
     public function test_entity_proposal_links_resolve_the_entity_by_resource_name_not_by_table(): void {
         // resource 是聚合名（社會機構的下層有三張表），連結要靠註冊表的 resource 查、不能靠表名。
         $proposer = $this->activeUser('entity-si-proposal@example.com', User::ROLE_CROWDSOURCING);

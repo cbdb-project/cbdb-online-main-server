@@ -1117,21 +1117,17 @@ class OperationsController extends Controller {
         if ($entity === null || !in_array($opType, [Operation::TYPE_PROPOSAL_CREATE, Operation::TYPE_PROPOSAL_UPDATE], true)) {
             return null;
         }
+        // update 提案的編輯頁以實體為宿主，實體不在了就沒有頁面可預填（編輯頁會 404）。
+        $pk = $opType === Operation::TYPE_PROPOSAL_UPDATE ? $this->entityProposalTargetPk($entity, $opType, $payload) : null;
+        if ($opType === Operation::TYPE_PROPOSAL_UPDATE && $pk === null) {
+            return null;
+        }
 
-        return EntityAggregateRegistry::formUrl(
-            $entity,
-            $opType === Operation::TYPE_PROPOSAL_UPDATE ? ($payload['__entity_pk'] ?? null) : null,
-            ['proposal' => (int) $item->id]
-        );
+        return EntityAggregateRegistry::formUrl($entity, $pk, ['proposal' => (int) $item->id]);
     }
 
     /**
      * 實體級提案的「資源」連結：指向提案所針對的實體編輯頁；此刻沒有實體可指就回 null。
-     *
-     * 與 resolveLinkResourceId() 同一套語義，只是識別鍵直接取自聚合意圖：
-     *  - create：核准前實體不存在；核准後 updateProposalStatus() 把配發的識別鍵記回 payload。
-     *  - update：識別鍵是實體身分、不隨提案改變，核准前後都指同一個實體。
-     *  - delete：核准後實體已刪除。
      * 連結同封寫表的「查閱」：打不開表單頁的身分（訪客／能力不足）不出連結。
      *
      * @param array<string, mixed> $payload 已解碼的 resource_data（含 __entity_aggregate）
@@ -1142,14 +1138,41 @@ class OperationsController extends Controller {
             return null;
         }
 
+        $pk = $this->entityProposalTargetPk($entity, $opType, $payload);
+
+        return $pk === null ? null : EntityAggregateRegistry::formUrl($entity, $pk);
+    }
+
+    /**
+     * 實體級提案此刻指向的實體識別鍵；沒有可指的實體回 null。
+     *
+     * 與 resolveLinkResourceId() 同一套語義，只是識別鍵直接取自聚合意圖：
+     *  - create：核准前實體不存在；核准後 updateProposalStatus() 把配發的識別鍵記回 payload。
+     *  - update：識別鍵是實體身分、不隨提案改變，核准前後都指同一個實體。
+     *  - delete：核准後實體已刪除。
+     * 最後再以聚合根的讀取路徑確認實體**現在**還在：提案送出後實體可能已被別的操作刪掉，
+     * 光憑意圖裡的識別鍵會發出一條必然 404 的連結。
+     *
+     * @param array<string, mixed> $entity  config/entity_aggregates.php 的實體項
+     * @param array<string, mixed> $payload 已解碼的 resource_data
+     */
+    protected function entityProposalTargetPk(array $entity, int $opType, array $payload): ?int {
         $applied = (string) ($payload['__review_status'] ?? 'pending') === 'approved';
         $pk = match ($opType) {
             Operation::TYPE_PROPOSAL_CREATE => $applied ? ($payload[(string) ($entity['pk'] ?? '')] ?? null) : null,
             Operation::TYPE_PROPOSAL_DELETE => $applied ? null : ($payload['__entity_pk'] ?? null),
             default => $payload['__entity_pk'] ?? null,
         };
+        if (!is_scalar($pk) || !ctype_digit((string) $pk)) {
+            return null;
+        }
 
-        return $pk === null ? null : EntityAggregateRegistry::formUrl($entity, $pk);
+        $service = is_string($entity['service'] ?? null) ? app($entity['service']) : null;
+        if (!$service instanceof \App\Services\Import\EntityAggregateService || $service->load((int) $pk) === null) {
+            return null;
+        }
+
+        return (int) $pk;
     }
 
     /**

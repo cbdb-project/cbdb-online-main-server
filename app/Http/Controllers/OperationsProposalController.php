@@ -121,6 +121,7 @@ class OperationsProposalController extends Controller {
 
         try {
             DB::transaction(function () use ($opType, $table, $data, $keyColumns, $original, $operation, $comment, $auxiliaryPayload) {
+                $this->lockPendingProposal($operation);
                 [$appliedRow, $usedDirectWorkflow] = $this->applyProposal(
                     $operation,
                     $table,
@@ -273,6 +274,7 @@ class OperationsProposalController extends Controller {
                 $comment,
                 $pkField
             ) {
+                $this->lockPendingProposal($operation);
                 $response = $handler->handle($resource, 'direct', $entityOperation, $personId, $targetPk, $changes, []);
                 $status = $response->getStatusCode();
                 $body = json_decode($response->getContent(), true);
@@ -326,7 +328,10 @@ class OperationsProposalController extends Controller {
         $this->ensureCanReview($operation);
 
         $comment = trim((string) $request->input('review_comment', ''));
-        $this->updateProposalStatus($operation, 'rejected', $comment);
+        DB::transaction(function () use ($operation, $comment) {
+            $this->lockPendingProposal($operation);
+            $this->updateProposalStatus($operation, 'rejected', $comment);
+        });
 
         flash('提案已退回 @ '.Carbon::now(), 'info');
 
@@ -359,25 +364,58 @@ class OperationsProposalController extends Controller {
             abort(403, '該提案目前不可撤回。');
         }
 
-        $meta = is_array($payload['__proposal_meta'] ?? null) ? $payload['__proposal_meta'] : [];
         $reason = trim((string) $request->input('reason', ''));
-        unset($meta['cancel_reason']);
-        if ($reason !== '') {
-            $meta['cancel_reason'] = $reason;
-        }
-        $meta['cancelled_at'] = Carbon::now()->format('Y-m-d H:i:s');
-        $meta['cancelled_by'] = Auth::user()->name ?? Auth::id();
-        $meta['cancelled_by_id'] = Auth::id();
-        $payload['__proposal_meta'] = $meta;
-        $payload['__review_status'] = 'cancelled';
-        unset($payload['__review_comment'], $payload['__reviewed_by'], $payload['__reviewed_by_id'], $payload['__reviewed_at']);
+        // 與核准／退回同一把列鎖：提案人撤回與審核人核准同時發生時，兩邊都會先各自看到 pending；
+        // 鎖上後重讀，晚到的那一方會發現狀態已變而放棄，不會出現「已撤回卻仍被套用」。
+        DB::transaction(function () use ($operation, $reason) {
+            $payload = $this->lockProposal($operation);
+            if (!in_array((string) ($payload['__review_status'] ?? 'pending'), ['pending', 'rejected'], true)) {
+                abort(403, '該提案目前不可撤回。');
+            }
 
-        $operation->resource_data = json_encode($payload, JSON_UNESCAPED_UNICODE);
-        $operation->save();
+            $meta = is_array($payload['__proposal_meta'] ?? null) ? $payload['__proposal_meta'] : [];
+            unset($meta['cancel_reason']);
+            if ($reason !== '') {
+                $meta['cancel_reason'] = $reason;
+            }
+            $meta['cancelled_at'] = Carbon::now()->format('Y-m-d H:i:s');
+            $meta['cancelled_by'] = Auth::user()->name ?? Auth::id();
+            $meta['cancelled_by_id'] = Auth::id();
+            $payload['__proposal_meta'] = $meta;
+            $payload['__review_status'] = 'cancelled';
+            unset($payload['__review_comment'], $payload['__reviewed_by'], $payload['__reviewed_by_id'], $payload['__reviewed_at']);
+
+            $operation->resource_data = json_encode($payload, JSON_UNESCAPED_UNICODE);
+            $operation->save();
+        });
 
         flash('提案已撤回 @ '.Carbon::now(), 'info');
 
         return redirect()->back();
+    }
+
+    /**
+     * 在交易內鎖住提案列（SELECT … FOR UPDATE）並以鎖後的資料更新 $operation，回傳解碼後的 payload。
+     * 呼叫端交易結束前，其他對同一筆提案的核准／退回／撤回都會等在這把鎖上。
+     *
+     * @return array<string, mixed>
+     */
+    protected function lockProposal(Operation $operation): array {
+        $locked = Operation::whereKey($operation->getKey())->lockForUpdate()->firstOrFail();
+        $operation->setRawAttributes($locked->getAttributes(), true);
+
+        return $this->decodeResourceData($operation);
+    }
+
+    /**
+     * 核准／退回前在交易內重驗「仍是 pending」。ensureCanReview() 在交易外看到的 pending 可能
+     * 在進交易前就被另一個請求（撤回、或另一位審核人）改掉；不重驗就會把一份已撤回的意圖套進資料表。
+     */
+    protected function lockPendingProposal(Operation $operation): void {
+        $payload = $this->lockProposal($operation);
+        if ((string) ($payload['__review_status'] ?? 'pending') !== 'pending') {
+            throw new \RuntimeException('該提案已審結或撤回，不可再審核。');
+        }
     }
 
     protected function ensureCanReview(Operation $operation): void {

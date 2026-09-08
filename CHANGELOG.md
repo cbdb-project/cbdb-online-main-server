@@ -4,6 +4,15 @@
 
 ## 2026-09
 
+### 表單送出改為 split button：直接儲存為主按鈕，「提交提案」收進旁邊的箭頭選單，拿掉二次確認彈窗
+
+- **背景**：全站 18 個 React 表單（13 個人物編輯器、Codes 新增／編輯 2 頁、office／social-institution／text-entity 3 個實體表單）原本並排「直接儲存」「提交建議」兩顆鈕；有直接寫入權者按「提交建議」還要再過一次 `ProposalModeDialog`（取消／提交建議／直接保存三選一）。彈窗的目的只是防止有權限者誤送不必要的提案，但每次提案都多一步。
+- **新設計**：共用元件 `components/ui/SaveSplitButton.tsx`。可直接寫入且可提案者看到「直接儲存 ▾」——主按鈕直接儲存，外觀對齊 Gmail 的「傳送 ▾」：箭頭鈕刻意收窄、主按鈕加寬；按箭頭後在正下方貼齊出現另一顆同色同風格、同寬的「提交提案」按鈕（相接處收直角、零間距），箭頭翻上，再按一次收起。圖示用 clipboard-check，說明「送審（不直接儲存，徵求管理員意見）」放在 tooltip。提案要點兩次（箭頭→選單項）就足以防誤觸，彈窗刪除。只可提案者維持單一「提交提案」主按鈕、點一下即送（原本就沒有彈窗）；修改提案模式維持單一「更新提案」；Codes 頁對訪客仍顯示單一「直接儲存」（由後端擋）。
+- **行為細節**：`disabled`（儲存中／編輯模式未變更）同時作用於主按鈕與箭頭，選單打不開、開著時自動收起；Enter 鍵送出行為不變（可直接寫入者 direct、否則 proposal）。無障礙：`aria-haspopup="menu"`／`aria-expanded`／`role="menu"`／`role="menuitem"`，箭頭鈕 ArrowDown／ArrowUp 開啟並聚焦第一項，Esc 關閉並把焦點還給箭頭鈕，點擊元件外部關閉。兩套外觀共用同一行為：人物編輯器用 `PersonEditorShared/grid` 的 inline style，Codes／實體表單用 Tailwind `Button` 樣式。
+- **收斂**：16 個呼叫點（13 個人物編輯器、Codes 兩頁各一、3 個實體表單共用的 `EntityFormFooter` 算一處）各自的 `confirmProposalMode` state 與 `ProposalModeDialog` 一併移除；`direct_save_prompt_*`（biogmains／codes）與 `proposal_confirm_*`（office／social_institution／text_entity）翻譯鍵刪除，改在 shared `common` 加 `more_submit_options`／`proposal_menu_hint` 兩鍵。Codes 頁順帶對齊人物編輯器：只可提案者只看到「提交提案」（原本也顯示一顆必吃 403 的「直接儲存」）。
+- **測試**：`SaveSplitButton.test.tsx`（vitest＋jsdom，9 案例：四種形態、選單開關與鍵盤、disabled 連動、resubmit）；`vitest.config.ts` 的 include 擴到 `*.test.tsx`。另以 Playwright 對實際頁面走過專家與眾包兩種身分（basicinformation edit-v2、別名新增、`/app/office/create`、`/app/codes/NIAN_HAO/create`）：選單項送出的請求確為 `mode=proposal`、主按鈕為 `mode=direct`、過程中沒有任何 dialog。純前端改動，後端與 API 不變。
+- **已知限制（TODO）**：人物編輯器與 Codes／實體表單的按鈕仍是兩套樣式系統——前者用 `PersonEditorShared/grid.ts` 的 inline style（0.95rem、字重 700），後者用 Tailwind `Button`（0.875rem、字重 500、高 36px）——所以同一個 split button 在兩類頁面上字級、字重、間距不一致。`SaveSplitButton` 以 `appearance` 參數各自對齊所在頁面的「刪除」「取消」，差異是既有的，不是這次引入。後續統一時建議整頁一起改（把 `grid.ts` 的按鈕尺寸對齊 Tailwind `Button`，或反過來），不要只改 split button，否則會變成同一列按鈕兩種風格。
+
 ### 實體級提案收尾：三個聚合的提案接通表單頁、operations 列表與修改／撤回流程
 
 - **背景**：office／social-institution／text-entity 的提案管線（`mode=proposal` 存聚合意圖、核准以 direct 重放同一 handler，架構文件 §4.5）後端早已落地，但周邊沒接：只有官職表單有「提交建議」按鈕，機構與文獻的表單頁用 `canWriteDirectly()` 擋門、可提案者根本進不了頁；核准端沒把落庫的 operation id 記回提案，「比較」對實體提案永遠灰掉；`/app/operations` 對這類提案列的「修改提案」與「撤回」都指向 `codes.proposals.*`——那條路徑以**表名**為路徑段，`guardTable('office')` 必 404，「資源」則因聚合名不是 codes 表而永遠沒有連結。

@@ -19,8 +19,6 @@ return [
     'btn_resubmit' => 'Update proposal',
     'proposal_submitted' => 'Proposal submitted, pending administrator review.',
     'back_to_list' => 'Back to list',
-    'proposal_confirm_title' => 'Submission mode',
-    'proposal_confirm_desc' => 'You have direct write access. Save directly, or submit a proposal for review?',
     'modification_note_label' => 'Change note',
     'modification_note_placeholder' => 'Explain the reason for the change when proposing',
     'btn_back' => 'Back to list',

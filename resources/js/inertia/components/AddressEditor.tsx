@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import ActionStatus, { BtnSpinner } from './PersonEditorShared/ActionStatus';
-import { ProposalModeDialog } from './ui/ProposalModeDialog';
+import ActionStatus from './PersonEditorShared/ActionStatus';
+import { SaveSplitButton } from './ui/SaveSplitButton';
 import { redirectAfterSubresourceCreate } from './PersonEditorShared/afterCreate';
 import { router } from '@inertiajs/react';
 import EraTimeField, { EraTimeFieldValues } from './EraTimeField';
@@ -9,7 +9,7 @@ import TextpersonPair from './PersonEditorShared/TextpersonPair';
 import { getCsrfToken } from './PersonBrowser/shared/csrf';
 import {
     gridCardStyle, gGrid, gInputStyle, gReadonlyStyle, gOkStyle, gErrStyle,
-    gSubmitRow, gBtnGroupRight, gPrimaryBtn, gInfoBtn, gDangerBtn, gCancelBtn,
+    gSubmitRow, gBtnGroupRight, gDangerBtn, gCancelBtn,
     gAuditWrapStyle, gHiddenSubmitStyle, gridSectionHeadStyle, GridLabel, gridCell, gridInput,
 } from './PersonEditorShared/grid';
 
@@ -76,7 +76,6 @@ export default function AddressEditor({
     const originalPk = useRef<Record<string, number>>(Object.fromEntries(PK.map((k) => [k, Number(initialFields[k] ?? (k === 'c_personid' ? personId : 0))])));
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
-    const [confirmProposalMode, setConfirmProposalMode] = useState(false);
     const [message, setMessage] = useState<string | null>(null);
     const flashSaved = (m: string) => { setMessage(m); if (msgTimer.current) window.clearTimeout(msgTimer.current); msgTimer.current = window.setTimeout(() => setMessage(null), 3000); };
     useEffect(() => () => { if (msgTimer.current) window.clearTimeout(msgTimer.current); }, []);
@@ -292,26 +291,24 @@ export default function AddressEditor({
             )}
 
             <div style={gSubmitRow}>
-                {canEdit && !isResubmit ? <button type="button" style={gPrimaryBtn} disabled={saving || (mode === 'edit' && !dirty)} onClick={() => void save('direct')}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : tr('save_directly', '直接保存')}</button> : null}
-                {(canEdit || canPropose) ? <button type="button" style={gInfoBtn} disabled={saving || (mode === 'edit' && !dirty && !isResubmit)} onClick={() => (canEdit && !isResubmit ? setConfirmProposalMode(true) : void save('proposal'))}>{saving ? <><BtnSpinner />{tr('saving', '儲存中…')}</> : (isResubmit ? tr('resubmit_proposal', '更新提案') : tr('submit_proposal', '提交建議'))}</button> : null}
+                {/* 直接保存為主按鈕；提案收進旁邊的箭頭選單（點兩次才送出，取代原本的二次確認彈窗）。 */}
+                <SaveSplitButton
+                    appearance="grid"
+                    directAvailable={canEdit}
+                    proposalAvailable={canPropose}
+                    isResubmit={isResubmit}
+                    disabled={saving || (mode === 'edit' && !dirty && !isResubmit)}
+                    saving={saving}
+                    labels={{ saveDirect: tr('save_directly', '直接保存'), submitProposal: tr('submit_proposal', '提交建議'), resubmitProposal: tr('resubmit_proposal', '更新提案'), saving: tr('saving', '儲存中…') }}
+                    onSaveDirect={() => void save('direct')}
+                    onSubmitProposal={() => void save('proposal')}
+                />
                 <ActionStatus saving={saving} deleting={deleting} message={message} error={error} t={t} />
                 <div style={gBtnGroupRight}>
                     {mode === 'edit' && canEdit && deleteEndpoint && !isResubmit ? <button type="button" style={gDangerBtn} disabled={deleting} onClick={() => void doDelete()}>{tr('delete', '刪除')}</button> : null}
                     <a href={indexUrl} style={gCancelBtn}>{tr('cancel', '取消')}</a>
                 </div>
             </div>
-            <ProposalModeDialog
-                open={confirmProposalMode}
-                onOpenChange={setConfirmProposalMode}
-                title={tr('direct_save_prompt_title', '直接保存還是提交提案？')}
-                description={tr('direct_save_prompt_desc', '您具有直接保存的權限。直接保存會立即套用變更；提交提案則需等待其他同事審核後才會套用。請選擇您想要的方式。')}
-                saveDirectLabel={tr('save_directly', '直接保存')}
-                submitProposalLabel={tr('submit_proposal', '提交建議')}
-                cancelLabel={tr('cancel', '取消')}
-                loading={saving}
-                onSaveDirect={() => { setConfirmProposalMode(false); void save('direct'); }}
-                onSubmitProposal={() => { setConfirmProposalMode(false); void save('proposal'); }}
-            />
         </form>
     );
 }

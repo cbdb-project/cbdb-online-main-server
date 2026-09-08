@@ -13,6 +13,9 @@ return [
     'view'              => '查看',
     'create'            => '建立',
     'saving'            => '儲存中…',
+    // 表單送出 split button（SaveSplitButton）：箭頭鈕的 aria-label、選單項「提交提案」下方的說明
+    'more_submit_options' => '更多送出方式',
+    'proposal_menu_hint'  => '送審（不直接儲存，徵求管理員意見）',
     'update'            => '更新',
     'reset'             => '重置',
     'close'             => '關閉',

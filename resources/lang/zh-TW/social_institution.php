@@ -19,8 +19,6 @@ return [
     'btn_resubmit' => '更新提案',
     'proposal_submitted' => '已提交建議，等待管理員審核。',
     'back_to_list' => '返回列表',
-    'proposal_confirm_title' => '提交方式',
-    'proposal_confirm_desc' => '您具有直接寫入權限。要直接保存，還是提交建議等待審核？',
     'modification_note_label' => '修改說明',
     'modification_note_placeholder' => '提案時請說明修改原因',
     'btn_back' => '返回列表',

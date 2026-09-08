@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { getCsrfToken } from '../PersonBrowser/shared/csrf';
-import { Button } from '../ui/Button';
 import { FormField } from '../ui/FormField';
-import { ProposalModeDialog } from '../ui/ProposalModeDialog';
+import { SaveSplitButton } from '../ui/SaveSplitButton';
 
 /**
  * 實體聚合表單（Office／SocialInstitution／Text）共用的提交管線：direct／proposal 兩種模式、
@@ -73,7 +72,6 @@ export function useEntityFormSubmit(opts: SubmitOptions) {
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [serverError, setServerError] = useState<string | null>(null);
     const [proposalSubmitted, setProposalSubmitted] = useState(false);
-    const [confirmProposalMode, setConfirmProposalMode] = useState(false);
     const [comment, setComment] = useState(opts.resubmit?.initial_comment ?? '');
 
     const save = async (submitMode: SubmitMode) => {
@@ -144,8 +142,6 @@ export function useEntityFormSubmit(opts: SubmitOptions) {
         errors,
         serverError,
         proposalSubmitted,
-        confirmProposalMode,
-        setConfirmProposalMode,
         comment,
         setComment,
         save,
@@ -184,8 +180,8 @@ interface FooterProps {
 }
 
 /**
- * 表單底部：提案說明（可提案者才有）、直接儲存／提交建議／更新提案／取消，以及
- * 有直接寫入權者按「提交建議」時的二次確認。修改提案模式下沒有「直接儲存」——
+ * 表單底部：提案說明（可提案者才有）、送出 split button（直接儲存為主按鈕、提交建議收進
+ * 箭頭選單；只可提案者為單一提交建議鈕）、取消。修改提案模式下沒有「直接儲存」——
  * resubmit 的語義就是重發提案。
  */
 export function EntityFormFooter({ form, canEdit, canPropose, indexUrl, idPrefix, t }: FooterProps) {
@@ -208,44 +204,20 @@ export function EntityFormFooter({ form, canEdit, canPropose, indexUrl, idPrefix
             )}
 
             <div className="flex gap-2 pt-2">
-                {canEdit && !form.isResubmit && (
-                    <Button type="button" disabled={form.busy} onClick={() => void form.save('direct')}>
-                        {t('btn_save')}
-                    </Button>
-                )}
-                {canPropose && (
-                    <Button
-                        type="button"
-                        variant={canEdit && !form.isResubmit ? 'secondary' : 'default'}
-                        disabled={form.busy}
-                        onClick={() => (canEdit && !form.isResubmit ? form.setConfirmProposalMode(true) : void form.save('proposal'))}
-                    >
-                        {form.isResubmit ? t('btn_resubmit') : t('btn_propose')}
-                    </Button>
-                )}
+                <SaveSplitButton
+                    directAvailable={canEdit}
+                    proposalAvailable={canPropose}
+                    isResubmit={form.isResubmit}
+                    disabled={form.busy}
+                    labels={{ saveDirect: t('btn_save'), submitProposal: t('btn_propose'), resubmitProposal: t('btn_resubmit') }}
+                    onSaveDirect={() => void form.save('direct')}
+                    onSubmitProposal={() => void form.save('proposal')}
+                />
                 <a href={indexUrl} className="inline-flex items-center rounded-md border border-input px-4 py-2 text-sm hover:bg-muted">
                     {t('btn_cancel')}
                 </a>
             </div>
 
-            <ProposalModeDialog
-                open={form.confirmProposalMode}
-                onOpenChange={form.setConfirmProposalMode}
-                title={t('proposal_confirm_title')}
-                description={t('proposal_confirm_desc')}
-                saveDirectLabel={t('btn_save')}
-                submitProposalLabel={t('btn_propose')}
-                cancelLabel={t('btn_cancel')}
-                loading={form.busy}
-                onSaveDirect={() => {
-                    form.setConfirmProposalMode(false);
-                    void form.save('direct');
-                }}
-                onSubmitProposal={() => {
-                    form.setConfirmProposalMode(false);
-                    void form.save('proposal');
-                }}
-            />
         </>
     );
 }

@@ -13,6 +13,9 @@ return [
     'view'              => 'View',
     'create'            => 'Create',
     'saving'            => 'Saving…',
+    // Form submit split button (SaveSplitButton): toggle aria-label and the hint under the "Submit proposal" menu item
+    'more_submit_options' => 'More submit options',
+    'proposal_menu_hint'  => 'Submit for review (not saved directly; asks an administrator to weigh in)',
     'update'            => 'Update',
     'reset'             => 'Reset',
     'close'             => 'Close',

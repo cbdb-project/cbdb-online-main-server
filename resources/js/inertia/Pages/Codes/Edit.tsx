@@ -6,7 +6,7 @@ import { FormField } from '../../components/ui/FormField';
 import { CodesColumnField, type ColumnBehaviour } from '../../components/Codes/CodesColumnField';
 import { useLoadTextTitle } from '../../components/Codes/useLoadTextTitle';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
-import { ProposalModeDialog } from '../../components/ui/ProposalModeDialog';
+import { SaveSplitButton } from '../../components/ui/SaveSplitButton';
 import { PinyinUmlautConfirmDialog } from '../../components/PinyinUmlautConfirmDialog';
 import { collectUmlautConversions, type Tier2UmlautHit } from '../../utils/pinyinUmlaut';
 import { TextCodesAuthorList, type TextAuthors } from '../../components/TextCodesAuthorList';
@@ -54,9 +54,8 @@ export default function CodesEdit() {
 
     const form = useForm<Record<string, string>>(initial);
     const [confirmDelete, setConfirmDelete] = useState(false);
-    const [confirmProposalMode, setConfirmProposalMode] = useState(false);
     const [umlautPrompt, setUmlautPrompt] = useState<{ hits: Tier2UmlautHit[]; run: (overrides?: Record<string, string>) => void } | null>(null);
-    // 具直接保存權限者（非眾包用戶）點擊「提交提案」前先確認是否改為直接保存。
+    // 具直接保存權限者（非眾包用戶）：直接保存為主按鈕，提案收進箭頭選單；只可提案者只有提案鈕。
     const canWriteDirectly = !!props.auth.user?.can.write_directly;
 
     // 送出（Tier 2 確認後）：overrides 以 transform 保證此次提交使用者選擇的值，避免 setData 非同步問題。
@@ -146,12 +145,15 @@ export default function CodesEdit() {
                 )}
 
                 <div className="flex flex-wrap gap-2">
-                    <Button type="submit" disabled={form.processing}>{t('save_direct')}</Button>
-                    {can_propose && (
-                        <Button type="button" variant="secondary" disabled={form.processing} onClick={() => (canWriteDirectly ? setConfirmProposalMode(true) : propose())}>
-                            {t('submit_proposal')}
-                        </Button>
-                    )}
+                    {/* 直接保存走原生 form submit（含拼音 ü 確認閘）；訪客／非活躍帳號仍看得到直接保存鈕，由後端擋。 */}
+                    <SaveSplitButton
+                        directAvailable={canWriteDirectly || !can_propose}
+                        proposalAvailable={can_propose}
+                        disabled={form.processing}
+                        saveDirectType="submit"
+                        labels={{ saveDirect: t('save_direct'), submitProposal: t('submit_proposal') }}
+                        onSubmitProposal={propose}
+                    />
                     {!RISKY_DELETE_DISABLED && (
                         <Button type="button" variant="destructive" disabled={form.processing} onClick={() => setConfirmDelete(true)}>
                             {tc('delete')}
@@ -191,18 +193,6 @@ export default function CodesEdit() {
                 }}
             />
 
-            <ProposalModeDialog
-                open={confirmProposalMode}
-                onOpenChange={setConfirmProposalMode}
-                title={t('direct_save_prompt_title')}
-                description={t('direct_save_prompt_desc')}
-                saveDirectLabel={t('save_direct')}
-                submitProposalLabel={t('submit_proposal')}
-                cancelLabel={tc('cancel')}
-                loading={form.processing}
-                onSaveDirect={() => { setConfirmProposalMode(false); saveDirect(); }}
-                onSubmitProposal={() => { setConfirmProposalMode(false); propose(); }}
-            />
         </DashboardLayout>
     );
 }

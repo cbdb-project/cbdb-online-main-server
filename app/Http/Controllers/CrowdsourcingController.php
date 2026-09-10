@@ -12,6 +12,7 @@ use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
 use App\Services\CharVariantMapService;
 use App\Support\CompositePrimaryKey;
+use App\Support\SelfReferencingTreeGuard;
 use App\Support\VariantReplaceScope;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\App;
@@ -294,6 +295,15 @@ class CrowdsourcingController extends Controller {
                     break;
                 case "OFFICE_TYPE_TREE":
                     $new_id = $data['c_office_type_node_id'];
+                    // 自參照層級樹：自我引用滿足自參照外鍵、資料庫擋不住，而成環的樹
+                    // 沒有任何消費者能安全走訪。這條眾包核准路徑由仍在服役的 v1 token API
+                    // 餵入（AGENTS §1.3 的「仍在服役的寫入路徑」），所以守衛必須也蓋到這裡。
+                    if ($treeCycleError = SelfReferencingTreeGuard::findCycleForRowWrite('OFFICE_TYPE_TREE', ['c_office_type_node_id'], $data, [])) {
+                        DB::table('operations')->where('id', $id)->update(['crowdsourcing_status' => 4, 'rate' => $rate, 'updated_at' => $updated_at]);
+                        flash('Create error: '.$treeCycleError.' @ '.Carbon::now(), 'danger');
+
+                        break;
+                    }
                     $message = OfficeTypeTree::create($data);
                     if ($message == true) {
                         DB::table('operations')->where('id', $id)->update(['crowdsourcing_status' => 1, 'rate' => $rate, 'updated_at' => $updated_at]);
@@ -343,6 +353,14 @@ class CrowdsourcingController extends Controller {
                 case "OFFICE_TYPE_TREE":
                     $biog = OfficeTypeTree::find($pId);
                     $ori = json_decode($biog);
+                    // 環路守衛（理由同 create 分支）。比對用**現況**那一列，不是提案內容
+                    // ——提案可能躺了好幾天，樹在那之後已經動過。
+                    if ($treeCycleError = SelfReferencingTreeGuard::findCycleForRowWrite('OFFICE_TYPE_TREE', ['c_office_type_node_id'], $data, (array) ($biog ? $biog->getAttributes() : []))) {
+                        DB::table('operations')->where('id', $id)->update(['crowdsourcing_status' => 4, 'rate' => $rate, 'updated_at' => $updated_at]);
+                        flash('Update error: '.$treeCycleError.' @ '.Carbon::now(), 'danger');
+
+                        break;
+                    }
                     $biog->update($data);
                     DB::table('operations')->where('id', $id)->update(['crowdsourcing_status' => 1, 'rate' => $rate, 'updated_at' => $updated_at]);
                     $this->operationRepository->store(Auth::id(), 0, 3, $resource, $pId, $data, $ori);

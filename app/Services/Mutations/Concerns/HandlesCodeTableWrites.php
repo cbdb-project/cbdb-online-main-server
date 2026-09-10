@@ -2,6 +2,7 @@
 
 namespace App\Services\Mutations\Concerns;
 
+use App\Support\SelfReferencingTreeGuard;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -108,6 +109,84 @@ trait HandlesCodeTableWrites {
         return $this->codeTableIntegerRangeCache[$cacheKey] = $ranges;
     }
 
+    /**
+     * 欄位型別快取：連線|表名 => [小寫欄位名 => ['type_name' => …, 'max_length' => int|null]]。
+     *
+     * @var array<string,array<string,array{type_name:string,max_length:int|null}>>
+     */
+    private array $codeTableColumnTypeCache = [];
+
+    /** 文本型別（可當文本主鍵）。 */
+    private const TEXT_TYPE_NAMES = ['varchar', 'char', 'tinytext', 'text', 'mediumtext', 'longtext'];
+
+    /**
+     * 欄位型別（含 varchar 長度）。用來判斷主鍵是數值還是文本——本檔原本一律 `(int)`
+     * 轉型，對 `OFFICE_TYPE_TREE.c_office_type_node_id` 這種**零填補的階層路徑字串**
+     * （`06`、`060102`）會把 `'06'` 轉成 `6`，直接建出一筆錯鍵的節點。
+     *
+     * @return array<string,array{type_name:string,max_length:int|null}>
+     */
+    protected function columnTypes(string $table): array {
+        $cacheKey = DB::getDefaultConnection() . '|' . $table;
+        if (array_key_exists($cacheKey, $this->codeTableColumnTypeCache)) {
+            return $this->codeTableColumnTypeCache[$cacheKey];
+        }
+
+        $types = [];
+
+        try {
+            foreach (Schema::getColumns($table) as $column) {
+                $length = null;
+                if (preg_match('/\((\d+)\)/', (string) ($column['type'] ?? ''), $m) === 1) {
+                    $length = (int) $m[1];
+                }
+
+                $types[strtolower((string) $column['name'])] = [
+                    'type_name' => strtolower((string) ($column['type_name'] ?? '')),
+                    'max_length' => $length,
+                ];
+            }
+        } catch (\Throwable $e) {
+            $types = [];
+        }
+
+        return $this->codeTableColumnTypeCache[$cacheKey] = $types;
+    }
+
+    /**
+     * 該欄是否為文本型別（據實際 schema）。
+     *
+     * 查不到型別時回 false（＝當成數值處理）。**這個方向對文本主鍵是危險的**——
+     * 「當成數值」正是本機制要防的那個損壞。所以呼叫端必須先用
+     * {@see schemaUnavailable()} 擋掉「整張表的型別都讀不到」的情況，
+     * 不要把這個 false 當成「已確認是數值欄」。
+     */
+    protected function isTextColumn(string $table, string $column): bool {
+        $type = $this->columnTypes($table)[strtolower($column)]['type_name'] ?? null;
+
+        return $type !== null && in_array($type, self::TEXT_TYPE_NAMES, true);
+    }
+
+    /**
+     * 整張表的欄位型別都讀不到（連線／權限異常，或表不存在）。
+     *
+     * 寫入路徑要 fail-closed 地擋下來：型別讀不到時 isTextColumn() 一律回 false，
+     * 文本主鍵會被 (int) 轉型建到錯鍵上，而 D7 與 auto_assign 兩個守衛也都因為
+     * 掛在 isTextColumn() 之下而一起失效——三個保護同時消失，且完全無聲。
+     */
+    protected function schemaUnavailable(string $table): bool {
+        return $this->columnTypes($table) === [];
+    }
+
+    /**
+     * 自參照樹的環路守衛。實作在 {@see \App\Support\SelfReferencingTreeGuard}——
+     * 同一張表有四條寫入路徑（create／direct update／提案核准／operations 還原），
+     * 後兩條不屬於 handler 體系，所以判定必須放在共用的 support 而不是這個 trait。
+     */
+    protected function findTreeCycle(string $table, string $keyColumn, string $parentColumn, mixed $nodeId, mixed $newParentId): ?string {
+        return SelfReferencingTreeGuard::findCycle($table, $keyColumn, $parentColumn, $nodeId, $newParentId);
+    }
+
     /** @return array<int,string> 小寫欄位名；查不到時回空陣列（呼叫端須自行決定 fail-open／closed）。 */
     protected function columnListing(string $table): array {
         // 快取鍵帶連線名，理由同 integerRanges()。
@@ -164,9 +243,29 @@ trait HandlesCodeTableWrites {
         return in_array((int) ($e->errorInfo[1] ?? 0), [1264, 1265, 1366, 1406], true);
     }
 
+    /**
+     * 鎖競爭：MariaDB 1213（deadlock found）與 1205（lock wait timeout）。
+     *
+     * 為什麼需要單獨分類：自參照樹的守衛在交易內用 `SELECT … FOR UPDATE` 走訪祖先鏈，
+     * 而兩個方向相反的重掛（`A.parent=B` 與 `B.parent=A`）會以不同順序取鎖，資料庫因此
+     * 可能挑一方回滾。交易回滾是**正確**的（不會寫出環），但那一方若得到 500 就太難看了
+     * ——它是可以直接重試的暫時性衝突，該回 409。
+     */
+    protected function isLockContention(\Illuminate\Database\QueryException $e): bool {
+        if (in_array((int) ($e->errorInfo[1] ?? 0), [1205, 1213], true)) {
+            return true;
+        }
+
+        $msg = $e->getMessage();
+
+        return str_contains($msg, 'Deadlock found')
+            || str_contains($msg, 'Lock wait timeout exceeded')
+            || str_contains($msg, 'database is locked');
+    }
+
     /** 唯一鍵違反。必須排在另外兩者之後判定（errno 19 共用）。 */
     protected function isUniqueConstraintViolation(\Illuminate\Database\QueryException $e): bool {
-        if ($this->isForeignKeyViolation($e) || $this->isNotNullOrCheckViolation($e)) {
+        if ($this->isForeignKeyViolation($e) || $this->isNotNullOrCheckViolation($e) || $this->isLockContention($e)) {
             return false;
         }
 

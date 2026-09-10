@@ -182,6 +182,12 @@ class CompositePrimaryKey {
         'ADDR_CODES' => [
             'c_addr_id',
         ],
+        // 官職類型層級樹。主鍵是**文本**（零填補的階層路徑字串，如 '060102'），
+        // 不是數值——任何 (int) 轉型都會把 '06' 變成 6。
+        // 與 OperationsController::resourceKeyColumns() 及 config 的 key_columns 一致。
+        'OFFICE_TYPE_TREE' => [
+            'c_office_type_node_id',
+        ],
         // 地名隸屬關係。順序須與資料庫 PRIMARY KEY
         // (c_addr_id, c_belongs_to, c_firstyear, c_lastyear) 及
         // OperationsController::resourceKeyColumns() 完全一致。

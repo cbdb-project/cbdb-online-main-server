@@ -125,9 +125,12 @@ final class VariantReplaceScope {
         'TEXT_CODES' => ['c_text_type_id'],
         //
         // 官職類型樹：REL 側的欄名（c_office_tree_id）與 PK 側（c_office_type_node_id）
-        // **不同名**，只掃 node_id 會漏掉 REL 側。這一組有實際風險而非理論風險——
-        // c_office_type_node_id 的值域含中文，且被 `LIKE '%$q%'` 做中文搜尋
-        // （ApiController.php:269），也被 `LIKE '$id%'` 前綴走訪（Api/ApiController.php:463）。
+        // **不同名**，只掃 node_id 會漏掉 REL 側。
+        // 這一組的排除理由是「它是跨表 join 的代碼鍵」，而且被 `LIKE '$id%'` 前綴走訪
+        // （Api/ApiController.php:463）——階層關係編碼在 id 字串本身，改一個字元等於把
+        // 節點搬走。（附註：2026-09 實測現庫 2739 列的 node_id 全是 ASCII 數字串，所以
+        // 型別閘門之外的中文風險目前是理論性的；但它同時被 `LIKE '%$q%'` 的搜尋掃到
+        // ——ApiController.php:269 把 node_id 與中文說明欄一起搜——所以排除仍是對的。）
         'OFFICE_TYPE_TREE' => ['c_office_type_node_id', 'c_parent_id'],
         'OFFICE_CODE_TYPE_REL' => ['c_office_tree_id'],
         //

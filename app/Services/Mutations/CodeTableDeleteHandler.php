@@ -76,7 +76,8 @@ class CodeTableDeleteHandler extends AbstractMutationHandler {
 
                 continue;
             }
-            $pk[$col] = (int) $value;
+            // 文本主鍵不可轉 int（'060102' → 60102 會刪錯列或刪不到）。
+            $pk[$col] = $this->isTextColumn($table, $col) ? (string) $value : (int) $value;
         }
         if (!empty($missingKeys)) {
             $errors = [];

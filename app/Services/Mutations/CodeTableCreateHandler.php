@@ -8,6 +8,7 @@ use App\Repositories\ToolsRepository;
 use App\Services\AuditLogService;
 use App\Support\CodeTableFieldValidator;
 use App\Support\CompositePrimaryKey;
+use App\Support\PinyinUmlaut;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -180,6 +181,13 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
             return $this->errorResponse('參數校驗失敗', 422, $validationErrors);
         }
 
+        // §D-6 保存止血：Tier 1 拼音欄的 v→ü 靜默歸一化。**create 端原本沒有這一步**，
+        // 於是同一個 `lv` 走 /api/v2/create 存 `lv`、走 /api/v2/mutate 或 /codes 存 `lü`
+        // ——同一欄兩種寫法，而 §D-6 的承諾是「保存時一律歸一」。Tier 定義只有一份
+        // （config/code_table_mutations.php），這裡按表名去查，不在本檔複製一份 tier 清單。
+        // 順序比照 update 端：歸一化在落地替換之前。
+        $row = PinyinUmlaut::normalizeFields($row, $this->tier1FieldsFor($table));
+
         // 異體字落地替換（型別驅動）。掛在白名單化之後、落庫（與 ToolsRepository::timestamp()
         // 蓋稽核欄）之前；稽核欄本來就在排除清單裡。char_variant_map 自身在 EXCLUDED_TABLES
         // （替換等於自我吞噬），所以對照表的維護不會被自己改寫。
@@ -295,6 +303,26 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
                 'row' => $insertedArray,
             ],
         ]));
+    }
+
+    /**
+     * 該表的 §D-6 Tier 1 拼音欄（純拼音、無西文，保存時靜默 v→ü）。
+     *
+     * Tier 的定義只存在於 `config/code_table_mutations.php`（update 端的 config）；
+     * 這裡按**表名**去查而不是在 code_table_writes 複製一份，否則兩份 tier 清單一定會漂移
+     * ——而漂移的症狀是「同一個值在新增與修改後落庫成不同字形」，最難查的那一類。
+     * 沒登錄在那份 config 的表（純新增表）回空陣列＝不做歸一。
+     *
+     * @return array<int,string>
+     */
+    protected function tier1FieldsFor(string $table): array {
+        foreach ((array) config('code_table_mutations.tables', []) as $definition) {
+            if (($definition['table'] ?? null) === $table) {
+                return (array) ($definition['tier1_fields'] ?? []);
+            }
+        }
+
+        return [];
     }
 
     /**

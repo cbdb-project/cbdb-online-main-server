@@ -5,6 +5,8 @@ namespace App\Services\Mutations;
 use App\Models\Operation;
 use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
+use App\Support\AuditActor;
+use App\Support\CodeTableFieldValidator;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -25,6 +27,7 @@ use Illuminate\Support\Str;
 abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler {
     use \App\Services\Mutations\Concerns\AppliesVariantReplacement;
     use \App\Services\Mutations\Concerns\GuardsCharVariantMapWrites;
+    use \App\Services\Mutations\Concerns\HandlesCodeTableWrites;
     protected OperationRepository $operationRepository;
     protected AuditLogService $auditLogService;
 
@@ -114,6 +117,10 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
             ]);
         }
 
+        // 型別正規化（與 create 端同一套；只在單邊做會製造「新增進得去、改回同一個值
+        // 卻 422」的不對稱）。必須在校驗與變更偵測之前：正規化後才是真正要落庫的值。
+        $updateData = CodeTableFieldValidator::normalize($updateData, $this->fieldTypeSpec());
+
         // 驗證欄位值
         $validationErrors = $this->validateFields($updateData);
         if (!empty($validationErrors)) {
@@ -182,7 +189,7 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
 
         try {
             DB::transaction(function () use ($table, $pk, $resourceId, $updateData, $originalArray, $comment, $operationId, $personId, &$operation, &$newArray) {
-                $this->whereByPk(DB::table($table), $pk)->update($updateData);
+                $this->whereByPk(DB::table($table), $pk)->update($this->stampModifiedColumns($table, $updateData));
 
                 $updatedRow = $this->findByPk($pk);
                 $newArray = $this->auditLogService->normalizeRow($updatedRow);
@@ -214,10 +221,31 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
                 );
             });
         } catch (\Illuminate\Database\QueryException $e) {
+            // 這三個回應都在落地替換之後，所以都要帶 notices（AGENTS §1.3：成功、409、422
+            // 都要掛）——被擋下來時使用者更需要知道自己輸入的字已被正規化。
+            //
+            // 判定順序不可調換：SQLite 的 UNIQUE／FOREIGN KEY／NOT NULL 共用 errno 19，
+            // trait 內以訊息互斥（見 HandlesCodeTableWrites）。
+            if ($this->isForeignKeyViolation($e)) {
+                // 白名單開放的欄位裡有外鍵欄（ADDR_CODES.c_admin_cat_code → ADMIN_CAT_CODES、
+                // ADDR_BELONGS_DATA.c_source → TEXT_CODES）。指向不存在的代碼是呼叫端的輸入
+                // 問題，要回 422；不擋的話 MariaDB 1452 會一路冒到 controller 變成 500，
+                // SQLite 則會被誤判成 409「請重試」而誘導無效的重試迴圈。
+                return $this->withVariantNotices($this->errorResponse('關聯的記錄不存在（外鍵約束）', 422, ['changes' => ['foreign_key_violation']]));
+            }
+            // NOT NULL／CHECK：理論上已由 not_null_fields 在 422 擋下，這裡是登記漏了時的
+            // 兜底——同樣是呼叫端輸入問題，不該以 500 或「請重試」的 409 呈現。
+            if ($this->isNotNullOrCheckViolation($e)) {
+                return $this->withVariantNotices($this->errorResponse('欄位不可為空', 422, ['changes' => ['not_null_violation']]));
+            }
+            // 值轉換／超出範圍（strict sql_mode 才會拋）：同樣是輸入問題，兜底轉 422。
+            if ($this->isValueRangeOrConversionViolation($e)) {
+                return $this->withVariantNotices($this->errorResponse('欄位值超出允許範圍或型別不符', 422, ['changes' => ['invalid_value']]));
+            }
             // 部分表（如 char_variant_map 的 c_variant_char）在非主鍵欄位上另有唯一鍵；
             // 更新撞到該唯一鍵須回 409（可重試/可提示），不能讓資料庫層例外冒出成 500。
             if ($this->isUniqueConstraintViolation($e)) {
-                return $this->errorResponse('修改後的值與其他記錄的唯一鍵衝突', 409, ['changes' => ['conflict']]);
+                return $this->withVariantNotices($this->errorResponse('修改後的值與其他記錄的唯一鍵衝突', 409, ['changes' => ['conflict']]));
             }
 
             throw $e;
@@ -302,22 +330,61 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
     }
 
     /**
+     * 允許以浮點數更新的欄位（預設無）。理由同 integerFields()，只是值域是 double
+     * （目前用於 ADDR_CODES 的 x_coord／y_coord 經緯度）。整數同樣被接受——JSON 的
+     * `120` 與 `120.0` 是同一個座標，客戶端沒有辦法強制序列化成後者。
+     *
+     * @return array<int,string>
+     */
+    protected function floatFields(): array {
+        return [];
+    }
+
+    /**
+     * 不套 255 長度上限的欄位（預設無）：實際型別為 text／longtext 的欄。
+     * 不登記的話 longtext 欄會被基底的 255 檢查誤擋（ADDR_CODES.c_notes 即是）。
+     *
+     * @return array<int,string>
+     */
+    protected function longTextFields(): array {
+        return [];
+    }
+
+    /**
+     * 資料庫 NOT NULL、不接受以 null 清空的欄位（預設無）。
+     * 不登記的話送 null 會直接變成資料庫層的 1048 例外（500）而不是 422
+     * （ADDR_CODES.c_admin_cat_code 即是：NOT NULL DEFAULT 0 且帶 FK）。
+     *
+     * @return array<int,string>
+     */
+    protected function notNullFields(): array {
+        return [];
+    }
+
+    /**
      * 欄位值校驗：預設對每個白名單欄做「字串或 null、長度 ≤ 255」檢查；
-     * integerFields() 內列出的欄位額外接受整數。需要更嚴格規則的表可覆寫。
+     * integerFields()／floatFields()／longTextFields()／notNullFields() 逐欄放寬或收緊。
+     * 判定本體與 create 端共用（{@see \App\Support\CodeTableFieldValidator}），
+     * 確保同一張表在 create 與 update 得到一致的錯誤語義。需要更嚴格規則的表可覆寫。
      */
     protected function validateFields(array $data): array {
-        $errors = [];
-        $integerFields = $this->integerFields();
-        foreach ($data as $field => $value) {
-            $allowInt = in_array($field, $integerFields, true);
-            if ($value !== null && !is_string($value) && !($allowInt && is_int($value))) {
-                $errors[$field] = [$field . ($allowInt ? ' 必須為字串、整數或 null' : ' 必須為字串或 null')];
-            } elseif (is_string($value) && mb_strlen($value) > 255) {
-                $errors[$field] = [$field . ' 長度不可超過 255 字元'];
-            }
-        }
+        return CodeTableFieldValidator::validate($data, $this->fieldTypeSpec());
+    }
 
-        return $errors;
+    /**
+     * 本表的型別登記，整理成 {@see CodeTableFieldValidator} 的 spec 形狀。
+     *
+     * @return array<string,array<int,string>>
+     */
+    protected function fieldTypeSpec(): array {
+        return [
+            'integer_fields' => $this->integerFields(),
+            'float_fields' => $this->floatFields(),
+            'long_text_fields' => $this->longTextFields(),
+            'not_null_fields' => $this->notNullFields(),
+            // 由實際 schema 推導，不是手抄的 config（見 trait 註解）。
+            'integer_ranges' => $this->integerRanges($this->tableName()),
+        ];
     }
 
     /**
@@ -331,27 +398,35 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
         return $updateData;
     }
 
+    /**
+     * 蓋「最後一次實際寫入」稽核欄（AGENTS.md §1.2），經 AuditActor 署名。
+     *
+     * 為什麼要在這裡補：本基底原本直接 `->update($updateData)`，從不蓋 c_modified_*。
+     * 同一列若改走 /codes 表單就會被 CodesController 蓋章，於是同一張表的
+     * c_modified_by 會依「最後是哪個介面改的」而時對時錯——比全部留空更難查。
+     * 表沒有這組欄位（多數純代碼表）時原樣返回，不會製造 Unknown column。
+     *
+     * @param array<string,mixed> $updateData
+     * @return array<string,mixed>
+     */
+    protected function stampModifiedColumns(string $table, array $updateData): array {
+        $columns = $this->columnListing($table);
+        if ($columns === []) {
+            return $updateData;
+        }
+
+        if (in_array('c_modified_by', $columns, true)) {
+            $updateData['c_modified_by'] = AuditActor::currentName();
+        }
+        if (in_array('c_modified_date', $columns, true)) {
+            $updateData['c_modified_date'] = Carbon::now();
+        }
+
+        return $updateData;
+    }
+
     /** 以主鍵定位單列。 */
     protected function findByPk(array $pk): ?object {
         return $this->whereByPk(DB::table($this->tableName()), $pk)->first();
-    }
-
-    /** 把主鍵條件套到 query builder。 */
-    protected function whereByPk(\Illuminate\Database\Query\Builder $query, array $pk): \Illuminate\Database\Query\Builder {
-        foreach ($pk as $col => $value) {
-            $query->where($col, $value);
-        }
-
-        return $query;
-    }
-
-    private function isUniqueConstraintViolation(\Illuminate\Database\QueryException $e): bool {
-        $code = (int) ($e->errorInfo[1] ?? 0);
-        if (in_array($code, [1062, 19], true)) {
-            return true;
-        }
-        $msg = $e->getMessage();
-
-        return str_contains($msg, 'UNIQUE') || str_contains($msg, 'Duplicate entry');
     }
 }

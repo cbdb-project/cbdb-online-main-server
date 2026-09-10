@@ -13,12 +13,25 @@
  *   - key_columns：主鍵欄（順序須與 CompositePrimaryKey::SCHEMAS 完全一致；基底有 500 防呆）。
  *   - allowed_fields：允許更新的欄位白名單（Phase B 首要為拼音／羅馬字欄，見 §D-6 Tier 登錄表）。
  *   - tier1_fields：保存時**後端靜默** v→ü 歸一化的欄（定義上即漢語拼音、無西文）。
- *   - tier2_fields：**可能含西文**的混合欄——後端**不**靜默轉（由前端 altname 式彈窗讓使用者決定）。
- *     tier1_fields ∪ tier2_fields 必等於 allowed_fields。依 §D-6 Tier 登錄表（實測定案）。
+ *   - tier2_fields：**可能含西文**的混合欄——後端**不**靜默轉（由前端 altname 式彈窗讓使用者決定，
+ *     見 CodesController::codeTableTier2Fields()）。
+ *     兩個 tier 只涵蓋**拼音／羅馬字**欄，且 tier1_fields ∪ tier2_fields ⊆ allowed_fields。
+ *     早期各表的 allowed_fields 清一色是拼音欄，兩者恰好相等；自 ADDR_CODES 開放整列編輯後
+ *     不再成立——中文名、年份、座標、註記與 v→ü 無關，**不可**為了湊相等而塞進 tier2
+ *     （那會讓 /codes 編輯器對它們也彈 ü 轉換視窗、也會被 cbdb:migrate-code-pinyin-v --tier=tier2 掃到）。
+ *     依 §D-6 Tier 登錄表（實測定案）。
  *   - integer_fields（可選，預設無）：allowed_fields 中允許以整數值更新的欄（見
  *     AbstractCodeTableMutationHandler::validateFields()）。預設所有欄一律要求 string|null；
  *     只有非拼音／文字的整數旗標欄（如 char_variant_map.c_strict_excluded）才需要登記，
  *     且僅登記該欄本身——不影響同一張表或其他表未登記欄位仍要求 string|null 的既有行為。
+ *   - float_fields（可選）：允許以數值（int|float）更新的欄，用於 double 欄（經緯度）。
+ *   - long_text_fields（可選）：實際型別為 text／longtext 的欄，不套預設的 255 長度上限。
+ *   - not_null_fields（可選）：資料庫 NOT NULL 的欄；送 null 一律 422。不登記的話
+ *     送 null 會變成資料庫層 1048 例外（500）。**數值型**的 NOT NULL 欄另外拒絕空字串
+ *     （`''` 進不了 smallint）；**文字型**的 NOT NULL 欄允許空字串——那些欄多半是
+ *     `NOT NULL DEFAULT ''`，`''` 正是它們「清空」的合法寫法。
+ *     登記完整性由 tests/Feature/CodeTableWriteConfigDriftTest 對實際 schema 機械檢查。
+ *     以上三者與 integer_fields 的判定本體與 create 端共用 {@see \App\Support\CodeTableFieldValidator}。
  *
  * 目前僅 update；c_personid 一律 0（code 表為全域代碼）。
  */
@@ -107,6 +120,8 @@ return [
             'allowed_fields' => ['c_text_cat_pinyin'],
             'tier1_fields' => ['c_text_cat_pinyin'],
             'tier2_fields' => [],
+            // NOT NULL DEFAULT ''：送 null 會是 1048（500）；要清空請送空字串。
+            'not_null_fields' => ['c_text_cat_pinyin'],
         ],
         [
             'resource' => 'ganzhi_codes',
@@ -117,6 +132,8 @@ return [
             'allowed_fields' => ['c_ganzhi_py'],
             'tier1_fields' => ['c_ganzhi_py'],
             'tier2_fields' => [],
+            // NOT NULL DEFAULT ''：送 null 會是 1048（500）；要清空請送空字串。
+            'not_null_fields' => ['c_ganzhi_py'],
         ],
         [
             'resource' => 'social_institution_name_codes',
@@ -127,6 +144,8 @@ return [
             'allowed_fields' => ['c_inst_name_py'],
             'tier1_fields' => ['c_inst_name_py'],
             'tier2_fields' => [],
+            // NOT NULL DEFAULT ''：送 null 會是 1048（500）；要清空請送空字串。
+            'not_null_fields' => ['c_inst_name_py'],
         ],
         [
             'resource' => 'social_institution_types',
@@ -151,12 +170,46 @@ return [
         [
             'resource' => 'addr_codes',
             'table' => 'ADDR_CODES',
-            'aliases' => ['addr_codes'],
+            'aliases' => ['addr_codes', 'addr-codes', 'addrcodes'],
             'display_name' => '地址代碼',
             'key_columns' => ['c_addr_id'],
-            'allowed_fields' => ['c_name'],
+            // 地名表可經 /api/v2/create 新增（config/code_table_writes.php），所以 update
+            // 端也必須收得下同一組欄位——只開 c_name 會讓「新增時填得進去、之後改不了」。
+            // 主鍵 c_addr_id 不在此列（改主鍵＝換一筆地名，須另行新增／刪除）。
+            'allowed_fields' => [
+                'c_name', 'c_name_chn', 'c_alt_names',
+                'c_firstyear', 'c_lastyear',
+                'c_admin_type', 'c_admin_cat_code',
+                'x_coord', 'y_coord', 'CHGIS_PT_ID',
+                'c_notes',
+            ],
+            // tier 只涵蓋拼音／羅馬字欄：本表僅 c_name 一欄（Tier 2＝可能含西文，後端不轉、
+            // 由前端彈窗讓使用者決定）。其餘欄位（中文名、年份、座標、註記）與 v→ü 無關，
+            // 兩個 tier 都不列——列進 tier2 會讓 /codes 編輯器對它們也彈 ü 轉換視窗。
             'tier1_fields' => [],
             'tier2_fields' => ['c_name'],
+            'integer_fields' => ['c_firstyear', 'c_lastyear', 'c_admin_cat_code', 'CHGIS_PT_ID'],
+            'float_fields' => ['x_coord', 'y_coord'],
+            // c_notes 是 longtext，不套基底的 255 上限。
+            'long_text_fields' => ['c_notes'],
+            // c_admin_cat_code：NOT NULL DEFAULT 0 且帶 FK → ADMIN_CAT_CODES；
+            // 送 null 會是資料庫層 1048（500）而不是 422。
+            'not_null_fields' => ['c_admin_cat_code'],
+        ],
+        [
+            // 地名隸屬關係（某地名在某年段隸屬於哪個上級地名）。四欄複合主鍵全是數值欄，
+            // 主鍵不可經 update 更動——改隸屬對象或年段等於換一筆記錄，走 create + delete。
+            'resource' => 'addr_belongs_data',
+            'table' => 'ADDR_BELONGS_DATA',
+            'aliases' => ['addr_belongs_data', 'addr-belongs-data', 'addr_belongs', 'addr-belongs'],
+            'display_name' => '地址隸屬關係',
+            'key_columns' => ['c_addr_id', 'c_belongs_to', 'c_firstyear', 'c_lastyear'],
+            'allowed_fields' => ['c_source', 'c_pages', 'c_notes'],
+            // 出處、頁碼、註記都不是拼音欄，兩個 tier 皆空。
+            'tier1_fields' => [],
+            'tier2_fields' => [],
+            // c_source 是 FK → TEXT_CODES.c_textid（可為 null＝未註明出處）。
+            'integer_fields' => ['c_source'],
         ],
         [
             'resource' => 'char_variant_map',
@@ -171,6 +224,8 @@ return [
             // AbstractCodeTableMutationHandler::validateFields() 預設只接受 string|null，
             // 這裡明確登記允許整數，且僅限這一欄——不影響本檔其他表仍要求 string|null 的既有行為。
             'integer_fields' => ['c_strict_excluded'],
+            // NOT NULL：送 null 不擋的話是資料庫層 1048（500）而不是 422。
+            'not_null_fields' => ['c_variant_char', 'c_reference_char', 'c_strict_excluded'],
         ],
     ],
 ];

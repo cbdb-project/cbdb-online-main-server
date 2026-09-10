@@ -61,8 +61,11 @@ class MutationCreateUpdateParityTest extends TestCase {
         // create 與 update 共用同一組欄位（BiogSourceRepository 的 KEY_COLUMNS + MUTABLE_COLUMNS），
         // 同一支 handler 內分支，結構上不可能不對稱。
         \App\Services\Mutations\SourceMutationHandler::class => 'create/update 共用同一組欄位常數',
-        // 兩端都從同一個 config('code_table_mutations.<table>.allowed_fields') 讀，同上。
-        \App\Services\Mutations\CodeTableCreateHandler::class => 'create/update 共用同一份 config 白名單',
+        // 代碼表 create 讀 config/code_table_writes.php、update 讀 config/code_table_mutations.php
+        // ——是**兩份**手打清單，不是同一份（早年 create 端只服務 TEXT_CODES 時曾經誤以為是）。
+        // 兩端對稱由 CodeTableWriteConfigDriftTest 專門守衛（那裡才拿得到「同一張表」的對應
+        // 關係；本測試的掃描是以 handler 的欄位常數為單位，看不到 config 驅動的多表分派）。
+        \App\Services\Mutations\CodeTableCreateHandler::class => 'config 驅動的多表分派，兩端對稱改由 CodeTableWriteConfigDriftTest 守衛',
         // 實體聚合的鍵是**領域鍵**（begin_year、by_nianhao_code…）而非欄名，且兩端**允許**不同
         // （social-institution 刻意 create 收 5 鍵、update 收 19 鍵，見 API.md §13.4）。
         // 要守的是另一組不變量，需另立守衛，不套用本測試的「update 有的 create 都要有」。

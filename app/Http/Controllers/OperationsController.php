@@ -1783,6 +1783,7 @@ class OperationsController extends Controller {
             'SOCIAL_INSTITUTION_ADDR' => ['c_inst_addr_id','c_inst_addr_type_code','c_inst_code','c_inst_name_code','inst_xcoord','inst_ycoord'],
             'ADMIN_CAT_CODES' => ['c_admin_cat_code'],
             'ADDR_CODES' => ['c_addr_id'],
+            'ADDR_BELONGS_DATA' => ['c_addr_id', 'c_belongs_to', 'c_firstyear', 'c_lastyear'],
             // 親屬關係化簡規則表：可經泛用 /codes 介面寫入，所以會產生 operations 列，
             // 而「還原」按鈕的顯示條件（admin ＋ opType 3/4 ＋ can_compare）不看這份 map——
             // 漏登錄的症狀是按鈕出現、按下去卻 restore_no_pk。順序須與 migration 的

@@ -182,6 +182,15 @@ class CompositePrimaryKey {
         'ADDR_CODES' => [
             'c_addr_id',
         ],
+        // 地名隸屬關係。順序須與資料庫 PRIMARY KEY
+        // (c_addr_id, c_belongs_to, c_firstyear, c_lastyear) 及
+        // OperationsController::resourceKeyColumns() 完全一致。
+        'ADDR_BELONGS_DATA' => [
+            'c_addr_id',
+            'c_belongs_to',
+            'c_firstyear',
+            'c_lastyear',
+        ],
         'CHAR_VARIANT_MAP' => [
             'id',
         ],

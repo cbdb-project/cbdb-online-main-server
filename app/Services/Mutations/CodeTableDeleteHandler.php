@@ -11,11 +11,16 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 /**
- * config 驅動的 code 表「刪除」handler（先支援 TEXT_CODES），供回滾/清理錯誤新增。
- * 定義見 config/code_table_writes.php。按單主鍵刪除，走既有授權 + operations + AuditLog（before-image）。
+ * config 驅動的 code／查找表「刪除」handler，供回滾/清理錯誤新增。
+ * 定義見 config/code_table_writes.php。按 key_columns（單鍵或複合鍵）刪除，
+ * 走既有授權 + operations + AuditLog（before-image）。
+ *
+ * 注意：handle() 開頭目前無條件回 403（碼表刪除全面停用，理由見該處註解），
+ * 底下的刪除實作是為了恢復時可用而維持著、目前不可達。
  */
 class CodeTableDeleteHandler extends AbstractMutationHandler {
     use \App\Services\Mutations\Concerns\GuardsCharVariantMapWrites;
+    use \App\Services\Mutations\Concerns\HandlesCodeTableWrites;
     protected array $definitions;
     protected OperationRepository $operationRepository;
     protected AuditLogService $auditLogService;
@@ -60,25 +65,38 @@ class CodeTableDeleteHandler extends AbstractMutationHandler {
         }
 
         $table = $def['table'];
-        $keyColumn = $def['key_column'];
+        $keyColumns = $def['key_columns'];
 
-        $id = $targetPk[$keyColumn] ?? null;
-        if ($id === null || $id === '') {
-            return $this->errorResponse('缺少主鍵 ' . $keyColumn, 422, ['target.pk.' . $keyColumn => ['required']]);
+        $pk = [];
+        $missingKeys = [];
+        foreach ($keyColumns as $col) {
+            $value = $targetPk[$col] ?? null;
+            if ($value === null || $value === '') {
+                $missingKeys[] = $col;
+
+                continue;
+            }
+            $pk[$col] = (int) $value;
         }
-        $id = (int) $id;
+        if (!empty($missingKeys)) {
+            $errors = [];
+            foreach ($missingKeys as $col) {
+                $errors['target.pk.' . $col] = ['required'];
+            }
 
-        $original = DB::table($table)->where($keyColumn, $id)->first();
+            return $this->errorResponse('缺少主鍵 ' . implode('、', $missingKeys), 422, $errors);
+        }
+
+        $original = $this->whereByPk(DB::table($table), $pk)->first();
         if (!$original) {
             return $this->errorResponse($table . ' 記錄不存在', 404);
         }
         $originalArray = $this->auditLogService->normalizeRow($original);
 
         $operation = null;
-        DB::transaction(function () use (&$operation, $table, $keyColumn, $id, $originalArray, $personId) {
-            DB::table($table)->where($keyColumn, $id)->delete();
+        DB::transaction(function () use (&$operation, $table, $pk, $originalArray, $personId) {
+            $this->whereByPk(DB::table($table), $pk)->delete();
 
-            $pk = [$keyColumn => $id];
             $operation = $this->operationRepository->store(
                 Auth::id(),
                 $personId,
@@ -113,7 +131,7 @@ class CodeTableDeleteHandler extends AbstractMutationHandler {
             'mode' => 'direct',
             'operation' => 'delete',
             'result' => [
-                'pk' => [$keyColumn => $id],
+                'pk' => $pk,
                 'status' => 'deleted',
                 'operation_id' => $operation?->id,
             ],

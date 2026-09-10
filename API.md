@@ -463,13 +463,13 @@ CBDB 子資源表幾乎都是複合主鍵，且不使用 Eloquent 主鍵行為�
 | sources | **create／update 只接受 `sources`**；delete 另接受 source, biog_source_data | BIOG_SOURCE_DATA | ✔ | ✔ | ✔ |
 | merged-person | merged_person, merged_person_data, mergedperson | MERGED_PERSON_DATA | ✔ | ✘ | ✔ |
 | 可修改的代碼表（nianhao、office_codes、dynasties…） | 見〈代碼表與複合實體寫入〉 | 各代碼表 | ✘（501） | ✔ | ✘（501） |
-| 可新增的代碼表（text-codes、char-variant-map） | 逐操作不同，見〈代碼表與複合實體寫入〉 | TEXT_CODES、char_variant_map | 僅 direct | ✔ | ✘（403，已停用） |
+| 可新增的代碼表（text-codes、char-variant-map、addr-codes、addr-belongs-data） | 逐操作不同，見〈代碼表與複合實體寫入〉 | TEXT_CODES、char_variant_map、ADDR_CODES、ADDR_BELONGS_DATA | 僅 direct | ✔ | ✘（403，已停用） |
 | office、social-institution、text-entity（複合實體聚合） | 見〈代碼表與複合實體寫入〉 | 多表聚合 | ✔ | ✔ | ✔ |
 
 - 表中 `✔` 表示 `direct` 與 `proposal` 兩種模式都支援。
 - 人物主檔（basicinformation）的 `create` 與 `delete` **不支援 proposal**，會回 501 `mode: ["proposal_not_supported"]`；`update` 則兩種模式都支援。
 - 人物主檔的 `delete` 是**軟刪除**：把 `c_name_chn` 改為 `<待删除>`（UPDATE，不是真的 DELETE，也不觸發外鍵連鎖），並記一筆 `op_type=4` 的 operation。
-- 代碼表分兩組：**只能改**的一組（`config/code_table_mutations.php`，如 nianhao、office_codes、dynasties、choronym_codes、ganzhi_codes 等）送 `create`／`delete` 會回 501；**可新增**的一組只有 `TEXT_CODES` 與 `char_variant_map`（`config/code_table_writes.php`）。代碼表的 `delete` 一律不開放——受支援的兩張表回 **403**（防止級聯刪除人物資料），其餘代碼表回 501。
+- 代碼表分兩組：**只能改**的一組（`config/code_table_mutations.php`，如 nianhao、office_codes、dynasties、choronym_codes、ganzhi_codes 等）送 `create`／`delete` 會回 501；**可新增**的一組是 `TEXT_CODES`、`char_variant_map`、`ADDR_CODES` 與 `ADDR_BELONGS_DATA`（`config/code_table_writes.php`）。代碼表的 `delete` 一律不開放——受支援的四張表回 **403**（防止級聯刪除人物資料），其餘代碼表回 501。
 - 不支援的 `resource` / `mode` / `operation` 組合一律回 **501**：`{"ok":false,"message":"目前尚未支援此變更模式","errors":{"resource":"...","mode":"...","operation":"..."}}`。
 
 各資源的欄位白名單、必填規則與範例見〈各資源欄位參考〉。
@@ -483,9 +483,9 @@ CBDB 子資源表幾乎都是複合主鍵，且不使用 Eloquent 主鍵行為�
 | 404 | 目標列不存在（訊息形如 `ALTNAME_DATA 記錄不存在`） | — |
 | 409 | 主鍵衝突或狀態衝突 | `target.pk: conflict` / `duplicate` / `pending_proposal_exists`、`changes: conflict`、`mirror_conflict`、`mirror_suspected`、`mirror_delete_multiple`、`mirror: conflict` |
 | 419 | CSRF token 不符（只會發生在 `resubmit`、`opposite-edges`） | — |
-| 422 | 參數校驗失敗 | `target.pk: required`、`person_id: required`、`pk`（主鍵缺欄位）、`person_id: mismatch`、`changes: required` / `empty` / `no_supported_fields` / `no_effective_changes` / `disallowed_fields: <欄位清單>`、各欄位級規則、`mirror_integrity: fail_closed` |
+| 422 | 參數校驗失敗 | `target.pk: required`、`target.pk.<欄名>: required` / `numeric`（代碼表 create）、`person_id: required`、`pk`（主鍵缺欄位）、`person_id: mismatch`、`changes: required` / `empty` / `no_supported_fields` / `no_effective_changes` / `disallowed_fields: <欄位清單>` / `foreign_key_violation` / `not_null_violation` / `invalid_value`（代碼表寫入）、各欄位級規則、`mirror_integrity: fail_closed` |
 | 429 | 超過限流。**本章的 `/api/v2` 寫入端點在應用程式層沒有限流，不會由應用程式回 429**（見 1.3）；會回 429 的是 `api` 群組端點（600 次／分鐘）、`/api/mcp`（預設 120 次／分鐘）與少數自帶額度的端點（見 14.9） | — |
-| 500 | 未預期的伺服器錯誤 | — |
+| 500 | 未預期的伺服器錯誤 | 代碼表 create 另有設定錯誤時的 `pk: schema_mismatch` / `auto_assign_unsupported`（主鍵登錄與 `CompositePrimaryKey::SCHEMAS` 不一致、或複合主鍵誤設自動配發），屬部署設定問題、不是呼叫端能修的 |
 | 501 | `resource` / `mode` / `operation` 組合不支援 | `resource`、`mode`、`operation`（此處的值是**字串**，不是字串陣列） |
 
 **`errors` 值的型別不統一**，請寬鬆解析：多數是「欄位 → 錯誤代號字串陣列」，但
@@ -508,6 +508,11 @@ CBDB 子資源表幾乎都是複合主鍵，且不使用 Eloquent 主鍵行為�
 | `changes: ["no_effective_changes"]` | 送出的值與現值完全相同（後端以字串比對），沒有任何實際變更 |
 | `person_id: ["mismatch"]` | `person_id` 與 `target.pk` 內人物欄不符，或與資料庫該列的人物欄不符 |
 | `pk: ["缺少必要的複合主鍵參數：..."]` | `target.pk` 缺欄位 |
+| `target.pk.c_lastyear: ["required"]` | 代碼表 `create` 的複合主鍵缺欄位（逐欄回報，不是整包 `pk`） |
+| `target.pk.c_firstyear: ["numeric"]` | 代碼表 `create` 的主鍵值不是整數（不會靜默轉成 `0`） |
+| `changes: ["foreign_key_violation"]` | 代碼表 `create`／`update` 的外鍵指向不存在的列（先建父列） |
+| `changes: ["not_null_violation"]` | 代碼表寫入把 NOT NULL 欄寫成空（兜底；通常會先被 `<欄名> 不可為空` 擋下） |
+| `changes: ["invalid_value"]` | 代碼表寫入的值超出欄位範圍或型別不符（兜底；只有 strict sql_mode 的部署會走到，通常先被欄位級規則擋下） |
 
 **警告（欄名打錯不一定會報錯）**：白名單外的欄位並非所有資源都會整筆拒絕。下列路徑是**靜默丟棄**未知欄位，會回 `200` / `ok: true` 但該欄根本沒寫進資料庫：
 
@@ -1393,22 +1398,35 @@ Authorization: Bearer <token>
 | social_institution_name_codes | — | SOCIAL_INSTITUTION_NAME_CODES | c_inst_name_code | c_inst_name_py |
 | social_institution_types | — | SOCIAL_INSTITUTION_TYPES | c_inst_type_code | c_inst_type_py |
 | admin_cat_codes | admin_cat | ADMIN_CAT_CODES | c_admin_cat_code | c_admin_cat_py |
-| addr_codes | — | ADDR_CODES | c_addr_id | c_name |
+| addr_codes | addr-codes, addrcodes | ADDR_CODES | c_addr_id | c_name, c_name_chn, c_alt_names, c_firstyear, c_lastyear, c_admin_type, c_admin_cat_code, x_coord, y_coord, CHGIS_PT_ID, c_notes |
+| addr_belongs_data | addr-belongs-data, addr_belongs, addr-belongs | ADDR_BELONGS_DATA | c_addr_id, c_belongs_to, c_firstyear, c_lastyear | c_source, c_pages, c_notes |
 | char_variant_map | char-variant-map, charvariantmap | char_variant_map | id | c_variant_char, c_reference_char, c_strict_excluded, c_notes |
 
 規則：
 
-- 值必須是**字串或 `null`**，且長度 ≤ 255 字元，否則 422（訊息形如 `<欄名> 必須為字串或 null`／`<欄名> 長度不可超過 255 字元`）。唯二可送整數的欄位是 `TEXT_INSTANCE_DATA.c_pub_year` 與 `char_variant_map.c_strict_excluded`。
+- 預設值必須是**字串或 `null`**，且長度 ≤ 255 字元，否則 422（訊息形如 `<欄名> 必須為字串或 null`／`<欄名> 長度不可超過 255 字元`）。放寬與收緊都是**逐表逐欄**登記的（`config/code_table_mutations.php`／`config/code_table_writes.php`，判定見 `App\Support\CodeTableFieldValidator`）：
+  - **可送整數**：`TEXT_INSTANCE_DATA.c_pub_year`、`char_variant_map.c_strict_excluded`、`ADDR_CODES` 的 `c_firstyear`／`c_lastyear`／`c_admin_cat_code`／`CHGIS_PT_ID`、`ADDR_BELONGS_DATA.c_source`（訊息 `<欄名> 必須為字串、整數或 null`）。
+  - **可送數值（整數或小數）**：`ADDR_CODES.x_coord`／`y_coord`（訊息 `<欄名> 必須為字串、數值或 null`）。
+  - 數值欄**送字串時必須真的是數字**（整數欄 `-?\d+`、浮點欄另允許小數點），否則 422 `<欄名> 必須為整數`／`必須為數值`。不擋的話 MariaDB 在本專案的非 strict sql_mode 下會把 `"not-a-year"` **靜默存成 0**，而 0 在年份／代碼欄都是合法值、事後看不出是壞資料。
+  - 可為 null 的數值欄送空字串 `""` 等於**清空（寫入 null）**，不是寫 0。
+  - 整數欄另有**值域檢查**（依該欄實際型別，如 smallint 是 -32768～32767），超出回 422 `<欄名> 必須在 <min> 與 <max> 之間`。同理由：非 strict sql_mode 下 MariaDB 會把 40000 靜默截斷成 32767，回 200 但年份是錯的。
+  - 超出 PHP 整數精度的數字字串回 422 `<欄名> 整數值超出可表示範圍`（`(int)` 會飽和成最大值，讓值域檢查誤判為「剛好在範圍內」）。`bigint` 欄不做值域檢查，只做這條溢位檢查。
+  - **不受 255 上限**：`ADDR_CODES.c_notes`（實際型別是 longtext）。13.2 的 create 另有 `TEXT_CODES.c_notes`——該欄只能新增時寫，不在本節的 update 白名單內。
+  - **整數欄也收「小數部分為 0 的浮點數」**（`1200.0` → `1200`）：不少 JSON 序列化器就是這樣送整數的。真的帶小數時回 422，不會靜默截斷。create 與 update 兩端一致。
+  - **文字欄收到 JSON 數字時，只有 `create` 會轉成字串**（`"c_pages": 12` → `"12"`，等同資料庫原本的隱式轉型）；`update` 一律回 422。這是刻意的不對稱：create 在加上型別校驗之前完全沒有檢查，改判 422 會打斷既有客戶端；update 從第一天就要求字串。**要送 update 請自己加引號。**
+  - **不可為 `null`**：資料庫 NOT NULL 的欄，訊息 `<欄名> 不可為空`。數值型的（`ADDR_CODES.c_admin_cat_code`、`char_variant_map.c_strict_excluded`）連空字串也拒絕，整個不送則吃資料庫預設值；文字型的（`TEXT_BIBLCAT_CODES.c_text_cat_pinyin`、`GANZHI_CODES.c_ganzhi_py`、`SOCIAL_INSTITUTION_NAME_CODES.c_inst_name_py`、`char_variant_map.c_variant_char`／`c_reference_char`）**允許送空字串**——那些欄是 `NOT NULL DEFAULT ''`，`''` 就是它們清空的合法寫法。
 - 純拼音欄位在保存時會**靜默**把 `v` 正規化為 `ü`（只轉「`l`／`n` 之後、且後面不接 `a`／`i`／`o`／`u`」的 `v`，例如 `lv`→`lü`、`nv`→`nü`）。可能含西文的混合欄不做這個轉換——注意這是**逐表逐欄**登記的，同一個欄名在不同表可能不同：`ETHNICITY_TRIBE_CODES.c_name` 與 `TEXT_CODES.c_title` 會轉，`ADDR_CODES.c_name`、`DYNASTIES.c_dynasty`、`CHORONYM_CODES.c_choronym_desc`、`ETHNICITY_TRIBE_CODES.c_romanized` 不轉。
 - **`v→ü` 正規化發生在「有沒有變更」的判斷之前**：若庫內已是 `lü` 而你送 `lv`，兩者正規化後相同，會得到 422 `changes: no_effective_changes`。這不是 bug。
 - 改後的值與其他列的唯一鍵衝突 → 409 `changes: conflict`。
+- 外鍵欄指向不存在的列 → 422 `changes: ["foreign_key_violation"]`（`ADDR_CODES.c_admin_cat_code` → `ADMIN_CAT_CODES`、`ADDR_BELONGS_DATA.c_source` → `TEXT_CODES`）。NOT NULL 欄仍被寫成空 → 422 `changes: ["not_null_violation"]`（正常情況下會先被上面的欄位級規則擋在 `<欄名> 不可為空`）。
 - 其餘錯誤與人物子資源一致：白名單外欄位 422 `disallowed_fields`、`changes` 整包為空 422 `changes: empty`、有送但值相同 422 `changes: no_effective_changes`、找不到列 404。
 - 回應 `result` 含 `pk`／`updated_fields`／`operation_id`／`row`；proposal 的 payload 另含 `__key_columns` 與 `__proposal_meta`。
+- 更新成功時系統會蓋 `c_modified_by`／`c_modified_date`（表有這兩欄時；署名經 `AuditActor`）；`c_created_*` 只在新增時蓋、之後永遠沿用。
 - **代碼表 `update` 寫入 `operations` 時，`c_personid` 一律被記成 `0`**（不論你送什麼 `person_id`）。13.2 的 `create` 則是原樣記錄你送的 `person_id`——兩者不一致，追蹤時請注意。
 
 ### 13.2 可新增的代碼表（只支援 `create`、只支援 `direct`）
 
-只有兩張表開放新增：
+目前開放新增的有四張表：
 
 > **與 13.4 的 `text-entity` 聚合並存**：`TEXT_CODES` 兩條寫入路徑都在役——本節的裸表 create 是「就這一列、就這些欄」的機器化寫入（S5 起同樣會做異體字落地替換）；聚合資源另外處理拼音派生、書名字形／標點正規化與 `TEXT_INSTANCE_DATA` 版本列。要建立一筆語義完整的文獻，用 13.4；只補一列原始資料，用本節。
 
@@ -1416,20 +1434,29 @@ Authorization: Bearer <token>
 | ------ | ------ | ------ | ------ | ------ |
 | text-codes | text_codes, textcodes | TEXT_CODES | c_textid（可自動配發） | c_title_chn, c_title, c_title_trans, c_text_type_id, c_text_year, c_text_nh_code, c_text_nh_year, c_text_range_code, c_bibl_cat_code, c_extant, c_text_country, c_text_dy, c_source, c_pages, c_url_api, c_url_api_coda, c_url_homepage, c_notes, c_title_alt_chn |
 | char-variant-map | char_variant_map, charvariantmap | char_variant_map | id（可自動配發） | c_variant_char, c_reference_char, c_strict_excluded, c_notes |
+| addr-codes | addr_codes, addrcodes | ADDR_CODES | c_addr_id（可自動配發） | c_name, c_name_chn, c_alt_names, c_firstyear, c_lastyear, c_admin_type, c_admin_cat_code, x_coord, y_coord, CHGIS_PT_ID, c_notes |
+| addr-belongs-data | addr_belongs_data, addr_belongs, addr-belongs | ADDR_BELONGS_DATA | c_addr_id, c_belongs_to, c_firstyear, c_lastyear（**四欄都必填、不配發**） | c_source, c_pages, c_notes |
 
-- 主鍵可放在 `target.pk` 或 `changes`；**兩處都沒給值時由伺服器以 `max(主鍵)+1` 自動配發**。但 `target` 這個鍵本身仍必須存在——請送 `"target": {"pk": {}}`，完全省略會被控制器層 422 擋下。
+- 主鍵可放在 `target.pk` 或 `changes`；**單一主鍵的表在兩處都沒給值時，由伺服器以 `max(主鍵)+1` 自動配發**。但 `target` 這個鍵本身仍必須存在——請送 `"target": {"pk": {}}`，完全省略會被控制器層 422 擋下。
+- **複合主鍵的表（`addr-belongs-data`）沒有自動配發**：四個主鍵欄一個都不能少，缺哪一欄就回 422 `target.pk.<欄名>: ["required"]`。
+- 主鍵值必須是整數（或可解析為整數的字串），否則 422 `target.pk.<欄名>: ["numeric"]`——不會靜默轉成 `0`；超出 PHP 整數精度的字串同樣回 `numeric`（`(int)` 會飽和成最大值而非報錯）。
+- 主鍵值也受**值域檢查**（依該欄實際型別），超出回 422 `target.pk.<欄名>: ["out_of_range:<min>..<max>"]`。非 strict sql_mode 下不擋的話，`ADDR_BELONGS_DATA.c_firstyear`（smallint）收到 40000 會被截斷成 32767——那一列就被建在**你沒有指定的主鍵**上，回應顯示 40000、實際存 32767，之後照回應的鍵去改或刪一律 404。
 - 顯式指定且已存在 → 409 `target.pk: conflict`；並發撞號 → 409（訊息會提示重試）。**非主鍵的唯一鍵撞值時也回 409**，而 `errors` 仍是 `target.pk: conflict`（例如 `char_variant_map.c_variant_char` 重複）。
-- 白名單外欄位 → 422，`errors.changes` 是單一字串 `"disallowed_fields: c_xxx"`。
-- 只支援 `mode=direct`；送 `mode=proposal` 會得到 **501**（找不到 handler），不是 403。
+- 白名單外欄位 → 422，`errors.changes` 是單一字串 `"disallowed_fields: c_xxx"`（稽核欄 `c_created_by` 等也在白名單外，不可自行指定署名）。
+- 欄位型別／長度／NOT NULL 的校驗規則與 13.1 完全相同（同一份登記、同一套判定），唯一的差異是文字欄收到 JSON 數字時 create 會轉成字串、update 會 422（見 13.1 的說明）。
+- **外鍵指向不存在的列 → 422 `changes: ["foreign_key_violation"]`**（例如 `addr-belongs-data` 的 `c_belongs_to` 上級地名尚未建立、或 `c_source` 指向不存在的 `TEXT_CODES.c_textid`）。先建父列再建子列。
+- 只支援 `mode=direct`；送 `mode=proposal` 會得到 **501**（找不到 handler），不是 403。注意這與 13.1 的 `update` 不對稱：**代碼表可以提案修改、但不能提案新增**，眾包帳號只能改不能增。
 - 回應：`result.pk`、`result.status: "created"`、`result.operation_id`、`result.row`；系統會蓋 `c_created_by`／`c_created_date`。
 - 可以放進 `batch_mutate` 一起送。
+- **本節這四張表沒有 `/api/v2/read` 定義**（代碼表中只有 `nianhao` 有）：新增後要拿到伺服器配發的主鍵，直接看回應的 `result.pk` 與 `result.row`（整列都在裡面）。
+- **地名相關**：`ADDRESSES` 是由 `ADDR_CODES` + `ADDR_BELONGS_DATA` 派生的反正規化快取表，只由 `php artisan cbdb:regenerate-addresses-table` 重建。經本 API 新增的地名，在重建之前不會出現在依賴該快取的功能（官職地點自動填表、朝代同名地消歧、部分自然語言查詢）。批次匯入地名後請安排重建。
 - `TEXT_CODES` 的新增與修改是**兩份不同的定義**，別名清單不對稱：`create` 接受 `text-codes`／`text_codes`／`textcodes`，而 `update` **只接受 `text_codes`**（送 `text-codes` 做 update 會 501）。最保險是 create 用 `text-codes`、update 用 `text_codes`。
 
 ### 13.3 代碼表刪除：一律不開放
 
 代碼表被大量人物資料以外鍵引用，刪一列可能影響數萬筆記錄且難以乾淨復原，因此刪除**已停用**：
 
-- 上述兩張支援寫入的表、且 `mode=direct` → **403**（`代碼表刪除已停用（防止級聯刪除人物資料）`）
+- 上述四張支援寫入的表、且 `mode=direct` → **403**（`代碼表刪除已停用（防止級聯刪除人物資料）`）
 - 其他代碼表，或 `mode=proposal` → **501**（找不到對應 handler）
 
 ### 13.4 複合實體聚合：office、social-institution 與 text-entity

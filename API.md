@@ -463,13 +463,13 @@ CBDB 子資源表幾乎都是複合主鍵，且不使用 Eloquent 主鍵行為�
 | sources | **create／update 只接受 `sources`**；delete 另接受 source, biog_source_data | BIOG_SOURCE_DATA | ✔ | ✔ | ✔ |
 | merged-person | merged_person, merged_person_data, mergedperson | MERGED_PERSON_DATA | ✔ | ✘ | ✔ |
 | 可修改的代碼表（nianhao、office_codes、dynasties…） | 見〈代碼表與複合實體寫入〉 | 各代碼表 | ✘（501） | ✔ | ✘（501） |
-| 可新增的代碼表（text-codes、char-variant-map、addr-codes、addr-belongs-data、admin-cat-codes） | 逐操作不同，見〈代碼表與複合實體寫入〉 | TEXT_CODES、char_variant_map、ADDR_CODES、ADDR_BELONGS_DATA、ADMIN_CAT_CODES | 僅 direct | ✔ | ✘（403，已停用） |
+| 可新增的代碼表（text-codes、char-variant-map、addr-codes、addr-belongs-data、admin-cat-codes、office-type-tree） | 逐操作不同，見〈代碼表與複合實體寫入〉 | TEXT_CODES、char_variant_map、ADDR_CODES、ADDR_BELONGS_DATA、ADMIN_CAT_CODES、OFFICE_TYPE_TREE | 僅 direct | ✔ | ✘（403，已停用） |
 | office、social-institution、text-entity（複合實體聚合） | 見〈代碼表與複合實體寫入〉 | 多表聚合 | ✔ | ✔ | ✔ |
 
 - 表中 `✔` 表示 `direct` 與 `proposal` 兩種模式都支援。
 - 人物主檔（basicinformation）的 `create` 與 `delete` **不支援 proposal**，會回 501 `mode: ["proposal_not_supported"]`；`update` 則兩種模式都支援。
 - 人物主檔的 `delete` 是**軟刪除**：把 `c_name_chn` 改為 `<待删除>`（UPDATE，不是真的 DELETE，也不觸發外鍵連鎖），並記一筆 `op_type=4` 的 operation。
-- 代碼表分兩組：**只能改**的一組（`config/code_table_mutations.php`，如 nianhao、office_codes、dynasties、choronym_codes、ganzhi_codes 等）送 `create`／`delete` 會回 501；**可新增**的一組是 `TEXT_CODES`、`char_variant_map`、`ADDR_CODES`、`ADDR_BELONGS_DATA` 與 `ADMIN_CAT_CODES`（`config/code_table_writes.php`）。代碼表的 `delete` 一律不開放——受支援的五張表回 **403**（防止級聯刪除人物資料），其餘代碼表回 501。
+- 代碼表分兩組：**只能改**的一組（`config/code_table_mutations.php`，如 nianhao、office_codes、dynasties、choronym_codes、ganzhi_codes 等）送 `create`／`delete` 會回 501；**可新增**的一組是 `TEXT_CODES`、`char_variant_map`、`ADDR_CODES`、`ADDR_BELONGS_DATA`、`ADMIN_CAT_CODES` 與 `OFFICE_TYPE_TREE`（`config/code_table_writes.php`）。代碼表的 `delete` 一律不開放——受支援的六張表回 **403**（防止級聯刪除人物資料），其餘代碼表回 501。
 - 不支援的 `resource` / `mode` / `operation` 組合一律回 **501**：`{"ok":false,"message":"目前尚未支援此變更模式","errors":{"resource":"...","mode":"...","operation":"..."}}`。
 
 各資源的欄位白名單、必填規則與範例見〈各資源欄位參考〉。
@@ -483,9 +483,9 @@ CBDB 子資源表幾乎都是複合主鍵，且不使用 Eloquent 主鍵行為�
 | 404 | 目標列不存在（訊息形如 `ALTNAME_DATA 記錄不存在`） | — |
 | 409 | 主鍵衝突或狀態衝突 | `target.pk: conflict` / `duplicate` / `pending_proposal_exists`、`changes: conflict`、`mirror_conflict`、`mirror_suspected`、`mirror_delete_multiple`、`mirror: conflict` |
 | 419 | CSRF token 不符（只會發生在 `resubmit`、`opposite-edges`） | — |
-| 422 | 參數校驗失敗 | `target.pk: required`、`target.pk.<欄名>: required` / `numeric`（代碼表 create）、`person_id: required`、`pk`（主鍵缺欄位）、`person_id: mismatch`、`changes: required` / `empty` / `no_supported_fields` / `no_effective_changes` / `disallowed_fields: <欄位清單>` / `foreign_key_violation` / `not_null_violation` / `invalid_value`（代碼表寫入）、各欄位級規則、`mirror_integrity: fail_closed` |
+| 422 | 參數校驗失敗 | `target.pk: required`、`target.pk.<欄名>: required` / `numeric`（代碼表 create）、`person_id: required`、`pk`（主鍵缺欄位）、`person_id: mismatch`、`changes: required` / `empty` / `no_supported_fields` / `no_effective_changes` / `disallowed_fields: <欄位清單>` / `foreign_key_violation` / `not_null_violation` / `invalid_value` / `tree_cycle`（代碼表寫入）、各欄位級規則、`mirror_integrity: fail_closed` |
 | 429 | 超過限流。**本章的 `/api/v2` 寫入端點在應用程式層沒有限流，不會由應用程式回 429**（見 1.3）；會回 429 的是 `api` 群組端點（600 次／分鐘）、`/api/mcp`（預設 120 次／分鐘）與少數自帶額度的端點（見 14.9） | — |
-| 500 | 未預期的伺服器錯誤 | 代碼表 create 另有設定錯誤時的 `pk: schema_mismatch` / `auto_assign_unsupported`（主鍵登錄與 `CompositePrimaryKey::SCHEMAS` 不一致、或複合主鍵誤設自動配發），屬部署設定問題、不是呼叫端能修的 |
+| 500 | 未預期的伺服器錯誤 | 代碼表 create 另有設定錯誤時的 `pk: schema_mismatch` / `auto_assign_unsupported` / `text_key_in_variant_scope` / `schema_unavailable`（主鍵登錄與 `CompositePrimaryKey::SCHEMAS` 不一致、複合或文本主鍵誤設自動配發、文本主鍵落在異體字替換範圍內、讀不到欄位型別），屬部署設定問題、不是呼叫端能修的 |
 | 501 | `resource` / `mode` / `operation` 組合不支援 | `resource`、`mode`、`operation`（此處的值是**字串**，不是字串陣列） |
 
 **`errors` 值的型別不統一**，請寬鬆解析：多數是「欄位 → 錯誤代號字串陣列」，但
@@ -510,9 +510,12 @@ CBDB 子資源表幾乎都是複合主鍵，且不使用 Eloquent 主鍵行為�
 | `pk: ["缺少必要的複合主鍵參數：..."]` | `target.pk` 缺欄位 |
 | `target.pk.c_lastyear: ["required"]` | 代碼表 `create` 的複合主鍵缺欄位（逐欄回報，不是整包 `pk`） |
 | `target.pk.c_firstyear: ["numeric"]` | 代碼表 `create` 的主鍵值不是整數（不會靜默轉成 `0`） |
+| `target.pk.c_office_type_node_id: ["string"]` / `["max:255"]` | 文本主鍵的值不是字串／整數，或超過欄位長度 |
 | `changes: ["foreign_key_violation"]` | 代碼表 `create`／`update` 的外鍵指向不存在的列（先建父列） |
 | `changes: ["not_null_violation"]` | 代碼表寫入把 NOT NULL 欄寫成空（兜底；通常會先被 `<欄名> 不可為空` 擋下） |
 | `changes: ["invalid_value"]` | 代碼表寫入的值超出欄位範圍或型別不符（兜底；只有 strict sql_mode 的部署會走到，通常先被欄位級規則擋下） |
+| `changes: ["tree_cycle"]` | 自參照層級樹（`office-type-tree`）的上層節點會造成環：自己當自己的上層，或把節點搬到自己的子孫之下 |
+| 409 `changes: ["lock_contention"]` | 代碼表寫入與其他同時進行的修改發生鎖衝突（deadlock／lock wait timeout）。交易已回滾、沒有寫入，**直接重試即可** |
 
 **警告（欄名打錯不一定會報錯）**：白名單外的欄位並非所有資源都會整筆拒絕。下列路徑是**靜默丟棄**未知欄位，會回 `200` / `ok: true` 但該欄根本沒寫進資料庫：
 
@@ -1400,6 +1403,7 @@ Authorization: Bearer <token>
 | admin_cat_codes | admin_cat, admin-cat-codes, admin-cat | ADMIN_CAT_CODES | c_admin_cat_code | c_admin_cat_py, c_admin_cat_hz, c_admin_cat_trans, c_notes |
 | addr_codes | addr-codes, addrcodes | ADDR_CODES | c_addr_id | c_name, c_name_chn, c_alt_names, c_firstyear, c_lastyear, c_admin_type, c_admin_cat_code, x_coord, y_coord, CHGIS_PT_ID, c_notes |
 | addr_belongs_data | addr-belongs-data, addr_belongs, addr-belongs | ADDR_BELONGS_DATA | c_addr_id, c_belongs_to, c_firstyear, c_lastyear | c_source, c_pages, c_notes |
+| office_type_tree | office-type-tree, officetypetree | OFFICE_TYPE_TREE | c_office_type_node_id | c_office_type_desc, c_office_type_desc_chn, c_parent_id |
 | char_variant_map | char-variant-map, charvariantmap | char_variant_map | id | c_variant_char, c_reference_char, c_strict_excluded, c_notes |
 
 規則：
@@ -1426,7 +1430,7 @@ Authorization: Bearer <token>
 
 ### 13.2 可新增的代碼表（只支援 `create`、只支援 `direct`）
 
-目前開放新增的有五張表：
+目前開放新增的有六張表：
 
 > **與 13.4 的 `text-entity` 聚合並存**：`TEXT_CODES` 兩條寫入路徑都在役——本節的裸表 create 是「就這一列、就這些欄」的機器化寫入（S5 起同樣會做異體字落地替換）；聚合資源另外處理拼音派生、書名字形／標點正規化與 `TEXT_INSTANCE_DATA` 版本列。要建立一筆語義完整的文獻，用 13.4；只補一列原始資料，用本節。
 
@@ -1437,19 +1441,26 @@ Authorization: Bearer <token>
 | addr-codes | addr_codes, addrcodes | ADDR_CODES | c_addr_id（可自動配發） | c_name, c_name_chn, c_alt_names, c_firstyear, c_lastyear, c_admin_type, c_admin_cat_code, x_coord, y_coord, CHGIS_PT_ID, c_notes |
 | addr-belongs-data | addr_belongs_data, addr_belongs, addr-belongs | ADDR_BELONGS_DATA | c_addr_id, c_belongs_to, c_firstyear, c_lastyear（**四欄都必填、不配發**） | c_source, c_pages, c_notes |
 | admin-cat-codes | admin_cat_codes, admin-cat, admin_cat | ADMIN_CAT_CODES | c_admin_cat_code（可自動配發） | c_admin_cat_py, c_admin_cat_hz, c_admin_cat_trans, c_notes |
+| office-type-tree | office_type_tree, officetypetree | OFFICE_TYPE_TREE | c_office_type_node_id（**文本主鍵、必填、不配發**） | c_office_type_desc, c_office_type_desc_chn, c_parent_id |
 
 - 主鍵可放在 `target.pk` 或 `changes`；**單一主鍵的表在兩處都沒給值時，由伺服器以 `max(主鍵)+1` 自動配發**。但 `target` 這個鍵本身仍必須存在——請送 `"target": {"pk": {}}`，完全省略會被控制器層 422 擋下。
 - **複合主鍵的表（`addr-belongs-data`）沒有自動配發**：四個主鍵欄一個都不能少，缺哪一欄就回 422 `target.pk.<欄名>: ["required"]`。
+- **`OFFICE_TYPE_TREE` 是唯一的文本主鍵表**：`c_office_type_node_id` 是零填補的階層路徑字串（`06`、`0601`、`060102`），請**原樣以字串送出**——它不會被轉成數字，前導零有意義（`'06'` 與 `'6'` 是不同的節點）。超過欄位長度回 422 `target.pk.<欄名>: ["max:255"]`；非字串／非整數回 `["string"]`。其餘表的主鍵仍是數值，適用下面兩條。
 - 主鍵值必須是整數（或可解析為整數的字串），否則 422 `target.pk.<欄名>: ["numeric"]`——不會靜默轉成 `0`；超出 PHP 整數精度的字串同樣回 `numeric`（`(int)` 會飽和成最大值而非報錯）。
+- 文本主鍵送非字串／非整數回 422 `target.pk.<欄名>: ["string"]`（`create` 與 `update` 兩端都是）。
 - 主鍵值也受**值域檢查**（依該欄實際型別），超出回 422 `target.pk.<欄名>: ["out_of_range:<min>..<max>"]`。非 strict sql_mode 下不擋的話，`ADDR_BELONGS_DATA.c_firstyear`（smallint）收到 40000 會被截斷成 32767——那一列就被建在**你沒有指定的主鍵**上，回應顯示 40000、實際存 32767，之後照回應的鍵去改或刪一律 404。
 - 顯式指定且已存在 → 409 `target.pk: conflict`；並發撞號 → 409（訊息會提示重試）。**非主鍵的唯一鍵撞值時也回 409**，而 `errors` 仍是 `target.pk: conflict`（例如 `char_variant_map.c_variant_char` 重複）。
 - 白名單外欄位 → 422，`errors.changes` 是單一字串 `"disallowed_fields: c_xxx"`（稽核欄 `c_created_by` 等也在白名單外，不可自行指定署名）。
 - 欄位型別／長度／NOT NULL 的校驗規則與 13.1 完全相同（同一份登記、同一套判定），唯一的差異是文字欄收到 JSON 數字時 create 會轉成字串、update 會 422（見 13.1 的說明）。
 - **外鍵指向不存在的列 → 422 `changes: ["foreign_key_violation"]`**（例如 `addr-belongs-data` 的 `c_belongs_to` 上級地名尚未建立、或 `c_source` 指向不存在的 `TEXT_CODES.c_textid`）。先建父列再建子列。
+- **自參照層級樹（`office-type-tree`）另有環路守衛 → 422 `changes: ["tree_cycle"]`**：節點不可以自己為上層，`update` 也不可把節點搬到自己的子孫之下；把節點掛到一個**本來就在環上**的分支同樣被拒。這幾種寫法都滿足外鍵、資料庫擋不住，而成環的樹沒有任何消費者能安全走訪。守衛在**六條寫入路徑**上都會跑：`/api/v2/create`、`/api/v2/mutate`、提案核准、operations 還原、`/codes` UI 的新增與修改、眾包核准（提案會躺好幾天，提交時合法的搬移在核准時可能已經成環）。v2 的兩條另外在寫入交易內以鎖定複查一次（`SELECT … FOR UPDATE` 走訪祖先鏈），關掉「檢查後才寫」的並發窗口；其餘四條是單一管理者的互動操作，只有無鎖的單次檢查。兩個方向相反的重掛會以不同順序取鎖，資料庫可能挑一方回滾——那一方得到 409 `changes: ["lock_contention"]`，交易已回滾、沒有寫出環，直接重試即可。注意這張表**以「自己是自己的上層」表示根節點**（`'0'`），那是既有慣例、不算環——掛在根之下是合法的。
+- 環路守衛的祖先走訪有 **200 層上限**，超過一律以 `tree_cycle` 拒絕（無上限的話守衛自己會在既有的環上無窮迴圈）。現庫最深只有 7 層，正常操作碰不到。
+- `office-type-tree` 的 `c_parent_id` **可為 null**，所以新增時不帶它、或修改時清空，會產生一個不掛在樹上的孤立節點（現庫 2739 列都有上層，這條 API 是第一個能造出孤立節點的入口）。API 不強制——節點該掛哪裡是錄入判斷——但請自己帶上 `c_parent_id`。
+- 節點 id 與上層的關係**不由 API 校驗**：站內的階層查詢是對 **id 字串**做 `LIKE '<上層 id>%'` 前綴比對，所以新節點的 id 應該是其上層 id 的延伸（`060102` 之下用 `06010204`）。送一個不符前綴慣例的 id 會成功寫入，但那個節點在前綴走訪中不會出現在它的上層之下。
 - 只支援 `mode=direct`；送 `mode=proposal` 會得到 **501**（找不到 handler），不是 403。注意這與 13.1 的 `update` 不對稱：**代碼表可以提案修改、但不能提案新增**，眾包帳號只能改不能增。
 - 回應：`result.pk`、`result.status: "created"`、`result.operation_id`、`result.row`；**表有稽核欄時**系統會蓋 `c_created_by`／`c_created_date`。多數代碼表（含 `ADMIN_CAT_CODES`）沒有那組欄位，此時不蓋——操作者與時間仍完整記在 `operations` 與 `audit_log`。
 - 可以放進 `batch_mutate` 一起送。
-- **本節這五張表沒有 `/api/v2/read` 定義**（代碼表中只有 `nianhao` 有）：新增後要拿到伺服器配發的主鍵，直接看回應的 `result.pk` 與 `result.row`（整列都在裡面）。
+- **本節這六張表沒有 `/api/v2/read` 定義**（代碼表中只有 `nianhao` 有）：新增後要拿到伺服器配發的主鍵，直接看回應的 `result.pk` 與 `result.row`（整列都在裡面）。
 - **新增前請自行查重**：本節的表都沒有「同名就重用」的邏輯，也沒有 read 端點可查——`ADMIN_CAT_CODES.c_admin_cat_hz` 之類的名稱欄**沒有唯一鍵**（現庫本來就有同名的類別），送兩次就是兩列。批次匯入前請先用 `/codes` 或 Query Playground 把既有代碼查出來，否則 `ADDR_CODES.c_admin_cat_code` 會分散指向兩個同義類別。
 - **地名相關**：`ADDRESSES` 是由 `ADDR_CODES` + `ADDR_BELONGS_DATA` 派生的反正規化快取表，只由 `php artisan cbdb:regenerate-addresses-table` 重建。經本 API 新增的地名，在重建之前不會出現在依賴該快取的功能（官職地點自動填表、朝代同名地消歧、部分自然語言查詢）。批次匯入地名後請安排重建。
 - `TEXT_CODES` 的新增與修改是**兩份不同的定義**，別名清單不對稱：`create` 接受 `text-codes`／`text_codes`／`textcodes`，而 `update` **只接受 `text_codes`**（送 `text-codes` 做 update 會 501）。最保險是 create 用 `text-codes`、update 用 `text_codes`。
@@ -1458,7 +1469,7 @@ Authorization: Bearer <token>
 
 代碼表被大量人物資料以外鍵引用，刪一列可能影響數萬筆記錄且難以乾淨復原，因此刪除**已停用**：
 
-- 上述五張支援寫入的表、且 `mode=direct` → **403**（`代碼表刪除已停用（防止級聯刪除人物資料）`）
+- 上述六張支援寫入的表、且 `mode=direct` → **403**（`代碼表刪除已停用（防止級聯刪除人物資料）`）
 - 其他代碼表，或 `mode=proposal` → **501**（找不到對應 handler）
 
 ### 13.4 複合實體聚合：office、social-institution 與 text-entity

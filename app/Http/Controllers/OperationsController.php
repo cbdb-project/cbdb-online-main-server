@@ -12,6 +12,7 @@ use App\Services\CharVariantMapService;
 use App\Support\BasicInformationHistory;
 use App\Support\CompositePrimaryKey;
 use App\Support\EntityAggregateRegistry;
+use App\Support\SelfReferencingTreeGuard;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -1444,6 +1445,21 @@ class OperationsController extends Controller {
         // 注意這與「restore 不做內容替換」不衝突：那是不對還原內容做落地替換（保留歷史字形），
         // 這裡是對這張表的寫入做結構驗證。
         $this->assertCharVariantMapWritable($table, $payload, $conditions);
+
+        // 自參照層級樹（OFFICE_TYPE_TREE）：還原的是一個舊快照，而樹在那之後已經動過
+        // ——快照裡的上層節點可能已經變成這個節點的子孫，寫回去就成環。兩條邊各自都滿足
+        // 自參照外鍵，資料庫不會擋，而成環的樹沒有任何消費者能安全走訪。
+        // 理由與上一行對 char_variant_map 做結構驗證完全相同。
+        $treeCycleError = SelfReferencingTreeGuard::findCycleForRowWrite(
+            $table,
+            $this->resourceKeyColumns($table),
+            $payload,
+            (array) $query->first(),
+        );
+        if ($treeCycleError !== null) {
+            throw new \RuntimeException('無法還原：' . $treeCycleError);
+        }
+
         $query->update($payload);
 
         return [

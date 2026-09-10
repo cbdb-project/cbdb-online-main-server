@@ -9,6 +9,7 @@ use App\Services\AuditLogService;
 use App\Services\CharVariantMapService;
 use App\Services\NameSearchIndexService;
 use App\Support\CompositePrimaryKey;
+use App\Support\SelfReferencingTreeGuard;
 use App\Support\VariantEquivalentLookup;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
@@ -963,6 +964,29 @@ class OperationsProposalController extends Controller {
         // 該組字的落地替換在全站靜默停止（提案階段的守衛見 AbstractCodeTableMutationHandler）。
         if (strtolower($table) === 'char_variant_map' && !empty($updatePayload)) {
             CharVariantMapService::assertWritable($updatePayload, isset($original['id']) ? (int) $original['id'] : null);
+        }
+
+        // 自參照層級樹（OFFICE_TYPE_TREE）：提交時的環路守衛不夠，因為提案會躺好幾天
+        // ——提交時合法的「把 06 掛到 0699 之下」，核准時可能已經因為別人把 0699 搬到
+        // 06 之下而變成環。兩條邊各自都滿足自參照外鍵，資料庫不會擋。理由與上面
+        // char_variant_map 在同一條路徑上另外驗結構完全一樣。
+        //
+        // **第四個參數必須是 $current（現況）而不是 $original（提案當時的快照）**。
+        // 代碼表提案存的是整列合併結果，所以 buildUpdatePayload() 一定帶著 c_parent_id、
+        // 核准時一定會寫它——即使那是一個「只改說明」的提案。而守衛的「上層沒變就不驗」
+        // 短路若拿快照比對，命中的正好是這個情境：
+        //   t0 樹 0←06←0601←060102，提案只改 0601 的說明（payload 帶 c_parent_id='06'）
+        //   t1 有人把 0601 搬到 0 之下（合法）
+        //   t2 有人把 06 搬到 0601 之下（此刻仍合法）
+        //   t3 核准那個舊提案 → payload 的 '06' 等於快照的 '06' → 短路跳過 → 寫下
+        //      0601→06，而 06→0601 已經在庫裡：**環成立**。
+        // 用現況比對時 t3 會走進走訪並擋下來，而根節點（現況上層等於自己）仍然短路、
+        // 不會誤擋。
+        if (!empty($updatePayload)) {
+            $treeCycleError = SelfReferencingTreeGuard::findCycleForRowWrite($table, $keyColumns, $updatePayload, (array) $current);
+            if ($treeCycleError !== null) {
+                throw new \RuntimeException('無法核准：' . $treeCycleError);
+            }
         }
 
         if (!empty($updatePayload)) {

@@ -8,6 +8,7 @@ use App\Services\AuditLogService;
 use App\Support\AuditActor;
 use App\Support\CodeTableFieldValidator;
 use App\Support\CompositePrimaryKey;
+use App\Support\SelfReferencingTreeGuard;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -89,10 +90,40 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
             return $this->errorResponse('changes 不可為空', 422, ['changes' => ['empty']]);
         }
 
-        // 依 keyColumns 取出主鍵（已驗證＝SCHEMAS、全鍵存在且非 null）
+        // 型別讀不到就不要寫：isTextColumn() 在讀不到時回 false，於是文本主鍵不會被轉成
+        // 字串，MariaDB 會把 varchar 欄轉成數字比較、改到別的列並記下一個沒有任何列擁有
+        // 的鍵（見下方註解）。而 columnTypes() 會把「讀不到」快取起來，一次瞬時失敗會污染
+        // 整個 request。寧可 500 也不要寫壞一列。
+        if ($this->schemaUnavailable($table)) {
+            return $this->errorResponse($table . ' 讀不到欄位型別，為避免寫錯主鍵已中止', 500, ['pk' => ['schema_unavailable']]);
+        }
+
+        // 依 keyColumns 取出主鍵（已驗證＝SCHEMAS、全鍵存在且非 null）。
+        //
+        // **文本主鍵必須轉成字串**，而且理由不是潔癖：MariaDB 比較 varchar 與數字時會把
+        // 欄位轉成數字，所以 `where('c_office_type_node_id', 601)` 會命中 `'0601'` 那一列
+        // （已對真實庫實測）。於是 UPDATE 改到了對的列，但 resource_id、audit_log.row_pk
+        // 與回應的 result.pk 全部記成 `601`——一個沒有任何列擁有的鍵：operations 頁解不出
+        // 現況、呼叫端照回應的鍵做後續操作一律 404。若哪天出現數值相等的兩個 id
+        // （`'0601'` 與 `'601'`），同一個條件還會一次更新兩列而只記錄其中一個鍵。
+        // SQLite 不做這種轉型，所以測試環境永遠看不到——只能靠這裡擋。
         $pk = [];
         foreach ($this->keyColumns() as $col) {
-            $pk[$col] = $targetPk[$col];
+            $value = $targetPk[$col];
+            if ($this->isTextColumn($table, $col)) {
+                if (!is_string($value) && !is_int($value)) {
+                    return $this->errorResponse('主鍵格式不正確', 422, ['target.pk.' . $col => ['string']]);
+                }
+                $value = (string) $value;
+                // 長度也要驗，與 create 端同一條規則。少了這條，超長的鍵會一路走到
+                // findByPk 然後回 404「記錄不存在」——技術上沒錯，但把「你送的鍵不合法」
+                // 講成「這筆資料不存在」會讓呼叫端去找不存在的資料問題。
+                $maxLength = $this->columnTypes($table)[strtolower($col)]['max_length'] ?? null;
+                if ($maxLength !== null && mb_strlen($value) > $maxLength) {
+                    return $this->errorResponse('主鍵格式不正確', 422, ['target.pk.' . $col => ['max:' . $maxLength]]);
+                }
+            }
+            $pk[$col] = $value;
         }
 
         $original = $this->findByPk($pk);
@@ -125,6 +156,23 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
         $validationErrors = $this->validateFields($updateData);
         if (!empty($validationErrors)) {
             return $this->errorResponse('參數校驗失敗', 422, $validationErrors);
+        }
+
+        // 自參照樹：改上層節點可能成環（A→B、B→A 各自都滿足外鍵，資料庫擋不住），
+        // 而成環的樹沒有任何消費者能安全走訪。必須在落庫前擋（判定與其餘五條寫入路徑
+        // 共用 SelfReferencingTreeGuard）。
+        $treeParentColumn = $this->treeParentColumn();
+        if ($treeParentColumn !== null && array_key_exists($treeParentColumn, $updateData) && count($this->keyColumns()) === 1) {
+            $keyColumn = $this->keyColumns()[0];
+            $currentParent = $original->{$treeParentColumn} ?? null;
+            // 上層沒有真的改變時不驗：根節點的 c_parent_id 本來就等於自己（那是「根」的
+            // 表示法），把整列原樣送回來存檔不該被守衛擋下。
+            if ((string) $updateData[$treeParentColumn] !== (string) $currentParent) {
+                $cycleError = $this->findTreeCycle($table, $keyColumn, $treeParentColumn, $pk[$keyColumn], $updateData[$treeParentColumn]);
+                if ($cycleError !== null) {
+                    return $this->errorResponse($cycleError, 422, ['changes' => ['tree_cycle']]);
+                }
+            }
         }
 
         // 保存前處理（如 §D-6 Tier 1 拼音 v→ü 歸一化）；於變更偵測前，確保冪等（已是 ü→不觸發更新）。
@@ -189,6 +237,26 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
 
         try {
             DB::transaction(function () use ($table, $pk, $resourceId, $updateData, $originalArray, $comment, $operationId, $personId, &$operation, &$newArray) {
+                // 自參照樹：**交易內再驗一次，這次鎖住走訪路徑**。handle() 裡那次是為了
+                // 給呼叫端漂亮的 422，但它是「檢查後才寫」——兩個同時進行的
+                // `A.parent=B` 與 `B.parent=A` 各自都會看到對方還掛在根上而通過，
+                // 然後兩邊都提交、環成立。鎖住路徑上的列才真的收斂掉這個 race。
+                $treeParentColumn = $this->treeParentColumn();
+                if ($treeParentColumn !== null && array_key_exists($treeParentColumn, $updateData) && count($this->keyColumns()) === 1) {
+                    $keyColumn = $this->keyColumns()[0];
+                    $lockedCycleError = SelfReferencingTreeGuard::findCycle(
+                        $table,
+                        $keyColumn,
+                        $treeParentColumn,
+                        $pk[$keyColumn],
+                        $updateData[$treeParentColumn],
+                        true,
+                    );
+                    if ($lockedCycleError !== null) {
+                        throw new TreeCycleException($lockedCycleError);
+                    }
+                }
+
                 $this->whereByPk(DB::table($table), $pk)->update($this->stampModifiedColumns($table, $updateData));
 
                 $updatedRow = $this->findByPk($pk);
@@ -220,12 +288,21 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
                     $operationId
                 );
             });
+        } catch (TreeCycleException $e) {
+            // 交易內的鎖定複查擋下的競態；與 handle() 裡那次同樣回 422 tree_cycle。
+            return $this->withVariantNotices($this->errorResponse($e->getMessage(), 422, ['changes' => ['tree_cycle']]));
         } catch (\Illuminate\Database\QueryException $e) {
             // 這三個回應都在落地替換之後，所以都要帶 notices（AGENTS §1.3：成功、409、422
             // 都要掛）——被擋下來時使用者更需要知道自己輸入的字已被正規化。
             //
             // 判定順序不可調換：SQLite 的 UNIQUE／FOREIGN KEY／NOT NULL 共用 errno 19，
             // trait 內以訊息互斥（見 HandlesCodeTableWrites）。
+            // 鎖競爭（deadlock／lock wait timeout）：交易已回滾、沒有寫出環，
+            // 是可直接重試的暫時性衝突，回 409 而不是 500。自參照樹的鎖定走訪會讓
+            // 兩個方向相反的重掛以不同順序取鎖，資料庫因此可能挑一方回滾。
+            if ($this->isLockContention($e)) {
+                return $this->withVariantNotices($this->errorResponse('與其他同時進行的修改發生鎖衝突，請重試', 409, ['changes' => ['lock_contention']]));
+            }
             if ($this->isForeignKeyViolation($e)) {
                 // 白名單開放的欄位裡有外鍵欄（ADDR_CODES.c_admin_cat_code → ADMIN_CAT_CODES、
                 // ADDR_BELONGS_DATA.c_source → TEXT_CODES）。指向不存在的代碼是呼叫端的輸入
@@ -369,6 +446,14 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
      */
     protected function validateFields(array $data): array {
         return CodeTableFieldValidator::validate($data, $this->fieldTypeSpec());
+    }
+
+    /**
+     * 自參照樹的「上層」欄位名（預設無）。設了之後 update 會擋掉成環的修改。
+     * 目前只有 OFFICE_TYPE_TREE.c_parent_id。
+     */
+    protected function treeParentColumn(): ?string {
+        return null;
     }
 
     /**

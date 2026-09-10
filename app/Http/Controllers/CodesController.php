@@ -12,6 +12,7 @@ use App\Support\ColumnFilterExpression;
 use App\Support\ColumnFilterParseException;
 use App\Support\EntityAggregateRegistry;
 use App\Support\PinyinUmlaut;
+use App\Support\SelfReferencingTreeGuard;
 use App\Support\VariantEquivalentLookup;
 use App\Support\VariantReplaceScope;
 use Carbon\Carbon;
@@ -1366,6 +1367,16 @@ class CodesController extends Controller {
         // 避免觸發完整性違規；留白但無預設值的 NOT NULL 欄仍交由資料庫拋出誠實錯誤。
         $data = $this->applyColumnDefaultsForBlanks($table, $data);
 
+        // 自參照層級樹（OFFICE_TYPE_TREE）：這條 UI 路徑才是這張表的主要寫入者，
+        // 所以守衛不能只掛在 v2 API 上。自我引用與「搬到自己的子孫之下」都滿足自參照
+        // 外鍵、資料庫擋不住，而成環的樹沒有任何消費者能安全走訪。
+        // 比對用**現況**（$originalRow 是進來時讀的那一列），不是表單送來的值。
+        if ($treeCycleError = SelfReferencingTreeGuard::findCycleForRowWrite($table, array_keys($conditions), $data, (array) ($originalRow ?: []))) {
+            flash($treeCycleError, 'error');
+
+            return redirect()->back()->withInput()->withErrors(['tree_cycle' => $treeCycleError]);
+        }
+
         try {
             $query->update($data);
         } catch (\Illuminate\Database\QueryException $e) {
@@ -1855,6 +1866,14 @@ class CodesController extends Controller {
         // 留白的 NOT NULL 欄（空字串經 ConvertEmptyStringsToNull 已成 null）改套用資料庫預設值，
         // 避免把 null 寫入 NOT NULL 欄觸發完整性違規（例如 pinyin.c_lastname 留白應視為預設 0）。
         $data = $this->applyColumnDefaultsForBlanks($table, $data);
+
+        // 自參照層級樹：新增時只可能成 1-環（新節點還不可能是誰的祖先），但自我引用
+        // 滿足自參照外鍵、資料庫擋不住。$original 傳空陣列＝一定會實際走訪、不短路。
+        if ($treeCycleError = SelfReferencingTreeGuard::findCycleForRowWrite($table, $keyColumns, $data, [])) {
+            flash($treeCycleError, 'error');
+
+            return redirect()->back()->withInput()->withErrors(['tree_cycle' => $treeCycleError]);
+        }
 
         try {
             DB::table($table)->insert($data);

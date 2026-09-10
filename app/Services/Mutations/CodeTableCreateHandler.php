@@ -9,6 +9,8 @@ use App\Services\AuditLogService;
 use App\Support\CodeTableFieldValidator;
 use App\Support\CompositePrimaryKey;
 use App\Support\PinyinUmlaut;
+use App\Support\SelfReferencingTreeGuard;
+use App\Support\VariantReplaceScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -79,9 +81,36 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
             return $this->errorResponse($table . ' 主鍵宣告與登錄不一致（設定錯誤）', 500, ['pk' => ['schema_mismatch']]);
         }
 
-        // auto_assign_id 只在單一主鍵欄時有語義（複合主鍵沒有「下一個 id」）。
+        // 型別讀不到就不要寫。isTextColumn() 在讀不到時一律回 false，於是文本主鍵會被
+        // (int) 轉型建到錯鍵上，而 D7 與 auto_assign 兩個守衛也都掛在 isTextColumn() 之下、
+        // 會一起失效——三個保護同時無聲消失。寧可 500 也不要寫壞一列。
+        if ($this->schemaUnavailable($table)) {
+            return $this->errorResponse($table . ' 讀不到欄位型別，為避免寫錯主鍵已中止', 500, ['pk' => ['schema_unavailable']]);
+        }
+
+        // auto_assign_id 只在單一數值主鍵欄時有語義（複合主鍵沒有「下一個 id」；
+        // 文本主鍵的 max(key)+1 更是毫無意義——`'060102' + 1` 不是一個階層路徑）。
         if ($autoAssign && count($keyColumns) !== 1) {
             return $this->errorResponse($table . ' 複合主鍵不支援自動分配主鍵（設定錯誤）', 500, ['pk' => ['auto_assign_unsupported']]);
+        }
+        if ($autoAssign && $this->isTextColumn($table, $keyColumns[0])) {
+            return $this->errorResponse($table . ' 文本主鍵不支援自動分配主鍵（設定錯誤）', 500, ['pk' => ['auto_assign_unsupported']]);
+        }
+
+        // D7 前提：文本主鍵只在**該欄不在異體字落地替換範圍內**時才可登錄。
+        // 若替換會動到主鍵，就必須先實作「兩形並存」查重（VariantEquivalentLookup 在
+        // 「主鍵全部都在替換範圍內」時只記 warning 就跳過），否則替換會**製造**重複列
+        // 而唯一鍵擋不住（不同字形＝不同鍵值）——那比完全不替換更糟。fail-closed。
+        foreach ($keyColumns as $keyColumn) {
+            if ($this->isTextColumn($table, $keyColumn)
+                && VariantReplaceScope::modeFor($table, $keyColumn) !== null
+            ) {
+                return $this->errorResponse(
+                    $table . '.' . $keyColumn . ' 是文本主鍵且在異體字替換範圍內，尚未支援（設定錯誤）',
+                    500,
+                    ['pk' => ['text_key_in_variant_scope']]
+                );
+            }
         }
 
         // 白名單校驗（可含主鍵欄）
@@ -103,15 +132,35 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
 
                 continue;
             }
-            // 本檔只登錄數值主鍵的表（見 config 的登錄前提），非數值一律是呼叫端錯誤。
-            // 不擋的話 `(int) 'abc'` 會靜默變成 0——而 0 在 CBDB 往往是合法值
-            // （c_firstyear = 0 就是），於是憑空生出一列鍵值錯誤、事後看不出異常的記錄。
+            // 文本主鍵：**絕對不可以** (int) 轉型。OFFICE_TYPE_TREE 的節點 id 是零填補的
+            // 階層路徑（'06'、'060102'），轉型會把 '06' 變成 6、把新節點建在錯誤的鍵上。
+            if ($this->isTextColumn($table, $col)) {
+                if (!is_string($value) && !is_int($value)) {
+                    $badKeys[$col] = 'string';
+
+                    continue;
+                }
+                $stringValue = (string) $value;
+                $maxLength = $this->columnTypes($table)[strtolower($col)]['max_length'] ?? 255;
+                if ($maxLength !== null && mb_strlen($stringValue) > $maxLength) {
+                    $badKeys[$col] = 'max:' . $maxLength;
+
+                    continue;
+                }
+                $explicitPk[$col] = $stringValue;
+
+                continue;
+            }
+
+            // 數值主鍵：非數值一律是呼叫端錯誤。不擋的話 `(int) 'abc'` 會靜默變成 0
+            // ——而 0 在 CBDB 往往是合法值（c_firstyear = 0 就是），於是憑空生出一列
+            // 鍵值錯誤、事後看不出異常的記錄。
             // 順帶擋掉超出 PHP int 精度的字串：`(int) '99999999999999999999'` 會**飽和**成
             // PHP_INT_MAX 而不是報錯，於是值域檢查會看到一個「剛好在範圍內」的數字。
             if (!is_int($value) && !(is_string($value)
                 && preg_match('/\A-?\d+\z/', $value) === 1
                 && (string) (int) preg_replace('/\A(-?)0+(?=\d)/', '$1', $value) === preg_replace('/\A(-?)0+(?=\d)/', '$1', $value))) {
-                $badKeys[] = $col;
+                $badKeys[$col] = 'numeric';
 
                 continue;
             }
@@ -120,11 +169,11 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
 
         if (!empty($badKeys)) {
             $errors = [];
-            foreach ($badKeys as $col) {
-                $errors['target.pk.' . $col] = ['numeric'];
+            foreach ($badKeys as $col => $rule) {
+                $errors['target.pk.' . $col] = [$rule];
             }
 
-            return $this->errorResponse('主鍵必須為整數：' . implode('、', $badKeys), 422, $errors);
+            return $this->errorResponse('主鍵格式不正確：' . implode('、', array_keys($badKeys)), 422, $errors);
         }
 
         // 主鍵也要驗值域。主鍵在白名單化時就被抽出去了，不會經過
@@ -136,7 +185,7 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
         $outOfRangeKeys = [];
         foreach ($explicitPk as $col => $value) {
             $range = $ranges[strtolower($col)] ?? null;
-            if ($range !== null && ($value < $range[0] || $value > $range[1])) {
+            if ($range !== null && is_int($value) && ($value < $range[0] || $value > $range[1])) {
                 $outOfRangeKeys[$col] = $range;
             }
         }
@@ -181,6 +230,28 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
             return $this->errorResponse('參數校驗失敗', 422, $validationErrors);
         }
 
+        // 自參照樹：擋掉「自己當自己的上層」。父節點必須存在由資料庫的自參照外鍵保證
+        // （違反 → 1452 → 422），但自我引用滿足外鍵、DB 擋不住。新增時只可能成 1-環
+        // （新節點還不可能是誰的祖先）。
+        //
+        // 位置與 update 端一致：**在拼音歸一化與落地替換之前**。今天 c_parent_id 既不是
+        // 拼音欄也不在替換範圍內，所以順序等價；但若哪天其中一項變了，「驗處理前的值、
+        // 落庫處理後的值」正是 AGENTS §1.3 點名的那個陷阱——兩端保持同一個順序，
+        // 才不會只有一邊踩到。
+        $treeParentColumn = $def['tree_parent_column'] ?? null;
+        if ($treeParentColumn !== null && count($keyColumns) === 1 && !empty($explicitPk)) {
+            $cycleError = $this->findTreeCycle(
+                $table,
+                $keyColumns[0],
+                $treeParentColumn,
+                $explicitPk[$keyColumns[0]],
+                $row[$treeParentColumn] ?? null
+            );
+            if ($cycleError !== null) {
+                return $this->errorResponse($cycleError, 422, ['changes' => ['tree_cycle']]);
+            }
+        }
+
         // §D-6 保存止血：Tier 1 拼音欄的 v→ü 靜默歸一化。**create 端原本沒有這一步**，
         // 於是同一個 `lv` 走 /api/v2/create 存 `lv`、走 /api/v2/mutate 或 /codes 存 `lü`
         // ——同一欄兩種寫法，而 §D-6 的承諾是「保存時一律歸一」。Tier 定義只有一份
@@ -194,8 +265,9 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
         //
         // 這一步也修掉 G4 的不一致：TEXT_CODES.c_title_chn 走 Codes UI／書名批次匯入會被歸一，
         // 走 token API 卻不會——同一個輸入落庫兩種字形。
-        // 本表全部主鍵都是數值欄（見 config 的登錄前提），替換不可能動到主鍵，
-        // 所以「替換必須早於 PK 計算」在這條路徑上自然成立。
+        // 「替換必須早於 PK 計算」在這條路徑上自然成立：主鍵在上面就已經決定，而文本
+        // 主鍵只在「該欄不在替換範圍內」時才准登錄（上面的 fail-closed 檢查），
+        // 所以替換不可能動到任何主鍵欄。
         // 第二個參數**必須顯式傳**：本類別沒有 tableName()，省略會 fallback 到不存在的
         // 方法而在 runtime 炸掉（不是靜態錯誤）。
         $this->resetVariantReplaced();
@@ -212,13 +284,31 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
             return $guardError;
         }
 
+
         try {
-            DB::transaction(function () use (&$operation, &$insertedArray, $table, $keyColumns, $explicitPk, $autoAssign, $row, $personId, $operationId, $comment) {
+            DB::transaction(function () use (&$operation, &$insertedArray, $table, $keyColumns, $explicitPk, $autoAssign, $row, $personId, $operationId, $comment, $treeParentColumn) {
                 if (!empty($explicitPk)) {
                     $pk = $explicitPk;
                 } else {
                     $keyColumn = $keyColumns[0];
                     $pk = [$keyColumn => max(0, (int) DB::table($table)->max($keyColumn)) + 1];
+                }
+
+                // 自參照樹：交易內鎖定複查（理由同 update 端——handle() 裡那次是「檢查後
+                // 才寫」，鎖住走訪路徑才收斂得掉並發）。新增只可能成 1-環，但兩個同時
+                // 新增互指的節點一樣可以繞過無鎖的檢查。
+                if ($treeParentColumn !== null && count($keyColumns) === 1) {
+                    $lockedCycleError = SelfReferencingTreeGuard::findCycle(
+                        $table,
+                        $keyColumns[0],
+                        $treeParentColumn,
+                        $pk[$keyColumns[0]],
+                        $row[$treeParentColumn] ?? null,
+                        true,
+                    );
+                    if ($lockedCycleError !== null) {
+                        throw new TreeCycleException($lockedCycleError);
+                    }
                 }
 
                 $rowData = array_merge($row, $pk);
@@ -255,6 +345,9 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
                     $operation ? (string) $operation->id : null
                 );
             });
+        } catch (TreeCycleException $e) {
+            // 交易內的鎖定複查擋下的競態；與上面那次同樣回 422 tree_cycle。
+            return $this->withVariantNotices($this->errorResponse($e->getMessage(), 422, ['changes' => ['tree_cycle']]));
         } catch (\Illuminate\Database\QueryException $e) {
             // 這幾個回應都在落地替換之後，所以**必須**帶 notices（AGENTS §1.3：成功、409、
             // 422 都要掛）——被擋下來時使用者更需要知道自己輸入的字被正規化了，否則交易
@@ -265,6 +358,12 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
             //
             // 外鍵指向不存在的列（如 ADDR_BELONGS_DATA 的上級地名尚未建立）是呼叫端的
             // 輸入問題，要回 422 而不是把資料庫例外冒成 500。
+            // 鎖競爭（deadlock／lock wait timeout）：交易已回滾、沒有寫出環，
+            // 是可直接重試的暫時性衝突，回 409 而不是 500。自參照樹的鎖定走訪會讓
+            // 兩個方向相反的重掛以不同順序取鎖，資料庫因此可能挑一方回滾。
+            if ($this->isLockContention($e)) {
+                return $this->withVariantNotices($this->errorResponse('與其他同時進行的修改發生鎖衝突，請重試', 409, ['changes' => ['lock_contention']]));
+            }
             if ($this->isForeignKeyViolation($e)) {
                 return $this->withVariantNotices($this->errorResponse('關聯的記錄不存在（外鍵約束）', 422, ['changes' => ['foreign_key_violation']]));
             }
@@ -288,7 +387,10 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
 
         $resultPk = [];
         foreach ($keyColumns as $col) {
-            $resultPk[$col] = (int) ($insertedArray[$col] ?? 0);
+            // 文本主鍵不可轉 int（會把 '060102' 變成 60102，呼叫端拿著回應的鍵回來就查不到）。
+            $resultPk[$col] = $this->isTextColumn($table, $col)
+                ? (string) ($insertedArray[$col] ?? '')
+                : (int) ($insertedArray[$col] ?? 0);
         }
 
         return $this->withVariantNotices(response()->json([

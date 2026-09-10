@@ -174,6 +174,20 @@ return [
             'long_text_fields' => ['c_notes'],
         ],
         [
+            // 官職類型層級樹。主鍵是文本（階層路徑字串），不在 update 白名單內
+            // ——改主鍵等於把節點搬到樹的另一個位置，須另行新增／刪除。
+            'resource' => 'office_type_tree',
+            'table' => 'OFFICE_TYPE_TREE',
+            'aliases' => ['office-type-tree', 'office_type_tree', 'officetypetree'],
+            'display_name' => '官職類型層級樹',
+            'key_columns' => ['c_office_type_node_id'],
+            'allowed_fields' => ['c_office_type_desc', 'c_office_type_desc_chn', 'c_parent_id'],
+            // 中英文說明與上層節點都不是拼音欄，兩個 tier 皆空。
+            'tier1_fields' => [],
+            'tier2_fields' => [],
+            'tree_parent_column' => 'c_parent_id',
+        ],
+        [
             'resource' => 'addr_codes',
             'table' => 'ADDR_CODES',
             'aliases' => ['addr_codes', 'addr-codes', 'addrcodes'],

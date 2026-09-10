@@ -160,12 +160,18 @@ return [
         [
             'resource' => 'admin_cat_codes',
             'table' => 'ADMIN_CAT_CODES',
-            'aliases' => ['admin_cat_codes', 'admin_cat'],
+            'aliases' => ['admin_cat_codes', 'admin_cat', 'admin-cat-codes', 'admin-cat'],
             'display_name' => '行政類別代碼',
             'key_columns' => ['c_admin_cat_code'],
-            'allowed_fields' => ['c_admin_cat_py'],
+            // 本表可經 /api/v2/create 新增（config/code_table_writes.php），所以 update 端
+            // 收得下同一組欄位——只開拼音欄會讓「新增時填得進去、之後改不了」
+            // （CodeTableWriteConfigDriftTest 會機械檢查兩端一致）。
+            'allowed_fields' => ['c_admin_cat_py', 'c_admin_cat_hz', 'c_admin_cat_trans', 'c_notes'],
             'tier1_fields' => ['c_admin_cat_py'],
+            // c_admin_cat_hz 是漢字、c_admin_cat_trans 是英譯、c_notes 是註記，
+            // 都不是拼音欄，兩個 tier 都不列（列進 tier2 會讓 /codes 編輯器對它們彈 ü 轉換視窗）。
             'tier2_fields' => [],
+            'long_text_fields' => ['c_notes'],
         ],
         [
             'resource' => 'addr_codes',

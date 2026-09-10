@@ -84,6 +84,25 @@ return [
             // 但送 null／空字串是明確的錯誤，要在 422 就擋下。
             'not_null_fields' => ['c_admin_cat_code'],
         ],
+        // 行政類別代碼（州／府／縣…）。原本只能 update 拼音欄、沒有新增入口，
+        // 於是要建一個新的行政類別只能走 /codes UI（機器化匯入地名時卡在這裡）。
+        // 被 ADDR_CODES.c_admin_cat_code 與 ADMIN_CAT_CODE_TYPE_REL 以外鍵引用，
+        // 所以刪除仍然停用（與其他代碼表一致）。
+        'ADMIN_CAT_CODES' => [
+            'resource' => 'admin-cat-codes',
+            'aliases' => ['admin-cat-codes', 'admin_cat_codes', 'admin-cat', 'admin_cat'],
+            'table' => 'ADMIN_CAT_CODES',
+            'display_name' => '行政類別代碼',
+            'key_columns' => ['c_admin_cat_code'],
+            'auto_assign_id' => true,
+            'allowed_fields' => ['c_admin_cat_py', 'c_admin_cat_hz', 'c_admin_cat_trans', 'c_notes'],
+            'long_text_fields' => ['c_notes'],
+            // 本表沒有 c_created_by／c_modified_* 那組稽核欄，**刻意不補**：v2 的每一次寫入
+            // 都已經在 operations 與 audit_log 留下操作者與時間，補欄只會讓 /codes 列表多出
+            // 四個永遠是空的欄。CodeTableCreateHandler 按實際欄位蓋章，缺欄不會 500
+            // （ADDR_CODES 當年就是因為缺欄而必然新增失敗，那張表選擇補欄是因為它已經有
+            // 姊妹表 ADDR_BELONGS_DATA 帶著同一組欄位、補齊才一致）。
+        ],
         // 地名隸屬關係：四欄複合主鍵（地名、上級地名、起訖年）全部由呼叫端給定——
         // 沒有 auto_assign 的餘地，也不該有：換上級或換年段就是另一筆記錄。
         'ADDR_BELONGS_DATA' => [

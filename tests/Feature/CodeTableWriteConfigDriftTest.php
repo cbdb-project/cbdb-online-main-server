@@ -80,6 +80,74 @@ class CodeTableWriteConfigDriftTest extends TestCase {
         );
     }
 
+    /**
+     * 兩份 config 的別名清單**刻意**不對稱的表：表 => 理由。
+     * 完整比對：不在這裡、兩邊別名集合又不相等的表一律判紅。
+     */
+    private const ALIASES_MAY_DIFFER = [
+        // 歷史遺留且已對外文件化（API.md 13.2 最後一條）：create 接受
+        // text-codes／text_codes／textcodes，update 只接受 text_codes。
+        // 改動會打斷既有客戶端，故維持並登記在此。
+        'TEXT_CODES' => 'create 與 update 別名刻意不對稱，已在 API.md 13.2 明文說明',
+    ];
+
+    #[Test]
+    public function aliases_agree_between_both_configs_for_shared_tables(): void {
+        // 症狀很難查：某個拼法「新增成功、修改卻 501」——呼叫端會以為是自己弄錯表名。
+        $writes = $this->byTable(config('code_table_writes.tables', []));
+        $updates = $this->byTable(config('code_table_mutations.tables', []));
+
+        $mismatched = [];
+        foreach (array_intersect(array_keys($writes), array_keys($updates)) as $table) {
+            if (isset(self::ALIASES_MAY_DIFFER[$table])) {
+                continue;
+            }
+
+            $createAliases = array_values((array) ($writes[$table]['aliases'] ?? []));
+            $updateAliases = array_values((array) ($updates[$table]['aliases'] ?? []));
+            sort($createAliases);
+            sort($updateAliases);
+
+            if ($createAliases !== $updateAliases) {
+                $mismatched[$table] = [
+                    'create_only' => array_values(array_diff($createAliases, $updateAliases)),
+                    'update_only' => array_values(array_diff($updateAliases, $createAliases)),
+                ];
+            }
+        }
+
+        $this->assertSame(
+            [],
+            $mismatched,
+            "同一張表的 create 與 update 別名清單不一致：
+"
+                . json_encode($mismatched, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+                . "
+只有一邊認得的拼法會讓呼叫端拿到 501（找不到 handler），而錯誤訊息看起來像是表名寫錯。"
+                . '刻意的差異請登記進 ALIASES_MAY_DIFFER 並寫理由。'
+        );
+    }
+
+    #[Test]
+    public function every_configured_resource_name_is_one_of_its_own_aliases(): void {
+        // resource 是回應與提案 meta 用的正規名；不在自己的 aliases 裡的話，
+        // 呼叫端照回應的 resource 值回送會 501。
+        $problems = [];
+        foreach ([
+            'code_table_writes' => config('code_table_writes.tables', []),
+            'code_table_mutations' => config('code_table_mutations.tables', []),
+        ] as $configName => $definitions) {
+            foreach ($definitions as $def) {
+                if (!in_array($def['resource'] ?? '', (array) ($def['aliases'] ?? []), true)) {
+                    $problems[] = $configName . ': ' . ($def['table'] ?? '?') . ' 的 resource「' . ($def['resource'] ?? '') . '」不在自己的 aliases 內';
+                }
+            }
+        }
+
+        $this->assertSame([], $problems, implode("
+", $problems));
+    }
+
     #[Test]
     public function type_registries_agree_between_both_configs_for_shared_tables(): void {
         $writes = $this->byTable(config('code_table_writes.tables', []));

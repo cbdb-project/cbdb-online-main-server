@@ -4,6 +4,16 @@
 
 ## 2026-09
 
+### v2 API 補上行政類別代碼（ADMIN_CAT_CODES）的新增，並把 update 白名單擴到整列
+
+- **回報**：「只能 update `c_admin_cat_py`；沒有 create」。要建一個新的行政類別（州／府／縣…）只能走 `/codes` UI；機器化匯入地名時就卡在這裡——`ADDR_CODES.c_admin_cat_code` 帶外鍵，引用不存在的類別會被擋下，而 API 又建不出新類別。
+- **新增能力**：`admin-cat-codes` 支援 `/api/v2/create`（主鍵可自動配發或指定），update 白名單從 `c_admin_cat_py` 一欄擴到 `c_admin_cat_py`／`c_admin_cat_hz`／`c_admin_cat_trans`／`c_notes` 四欄。既有的 §D-6 行為不變：`c_admin_cat_py` 仍是 Tier 1（保存時後端靜默 v→ü），另外三欄不是拼音欄、兩個 tier 都不列（列進 tier2 會讓 `/codes` 編輯器對漢字名與註記也彈 ü 轉換視窗）。`c_notes` 是 longtext，登記進 `long_text_fields` 以免被 255 上限誤擋。
+- **沒有補稽核欄，這是刻意的**：本表（以及多數代碼表）沒有 `c_created_by`／`c_modified_*` 那組欄位。v2 的每一次寫入都已經在 `operations` 與 `audit_log` 留下操作者與時間，補欄只會讓 `/codes` 列表多出四個永遠是空的欄。`CodeTableCreateHandler` 上一個 commit 起就是按實際欄位蓋章，所以缺欄不會再像 `ADDR_CODES` 那樣直接 500——測試裡有一支專門把「沒有稽核欄也要能新增」釘住。
+- **刪除維持停用**（403）：本表被 `ADDR_CODES.c_admin_cat_code` 與 `ADMIN_CAT_CODE_TYPE_REL` 以外鍵引用，與其他代碼表一致。
+- **順帶修掉一個既有的兩端不一致**：`CodeTableCreateHandler` 從來沒有做 §D-6 的 Tier 1 拼音 v→ü 歸一化，於是同一個 `lv` 走 `/api/v2/create` 存 `lv`、走 `/api/v2/mutate` 或 `/codes` 存 `lü`——同一欄兩種寫法，而 §D-6 的承諾是「保存時一律歸一」。現在 create 端也做，Tier 定義仍只有一份（`config/code_table_mutations.php`），create 端按表名去查、不複製第二份清單。連帶修好 `TEXT_CODES.c_title`（同樣是 Tier 1 且開放新增）。
+- **兩份 config 的別名一致性也機械化**：`CodeTableWriteConfigDriftTest` 新增兩條——同一張表在兩份 config 的別名集合必須相等（`TEXT_CODES` 的不對稱是歷史遺留且已對外文件化，登記為例外），且每個 `resource` 正規名必須在自己的 `aliases` 內。漏掉的症狀是「某個拼法新增成功、修改卻 501」，錯誤訊息看起來像是表名寫錯。
+- **測試**：`ApiV2MutateAdminCatCodesTest`（10 案例：無稽核欄的自動配發、顯式主鍵與 409、smallint 主鍵值域、update 四欄對稱、longtext 註記不被 255 擋、Tier 1 拼音在 update 與 create 兩端都轉、中文欄落地替換並回 notices、刪除 403、未啟用帳號 403＋提案新增 501）。兩份 config 的白名單一致性由既有的 `CodeTableWriteConfigDriftTest` 自動把關。
+
 ### v2 API 補上地名表寫入：ADDR_CODES 可新增、可整列修改，ADDR_BELONGS_DATA 從無到有
 
 - **回報**：「API 無法新增地名表記錄」。查證屬實，而且不只一層：`ADDR_CODES` 只登錄在 `config/code_table_mutations.php`（純 update）、白名單只有 `c_name` 一欄，沒有任何新增入口；`ADDR_BELONGS_DATA`（地名隸屬關係）連 update 都沒有。就算當時把 `ADDR_CODES` 登進 `config/code_table_writes.php` 也照樣失敗——`CodeTableCreateHandler` 經 `ToolsRepository::timestamp()` 無條件寫 `c_created_by`／`c_created_date`，而這張表從建表起就沒有那 4 欄，會直接以「Unknown column」炸掉；而且 create handler 當時只認單一主鍵，`ADDR_BELONGS_DATA` 的四欄複合主鍵根本進不來。

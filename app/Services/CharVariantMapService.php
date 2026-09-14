@@ -305,13 +305,15 @@ class CharVariantMapService {
      * 插入額外欄位，只能對已完成的 JsonResponse 再加工）。
      *
      * 注意：這裡是重新組一個全新的 JsonResponse，不是複製／修改原始 `$response`，
-     * 所以不會帶到原始回應上可能設定的自訂 header／cookie。目前所有呼叫端
-     * （AbstractPersonSubresourceCreateHandler／AbstractPersonSubresourceMutationHandler
-     * 的 handleDirect()／handleProposal()）都只用 response()->json([...]) 組出單純的
-     * JSON 回應，沒有額外 header／cookie，故現階段無影響；若未來這些父類別新增了
-     * header／cookie，需要重新評估這裡是否要改用 `$response->setData($data)` 保留原始
-     * response 物件（含 header）而非重建。
-     *
+ * 所以不會帶到原始回應上可能設定的自訂 header／cookie。呼叫端目前包含
+ * `AppliesVariantReplacement::withVariantNotices()`（人物子資源的 create／mutation 基底、
+ * `PossessionCreateHandler`／`PostingCreateHandler`／`PostingMutationHandler`／
+ * `SourceMutationHandler`）、`BiogMainMutationHandler`，以及自 2026-09 起的
+ * `WritesNoticeAggregate`（兩個代碼表 handler 共 18 個 return）。它們全部只用
+ * `response()->json([...])` 組出單純的 JSON 回應，沒有額外 header／cookie，故現階段
+ * 無影響；若未來有呼叫端新增了 header／cookie，需要改用 `$response->setData($data)`
+ * 保留原始 response 物件（含 header）而非重建。
+ *
      * @param array<string,string|array<int,string>> $replaced 形狀同 buildNotices()
      */
     public static function withNotices(JsonResponse $response, array $replaced): JsonResponse {

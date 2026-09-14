@@ -59,8 +59,8 @@ trait NormalizesCoordinatePairs {
      *                           （`CodeTableCreateHandler` 的表由請求決定，就是這種）。
      * @return array<string,mixed>
      */
-    protected function applyCoordinateNormalization(array $data, ?string $table = null): array {
-        $result = CoordinatePairNormalizer::normalizeRow($data, $table ?? $this->tableName());
+    protected function applyCoordinateNormalization(array $data, ?string $table = null, bool $dataIsCompleteRow = false): array {
+        $result = CoordinatePairNormalizer::normalizeRow($data, $table ?? $this->tableName(), $dataIsCompleteRow);
 
         foreach ($result['cleared'] as $column => $reason) {
             $this->coordinateCleared[(string) $column] = [

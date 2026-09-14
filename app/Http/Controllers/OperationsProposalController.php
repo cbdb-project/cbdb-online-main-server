@@ -235,6 +235,8 @@ class OperationsProposalController extends Controller {
         }
 
         flash('提案已核准並套用至資料表 @ '.Carbon::now(), 'success');
+        // 核准若順手把座標歸零了，審核者必須看見——那可能丟掉了一個真實的經緯度值。
+        $this->flashCoordinateNoticesOnApproval();
 
         return redirect()->back();
     }
@@ -961,6 +963,10 @@ class OperationsProposalController extends Controller {
         // 該讓審核者看到並回去修提案，而不是由系統代為決定要丟掉它。丟出
         // RuntimeException 是這兩個 apply* 方法既有的失敗慣例（上下都是這樣擋的），
         // 呼叫端會轉成使用者看得到的錯誤訊息。
+        if (!CoordinatePairNormalizer::handles($table)) {
+            return $data;
+        }
+
         $invalid = CoordinatePairNormalizer::invalidColumns($data, $table);
         if ($invalid !== []) {
             throw new \RuntimeException(
@@ -969,7 +975,37 @@ class OperationsProposalController extends Controller {
             );
         }
 
-        return CoordinatePairNormalizer::normalizeRow($data, $table)['data'];
+        // 累積 `cleared` 給呼叫端 flash 出來。**不可以丟掉。**
+        // 代碼表 update 的提案 payload 是 `array_merge($originalArray, $updateData, …)`，
+        // 也就是快照裡帶著提案人從沒碰過的座標欄。於是核准一筆無關的 `c_notes` 編輯，
+        // 就可能順手把一列半髒座標（`x=113.5, y=0`）的真實經度 113.5 清成 NULL——
+        // 而 `REASON_PARTNER` 的定義正是「系統丟掉了一個真的值」，它自己的註解寫著
+        // 這個原因**必須**能傳到使用者眼前。旁邊的 invalidColumns() 會大聲中止，
+        // 這一條卻靜默，那是不對稱的。
+        $result = CoordinatePairNormalizer::normalizeRow($data, $table);
+        $this->coordinateClearedOnApproval = array_merge(
+            $this->coordinateClearedOnApproval,
+            $result['cleared']
+        );
+
+        return $result['data'];
+    }
+
+    /**
+     * 本次核准過程中被歸零的座標欄（欄名 → 原因）。
+     *
+     * 由 `normalizeCoordinatesForApproval()` 累積、由 `approve()` 在成功訊息旁 flash 出來。
+     * 控制器每個 request 一個實例，所以不需要 reset。
+     *
+     * @var array<string,string>
+     */
+    protected array $coordinateClearedOnApproval = [];
+
+    /** 把核准過程中的座標歸零通知 flash 給審核者（沒有就什麼都不做）。 */
+    protected function flashCoordinateNoticesOnApproval(): void {
+        foreach (CoordinatePairNormalizer::buildNotices($this->coordinateClearedOnApproval) as $notice) {
+            flash($notice, 'warning');
+        }
     }
 
     protected function applyCreateProposal(string $table, array $data, array $keyColumns): array {

@@ -12,9 +12,8 @@ use Tests\TestCase;
 /**
  * 事後清掃：`cbdb:normalize-addr-coords` 與共用它的一次性 data migration。
  *
- * 為什麼需要這道地板：寫入端守衛只管**新的寫入**。生產環境那 316 列 `0,0` 的
- * `c_created_by`／`c_modified_by` 全是 `NULL`——從來沒被應用寫過，是原始匯入帶進來的。
- * 下一次上游重灌、或任何匯入舊 dump 的新部署，都會再帶一批。
+ * 為什麼需要這道地板：寫入端守衛只管**新的寫入**。生產環境那 316 列 `0,0` 幾乎確定是原始
+ * 匯入帶進來的，而任何上游重灌、或任何匯入舊 dump 的新部署，都會再帶一批。
  */
 class NormalizeAddrCoordsCommandTest extends TestCase {
     protected function setUp(): void {
@@ -174,5 +173,27 @@ class NormalizeAddrCoordsCommandTest extends TestCase {
         // 重建的派生快取——在派生物上逐列改只會與源頭不一致。
         $this->artisan('cbdb:normalize-addr-coords', ['--table' => 'ADDRESSES'])
             ->assertExitCode(1);
+    }
+
+    #[Test]
+    public function testTheTableNameIsNormalisedToTheRegisteredSpelling(): void {
+        // `pairsFor()`／`keyColumnFor()` 是大小寫不敏感地比對，但 `DB::table()` 用的是原樣
+        // 字串——於是 `--table=addr_codes` 會通過兩道閘門，然後在 case-sensitive 的 MySQL
+        //（Linux 上的預設）拋未捕捉的 QueryException。
+        //
+        // **這裡刻意斷言「機制」而不是「結果」**：SQLite 的表名大小寫不敏感，所以「小寫
+        // 表名也能清到資料」在測試環境裡**加不加歸一都會綠**（已用 mutation 確認）。
+        // 回傳的 `table` 欄位是歸一後的值，那在兩種引擎上都一樣可觀察，拿掉歸一就會紅。
+        $this->seedRows();
+
+        $result = app(CoordinateZeroCleanupService::class)->cleanTable('addr_codes');
+
+        $this->assertSame(
+            'ADDR_CODES',
+            $result['table'],
+            '表名必須被歸一成登記的拼法，否則 DB::table() 會拿到原樣字串'
+        );
+        // 順帶確認它真的做了事（不是因為表名不對而空轉）。
+        $this->assertSame(4, $result['cleared']);
     }
 }

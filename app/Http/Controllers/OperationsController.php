@@ -1548,7 +1548,15 @@ class OperationsController extends Controller {
                     'columns' => implode('、', array_keys($invalidCoordinates)),
                 ]));
             }
-            $coordinateResult = CoordinatePairNormalizer::normalizeRow($payload, $table);
+            // **整列模式**：`restoreDelete` 是把一整列重建回去（下面走 insert／
+            // updateOrInsert），所以快照裡缺席的那一軸必然落庫成 NULL——「只有經度」的
+            // 快照在這裡已經是半截座標。`restoreUpdate` 那一側刻意不同：它可能只寫回
+            // 部分欄位，另一軸在資料庫裡可能本來就有值。
+            //
+            // 第一版兩邊都用逐欄模式，於是只帶一軸的刪除快照會還原出 `105.36, NULL`
+            //（審查端到端證明過）。實務可達性低（正常快照來自 `SELECT *`，兩欄都在），
+            // 但那是資料形狀的巧合、不是結構保證。
+            $coordinateResult = CoordinatePairNormalizer::normalizeRow($payload, $table, true);
             $payload = $coordinateResult['data'];
             $this->coordinateClearedOnRestore = array_merge(
                 $this->coordinateClearedOnRestore,

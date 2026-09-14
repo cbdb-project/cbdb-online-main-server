@@ -582,4 +582,105 @@ class CodesUiZeroCoordinateTest extends TestCase {
             '還原順手丟掉了一個真實的經度值，卻沒有任何訊息告訴還原者'
         );
     }
+
+    #[Test]
+    public function testRestoringADeletedRowWhoseSnapshotHasOnlyOneAxisClearsBoth(): void {
+        // `restoreDelete` 是整列重建（insert／updateOrInsert），所以快照裡缺席的那一軸必然
+        // 落庫成 NULL——「只有經度」的快照已經是半截座標。第一版兩條 restore 都用逐欄模式，
+        // 於是這種快照會還原出 `105.36354, NULL`（審查端到端證明過）。
+        //
+        // 既有的那支 restoreDelete 測試抓不到它，因為它建的是完整的一對——「測試存在但覆蓋
+        // 了錯誤的形狀」。
+        $admin = User::forceCreate([
+            'name' => 'restore half admin',
+            'email' => 'restore-half@example.com',
+            'confirmation_token' => 'token-restore-half',
+            'is_active' => User::STATUS_ACTIVE,
+            'is_admin' => User::ROLE_SUPER_ADMIN,
+        ]);
+
+        $deletedRow = [
+            'c_addr_id' => 9008,
+            'c_name' => 'HalfDeleted',
+            'c_name_chn' => '半截已刪',
+            'c_admin_cat_code' => 176,
+            'x_coord' => 105.36354,
+            // 刻意完全沒有 y_coord 這個鍵
+        ];
+
+        $operationId = DB::table('operations')->insertGetId([
+            'user_id' => $admin->id,
+            'c_personid' => 0,
+            'op_type' => Operation::TYPE_DELETE,
+            'resource' => 'ADDR_CODES',
+            'resource_id' => 'c_addr_id=9008',
+            'resource_data' => json_encode($deletedRow, JSON_UNESCAPED_UNICODE),
+            'resource_original' => json_encode($deletedRow, JSON_UNESCAPED_UNICODE),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($admin);
+        $this->post('/operations/'.$operationId.'/restore');
+
+        $row = $this->row(9008);
+        $this->assertNotNull($row, '還原應該把這一列建回來');
+        $this->assertNull(
+            $row->x_coord,
+            'restoreDelete 是整列寫入，只有一軸的快照必須整對清空，不可以存出 105.36354, NULL'
+        );
+        $this->assertNull($row->y_coord);
+    }
+
+    #[Test]
+    public function testEditingAnExistingUpdateProposalStillWarnsAboutTheAxisItWillWipe(): void {
+        // `proposalUpdateExisting` 原本沒有讀現況列，於是通知過濾器會把**每一個**沒送來的
+        // 伙伴欄都當成「假損失」濾掉——使用者不會被告知一個真實的 `y_coord` 將在核准時被
+        // 清掉，而 §1.4 明說那種通知不可以靜默。
+        $admin = User::forceCreate([
+            'name' => 'prop update editor',
+            'email' => 'codes-prop-upd@example.com',
+            'confirmation_token' => 'token-prop-upd',
+            'is_active' => User::STATUS_ACTIVE,
+            'is_admin' => User::ROLE_SUPER_ADMIN,
+        ]);
+        // 現況列有一個真實的緯度，它會在核准時被一併清掉。
+        $this->seedRow(['x_coord' => 113.5, 'y_coord' => 40.3]);
+
+        $operationId = DB::table('operations')->insertGetId([
+            'user_id' => $admin->id,
+            'c_personid' => 0,
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+            'resource' => 'ADDR_CODES',
+            // Codes UI 的 resource_id 是 `_._` 串接的裸值（buildCompositeId），單一主鍵
+            // 就是裸 id；v2 那邊才是 `c_addr_id=4338`。這條路徑讀的是前者。
+            'resource_id' => '4338',
+            'resource_data' => json_encode([
+                'c_addr_id' => 4338,
+                'c_name_chn' => '安定衛',
+                'c_admin_cat_code' => 176,
+                '__review_status' => 'pending',
+                '__key_columns' => ['c_addr_id'],
+            ], JSON_UNESCAPED_UNICODE),
+            'resource_original' => json_encode((array) $this->row(), JSON_UNESCAPED_UNICODE),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($admin);
+        // 只送 x_coord=0，完全不送 y_coord
+        $this->patch('/app/codes/ADDR_CODES/proposals/'.$operationId, [
+            'c_addr_id' => '4338',
+            'c_name_chn' => '安定衛',
+            'c_admin_cat_code' => '176',
+            'x_coord' => '0',
+        ]);
+
+        $messages = json_encode(session()->all(), JSON_UNESCAPED_UNICODE);
+        $this->assertStringContainsString(
+            'y_coord',
+            (string) $messages,
+            '現況列的 y_coord 是 40.3，會在核准時被一併清掉，必須告知使用者'
+        );
+    }
 }

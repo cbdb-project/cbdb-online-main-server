@@ -8,9 +8,9 @@ use Illuminate\Console\Command;
 /**
  * 把 `ADDR_CODES` 裡殘留的零／半截座標掃成 `NULL`。
  *
- * **每次上游資料重灌之後都該跑一次。** 寫入端守衛只管新的寫入；`ADDR_CODES` 那 316 列
- * `0,0` 的 `c_created_by`／`c_modified_by` 全部是 `NULL`，也就是從來沒被應用寫過——
- * 是原始匯入帶進來的，下一次重灌會再帶一批。
+ * **每次上游資料重灌之後都該跑一次。** 寫入端守衛只管新的寫入，而 `ADDR_CODES` 的 316 列
+ * `0,0` 幾乎確定是匯入帶進來的（散佈整個 id 區間、涵蓋一整批同類地名）。下一次重灌會再
+ * 帶一批。同理，任何匯入舊 dump 的新部署也需要這道地板。
  *
  * 幂等：`NULL` 既非空白亦非零，第二次跑什麼都不做。所以放進部署腳本或 cron 都安全。
  *
@@ -64,8 +64,12 @@ class NormalizeAddrCoords extends Command {
         if ($result['cleared'] > 0 && !$dryRun) {
             $this->newLine();
             $this->comment('提醒：ADDRESSES 是由 ADDR_CODES 重建的派生快取。座標已變更，');
-            $this->comment('      請在合適的時機執行 `php artisan cbdb:regenerate-addresses-table`，');
-            $this->comment('      否則 posting 自動填充與朝代同名消歧仍會看到舊座標。');
+            $this->comment('      請在合適的時機執行 `php artisan cbdb:regenerate-addresses-table`。');
+            // 刻意不點名「posting 自動填充」與「朝代同名消歧」——查過了：
+            // `PostingAutofillService` 對 x_coord／y_coord **零引用**，它查 ADDRESSES 只取
+            // 名稱與年份欄，其餘位址查詢打的是已清乾淨的 ADDR_CODES。會看到舊座標的是
+            // /codes/ADDRESSES 瀏覽頁、Query Playground 的原始 SQL，以及下游匯出。
+            $this->comment('      在那之前，/codes/ADDRESSES、Query Playground 與下游匯出仍會看到舊座標。');
         }
 
         return self::SUCCESS;

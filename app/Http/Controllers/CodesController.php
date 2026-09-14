@@ -1393,7 +1393,7 @@ class CodesController extends Controller {
                 // 這個衝突可能是落地替換自己造成的（使用者輸入的是自認為不同的字形），
                 // 不附上通知的話使用者無從得知系統改了字。
                 $this->flashVariantNotices($variantReplaced);
-                $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
+                $this->flashCoordinateNotices($coordinateCleared, $originalRow);
 
                 return redirect()->back()
                     ->withInput()
@@ -1405,7 +1405,7 @@ class CodesController extends Controller {
                 \Illuminate\Support\Facades\Log::warning('Codes 更新完整性違規', ['table' => $table, 'error' => $e->getMessage()]);
                 flash('更新失敗：必填欄位未填寫或關聯值不存在。', 'error');
                 $this->flashVariantNotices($variantReplaced);
-                $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
+                $this->flashCoordinateNotices($coordinateCleared, $originalRow);
 
                 return redirect()->back()
                     ->withInput()
@@ -1421,7 +1421,7 @@ class CodesController extends Controller {
 
         flash('Update success @ '.Carbon::now(), 'success');
         $this->flashVariantNotices($variantReplaced);
-        $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
+        $this->flashCoordinateNotices($coordinateCleared, $originalRow);
         $this->resetVariantMapCacheIfNeeded($table);
 
         $id = $this->buildCompositeId($keyColumns, $updatedRow);
@@ -1590,7 +1590,7 @@ class CodesController extends Controller {
             // 才撞上既有列（或才變成「沒有修改」）。少了通知，加上 withInput() 回填的是
             // **替換前**的原始輸入，使用者會完全無從理解為什麼。
             $this->flashVariantNotices($variantReplaced);
-            $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
+            $this->flashCoordinateNotices($coordinateCleared, []);
 
             return redirect()->back()->withInput();
         }
@@ -1602,7 +1602,7 @@ class CodesController extends Controller {
             flash('提案失敗：已有其他新增提案使用相同主鍵，請調整後再提交。', 'warning');
             // 同上：這個衝突可能是落地替換造成的。
             $this->flashVariantNotices($variantReplaced);
-            $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
+            $this->flashCoordinateNotices($coordinateCleared, []);
 
             return redirect()->back()->withInput();
         }
@@ -1624,7 +1624,7 @@ class CodesController extends Controller {
         // 含異體字的資料再原樣送出，替換就會產生 diff、記成一筆他自己沒察覺的提案。
         // 至少要讓他看到「系統把字改了」。
         $this->flashVariantNotices($variantReplaced);
-        $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
+        $this->flashCoordinateNotices($coordinateCleared, []);
 
         return redirect()->route($showRoute, ['table_name' => $table]);
     }
@@ -1725,6 +1725,16 @@ class CodesController extends Controller {
         $guardConditions = $isCreate
             ? []
             : $this->buildConditionsFromId($keyColumns, (string) ($operation['resource_id'] ?? ''));
+        // 座標通知需要「現況列」才能分辨真損失與假損失：`flashCoordinateNotices()` 會把
+        // 「沒送來、而且原值本來就是 NULL」的伙伴欄濾掉，但傳空陣列時那條規則會把**每一個**
+        // 沒送來的伙伴欄都濾掉——於是修改提案若只送 `x_coord=0`，使用者不會被告知一個真實的
+        // `y_coord` 將在核准時被清掉，而 §1.4 明說那種通知不可以靜默。
+        // create 提案沒有既有列（也沒有既存值可丟），維持空陣列。
+        // 變數名刻意不叫 $existingRow——這個方法下面已經有一個同名變數，語義是
+        // 「查重找到的衝突列」，完全不同的東西。
+        $liveRowForNotices = $isCreate || $guardConditions === []
+            ? []
+            : (array) ($this->fetchRowByKeys($table, $keyColumns, $guardConditions) ?: []);
         if ($guardError = $this->guardCharVariantMapWrite($table, $data, $guardConditions)) {
             flash($guardError, 'error');
 
@@ -1747,7 +1757,7 @@ class CodesController extends Controller {
                 flash('提案失敗：資料已存在，請改用修改提案。', 'warning');
                 // 同 performProposalStore 的同名分支：衝突可能是落地替換造成的。
                 $this->flashVariantNotices($variantReplaced);
-                $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
+                $this->flashCoordinateNotices($coordinateCleared, $liveRowForNotices);
 
                 return redirect()->back()->withInput();
             }
@@ -1757,7 +1767,7 @@ class CodesController extends Controller {
                 flash('提案失敗：已有其他新增提案使用相同主鍵，請調整後再提交。', 'warning');
                 // 同上：這個衝突可能是落地替換造成的。
                 $this->flashVariantNotices($variantReplaced);
-                $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
+                $this->flashCoordinateNotices($coordinateCleared, $liveRowForNotices);
 
                 return redirect()->back()->withInput();
             }
@@ -1800,7 +1810,7 @@ class CodesController extends Controller {
 
         flash('提案內容已更新，等待審核 @ '.Carbon::now(), 'success');
         $this->flashVariantNotices($variantReplaced);
-        $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
+        $this->flashCoordinateNotices($coordinateCleared, $liveRowForNotices);
 
         return redirect()->route('app.operations.index', ['proposals_only' => 1]);
     }
@@ -1899,7 +1909,7 @@ class CodesController extends Controller {
         if ($this->findExistingRowInEitherVariantForm($table, $keyColumns, $data)) {
             flash('新增失敗：主鍵或唯一值已存在。', 'error');
             $this->flashVariantNotices($variantReplaced);
-            $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
+            $this->flashCoordinateNotices($coordinateCleared, []);
 
             return redirect()->back()
                 ->withInput()
@@ -1930,7 +1940,7 @@ class CodesController extends Controller {
                 // 這個衝突可能是落地替換自己造成的（使用者輸入的是自認為不同的字形），
                 // 不附上通知的話使用者無從得知系統改了字。
                 $this->flashVariantNotices($variantReplaced);
-                $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
+                $this->flashCoordinateNotices($coordinateCleared, []);
 
                 return redirect()->back()
                     ->withInput()
@@ -1943,7 +1953,7 @@ class CodesController extends Controller {
                 \Illuminate\Support\Facades\Log::warning('Codes 新增完整性違規', ['table' => $table, 'error' => $e->getMessage()]);
                 flash('新增失敗：必填欄位未填寫或關聯值不存在。', 'error');
                 $this->flashVariantNotices($variantReplaced);
-                $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
+                $this->flashCoordinateNotices($coordinateCleared, []);
 
                 return redirect()->back()
                     ->withInput()
@@ -1963,7 +1973,7 @@ class CodesController extends Controller {
         // 讓錄入者知道系統改了字（落地替換是無條件套用、沒有「保留」選項，所以用非阻塞
         // 的 flash 而不是要使用者做決定的彈窗）。
         $this->flashVariantNotices($variantReplaced);
-        $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
+        $this->flashCoordinateNotices($coordinateCleared, []);
         $this->resetVariantMapCacheIfNeeded($table);
 
         return redirect()->route($editRoute, ['table_name' => $table, 'id' => $id]);
@@ -2029,7 +2039,7 @@ class CodesController extends Controller {
             // 才撞上既有列（或才變成「沒有修改」）。少了通知，加上 withInput() 回填的是
             // **替換前**的原始輸入，使用者會完全無從理解為什麼。
             $this->flashVariantNotices($variantReplaced);
-            $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
+            $this->flashCoordinateNotices($coordinateCleared, $originalRow);
 
             return redirect()->back()->withInput();
         }
@@ -2051,7 +2061,7 @@ class CodesController extends Controller {
         // 含異體字的資料再原樣送出，替換就會產生 diff、記成一筆他自己沒察覺的提案。
         // 至少要讓他看到「系統把字改了」。
         $this->flashVariantNotices($variantReplaced);
-        $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
+        $this->flashCoordinateNotices($coordinateCleared, $originalRow);
 
         return redirect()->route($editRoute, ['table_name' => $table, 'id' => $id]);
     }

@@ -125,9 +125,15 @@
   「鄰居」（實測 316 列產生 99,856 對）。`ADDR_CODES` 那 316 列已於 2026-09-14 清理／回填。
 - 任何**會把經緯度寫進資料庫**的新路徑，落庫前必須經過
   [CoordinatePairNormalizer](./app/Support/CoordinatePairNormalizer.php) 的
-  `normalizeRow($data, $table)`。範圍由 `PAIRS` 登記決定，未登記的表 fail-closed（不處理），
-  所以 `$table` 要傳**目標資料表**。**新增任何帶經緯度的資料表時，必須同步加進 `PAIRS`**
-  （`tests/Unit/CoordinatePairRegistryGuardTest.php` 會在漏登記時紅）。
+  `normalizeRow($data, $table, $dataIsCompleteRow)`。範圍由 `PAIRS` 登記決定，未登記的表
+  fail-closed（不處理），所以 `$table` 要傳**目標資料表**；第三個參數見下面的 create／update
+  那一條——**整列寫入端（insert）必須傳 `true`**，漏傳會讓半截對溜過去（已經漏過兩次）。
+- **新增任何帶經緯度的資料表時要評估是否加進 `PAIRS`，但不是一律加。**
+  `tests/Unit/CoordinatePairRegistryGuardTest.php` 只在「欄名叫 `x_coord`／`y_coord` 卻沒登記」
+  時會紅——換個欄名它看不到，所以別只靠它提醒。而且**有一張表刻意不登記**：
+  `SOCIAL_INSTITUTION_ADDR.inst_xcoord`／`inst_ycoord` 是 `double NOT NULL` 且是複合主鍵成員，
+  寫 `NULL` 進去是資料庫層的 1048（500），不是更乾淨的空值。判準是「這一對可以為 NULL 嗎」，
+  不是「它是不是座標」。
 - **座標是一對，不是兩個獨立的欄**：一對之中任一軸空白或為零，整對都寫 `NULL`——**包含
   呼叫端沒送的那一軸**。只有一軸的座標對每個消費端都不可用。這件事會讓
   `result.updated_fields` 出現呼叫端沒送的欄位，是對外契約的一部分（見 API.md §13.1）。

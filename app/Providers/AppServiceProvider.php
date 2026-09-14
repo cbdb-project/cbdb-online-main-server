@@ -68,7 +68,7 @@ class AppServiceProvider extends ServiceProvider {
         // 閘的是「保留明細」而不是「整個收集」：舊版 layouts/dashboard-v3.blade.php:346 的
         // 「本次查詢共 N 筆，耗時 X ms」那一行**沒有任何權限閘**，訪客與一般使用者都看得到，
         // 只有「查看詳細」連結與 modal 才限管理員（同檔 :348、:369）。若連筆數都不收，
-        // 等於順手改掉舊版對所有人的行為（flag 回退到 Blade 時也一樣少一行），那不在本次範圍。
+        // 等於順手改掉舊版對所有人的行為（kill switch 回退到 Blade 時也一樣少一行），那不在本次範圍。
         DB::listen(function (QueryExecuted $query) {
             app(QueryProfile::class)->add($query, $this->shouldRetainQueryDetails());
         });

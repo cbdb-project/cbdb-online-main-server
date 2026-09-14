@@ -324,8 +324,9 @@ class OperationsIndexLinksTest extends TestCase {
      */
     #[Test]
     public function test_composite_key_code_resource_view_link_actually_opens_the_row(): void {
-        // 明確釘住 flag：codes flag 本來就可被翻回 old（即時回退、不需改碼），
-        // 若靠預設值，別人一翻 flag 這條就變紅，而且連 id 解析的保證也一起失效。
+        // 明確釘住 flag：codes flag 仍可被翻成 old（環節 3 封路後它只改變**連結指向**、
+        // 不再讓 Blade 頁可開啟——而本測試驗的正是連結指向），若靠預設值，別人一翻 flag
+        // 這條就變紅，而且連 id 解析的保證也一起失效。
         config(['migration_flags.pages.codes' => 'new']);
 
         $user = User::forceCreate([
@@ -386,7 +387,10 @@ class OperationsIndexLinksTest extends TestCase {
 
     #[Test]
     public function test_code_resource_view_link_falls_back_to_blade_when_codes_flag_is_old(): void {
-        // codes flag 翻回 old 時，查閱連結要跟著回到 Blade 編輯頁（否則回退不完整）。
+        // codes flag 翻回 old 時，查閱連結要跟著回到 Blade 編輯頁。
+        // 📌 本測試驗的是**連結指向**，不是「Blade 頁還能開」——環節 3 之後那個 Blade
+        // 編輯頁會被 302 掉（見 LegacyBladePageRetirementTest）。這條斷言仍然有效
+        // （flag 確實還控制連結指向），但理由不再是「否則回退不完整」。
         config(['migration_flags.pages.codes' => 'old']);
 
         $user = User::forceCreate([

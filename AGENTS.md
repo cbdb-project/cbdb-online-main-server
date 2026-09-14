@@ -17,7 +17,7 @@
   - 🔴 **回退鍵已經不是 migration flag**：這批頁面翻 `MIGRATION_FLAG_*=old` **沒有任何效果**
     （封路 middleware 不讀 flag）。要回退請設 **`LEGACY_PAGE_RETIREMENT=false`** 並
     `php artisan config:clear && php artisan config:cache`——不需重新部署、不需 git revert。
-    migration flag 現在只影響**連結指向**（側邊欄、payload 裡的 URL），不影響舊頁能否開啟。
+    對**已被 `legacy.page` 封路的那批頁面**而言，migration flag 現在只影響**連結指向**（側邊欄、payload 裡的 URL），不影響舊頁能否開啟；**`auth.*`／`welcome` 未封路**（flag 分支在 controller 內部），它們的 flag 仍然決定渲染 Blade 或 React（見 `tests/Feature/AuthPagesInertiaTest.php`）。
   - 少數頁面本就無 flag：Query Playground 主頁 `/query-playground` 硬導向 `/app/query-playground`；
     外部資料庫引用瀏覽器 `/external-db-link` 硬導向 `/app/external-db-link`（Blade 版已刪）。
   - AdminLTE 實體下架（環節 5）尚未執行。
@@ -205,7 +205,9 @@ php artisan cbdb:fetch-chgis-map        # 下載 CHGIS 底圖（缺檔才下載�
 - `POSTED_TO_ADDR_DATA` 的 `resource_id` 會沿用 `POSTED_TO_OFFICE_DATA` 格式，地址明細存於 `resource_data['rows']`。
 - 與時間欄位有關的修改，請注意 `DB_TIMEZONE` 必須與 `APP_TIMEZONE` 對齊；資料庫時區使用數字偏移，例如 `+08:00`。
 - 若測試需自行建表，請補齊必要主鍵、nullable、timestamps；很多回歸都來自測試表結構過度簡化。
-- `app/codes/{table_name}`（`CodesController@appShow`）帶 `sort_by`／`filters[...]` 時需登入且 `Auth::user()->isActive()`（見 `guardSortFilterRequiresAuth()`）；**Blade 版 `codes/{table_name}`（`show()`）未同步處理**，若把 `codes` migration flag 切回 `old` 會重新暴露無門檻的深分頁排序查詢，需重新評估。詳見 [docs/CODES_SORT_FILTER_AUTH_GATE.md](./docs/CODES_SORT_FILTER_AUTH_GATE.md)。
+- `app/codes/{table_name}`（`CodesController@appShow`）帶 `sort_by`／`filters[...]` 時需登入且 `Auth::user()->isActive()`（見 `guardSortFilterRequiresAuth()`）；**Blade 版 `codes/{table_name}`（`show()`）未同步處理**。
+  🔴 **唯一能重新暴露它的是 `LEGACY_PAGE_RETIREMENT=false`**（全站 kill switch）：該 Blade 路由掛 `legacy.page:app.codes.show`、一律 302 導向 React 版，而封路 middleware 不讀 flag，所以翻 `MIGRATION_FLAG_CODES=old` **沒有任何效果**（最容易犯的錯，故明列）。**動用 kill switch 回退時必須把「無門檻深分頁排序查詢重新暴露」算進代價。**
+  詳見 [docs/CODES_SORT_FILTER_AUTH_GATE.md](./docs/CODES_SORT_FILTER_AUTH_GATE.md)。
 
 ## 文檔維護原則
 - `AGENTS.md` 只保留目前有效的規則與入口，不記錄已淘汰的歷史流程。

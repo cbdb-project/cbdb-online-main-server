@@ -3,7 +3,7 @@
 > 本檔是遷移執行的**單一真實來源**：列舉全部待遷移頁面與狀態。策略與規則見 [REACT_INERTIA_MIGRATION_PLAN.md](./REACT_INERTIA_MIGRATION_PLAN.md)（recipe、保真度原則、自主執行協定）。
 > **本檔可頻繁更新**（每完成一頁就改狀態）；設計文件保持穩定。
 
-> ✅ **2026-06-26 全頁翻 new 上線**：Phase 1–6 所有可遷移頁（含 basicinformation 全套、view/index）已 `live`（flag `new`，使用者人工逐頁驗收通過）。仍為 `todo` 的只剩 **Phase 7（P7-1/2/3，AdminLTE 實體下架）** 與 **P6-C1/C2（死碼清理）**——舊視圖/路由目前保留供回退，尚未實體刪除。
+> ✅ **2026-06-26 全頁翻 new 上線**：Phase 1–6 所有可遷移頁（含 basicinformation 全套、view/index）已 `live`（flag `new`，使用者人工逐頁驗收通過）。仍為 `todo` 的只剩 **Phase 7（P7-1/2/3，AdminLTE 實體下架）** 與 **P6-C1/C2（死碼清理）**。🔴 **2026-09 更新**：「舊視圖/路由保留供回退」已不準確——人物編輯全套已**實體刪除**，其餘多數 legacy 頁面已**封路**（回退鍵是 `LEGACY_PAGE_RETIREMENT=false`，不是 flag）。見 [Blade 下架計畫](./BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)。
 
 ## 狀態圖例
 - `todo` 未開始　·　`in-progress` 進行中　·　`in-review` 已實作、走 gate 中　·　`done` 已合併（flag 仍指舊頁，待人切換）　·　`live` 已切換上線　·　`blocked` 卡住待人決定　·　`retired` 舊頁已退役刪除

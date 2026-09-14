@@ -1133,9 +1133,10 @@ class CodesController extends Controller {
                         // （見上方），拿去當姓名會讓 ID 假扮成人名，連結也會開到 404。
                         // 提案調整頁尤其會遇到——resource_data 裡的人物可能在送審後被合併掉。
                         'exists' => is_numeric($raw) ? isset($labels[(int) $raw]) : null,
-                        // 人物編輯頁 URL 由後端組（flag-aware，見 person_page_url()），前端只換 __ID__；
-                        // 不在元件裡寫死 /app/... 路徑，否則 basicinformation.editor flag 翻回 old 時
-                        // 只有這裡還指著 React 版。
+                        // 人物編輯頁 URL 由後端組（見 person_page_url()），前端只換 __ID__；
+                        // 不在元件裡寫死 /app/... 路徑，集中一處好改。
+                        // （原註解說的 basicinformation.editor flag 已隨環節 2 刪除，
+                        //  人物編輯只剩 React 版；保留集中組 URL 的做法仍然是對的。）
                         'edit_url_template' => person_page_url('__ID__', 'edit'),
                     ],
                 ];

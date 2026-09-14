@@ -1,5 +1,13 @@
 # Fidelity Spec：codes/show（P2-2，Phase 2 最重頁）
 
+
+> 🗄️ **歷史存檔（2026-09-14）**：本文件是遷移當時的 fidelity spec，記錄的是「新舊頁逐項對比」的
+> 驗收依據，**不是現況說明**。其中關於「flag 預設 old」「舊頁可安全回退」「URL 依 flag 解析」的
+> 敘述都已過時——Blade 下架計畫環節 2 把人物編輯全套**實體刪除**，環節 3 把其餘 legacy 頁面**封路**
+> （顯示頁 302／寫入端 410，封路 middleware **不讀 migration flag**，回退鍵是
+> `LEGACY_PAGE_RETIREMENT=false`）。現況請看
+> [BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](../BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)。
+
 > 舊頁 = `codes.show`（Blade）；新頁 = `app.codes.show`（Inertia）。flag = `codes`（群組共用，預設 old）。
 > public 路由（與舊頁同）。
 

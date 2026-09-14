@@ -378,7 +378,8 @@
 ### 稽核欄語義定案＋legacy Blade 表單下架閘門（修核准 422 與「比較」灰按鈕）
 - **語義定案（2026-08-05）**：`c_modified_by/date` 一律記「最後一次實際寫入」——核准提案、還原記錄都是寫入，落庫時蓋當下，不從提案 payload 或歷史快照沿用舊值；`c_created_*` 只在 create 蓋、之後永遠沿用。核准署名採雙人名「審核人 (Proposed by: 提案人)」，經新增的 `App\Support\AuditActor`（請求級 override）統一注入 `ToolsRepository::timestamp()` 與各處直接蓋章點（update handler、kinship/assoc 鏡像列、Codes、BiogMain 匯入等）。
 - **修核准 422**：提案 payload 是「快照」語義、可能夾帶四個稽核欄（legacy 提案入口無欄位白名單；update 提案 data＝original∪changes 天然含），核准重放 v2 handler 時會被白名單擋成 `disallowed_fields` 整筆失敗（2026-08-05 別名 create 提案實案）。`applyViaMutationHandler` 重放前統一剔除稽核欄（create／update 兩分支），由 handler 重新蓋章；通用路徑 `enforceAuditFieldsForCreate/Update` 同步改為無條件蓋章。restore 兩路徑（update／delete）也改蓋還原人＋還原時刻。
-- **legacy Blade 表單下架**：新增 `LegacyBladeFormGate` middleware 把 migration flag 語義做實——flag=new 時 legacy 表單 GET（人物 index/create/edit/show 與 12 個子資源的 index/create/edit）302 導向 `/app` 對應頁（edit.query 的 PK 查詢參數原樣轉發直接進編輯模式），寫入端點（store/update/updateQuery/destroyQuery/proposalStore/proposalUpdate）回 410；flag 改回 old 即完整放行、不需改碼。髒 payload 源頭（無白名單的 `proposalStore`）從此封死；其 `extractFormData` 亦加保險帶剔除稽核欄。
+- **legacy Blade 表單下架**：新增 `LegacyBladeFormGate` middleware 把 migration flag 語義做實——flag=new 時 legacy 表單 GET（人物 index/create/edit/show 與 12 個子資源的 index/create/edit）302 導向 `/app` 對應頁（edit.query 的 PK 查詢參數原樣轉發直接進編輯模式），寫入端點（store/update/updateQuery/destroyQuery/proposalStore/proposalUpdate）回 410；flag 改回 old 即完整放行、不需改碼。
+  - 📌 **後續（2026-09-14，Blade 下架環節 2）**：`LegacyBladeFormGate`、那些 legacy 路由與 controller、以及 15 個 `MIGRATION_FLAG_BASICINFO_*` flag **全部實體刪除**。「flag 改回 old 即完整放行」這條路**已不存在**，翻 flag 無法復活它們。髒 payload 源頭（無白名單的 `proposalStore`）從此封死；其 `extractFormData` 亦加保險帶剔除稽核欄。
 - **修「比較」灰按鈕**：核准改走 handler 重放後 audit_log 掛在新建 direct operation id 上，提案列自身撈不到 audit 而灰掉。核准時把落庫 operation id 寫回提案 payload（`__applied_operation_id`），operations 列表據此把 audit 認領回提案列。（此前核准的存量提案無此指標、仍灰；kinship/assoc bespoke 路徑暫未回報 id——連同三套差異機制的收斂見 `docs/OPERATIONS_COMPARE_CONSOLIDATION_PLAN.md`。）
 - 回歸測試：`ProposalAuditFieldSemanticsTest`（髒 payload 可核准／雙人名署名／restore 蓋章／audit 認領）、`LegacyBladeFormGateTest`（導向／410／flag=old 放行）；14 個仍測 legacy Blade CRUD 的既有測試類改在 setUp 撥回 flag=old（`TestCase::useLegacyPersonForms()`）。全量 2423 測試綠。
 
@@ -474,6 +475,7 @@
 - 背景：一次生產環境癱瘓事後分析發現，`/codes/{TABLE}?sort_by=...` 這類深分頁＋任意欄位排序／前導通配符 filter 查詢先於請求量異常變慢，推擠掉 php-fpm worker 拖垮全站。
 - `app/codes/{table_name}`（`CodesController@appShow`）新增 `guardSortFilterRequiresAuth()`：請求帶 `sort_by` 或非空 `filters[...]` 時，未登入導向 `login`（記錄 intended URL）；已登入但未激活（`Auth::user()->isActive()` 為 false）改用 flash 訊息 + `redirect()->back()`（避免被 `login` 路由的 `guest` middleware 攔截）；已登入且已激活不受影響。無 sort/filter 的基礎瀏覽維持公開，不需登入。
 - **Blade 版 `codes/{table_name}`（`CodesController@show`）本輪刻意不處理**，維持現況無門檻——若之後把 `codes` migration flag 切回 `old`，需重新評估。
+  - 📌 **後續（2026-09，Blade 下架環節 3）**：該條件已改變——Blade 版 `show()` 現在被 `legacy.page` middleware 一律 302 導向 React 版，而該 middleware **不讀 migration flag**。翻 `MIGRATION_FLAG_CODES=old` 不再能暴露它；真正會重新暴露的是 `LEGACY_PAGE_RETIREMENT=false`。見 [docs/CODES_SORT_FILTER_AUTH_GATE.md](./docs/CODES_SORT_FILTER_AUTH_GATE.md) 第 7 節。
 - React 前端（`Codes/Show.tsx`）加對應 UX 提示（排序表頭/套用篩選按鈕在未激活時顯示提示與 disabled 樣式），純體驗加分，非防線。
 - 設計、風險取捨、測試計劃詳見 [docs/CODES_SORT_FILTER_AUTH_GATE.md](docs/CODES_SORT_FILTER_AUTH_GATE.md)。
 
@@ -483,7 +485,8 @@
 - 全站可遷移的互動頁面 feature flag 由 `old` 翻為 `new`（`config/migration_flags.php`）：人物列表/檢視/詳情中樞、**13 個 React 編輯器**（basic-info + 12 個複合主鍵子資源：altname / addresses / texts / sources / offices / assoc / kinship / events / statuses / entries / possession / socialinst）、Codes CRUD、operations / manage / crowdsourcing、admin 日誌與批次工具、認證頁 / welcome 等，現以 React/Inertia 為**線上預設**。
 - 上線採 **gate-before-flip**：每頁先做新舊機器逐項對比（內容/欄位/說明文字/字體/導流/視覺）+ review agent + codex 雙閘，差異清單清空且使用者人工逐頁驗收後，才翻 `new`（見 [docs/REACT_MIGRATION_SIMULATION_TEST_PLAN.md](docs/REACT_MIGRATION_SIMULATION_TEST_PLAN.md) §0）。
 - 人物詳情中樞（`/app/basicinformation/{id}`）改用 legacy 風格 PersonBanner + 子資源分頁；重建年號轉換 React 元件（EraTimeField）、CHGIS place-link；補齊版面/互動/必填/改鍵 parity，子資源存檔後導向新記錄 edit 頁供複查（#120）。
-- **回退保證**：舊 Blade 視圖與路由**未刪除**，flag-gated 頁面回退只需把對應 flag 改回 `old`（可逆、不需改碼）。例外：Query Playground 無主頁 flag、`/query-playground` 硬導向 React 版，不走 flag 回退。AdminLTE 實體下架（Phase 7）尚未執行，故本階段「下線」指**下線為線上預設、舊版保留供回退**，非移除。
+- **回退保證**：舊 Blade 視圖與路由**未刪除**，flag-gated 頁面回退只需把對應 flag 改回 `old`（可逆、不需改碼）。
+  - 📌 **後續（2026-09，Blade 下架計畫）**：此保證已失效。人物編輯全套（`basicinformation.*`）已**實體刪除**；其餘 legacy 頁面已**封路**（顯示頁 302／寫入端 410），封路 middleware 不讀 flag，回退鍵改為 `LEGACY_PAGE_RETIREMENT=false`。仍由 flag 決定渲染的只剩 `auth.*` 與 `welcome`。例外：Query Playground 無主頁 flag、`/query-playground` 硬導向 React 版，不走 flag 回退。AdminLTE 實體下架（Phase 7）尚未執行，故本階段「下線」指**下線為線上預設、舊版保留供回退**，非移除。
 - 清理 legacy-parity 臨時測試組（#68，刪 18 個耦合舊路徑的 M 寫入等價測試）。
 
 ### 親屬／社會關係雙向鏡像「行內化」（編輯器內確認閘）

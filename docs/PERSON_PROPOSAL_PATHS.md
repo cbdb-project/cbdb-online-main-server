@@ -125,9 +125,12 @@ handler 白名單 → 422「包含不允許的欄位」整筆失敗。修正分�
 2. **稽核欄語義**（詳見 APPROVAL_FLOWS.md §3）：任何寫入蓋當下、署名雙人名
    「審核人 (Proposed by: 提案人)」，統一經 `App\Support\AuditActor`；通用路徑
    `enforceAuditFieldsForCreate/Update` 改無條件蓋章；restore 蓋還原人＋還原時刻。
-3. **入口下架**：`LegacyBladeFormGate` middleware——flag=new 時 legacy 表單 GET 302 導向
-   `/app` 對應頁、寫入端點（含 `proposalStore`）回 410；flag=old 完整放行（回退承諾保持）。
-   `extractFormData()` 另加剔除稽核欄保險帶。
+3. **入口下架**：原先由 `LegacyBladeFormGate` middleware 擋（flag=new 時 legacy 表單 GET 302、
+   寫入端點含 `proposalStore` 回 410；flag=old 完整放行）。
+   🔴 **2026-09-14 更新（Blade 下架環節 2）**：該 middleware 與 15 個 `MIGRATION_FLAG_BASICINFO_*`
+   flag、以及 `BasicInformationProposalController` 本體都已**實體刪除**——
+   **「flag=old 完整放行」這條路已經不存在**，不要再據此做安全評估。
+   `extractFormData()` 的剔除稽核欄保險帶隨該 controller 一併移除。
 4. **「比較」認領**：核准時把 handler 落庫的 direct operation id 寫回提案 payload
    （`__applied_operation_id`），operations 列表據此把 audit_log 認領回提案列。
    依決策**不回填存量**；路徑 B（kinship／assoc）未回報 id、其新核准提案「比較」仍不可用。
@@ -149,9 +152,10 @@ backfill、刪除 `$force=true` 廣集孤兒）都實作在 legacy 側、十餘�
 
 ### 5.2 legacy 提交路徑——✅ 已封（見 §4.7）
 
-`POST basicinformation/{personid}/{resource}/proposal` 在 flag=new 時 410。殘餘風險僅剩
-flag=old 回退窗口（此時 `extractFormData` 的稽核欄剔除仍有效，但其它欄位仍無白名單）。
-路由與控制器**實體仍在**，隨 Phase 7 AdminLTE 下架一併移除。
+`POST basicinformation/{personid}/{resource}/proposal` 已於 2026-09-14（Blade 下架環節 2）
+**連路由帶控制器一起實體刪除**，`LegacyBladeFormGate` 與對應的 15 個 flag 同時移除。
+🔴 **殘餘風險為零，而且不再有「flag=old 回退窗口」**——那個窗口在環節 2 之後已不存在，
+翻 flag 不會（也無法）復活這條入口。現役唯一的人物記錄提案入口是 `/api/v2/mutate`。
 
 ---
 

@@ -39,8 +39,8 @@ handler 的 `changes` 是**使用者意圖**——白名單刻意不含稽核欄
 | 入口 | 現況 |
 |---|---|
 | **`/api/v2/mutate`（`mode=proposal`）** | **現役唯一的人物記錄提案入口**。React 13 個編輯器全走此路；欄位白名單於提交當下生效，稽核欄等系統欄根本進不了 payload。create／update／delete 三種提案皆支援。**實體聚合**（office／social-institution／text-entity）的提案也走這裡（`/app/office`、`/app/social-institution`、`/app/text` 三個表單頁的「提交建議」），存的是聚合意圖 |
-| codes 模組（`CodesController@proposalStore/@proposalUpdate`） | 現役（codes 自有流程，不在 LegacyBladeFormGate 範圍） |
-| legacy Blade（`BasicInformationProposalController@proposalStore/@proposalUpdate`） | **已下架**：flag=new 時 `LegacyBladeFormGate` 對這兩條 POST 一律回 410。此入口**沒有欄位白名單**（任何表真實欄位照單全收，含稽核欄），是 2026-08-05 髒提案事故的源頭。flag=old 回退時才放行，且 `extractFormData()` 已加剔除稽核欄的保險帶 |
+| codes 模組（`CodesController@proposalStore/@proposalUpdate`） | 現役（codes 自有流程，不在已刪除的 `LegacyBladeFormGate` 範圍） |
+| legacy Blade（`BasicInformationProposalController@proposalStore/@proposalUpdate`） | **已於 2026-09-14 實體刪除**（Blade 下架環節 2）：controller、路由、`LegacyBladeFormGate` middleware 與對應的 15 個 `MIGRATION_FLAG_BASICINFO_*` flag 全部移除。此入口**沒有欄位白名單**（任何表真實欄位照單全收，含稽核欄），是 2026-08-05 髒提案事故的源頭。🔴 **不再有「flag=old 回退時才放行」這條路**——翻 flag 無法復活它 |
 
 - 只有活躍帳號（`is_active == 1`）能送出提案或直接儲存。
 - 新增提案在提交時即檢查資料表與其它 pending 提案的主鍵衝突，避免審核階段才失敗。

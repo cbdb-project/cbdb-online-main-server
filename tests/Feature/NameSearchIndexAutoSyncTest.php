@@ -3,8 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\BiogMain;
-use App\Models\User;
-use App\Services\CharVariantMapService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\Test;
@@ -13,10 +11,14 @@ use Tests\TestCase;
 /**
  * 姓名搜尋索引自動同步測試
  *
- * 測試 BiogMain 使用 Observer，以及 ALTNAME_DATA 透過實際 Controller + 服務的流程，是否能正確維護 CBDB__NAME_FTS 索引表。
+ * 測試 CBDB__NAME_FTS 索引表的自動維護。
  *
- * - BiogMain：使用 Eloquent + Observer 自動觸發
- * - ALTNAME_DATA：使用 BasicInformationAltnamesController + NameSearchIndexService（因復合主鍵改用 Query Builder）
+ * - BiogMain：Eloquent + BiogMainObserver 自動觸發（create／update／delete 三條）
+ * - 別名：直接呼叫 NameSearchIndexService::indexAltname()（ALTNAME_DATA 是複合主鍵、走 Query Builder）
+ *
+ * 原本這個檔還經 `BasicInformationAltnamesController` 驗別名寫入的索引同步，但該 controller 已於
+ * Blade 下架環節 2 刪除，對應的測試也隨之移除；別名寫入路徑的索引同步現在由
+ * `ApiV2AltnameNameIndexSyncTest`（v2 create／mutate／delete）覆蓋。
  */
 class NameSearchIndexAutoSyncTest extends TestCase {
     protected function setUp(): void {
@@ -39,52 +41,6 @@ class NameSearchIndexAutoSyncTest extends TestCase {
     }
 
     protected function createTestTables(): void {
-        // users 表（供 actingAs 與權限判斷）
-        Schema::create('users', function ($table) {
-            $table->increments('id');
-            $table->string('name');
-            $table->string('email')->unique();
-            $table->string('password');
-            $table->string('institution')->nullable();
-            $table->json('settings')->nullable();
-            $table->string('avatar')->nullable();
-            $table->string('confirmation_token')->nullable();
-            $table->smallInteger('is_active')->default(0);
-            $table->smallInteger('is_admin')->default(0);
-            $table->rememberToken();
-            $table->timestamps();
-        });
-
-        // operations 表（BasicInformationAltnamesController 會寫入）
-        Schema::create('operations', function ($table) {
-            $table->increments('id');
-            $table->integer('user_id');
-            $table->integer('c_personid');
-            $table->integer('op_type');
-            $table->string('resource');
-            $table->string('resource_id');
-            $table->text('resource_data')->nullable();
-            $table->text('resource_original')->nullable();
-            $table->integer('crowdsourcing_status')->default(0);
-            $table->timestamps();
-        });
-
-        // audit_log 表（供審計記錄寫入）
-        Schema::create('audit_log', function ($table) {
-            $table->bigIncrements('id');
-            $table->dateTime('occurred_at');
-            $table->dateTime('created_at');
-            $table->string('table_name', 64);
-            $table->string('operation', 16);
-            $table->string('actor_type', 32);
-            $table->string('actor_id', 128);
-            $table->char('operation_id', 26);
-            $table->json('row_pk');
-            $table->string('row_pk_text', 512);
-            $table->json('old_data')->nullable();
-            $table->json('new_data')->nullable();
-        });
-
         // BIOG_MAIN 表
         Schema::create('BIOG_MAIN', function ($table) {
             $table->integer('c_personid')->primary();
@@ -93,22 +49,6 @@ class NameSearchIndexAutoSyncTest extends TestCase {
             $table->string('c_surname')->nullable();
             $table->string('c_mingzi')->nullable();
             $table->timestamps();
-        });
-
-        // ALTNAME_DATA 表（使用復合主鍵，不使用 Eloquent）
-        Schema::create('ALTNAME_DATA', function ($table) {
-            $table->integer('c_personid');
-            $table->integer('c_sequence')->nullable();
-            $table->integer('c_alt_name_type_code');
-            $table->string('c_alt_name_chn')->nullable();
-            $table->integer('c_source')->nullable();
-            $table->string('c_created_by')->nullable();
-            $table->timestamp('c_created_date')->nullable();
-            $table->string('c_modified_by')->nullable();
-            $table->timestamp('c_modified_date')->nullable();
-
-            // 實際資料庫使用復合主鍵，但 SQLite 測試環境簡化處理
-            $table->index(['c_personid', 'c_sequence', 'c_alt_name_chn', 'c_alt_name_type_code'], 'idx_altname_pk');
         });
 
         // CBDB__NAME_FTS 表
@@ -130,69 +70,12 @@ class NameSearchIndexAutoSyncTest extends TestCase {
             $table->index('name_type_code', 'idx_cbdb__name_type');
         });
 
-        // ALTNAME_CODES 表（用於別名類型）
-        Schema::create('ALTNAME_CODES', function ($table) {
-            $table->integer('c_name_type_code')->primary();
-            $table->string('c_name_type_desc')->nullable();
-            $table->string('c_name_type_desc_chn')->nullable();
-        });
-
-        // 插入測試用別名類型
-        DB::table('ALTNAME_CODES')->insert([
-            ['c_name_type_code' => 4, 'c_name_type_desc' => 'zi', 'c_name_type_desc_chn' => '字'],
-            ['c_name_type_code' => 5, 'c_name_type_desc' => 'hao', 'c_name_type_desc_chn' => '號'],
-        ]);
-
-        // char_variant_map：與 database/migrations/2026_07_15_000000_create_char_variant_map_table.php
-        // 相同的 7 筆種子資料，供 BiogMainRepository::altnameStoreById()/altnameUpdateById() 的
-        // 異體字落地替換查詢使用（本測試走真實 controller，會實際觸發該查詢）。
-        Schema::create('char_variant_map', function ($table) {
-            $table->bigIncrements('id');
-            $table->string('c_variant_char', 10);
-            $table->string('c_reference_char', 10);
-            $table->tinyInteger('c_strict_excluded')->default(1);
-            $table->string('c_notes', 255)->nullable();
-            $table->timestamps();
-
-            $table->unique('c_variant_char', 'char_variant_map_c_variant_char_unique');
-        });
-
-        DB::table('char_variant_map')->insert([
-            ['c_variant_char' => '愼', 'c_reference_char' => '慎', 'c_strict_excluded' => 0],
-            ['c_variant_char' => '槀', 'c_reference_char' => '稿', 'c_strict_excluded' => 0],
-            ['c_variant_char' => '峯', 'c_reference_char' => '峰', 'c_strict_excluded' => 1],
-            ['c_variant_char' => '靑', 'c_reference_char' => '青', 'c_strict_excluded' => 0],
-            ['c_variant_char' => '頴', 'c_reference_char' => '穎', 'c_strict_excluded' => 0],
-            ['c_variant_char' => '淸', 'c_reference_char' => '清', 'c_strict_excluded' => 0],
-            ['c_variant_char' => '厰', 'c_reference_char' => '廠', 'c_strict_excluded' => 0],
-        ]);
-        CharVariantMapService::reset();
     }
 
     protected function tearDown(): void {
-        Schema::dropIfExists('ALTNAME_CODES');
         Schema::dropIfExists('CBDB__NAME_FTS');
-        Schema::dropIfExists('ALTNAME_DATA');
         Schema::dropIfExists('BIOG_MAIN');
-        Schema::dropIfExists('audit_log');
-        Schema::dropIfExists('operations');
-        Schema::dropIfExists('char_variant_map');
-        Schema::dropIfExists('users');
         parent::tearDown();
-    }
-
-    protected function createActiveExpert(): User {
-        $user = User::forceCreate([
-            'name' => 'Admin Tester',
-            'email' => 'admin@example.com',
-            'password' => bcrypt('secret'),
-        ]);
-
-        $user->is_active = User::STATUS_ACTIVE;
-        $user->is_admin = User::ROLE_EXPERT;
-        $user->save();
-
-        return $user;
     }
 
     // ===== BiogMain 測試 =====
@@ -300,8 +183,6 @@ class NameSearchIndexAutoSyncTest extends TestCase {
 
         $this->assertFalse($indexExists, '刪除人物應該移除所有索引');
     }
-
-    // ===== AltnameData 測試 =====
 
     // ===== 括號處理測試 =====
 

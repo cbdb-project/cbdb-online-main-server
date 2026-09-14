@@ -9,16 +9,11 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use PHPUnit\Framework\Attributes\Group;
+use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\SeedsPinyinDictionary;
 use Tests\TestCase;
 
-/**
- * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
- * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
- */
-#[Group('legacy-parity')]
 /**
  * ⚠️ **環節 4b-1 收斂**：`listRouteName()` 原本依 `$request->is('app/*')` 二選一，現在**一律**
  * 回傳 `app.admin.*`。理由：環節 3 把 legacy GET 封成 302 之後，legacy POST 完成 → redirect 到
@@ -28,20 +23,23 @@ use Tests\TestCase;
  * 所以本檔的 `assertRedirect(route('admin.batch-load-offices'))` 都改成 `app.admin.batch-load-offices`
  * ——那是收斂**刻意造成**的行為變化，不是回歸。
  *
- * ⚠️ 只改 `assertRedirect(...)`：其餘 `$this->get(route('admin.batch-load-offices'))` 是**刻意**打
- * legacy Blade 頁（本檔以 useLegacyBladePages() 局部關閉封路），要驗的正是 Blade 的渲染，
- * 不能一併改掉。本檔的完整分流留到 4b 的測試分流階段。
+ * ── 2026-09-15（Blade 下架環節 4b-3）─────────────────────────────
+ * 本檔**全部改打 React 端**（`/app/admin/batch-load-offices`），`#[Group('legacy-parity')]`
+ * 與 `useLegacyBladePages()` 一併移除。
+ *
+ * 寫入端（store／undo／update-pinyin）legacy 與 app 兩條路由**指向同一個 controller 方法**，
+ * 所以那些測試只是 route name 換前綴、斷言一字未改。
+ *
+ * 需要改斷言的是**結果頁**：原本 Blade 渲染、用 `assertSee` 掃 HTML；React 版把同一份
+ * 資料放進 `results`／`batch_errors`／`batch_id` props。
+ * ⚠️ **結果頁不可用 assertSee**：Inertia 把 props JSON 化時會把非 ASCII escape 成
+ * `\\uXXXX`，中文一個都掃不到（本檔既有註解早就踩過一次）。
  */
 class AdminBatchLoadOfficesTest extends TestCase {
     use SeedsPinyinDictionary;
 
     protected function setUp(): void {
         parent::setUp();
-
-        // 本類驗的是 legacy Blade 頁的行為。Blade 下架計畫環節 3「先封路、不刪碼」把那些
-        // 路由改成 302／410，但頁面本身還在、還部署著、還能被 kill switch 叫回來，
-        // 所以這份覆蓋在觀察期內仍有意義——局部關閉封路即可。環節 4 實體刪除時一併移除。
-        $this->useLegacyBladePages();
 
         config()->set('database.default', 'sqlite');
         config()->set('database.connections.sqlite.database', ':memory:');
@@ -179,13 +177,45 @@ class AdminBatchLoadOfficesTest extends TestCase {
         return $user;
     }
 
+    // ── Blade 下架環節 4b-3 的移植輔助 ──────────────────────────────
+    //
+    // 匯入結果頁原本是 Blade 渲染，所以測試用 assertSee 掃 HTML。React 版把同一份資料
+    // 放進 `results` prop（來源是 `->with('batch_results', …)` 的 flash）。
+    //
+    // ⚠️ **不要對結果頁用 assertSee**：Inertia 把 props JSON 化時會把非 ASCII escape 成
+    // `\uXXXX`，「宗人府供事」這種字串一個都掃不到（本檔既有註解已經踩過一次）。
+
+    /** 打結果頁並取回 `results` prop。 */
+    private function resultsProp(): array {
+        $results = [];
+
+        $this->get(route('app.admin.batch-load-offices'))
+            ->assertOk()
+            ->assertInertia(function (Assert $page) use (&$results) {
+                // 也釘住元件：少了這行，結果頁被換成別的 Inertia 元件時這批測試會照樣
+                // 讀 props 而不報錯（review 指出）。
+                $page->component('Admin/BatchLoadOffices/Index');
+                $results = array_map(fn ($row) => (array) $row, $page->toArray()['props']['results']);
+            });
+
+        return $results;
+    }
+
     #[Test]
     public function test_admin_can_view_form(): void {
         $user = $this->makeUser();
         $this->actingAs($user);
 
-        $response = $this->get(route('admin.batch-load-offices'));
-        $response->assertStatus(200)->assertSee('批次匯入官職');
+        // 原本 assertSee 頁面標題（Blade 直出中文）。React 版標題由前端翻譯鍵渲染，
+        // 伺服器端能負責的是「這個路由回的是那個 Inertia 頁、而且帶齊表單要用的 props」。
+        $this->get(route('app.admin.batch-load-offices'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Admin/BatchLoadOffices/Index')
+                ->has('urls.store')
+                ->has('urls.reset')
+                ->where('results', [])
+                ->where('batch_errors', []));
     }
 
     #[Test]
@@ -207,7 +237,7 @@ class AdminBatchLoadOfficesTest extends TestCase {
             'c_textid' => 4763,
         ]);
 
-        $response = $this->post(route('admin.batch-load-offices.store'), [
+        $response = $this->post(route('app.admin.batch-load-offices.store'), [
             'entries' => "宗人府供事\tClerk in the Imperial Clan Court\t清\t200501\t宗人府\t4763",
         ]);
 
@@ -228,13 +258,19 @@ class AdminBatchLoadOfficesTest extends TestCase {
 
         $this->assertSame(2, DB::table('operations')->count());
 
-        $followUp = $this->get(route('admin.batch-load-offices'));
-        $followUp->assertSee('宗人府供事')
-            ->assertSee('Clerk in the Imperial Clan Court')
-            ->assertSee('zong ren fu gong shi')
-            ->assertSee('清 / 20')
-            ->assertSee('200501')
-            ->assertSee('4763');
+        // 結果頁：原本逐字 assertSee，改成斷言 `results` prop 的那一列。
+        // 比原本強——`assertSee('200501')` 只要那串數字出現在頁面任何地方就綠，
+        // 這裡指名「`type_id` 這一欄就是 200501」。
+        $results = $this->resultsProp();
+        $this->assertCount(1, $results);
+        $this->assertSame('宗人府供事', $results[0]['name']);
+        $this->assertSame('Clerk in the Imperial Clan Court', $results[0]['translation']);
+        $this->assertSame('zong ren fu gong shi', $results[0]['pinyin']);
+        // 原本的 `assertSee('清 / 20')` 是 Blade 把兩欄拼成一格顯示；props 裡它們是兩欄。
+        $this->assertSame('清', $results[0]['dynasty_label']);
+        $this->assertSame(20, (int) $results[0]['dynasty_code']);
+        $this->assertSame('200501', (string) $results[0]['type_id']);
+        $this->assertSame('4763', (string) $results[0]['source_id']);
     }
 
     #[Test]
@@ -251,7 +287,7 @@ class AdminBatchLoadOfficesTest extends TestCase {
             'c_textid' => 4763,
         ]);
 
-        $response = $this->post(route('admin.batch-load-offices.store'), [
+        $response = $this->post(route('app.admin.batch-load-offices.store'), [
             'entries' => "宗人府供事\tClerk in the Imperial Clan Court\t清\t999999\t宗人府\t4763",
         ]);
 
@@ -299,7 +335,7 @@ class AdminBatchLoadOfficesTest extends TestCase {
         $this->actingAs($this->makeUser());
         $this->seedOfficeLookups('清');
 
-        $this->post(route('admin.batch-load-offices.store'), [
+        $this->post(route('app.admin.batch-load-offices.store'), [
             'entries' => "宗人府供事\tClerk\t淸\t200501\t宗人府\t4763",
         ])->assertRedirect(route('app.admin.batch-load-offices'));
 
@@ -316,7 +352,7 @@ class AdminBatchLoadOfficesTest extends TestCase {
         $this->actingAs($this->makeUser());
         $this->seedOfficeLookups('淸');
 
-        $this->post(route('admin.batch-load-offices.store'), [
+        $this->post(route('app.admin.batch-load-offices.store'), [
             'entries' => "宗人府供事\tClerk\t清\t200501\t宗人府\t4763",
         ])->assertRedirect(route('app.admin.batch-load-offices'));
 
@@ -334,7 +370,7 @@ class AdminBatchLoadOfficesTest extends TestCase {
         $this->actingAs($this->makeUser());
         $this->seedOfficeLookups('清');
 
-        $this->post(route('admin.batch-load-offices.store'), [
+        $this->post(route('app.admin.batch-load-offices.store'), [
             'entries' => "淸吏司\tClerk\t清\t200501\t宗人府\t4763",
         ])->assertRedirect(route('app.admin.batch-load-offices'));
 

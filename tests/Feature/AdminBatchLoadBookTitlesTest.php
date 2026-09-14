@@ -9,16 +9,11 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use PHPUnit\Framework\Attributes\Group;
+use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\SeedsPinyinDictionary;
 use Tests\TestCase;
 
-/**
- * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
- * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
- */
-#[Group('legacy-parity')]
 /**
  * ⚠️ **環節 4b-1 收斂**：`listRouteName()` 原本依 `$request->is('app/*')` 二選一，現在**一律**
  * 回傳 `app.admin.*`。理由：環節 3 把 legacy GET 封成 302 之後，legacy POST 完成 → redirect 到
@@ -28,20 +23,23 @@ use Tests\TestCase;
  * 所以本檔的 `assertRedirect(route('admin.batch-load-book-titles'))` 都改成 `app.admin.batch-load-book-titles`
  * ——那是收斂**刻意造成**的行為變化，不是回歸。
  *
- * ⚠️ 只改 `assertRedirect(...)`：其餘 `$this->get(route('admin.batch-load-book-titles'))` 是**刻意**打
- * legacy Blade 頁（本檔以 useLegacyBladePages() 局部關閉封路），要驗的正是 Blade 的渲染，
- * 不能一併改掉。本檔的完整分流留到 4b 的測試分流階段。
+ * ── 2026-09-15（Blade 下架環節 4b-3）─────────────────────────────
+ * 本檔**全部改打 React 端**（`/app/admin/batch-load-book-titles`），`#[Group('legacy-parity')]`
+ * 與 `useLegacyBladePages()` 一併移除。
+ *
+ * 寫入端（store／undo／update-pinyin）legacy 與 app 兩條路由**指向同一個 controller 方法**，
+ * 所以那些測試只是 route name 換前綴、斷言一字未改。
+ *
+ * 需要改斷言的是**結果頁**：原本 Blade 渲染、用 `assertSee` 掃 HTML；React 版把同一份
+ * 資料放進 `results`／`batch_errors`／`batch_id` props。
+ * ⚠️ **結果頁不可用 assertSee**：Inertia 把 props JSON 化時會把非 ASCII escape 成
+ * `\\uXXXX`，中文一個都掃不到（本檔既有註解早就踩過一次）。
  */
 class AdminBatchLoadBookTitlesTest extends TestCase {
     use SeedsPinyinDictionary;
 
     protected function setUp(): void {
         parent::setUp();
-
-        // 本類驗的是 legacy Blade 頁的行為。Blade 下架計畫環節 3「先封路、不刪碼」把那些
-        // 路由改成 302／410，但頁面本身還在、還部署著、還能被 kill switch 叫回來，
-        // 所以這份覆蓋在觀察期內仍有意義——局部關閉封路即可。環節 4 實體刪除時一併移除。
-        $this->useLegacyBladePages();
 
         config()->set('database.default', 'sqlite');
         config()->set('database.connections.sqlite.database', ':memory:');
@@ -202,7 +200,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $batch = '20250101090000-ABCDEF';
         DB::table('TEXT_CODES')->insert(['c_textid' => 7001, 'c_title_chn' => '呂齋', 'c_title' => null, 'c_notes' => '['.$batch.']']);
 
-        $this->postJson(route('admin.batch-load-book-titles.update-pinyin'), [
+        $this->postJson(route('app.admin.batch-load-book-titles.update-pinyin'), [
             'c_textid' => 7001,
             'batch_id' => $batch,
             'pinyin' => 'Lvzhai',
@@ -217,8 +215,38 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $user = $this->makeUser(['is_admin' => 0]);
         $this->actingAs($user);
 
-        $response = $this->get(route('admin.batch-load-book-titles'));
+        $response = $this->get(route('app.admin.batch-load-book-titles'));
         $response->assertStatus(403);
+    }
+
+    // -- Blade 下架環節 4b-3 的移植輔助 ------------------------------
+    //
+    // 匯入結果頁原本是 Blade 渲染，測試用 assertSee 掃 HTML（含 `class="pinyin-cell"`
+    // 這種**版型 class**）。React 版把同一份資料放進 props：`results`／`batch_errors`／
+    // `batch_id`，畫面長相是前端的事。
+    //
+    // 不要對結果頁用 assertSee：Inertia 把 props JSON 化時會把非 ASCII escape 成
+    // `\\uXXXX`，「某某書」這種字串一個都掃不到。
+
+    /** 打結果頁並取回整包 props。 */
+    private function formProps(): array {
+        $props = [];
+
+        $this->get(route('app.admin.batch-load-book-titles'))
+            ->assertOk()
+            ->assertInertia(function (Assert $page) use (&$props) {
+                // 也釘住元件：少了這行，結果頁被換成別的 Inertia 元件時這批測試會照樣
+                // 讀 props 而不報錯（review 指出）。
+                $page->component('Admin/BatchLoadBookTitles/Index');
+                $props = $page->toArray()['props'];
+            });
+
+        return $props;
+    }
+
+    /** 結果列（已轉成陣列）。 */
+    private function resultsProp(): array {
+        return array_map(fn ($row) => (array) $row, $this->formProps()['results']);
     }
 
     #[Test]
@@ -226,8 +254,18 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $user = $this->makeUser();
         $this->actingAs($user);
 
-        $response = $this->get(route('admin.batch-load-book-titles'));
-        $response->assertStatus(200)->assertSee('批次匯入書稿資料');
+        // 原本 assertSee 頁面標題（Blade 直出中文）。React 版標題由前端翻譯鍵渲染，
+        // 伺服器端能負責的是「這個路由回的是那個 Inertia 頁、而且帶齊表單要用的 props」。
+        $this->get(route('app.admin.batch-load-book-titles'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Admin/BatchLoadBookTitles/Index')
+                ->has('urls.store')
+                ->has('urls.undo')
+                ->has('urls.update_pinyin')
+                ->has('urls.check_rare_chars')
+                ->where('results', [])
+                ->where('batch_errors', []));
     }
 
     #[Test]
@@ -244,7 +282,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'c_title_chn' => '來源書',
         ]);
 
-        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "12345\t測試稿: 卷一\t54321",
         ]);
 
@@ -272,10 +310,18 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $this->assertSame(54321, $encoded['c_source']);
         $this->assertSame($record->c_notes, $encoded['c_notes']);
 
-        $followUp = $this->get(route('admin.batch-load-book-titles'));
-        $followUp->assertSee('本次批次編號');
-        $followUp->assertSee('書名拼音');
-        $followUp->assertSee('批次編號');
+        // 原本 assertSee 的三串字是 Blade 的**欄位標題與區塊標題**（畫面文案），
+        // 它們在 React 版是前端的翻譯鍵。伺服器端的對應物是「結果列與批次編號有傳下去」。
+        // 這比原本強：`assertSee('書名拼音')` 只證明那個標題被印出來，
+        // 連結果列是空的都會綠。
+        $props = $this->formProps();
+        $this->assertNotNull($props['batch_id'], '批次編號要傳下去（undo 靠它）');
+        $this->assertSame($record->c_notes, '['.$props['batch_id'].']');
+
+        $results = array_map(fn ($row) => (array) $row, $props['results']);
+        $this->assertCount(1, $results);
+        $this->assertSame(54322, (int) $results[0]['c_textid']);
+        $this->assertSame('ce shi gao', $results[0]['title_pinyin']);
     }
 
     #[Test]
@@ -283,15 +329,18 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $user = $this->makeUser();
         $this->actingAs($user);
 
-        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "abc\t\n",
         ]);
 
         $response->assertRedirect(route('app.admin.batch-load-book-titles'));
 
-        $followUp = $this->get(route('admin.batch-load-book-titles'));
-        $followUp->assertSee('匯入失敗');
-        $followUp->assertSee('未找到三欄資料');
+        // `匯入失敗` 是 Blade 的區塊標題（React 版由翻譯鍵 `admin.batch_import_failed` 渲染），
+        // `未找到三欄資料` 是後端產生的**錯誤訊息本身**——後者才是這條測試的主體。
+        $props = $this->formProps();
+        $this->assertCount(1, $props['batch_errors']);
+        $this->assertStringContainsString('未找到三欄資料', $props['batch_errors'][0]);
+        $this->assertSame([], $props['results'], '整批失敗時不得有結果列');
         $this->assertSame(0, DB::table('TEXT_CODES')->count());
     }
 
@@ -306,7 +355,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         ]);
         DB::table('TEXT_CODES')->insert(['c_textid' => 99999, 'c_title_chn' => '來源']);
 
-        $this->post(route('admin.batch-load-book-titles.store'), [
+        $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "100\t測試稿（附錄）\t99999",
         ]);
 
@@ -326,7 +375,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         ]);
         DB::table('TEXT_CODES')->insert(['c_textid' => 99998, 'c_title_chn' => '來源']);
 
-        $this->post(route('admin.batch-load-book-titles.store'), [
+        $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "101\t測試稿：卷一\t99998",
         ]);
 
@@ -346,7 +395,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         ]);
         DB::table('TEXT_CODES')->insert(['c_textid' => 99997, 'c_title_chn' => '來源']);
 
-        $this->post(route('admin.batch-load-book-titles.store'), [
+        $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "102\t測試稿：  卷一\t99997",
         ]);
 
@@ -367,7 +416,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         ]);
         DB::table('TEXT_CODES')->insert(['c_textid' => 99996, 'c_title_chn' => '來源']);
 
-        $this->post(route('admin.batch-load-book-titles.store'), [
+        $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "103\t測試稿（附錄）： 卷一\t99996",
         ]);
 
@@ -381,7 +430,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $user = $this->makeUser();
         $this->actingAs($user);
 
-        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "12345\t測試稿\t",
         ]);
 
@@ -390,8 +439,19 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $errors = $response->getSession()->get('batch_errors', []);
         $this->assertNotEmpty($errors);
 
-        $followUp = $this->get(route('admin.batch-load-book-titles'));
-        $followUp->assertSee('匯入失敗');
+        // `匯入失敗` 是 Blade 的區塊標題（React 版由翻譯鍵 `admin.batch_import_failed` 渲染）。
+        // 伺服器端的對應物是「錯誤有傳到 props」——而且要**指名是哪一種錯**，
+        // 否則任何一種錯都會讓斷言綠（review 指出我第一版只寫 assertNotEmpty）。
+        //
+        // 📌 指名之後才看清楚一件事：**這條測試的名字與它實際走到的分支不一樣**。
+        // 輸入是 `"12345	測試稿	"`，尾端 tab 之後沒有內容 ⇒ 切出來只有兩欄 ⇒ 命中的是
+        // 「未找到三欄資料」的解析錯誤，**不是**「來源 TEXT_ID 為空」那條（第 465 行）。
+        // 這是移植前就有的落差，不在本環節的範圍內改；先把實際行為釘住，
+        // 免得日後有人「修好」解析器時，這條測試不聲不響地換了一條路走。
+        $props = $this->formProps();
+        $this->assertCount(1, $props['batch_errors']);
+        $this->assertStringContainsString('未找到三欄資料', $props['batch_errors'][0]);
+        $this->assertSame([], $props['results']);
         $this->assertSame(0, DB::table('TEXT_CODES')->count());
     }
 
@@ -402,7 +462,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
 
         DB::table('TEXT_CODES')->insert(['c_textid' => 700, 'c_title_chn' => '來源']);
 
-        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "9999999\t測試書\t700",
         ]);
 
@@ -421,7 +481,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
 
         DB::table('BIOG_MAIN')->insert(['c_personid' => 200, 'c_dy' => '5']);
 
-        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "200\t測試書\t8888888",
         ]);
 
@@ -440,7 +500,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
 
         DB::table('BIOG_MAIN')->insert(['c_personid' => 201, 'c_dy' => '5']);
 
-        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "201\t測試書\tabc",
         ]);
 
@@ -459,7 +519,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         DB::table('BIOG_MAIN')->insert(['c_personid' => 204, 'c_dy' => '7']);
         DB::table('TEXT_CODES')->insert(['c_textid' => 703, 'c_title_chn' => '來源']);
 
-        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "204\t四書講義(屠錫光)\t703",
         ]);
 
@@ -480,7 +540,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         // 靜態字典（zdic 不含 Ext G 區）皆查無讀音 — which fails the pinyin check.
         $entries = "205\t合法書名\t704\n205\t𰻞瑣稿\t704";
 
-        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => $entries,
         ]);
 
@@ -503,7 +563,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         // 𰻞 (U+30EDE) is a valid Han character but not in the Pinyin dict（pinyin 表與
         // opencc-pinyin 靜態字典皆無，zdic 不含 Ext G 區）, so without this check it
         // would survive untranslated in c_title (e.g. "𰻞 suo xian na gao").
-        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "260\t𰻞瑣獻納稿\t760",
         ]);
 
@@ -525,7 +585,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         DB::table('TEXT_CODES')->insert(['c_textid' => 770, 'c_title_chn' => '來源']);
 
         // Same title that fails the pinyin check; with force=1 the row should import.
-        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "270\t靑瑣獻納稿\t770",
             'force' => '1',
         ]);
@@ -543,7 +603,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         DB::table('TEXT_CODES')->insert(['c_textid' => 771, 'c_title_chn' => '來源']);
 
         // Author 9999999 does not exist — force flag must NOT bypass this.
-        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "9999999\t靑瑣獻納稿\t771",
             'force' => '1',
         ]);
@@ -563,7 +623,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         DB::table('TEXT_CODES')->insert(['c_textid' => 780, 'c_title_chn' => '來源']);
 
         // 巵→zhi, 繫→xi were added to Pinyin::$dic. They should now pass the check.
-        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "280\t莊巵言\t780\n280\t易繫詞講\t780",
         ]);
 
@@ -584,7 +644,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         DB::table('TEXT_CODES')->insert(['c_textid' => 790, 'c_title_chn' => '來源']);
 
         // 臺→tai、淨→jing 已加入 Pinyin::$dic，含這兩個字的書名應能通過拼音檢查並轉出。
-        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "290\t臺灣府志\t790\n290\t淨土錄\t790",
         ]);
 
@@ -606,7 +666,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
 
         // 峯（U+5CEF）一律標準化為標準字形峰（U+5CF0）。標準化發生在 parseEntries，
         // 因此「存入的中文書名」本身就被改寫，拼音也據此轉為 feng，不會被無拼音檢查擋下。
-        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "291\t東坡集峯卷一\t791",
         ]);
 
@@ -631,7 +691,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
 
         // 靑（U+9751）一律標準化為標準字形青（U+9752）。標準化發生在 parseEntries，
         // 因此「存入的中文書名」本身就被改寫，拼音也據此轉為 qing，不會被無拼音檢查擋下。
-        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "293\t靑瑣稿\t793",
         ]);
 
@@ -656,7 +716,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
 
         // 頴（U+9834）一律標準化為標準字形穎（U+7A4E）。標準化發生在 parseEntries，
         // 因此「存入的中文書名」本身就被改寫，拼音也據此轉為 ying，不會被無拼音檢查擋下。
-        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "294\t頴集\t794",
         ]);
 
@@ -682,7 +742,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         DB::table('BIOG_MAIN')->insert(['c_personid' => 295, 'c_dy' => '6']);
         DB::table('TEXT_CODES')->insert(['c_textid' => 795, 'c_title_chn' => '來源']);
 
-        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "295\t淸厰集\t795",
         ]);
 
@@ -707,7 +767,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         DB::table('BIOG_MAIN')->insert(['c_personid' => 296, 'c_dy' => '6']);
         DB::table('TEXT_CODES')->insert(['c_textid' => 796, 'c_title_chn' => '來源']);
 
-        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "296\t愼獄集\t796",
         ]);
 
@@ -730,7 +790,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
 
         $entries = "297\t東坡集峯卷一\t797\n297\t普通書名\t797";
 
-        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => $entries,
         ]);
 
@@ -758,7 +818,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         // 簡體混入偵測改由 SimplifiedOnlyChars 顯式承擔（opencc-pinyin 靜態字典
         // 補全後，净 也能轉出拼音，「無拼音對應」不再兼任簡體防火牆）。
         // 含净的書名預設仍被攔下，訊息明確指出是簡體字形。
-        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "292\t净土錄\t792",
         ]);
 
@@ -782,7 +842,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
 
         // 簡體字形在古籍中可能是俗字（文獻原貌），故簡體嫌疑是「警告＋強制放行」
         // 而非硬性拒絕：force=1 應可匯入，且書名保留原字形、拼音照常轉出。
-        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "293\t净土錄\t793",
             'force' => '1',
         ]);
@@ -805,7 +865,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
 
         // Anything after a colon is dropped before pinyin conversion (see stripVolumeInfo),
         // so unpinyinable chars in the volume annotation should not block the import.
-        $response = $this->post(route('admin.batch-load-book-titles.store'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "261\t測試稿: 卷靑\t761",
         ]);
 
@@ -821,7 +881,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         DB::table('BIOG_MAIN')->insert(['c_personid' => 400, 'c_dy' => '6']);
         DB::table('TEXT_CODES')->insert(['c_textid' => 900, 'c_title_chn' => '來源']);
 
-        $store = $this->post(route('admin.batch-load-book-titles.store'), [
+        $store = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "400\t第一本書\t900\n400\t第二本書\t900",
         ]);
         $batchId = $store->getSession()->get('batch_id');
@@ -829,7 +889,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $this->assertSame(3, DB::table('TEXT_CODES')->count());
         $this->assertSame(2, DB::table('operations')->where('resource', 'TEXT_CODES')->count());
 
-        $undo = $this->post(route('admin.batch-load-book-titles.undo'), [
+        $undo = $this->post(route('app.admin.batch-load-book-titles.undo'), [
             'batch_id' => $batchId,
         ]);
         $undo->assertRedirect(route('app.admin.batch-load-book-titles'));
@@ -850,20 +910,20 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         DB::table('BIOG_MAIN')->insert(['c_personid' => 401, 'c_dy' => '6']);
         DB::table('TEXT_CODES')->insert(['c_textid' => 901, 'c_title_chn' => '來源']);
 
-        $first = $this->post(route('admin.batch-load-book-titles.store'), [
+        $first = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "401\t批次甲\t901",
         ]);
         $firstBatch = $first->getSession()->get('batch_id');
 
         // Each batch gets a random suffix, so two imports inside the same second
         // still receive distinct ids. No sleep needed.
-        $second = $this->post(route('admin.batch-load-book-titles.store'), [
+        $second = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "401\t批次乙\t901",
         ]);
         $secondBatch = $second->getSession()->get('batch_id');
         $this->assertNotSame($firstBatch, $secondBatch);
 
-        $this->post(route('admin.batch-load-book-titles.undo'), [
+        $this->post(route('app.admin.batch-load-book-titles.undo'), [
             'batch_id' => $firstBatch,
         ]);
 
@@ -879,7 +939,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
 
         DB::table('TEXT_CODES')->insert(['c_textid' => 902, 'c_title_chn' => '來源']);
 
-        $undo = $this->post(route('admin.batch-load-book-titles.undo'), [
+        $undo = $this->post(route('app.admin.batch-load-book-titles.undo'), [
             'batch_id' => '20990101000000-DEADBE',
         ]);
         $undo->assertRedirect(route('app.admin.batch-load-book-titles'));
@@ -894,7 +954,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $user = $this->makeUser();
         $this->actingAs($user);
 
-        $undo = $this->post(route('admin.batch-load-book-titles.undo'), [
+        $undo = $this->post(route('app.admin.batch-load-book-titles.undo'), [
             'batch_id' => 'not-a-batch',
         ]);
         // Laravel validation failure → redirect back with errors.
@@ -907,7 +967,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $user = $this->makeUser(['is_admin' => 0]);
         $this->actingAs($user);
 
-        $undo = $this->post(route('admin.batch-load-book-titles.undo'), [
+        $undo = $this->post(route('app.admin.batch-load-book-titles.undo'), [
             'batch_id' => '20260101000000-ABCDEF',
         ]);
         $undo->assertStatus(403);
@@ -921,14 +981,14 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         DB::table('BIOG_MAIN')->insert(['c_personid' => 500, 'c_dy' => '6']);
         DB::table('TEXT_CODES')->insert(['c_textid' => 1000, 'c_title_chn' => '來源']);
 
-        $store = $this->post(route('admin.batch-load-book-titles.store'), [
+        $store = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "500\t測試稿\t1000",
         ]);
         $batchId = $store->getSession()->get('batch_id');
         $created = DB::table('TEXT_CODES')->where('c_notes', '['.$batchId.']')->first();
         $this->assertSame('ce shi gao', $created->c_title);
 
-        $response = $this->post(route('admin.batch-load-book-titles.update-pinyin'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.update-pinyin'), [
             'c_textid' => $created->c_textid,
             'batch_id' => $batchId,
             'pinyin' => '  Ce  Shi  GAO  ',
@@ -981,14 +1041,14 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         DB::table('BIOG_MAIN')->insert(['c_personid' => 501, 'c_dy' => '6']);
         DB::table('TEXT_CODES')->insert(['c_textid' => 1100, 'c_title_chn' => '來源']);
 
-        $store = $this->post(route('admin.batch-load-book-titles.store'), [
+        $store = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "501\t測試稿\t1100",
         ]);
         $batchId = $store->getSession()->get('batch_id');
         $created = DB::table('TEXT_CODES')->where('c_notes', '['.$batchId.']')->first();
 
         // A different (well-formed) batch id whose marker does not match the row.
-        $response = $this->post(route('admin.batch-load-book-titles.update-pinyin'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.update-pinyin'), [
             'c_textid' => $created->c_textid,
             'batch_id' => '20990101000000-AAAAAA',
             'pinyin' => 'something else',
@@ -1005,7 +1065,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $user = $this->makeUser();
         $this->actingAs($user);
 
-        $response = $this->post(route('admin.batch-load-book-titles.update-pinyin'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.update-pinyin'), [
             'c_textid' => 99999999,
             'batch_id' => '20260101000000-ABCDEF',
             'pinyin' => 'foo bar',
@@ -1021,7 +1081,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
 
         DB::table('BIOG_MAIN')->insert(['c_personid' => 502, 'c_dy' => '6']);
         DB::table('TEXT_CODES')->insert(['c_textid' => 1200, 'c_title_chn' => '來源']);
-        $store = $this->post(route('admin.batch-load-book-titles.store'), [
+        $store = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "502\t測試稿\t1200",
         ]);
         $batchId = $store->getSession()->get('batch_id');
@@ -1031,7 +1091,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         // strings before the required check), so the request is rejected at
         // validation time with a redirect+session errors.
         foreach (['', '   '] as $value) {
-            $response = $this->post(route('admin.batch-load-book-titles.update-pinyin'), [
+            $response = $this->post(route('app.admin.batch-load-book-titles.update-pinyin'), [
                 'c_textid' => $created->c_textid,
                 'batch_id' => $batchId,
                 'pinyin' => $value,
@@ -1049,7 +1109,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $user = $this->makeUser();
         $this->actingAs($user);
 
-        $response = $this->post(route('admin.batch-load-book-titles.update-pinyin'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.update-pinyin'), [
             'c_textid' => 1,
             'batch_id' => 'not-a-batch',
             'pinyin' => 'foo',
@@ -1063,7 +1123,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $user = $this->makeUser(['is_admin' => 0]);
         $this->actingAs($user);
 
-        $response = $this->post(route('admin.batch-load-book-titles.update-pinyin'), [
+        $response = $this->post(route('app.admin.batch-load-book-titles.update-pinyin'), [
             'c_textid' => 1,
             'batch_id' => '20260101000000-ABCDEF',
             'pinyin' => 'foo',
@@ -1084,7 +1144,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         DB::table('BIOG_MAIN')->insert(['c_personid' => 600, 'c_dy' => '6']);
         DB::table('TEXT_CODES')->insert(['c_textid' => 1400, 'c_title_chn' => '來源']);
 
-        $store = $this->post(route('admin.batch-load-book-titles.store'), [
+        $store = $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "600\t測試稿\t1400",
         ]);
         $batchId = $store->getSession()->get('batch_id');
@@ -1092,7 +1152,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $this->assertSame('ce shi gao', $created->c_title);
 
         // Apply a manual edit, then locate the resulting update-operation row.
-        $this->post(route('admin.batch-load-book-titles.update-pinyin'), [
+        $this->post(route('app.admin.batch-load-book-titles.update-pinyin'), [
             'c_textid' => $created->c_textid,
             'batch_id' => $batchId,
             'pinyin' => 'manually edited',
@@ -1144,14 +1204,27 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
 
         DB::table('BIOG_MAIN')->insert(['c_personid' => 503, 'c_dy' => '6']);
         DB::table('TEXT_CODES')->insert(['c_textid' => 1300, 'c_title_chn' => '來源']);
-        $this->post(route('admin.batch-load-book-titles.store'), [
+        $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "503\t測試稿\t1300",
         ]);
 
-        $followUp = $this->get(route('admin.batch-load-book-titles'));
-        $followUp->assertSee('class="pinyin-cell"', false);
-        $followUp->assertSee('pinyin-edit-btn', false);
-        $followUp->assertSee('pinyin-save-btn', false);
+        // 原本斷言的是三個 **Blade 版型 class**（`pinyin-cell`／`pinyin-edit-btn`／
+        // `pinyin-save-btn`），那是 jQuery 就地編輯的鉤子。React 版沒有那些 class，
+        // 就地編輯是元件自己的狀態；伺服器端要負責的是**讓它可行的兩樣東西**：
+        // 結果列帶著 textid 與現行拼音，以及那個更新端點的 URL。
+        $props = $this->formProps();
+        $results = array_map(fn ($row) => (array) $row, $props['results']);
+
+        $this->assertCount(1, $results);
+        $this->assertSame(1301, (int) $results[0]['c_textid'], '就地編輯要靠 textid 定位');
+        $this->assertSame('ce shi gao', $results[0]['title_pinyin']);
+        $this->assertSame(
+            route('app.admin.batch-load-book-titles.update-pinyin', [], false),
+            $props['urls']['update_pinyin'],
+            '少了這個 URL，拼音就地編輯整個功能不可達'
+        );
+        // 批次編號也要在（更新端點會驗「這一列屬於本批次」——見 update_pinyin 的相關測試）。
+        $this->assertNotNull($props['batch_id']);
     }
 
     #[Test]
@@ -1327,13 +1400,17 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         DB::table('BIOG_MAIN')->insert(['c_personid' => 300, 'c_dy' => '9']);
         DB::table('TEXT_CODES')->insert(['c_textid' => 800, 'c_title_chn' => '來源']);
 
-        $this->post(route('admin.batch-load-book-titles.store'), [
+        $this->post(route('app.admin.batch-load-book-titles.store'), [
             'entries' => "300\t某某書\t800",
         ]);
 
-        $followUp = $this->get(route('admin.batch-load-book-titles'));
-        $followUp->assertSee('複製 textid 與書名');
-        $followUp->assertSee("801\t某某書", false);
-        $followUp->assertSee('id="copy-textid-title-source"', false);
+        // 原本斷言按鈕文案、隱藏 textarea 的 id、以及 Blade 預先拼好的
+        // `"801\t某某書"` 這個剪貼簿內容。React 版那三樣都是前端的事（文案走翻譯鍵、
+        // 內容由元件從 results 現組）。伺服器端要負責的是**組得出那段內容的原料**。
+        $results = $this->resultsProp();
+
+        $this->assertCount(1, $results);
+        $this->assertSame(801, (int) $results[0]['c_textid']);
+        $this->assertSame('某某書', $results[0]['title']);
     }
 }

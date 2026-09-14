@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
+use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -16,21 +16,16 @@ use Tests\TestCase;
  * 只验证 HTTP 状态码，不检查具体内容
  */
 /**
- * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
- * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
+ * ── 2026-09-15（Blade 下架環節 4b-3）─────────────────────────────
+ * 本檔全部改打 React 端（`/app/manage`）。寫入端（`appUpdate`）與 legacy `update()` 是
+ * 兩個薄殼、共用同一份實作，差別只在成功後的重導目標；顯示頁改斷言 Inertia props。
  */
-#[Group('legacy-parity')]
 class ManagePagesLoadTest extends TestCase {
     protected $adminUser;
     protected $regularUser;
 
     protected function setUp(): void {
         parent::setUp();
-
-        // 本類驗的是 legacy Blade 頁的行為。Blade 下架計畫環節 3「先封路、不刪碼」把那些
-        // 路由改成 302／410，但頁面本身還在、還部署著、還能被 kill switch 叫回來，
-        // 所以這份覆蓋在觀察期內仍有意義——局部關閉封路即可。環節 4 實體刪除時一併移除。
-        $this->useLegacyBladePages();
 
         // 使用 in-memory SQLite 数据库
         config()->set('database.default', 'sqlite');
@@ -149,8 +144,77 @@ class ManagePagesLoadTest extends TestCase {
      */
     #[Test]
     public function test_manage_index_page_loads() {
-        $response = $this->actingAs($this->adminUser)->get('/manage');
-        $response->assertStatus(200);
+        $rows = [];
+
+        $this->actingAs($this->adminUser)
+            ->get('/app/manage')
+            ->assertOk()
+            ->assertInertia(function (Assert $page) use (&$rows) {
+                $page->component('Admin/Manage/Index');
+                $rows = array_map(fn ($r) => (array) $r, $page->toArray()['props']['data']['rows']);
+            });
+
+        // 原本只斷言 200——空清單也會 200。順帶把 setUp 那句註解
+        //「被刪除的用戶不应该在列表中显示」真的釘成斷言：fixture 建了 5 個人，
+        // 其中 deleted@example.com-2024-01-01 是已刪除的，列表應該只有 4 個。
+        $this->assertCount(4, $rows);
+        $this->assertNotContains(
+            'deleted@example.com-2024-01-01',
+            array_column($rows, 'email'),
+            '已刪除的用戶不得出現在管理列表'
+        );
+    }
+
+    /**
+     * ── 2026-09-15（Blade 下架環節 4b-3，review 指出）─────────────────
+     *
+     * 上一條的 fixture 那個「已刪除用戶」**三個謂詞全中**（`confirmation_token`、
+     * `remember_token`、`password` 都是 `-`），所以只要 `buildUserListing()` 的三個
+     * `where` 還活著任何一個，它就被擋掉 ⇒ **那條測試只偵測得到「三個一起掉」**。
+     * review 實測：只留 `remember_token` 那個 closure、把另外兩個拿掉 ⇒ 上一條依然全綠。
+     *
+     * 這一條逐謂詞各建一個使用者（每人只觸發一個條件），任何**單一**謂詞被拿掉都會紅。
+     */
+    #[Test]
+    public function test_manage_index_soft_delete_filter_covers_every_predicate() {
+        // 每人只踩一個 `-`，其餘欄位都是正常值。
+        User::factory()->create([
+            'name' => 'Token Deleted', 'email' => 'token-deleted@example.com',
+            'is_active' => 1, 'is_admin' => 0,
+            'confirmation_token' => '-', 'remember_token' => 'ok', 'password' => 'ok',
+        ]);
+        User::factory()->create([
+            'name' => 'Remember Deleted', 'email' => 'remember-deleted@example.com',
+            'is_active' => 1, 'is_admin' => 0,
+            'confirmation_token' => 'ok', 'remember_token' => '-', 'password' => 'ok',
+        ]);
+        User::factory()->create([
+            'name' => 'Password Deleted', 'email' => 'password-deleted@example.com',
+            'is_active' => 1, 'is_admin' => 0,
+            'confirmation_token' => 'ok', 'remember_token' => 'ok', 'password' => '-',
+        ]);
+
+        $rows = [];
+
+        $this->actingAs($this->adminUser)
+            ->get('/app/manage')
+            ->assertOk()
+            ->assertInertia(function (Assert $page) use (&$rows) {
+                $page->component('Admin/Manage/Index');
+                $rows = array_map(fn ($r) => (array) $r, $page->toArray()['props']['data']['rows']);
+            });
+
+        $emails = array_column($rows, 'email');
+        foreach (['token-deleted', 'remember-deleted', 'password-deleted'] as $who) {
+            $this->assertNotContains(
+                $who.'@example.com',
+                $emails,
+                $who.' 只踩一個軟刪除謂詞，對應的 where 被拿掉就會漏出來'
+            );
+        }
+
+        // 正向對照：正常使用者仍在（否則「整張表都撈不到」也會讓上面全過）。
+        $this->assertContains($this->regularUser->email, $emails);
     }
 
     /**
@@ -158,7 +222,7 @@ class ManagePagesLoadTest extends TestCase {
      */
     #[Test]
     public function test_manage_index_redirects_non_admin() {
-        $response = $this->actingAs($this->regularUser)->get('/manage');
+        $response = $this->actingAs($this->regularUser)->get('/app/manage');
         $response->assertRedirect('/home');
     }
 
@@ -167,7 +231,7 @@ class ManagePagesLoadTest extends TestCase {
      */
     #[Test]
     public function test_manage_index_requires_authentication() {
-        $response = $this->get('/manage');
+        $response = $this->get('/app/manage');
         $response->assertRedirect('/login');
     }
 
@@ -176,13 +240,19 @@ class ManagePagesLoadTest extends TestCase {
      */
     #[Test]
     public function test_manage_edit_page_loads() {
-        $response = $this->actingAs($this->adminUser)
-            ->get("/manage/{$this->regularUser->id}/edit");
-
-        $response->assertStatus(200);
-        $response->assertSee('編輯用戶設定');
-        $response->assertSee($this->regularUser->name);
-        $response->assertSee($this->regularUser->email);
+        // 原本 assertSee 頁面標題（Blade 直出中文）＋使用者的姓名與 email。
+        // React 版標題走翻譯鍵；姓名與 email 在 `user` prop 裡。
+        // 🔴 `assertSee($user->email)` 其實很弱：頁面上任何地方出現那串字都會綠
+        //（例如登入者自己的 email 出現在 navbar）。這裡指名是 `user` 這個 prop 的欄位——
+        // 「編輯頁載入的是**正確那個人**」才是這條測試的主體。
+        $this->actingAs($this->adminUser)
+            ->get("/app/manage/{$this->regularUser->id}/edit")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Admin/Manage/Edit')
+                ->where('user.id', $this->regularUser->id)
+                ->where('user.name', $this->regularUser->name)
+                ->where('user.email', $this->regularUser->email));
     }
 
     /**
@@ -191,12 +261,12 @@ class ManagePagesLoadTest extends TestCase {
     #[Test]
     public function test_manage_update_active_status() {
         $response = $this->actingAs($this->adminUser)
-            ->put("/manage/{$this->regularUser->id}", [
+            ->put("/app/manage/{$this->regularUser->id}", [
                 'is_active' => 0,
                 'is_admin' => $this->regularUser->is_admin,
             ]);
 
-        $response->assertRedirect(route('manage.index'));
+        $response->assertRedirect(route('app.manage.index'));
 
         // 验证状态已改变
         $this->regularUser->refresh();
@@ -209,12 +279,12 @@ class ManagePagesLoadTest extends TestCase {
     #[Test]
     public function test_manage_update_user_role() {
         $response = $this->actingAs($this->adminUser)
-            ->put("/manage/{$this->regularUser->id}", [
+            ->put("/app/manage/{$this->regularUser->id}", [
                 'is_active' => $this->regularUser->is_active,
                 'is_admin' => 1, // 改为专家
             ]);
 
-        $response->assertRedirect(route('manage.index'));
+        $response->assertRedirect(route('app.manage.index'));
 
         // 验证用戶类型已改变
         $this->regularUser->refresh();
@@ -227,13 +297,13 @@ class ManagePagesLoadTest extends TestCase {
     #[Test]
     public function test_manage_delete_user() {
         $response = $this->actingAs($this->adminUser)
-            ->put("/manage/{$this->regularUser->id}", [
+            ->put("/app/manage/{$this->regularUser->id}", [
                 'is_active' => $this->regularUser->is_active,
                 'is_admin' => $this->regularUser->is_admin,
                 'delete_user' => 1,
             ]);
 
-        $response->assertRedirect(route('manage.index'));
+        $response->assertRedirect(route('app.manage.index'));
 
         // 验证用戶已被标记为删除
         $this->regularUser->refresh();
@@ -248,7 +318,7 @@ class ManagePagesLoadTest extends TestCase {
     #[Test]
     public function test_manage_edit_requires_admin() {
         $response = $this->actingAs($this->regularUser)
-            ->get("/manage/{$this->adminUser->id}/edit");
+            ->get("/app/manage/{$this->adminUser->id}/edit");
 
         $response->assertRedirect();
     }
@@ -259,7 +329,7 @@ class ManagePagesLoadTest extends TestCase {
     #[Test]
     public function test_manage_update_requires_admin() {
         $response = $this->actingAs($this->regularUser)
-            ->put("/manage/{$this->adminUser->id}", [
+            ->put("/app/manage/{$this->adminUser->id}", [
                 'is_active' => 0,
                 'is_admin' => 0,
             ]);
@@ -273,8 +343,8 @@ class ManagePagesLoadTest extends TestCase {
     #[Test]
     public function test_manage_edit_route_with_correct_parameters() {
         // 测试路由能正确生成 URL
-        $url = route('manage.edit', $this->regularUser->id);
-        $this->assertStringContainsString("/manage/{$this->regularUser->id}/edit", $url);
+        $url = route('app.manage.edit', $this->regularUser->id);
+        $this->assertStringContainsString("/app/manage/{$this->regularUser->id}/edit", $url);
     }
 
     /**
@@ -283,7 +353,7 @@ class ManagePagesLoadTest extends TestCase {
     #[Test]
     public function test_manage_update_nonexistent_user() {
         $response = $this->actingAs($this->adminUser)
-            ->put("/manage/99999", [
+            ->put("/app/manage/99999", [
                 'is_active' => 1,
                 'is_admin' => 0,
             ]);
@@ -298,7 +368,7 @@ class ManagePagesLoadTest extends TestCase {
     public function test_manage_update_validation() {
         // 测试无效的 is_active 值
         $response = $this->actingAs($this->adminUser)
-            ->put("/manage/{$this->regularUser->id}", [
+            ->put("/app/manage/{$this->regularUser->id}", [
                 'is_active' => 'invalid',
                 'is_admin' => 0,
             ]);
@@ -307,7 +377,7 @@ class ManagePagesLoadTest extends TestCase {
 
         // 测试无效的 is_admin 值
         $response = $this->actingAs($this->adminUser)
-            ->put("/manage/{$this->regularUser->id}", [
+            ->put("/app/manage/{$this->regularUser->id}", [
                 'is_active' => 1,
                 'is_admin' => 99,
             ]);

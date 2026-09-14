@@ -9,6 +9,7 @@ import { useTranslation } from '../../../hooks/useTranslation';
 import { getCsrfToken } from '../../../components/PersonBrowser/shared/csrf';
 import type { SharedProps } from '../../../types/page';
 import { cn } from '../../../lib/utils';
+import { buildCopyPayload } from './copyPayload';
 
 interface VariantReplacement {
     from: string;
@@ -224,8 +225,9 @@ export default function BatchLoadBookTitles() {
     };
 
     const copyResults = () => {
-        const payload = rows.map((r) => `${r.c_textid}\t${r.title}`).join('\n');
-        navigator.clipboard?.writeText(payload);
+        // 格式契約（textid TAB 書名、逐列換行）抽在 copyPayload.ts 並有 vitest 守著；
+        // 那條契約原本由 legacy Blade 在伺服器端拼好、由 PHP 測試釘住（見該檔註解）。
+        navigator.clipboard?.writeText(buildCopyPayload(rows));
     };
 
     return (

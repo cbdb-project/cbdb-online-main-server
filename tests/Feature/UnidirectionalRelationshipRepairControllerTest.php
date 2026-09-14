@@ -8,7 +8,7 @@ use App\Support\VariantReplaceScope;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
+use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -244,36 +244,34 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase {
 
     #[Test]
     public function guest_cannot_access_repair_page() {
-        $response = $this->get(route('admin.unidirectional-relationship-repair'));
+        $response = $this->get(route('app.admin.unidirectional-relationship-repair'));
 
         $response->assertRedirect(route('login'));
     }
 
-    #[Group('legacy-parity')]
     #[Test]
     public function regular_user_cannot_access_repair_page() {
-        // 本測試打的是 legacy Blade 頁（環節 3 已封路，但頁面還在、還能被 kill switch
-        // 叫回來），故局部關閉封路。環節 4 實體刪除時連同本呼叫一併移除。
-        $this->useLegacyBladePages();
-        $response = $this->actingAs($this->regularUser)
-            ->get(route('admin.unidirectional-relationship-repair'));
-
-        $response->assertStatus(403);
+        $this->actingAs($this->regularUser)
+            ->get(route('app.admin.unidirectional-relationship-repair'))
+            ->assertStatus(403);
     }
 
-    #[Group('legacy-parity')]
+    /**
+     * ── 2026-09-15（Blade 下架環節 4b-3）─────────────────────────────
+     * 原本打 legacy Blade 頁並 `assertSee` 三個區塊標題。React 版那三個標題是前端用
+     * 翻譯鍵渲染的；伺服器端能負責的是「回的是那個 Inertia 頁，而且**兩個修復端點的
+     * URL 都有傳下去**」——少了任一個，對應的修復功能就整個不可達，而那正是原本三個
+     * assertSee 想確認的事（頁面上有那兩塊功能）。
+     */
     #[Test]
     public function admin_can_access_repair_page() {
-        // 本測試打的是 legacy Blade 頁（環節 3 已封路，但頁面還在、還能被 kill switch
-        // 叫回來），故局部關閉封路。環節 4 實體刪除時連同本呼叫一併移除。
-        $this->useLegacyBladePages();
-        $response = $this->actingAs($this->adminUser)
-            ->get(route('admin.unidirectional-relationship-repair'));
-
-        $response->assertStatus(200);
-        $response->assertSee('單向關係修復');
-        $response->assertSee('親屬關係修復');
-        $response->assertSee('社會關係修復');
+        $this->actingAs($this->adminUser)
+            ->get(route('app.admin.unidirectional-relationship-repair'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Admin/UnidirectionalRelationshipRepair/Index')
+                ->where('urls.kinship', route('admin.unidirectional-relationship-repair.kinship', [], false))
+                ->where('urls.assoc', route('admin.unidirectional-relationship-repair.assoc', [], false)));
     }
 
     #[Test]

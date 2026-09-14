@@ -6,7 +6,6 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -25,18 +24,13 @@ use Tests\TestCase;
  * isActive() 閘門，所以這個例外不會放過寫入。
  */
 /**
- * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
- * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
+ * ── 2026-09-15（Blade 下架環節 4b-3）─────────────────────────────
+ * 本檔唯一的 legacy 耦合是拿 `/profile` 當「受保護頁面」的代表。已改打 `/app/profile`
+ * ——那才是實際受保護的路由（理由見下方 `inactive_session_is_forbidden_on_auth_routes`）。
  */
-#[Group('legacy-parity')]
 class InactiveAccountAccessTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
-
-        // 本類驗的是 legacy Blade 頁的行為。Blade 下架計畫環節 3「先封路、不刪碼」把那些
-        // 路由改成 302／410，但頁面本身還在、還部署著、還能被 kill switch 叫回來，
-        // 所以這份覆蓋在觀察期內仍有意義——局部關閉封路即可。環節 4 實體刪除時一併移除。
-        $this->useLegacyBladePages();
 
         config()->set('database.default', 'sqlite');
         config()->set('database.connections.sqlite', [
@@ -118,7 +112,19 @@ class InactiveAccountAccessTest extends TestCase {
 
         // `/dashboard` 自 Blade 下架環節 4a-3 起是純 redirect closure（Blade 頁已刪、不掛 auth），
         // 所以這裡改打 `/app/dashboard`——那才是實際受保護的路由。
-        foreach (['/profile', '/api-tokens', '/app/dashboard'] as $path) {
+        // `/profile` 同理：環節 4b-3 起本檔一律打 React 版 `/app/profile`。
+        //
+        // ⚠️ **理由不是「封路先跑、擋下測試失去意義」**——我第一版是這樣寫的，review 實測推翻：
+        // `/profile` 的 `auth` 是**路由群組** middleware（routes/web.php 的
+        // `Route::middleware('auth')->group`），合併後排在 `legacy.page` **之前**，所以
+        // `Authenticate::authenticate()` 裡的 `abort_if(!isActive(), 403)` 會先命中。
+        // 兩條「未啟用被擋」的測試在改動前後都是**真的**在驗 `auth.active`，沒有假綠。
+        //（`RetireLegacyBladePage` 註解講的「controller middleware 排在 route middleware 之後」
+        // 指的是 controller 建構式裡的 `$this->middleware('auth')`，不適用於群組 auth。）
+        //
+        // **真正會壞的是正向那條**：`active_session_still_passes` 打 legacy `/profile` 會拿到
+        // 封路的 302 而不是 200。加上那條路由本來就要在 4b-4 刪掉，所以整檔改打 `/app/profile`。
+        foreach (['/app/profile', '/api-tokens', '/app/dashboard'] as $path) {
             $this->actingAs($user)->get($path)
                 ->assertForbidden();
         }
@@ -140,20 +146,20 @@ class InactiveAccountAccessTest extends TestCase {
         // is_active=2（「激活郵件」保留值）不是 STATUS_ACTIVE，一樣不得放行。
         $user = $this->makeUser(User::STATUS_RESERVED);
 
-        $this->actingAs($user)->get('/profile')->assertForbidden();
+        $this->actingAs($user)->get('/app/profile')->assertForbidden();
     }
 
     #[Test]
     public function active_session_still_passes(): void {
         $user = $this->makeUser(User::STATUS_ACTIVE);
 
-        $this->actingAs($user)->get('/profile')->assertOk();
+        $this->actingAs($user)->get('/app/profile')->assertOk();
     }
 
     #[Test]
     public function guest_is_still_redirected_to_login_not_forbidden(): void {
         // 未登入的處理不能被這次改動波及：應該是導向登入頁，而不是 403。
-        $this->get('/profile')->assertRedirect(route('login'));
+        $this->get('/app/profile')->assertRedirect(route('login'));
     }
 
     // ───────── bearer token 路徑 ─────────
@@ -203,10 +209,10 @@ class InactiveAccountAccessTest extends TestCase {
 
         $this->assertSame(2, DB::table('personal_access_tokens')->count());
 
-        $this->actingAs($admin)->put('/manage/'.$victim->id, [
+        $this->actingAs($admin)->put('/app/manage/'.$victim->id, [
             'is_active' => User::STATUS_INACTIVE,
             'is_admin' => User::ROLE_REGULAR,
-        ])->assertRedirect(route('manage.index'));
+        ])->assertRedirect(route('app.manage.index'));
 
         $this->assertSame(0, DB::table('personal_access_tokens')->count());
 
@@ -228,11 +234,11 @@ class InactiveAccountAccessTest extends TestCase {
         $victim = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_REGULAR, 'victim@example.com');
         $victim->createToken('laptop');
 
-        $this->actingAs($admin)->put('/manage/'.$victim->id, [
+        $this->actingAs($admin)->put('/app/manage/'.$victim->id, [
             'is_active' => User::STATUS_ACTIVE,
             'is_admin' => User::ROLE_REGULAR,
             'delete_user' => 1,
-        ])->assertRedirect(route('manage.index'));
+        ])->assertRedirect(route('app.manage.index'));
 
         $this->assertSame(0, DB::table('personal_access_tokens')->count());
     }
@@ -261,11 +267,11 @@ class InactiveAccountAccessTest extends TestCase {
         $admin = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_SUPER_ADMIN, 'admin@example.com');
         $victim = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_SUPER_ADMIN, 'victim@example.com');
 
-        $this->actingAs($admin)->put('/manage/'.$victim->id, [
+        $this->actingAs($admin)->put('/app/manage/'.$victim->id, [
             'is_active' => User::STATUS_ACTIVE,
             'is_admin' => User::ROLE_SUPER_ADMIN,
             'delete_user' => 1,
-        ])->assertRedirect(route('manage.index'));
+        ])->assertRedirect(route('app.manage.index'));
 
         $victim->refresh();
         $this->assertSame(User::STATUS_INACTIVE, $victim->is_active);
@@ -361,10 +367,10 @@ class InactiveAccountAccessTest extends TestCase {
         $target = $this->makeUser(User::STATUS_ACTIVE, User::ROLE_REGULAR, 'target@example.com');
         $target->createToken('laptop');
 
-        $this->actingAs($admin)->put('/manage/'.$target->id, [
+        $this->actingAs($admin)->put('/app/manage/'.$target->id, [
             'is_active' => User::STATUS_ACTIVE,
             'is_admin' => User::ROLE_REGULAR,
-        ])->assertRedirect(route('manage.index'));
+        ])->assertRedirect(route('app.manage.index'));
 
         $this->assertSame(1, DB::table('personal_access_tokens')->count());
         $this->assertSame(0, DB::table('audit_log')->where('table_name', 'personal_access_tokens')->count());

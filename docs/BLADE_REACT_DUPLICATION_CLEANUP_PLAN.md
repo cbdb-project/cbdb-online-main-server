@@ -146,12 +146,12 @@
 
 | # | 項目 | 現況 | 取代可能性 | 難度 | 建議 |
 |---|---|---|---|---|---|
-| D-1 | `maps/index.blade.php`（103 行） | `GET app/maps` → `HistoricalMapsController@index`。**掛在 `/app/*` 但其實是 Blade**；為 `resources/js/historical-maps/app.js`（Leaflet 全螢幕）的宿主殼，**不套 AdminLTE、不依賴 jQuery/Bootstrap** | 高 | **低（S）** | Phase 7 **不必**急著動——它不依賴 AdminLTE，不阻擋下架。若要 React 化：改成 Inertia 頁並沿用同一支 JS 即可。注意它引用 Leaflet 的 CDN CSS |
+| D-1 | `maps/index.blade.php`（103 行） | `GET app/maps` → `HistoricalMapsController@index`。**掛在 `/app/*` 但其實是 Blade**；為 `resources/js/historical-maps/app.js`（Leaflet 全螢幕）的宿主殼，**不套 AdminLTE、不依賴 jQuery/Bootstrap** | 高 | **低（S）** | ✅ **環節 7 結論：移出本計畫**（詳見 §環節 7「D 類結論」）。它不是 legacy 頁，而是 `app/maps` 現在服役的頁面；獨立 HTML、不套 AdminLTE，環節 5 不會波及。若要 React 化：改成 Inertia 頁並沿用同一支 JS 即可。注意它引用 Leaflet 的 CDN CSS |
 | D-2 | `cbdbapi/person.blade.php` | v1 API 回應樣板 | — | — | **明確排除**，永久保留（改為純 Response 組裝屬另一議題） |
 | D-3 | `biogmains/_chgis_map_assets`（**僅此一檔**） | 被 `inertia.blade.php:36` `@include`，React 根模板依賴 | 高 | **中**（非「低」） | 搬離 `biogmains/` 命名空間（→ `resources/views/partials/chgis-map-assets.blade.php`），避免刪 `biogmains/**` 時誤刪。這是環節 2 的第一步。<br>⚠️ **`_place_link.blade.php` 不屬於本列**——它只被兩個 legacy Blade `@include`，隨 A-20 刪除（見 §二 C）。<br>⚠️ 難度是**中**不是低：它含 `route('basicinformation.index')`、`@push`／`@stack` 配對、`ChgisMapManager` 容器解析、`@vite` 入口；而且 `chgis-map/app.js:494-495` **目前只接受 base URL**（`${base}/${id}/map-points`），改用 `basicinformation.map-points` 需**同時改 JS 讓它接受完整 URL template**，不是只換一個 route 名 |
 | D-4 | `layouts/{app,dashboard-v3,header-v3,footer,sidebar-v3,partials/sidebar-node}`（837 行） | AdminLTE 殼 | 高 | **低**（A 全清後自動成孤兒） | 隨環節 5（Phase 7）一併刪。<br>📌 **`layouts/app.blade.php` 自環節 1 起已無任何消費端**（原唯一消費者 `biogmains/basicinformation/show.blade.php` 已刪）——但**仍不在環節 1/2 範圍**，維持排在環節 5 一併清，以免零散更動 layout |
-| D-5a | `basicinformation/{id}/saveas`、`basicinformation/{id}/Duplicate_Collateral_Info` | 🔴 **React 正在主動呼叫**：`TabContentLoader.tsx:260-261` 把 `saveasUrl`／`duplicateCollateralUrl` 直接寫成這兩條 legacy URL，餵給 BasicInfoEditor 的按鈕。兩條路由（`routes/web.php:161-162`）**完全無 middleware** | — | **中（M）** | ⚠️ **任何環節都不得刪除或 redirect**。正確描述是「React 依賴的 legacy 端點」，**不是**「React 缺的功能」。環節 7 的任務：評估把這兩條寫入邏輯搬進 v2 mutation／新 `/app` 端點，**搬完才能刪** |
-| D-5b | `Route::resource('basicinformation')` 的 `destroy` | 被 `LegacyBladeFormGate::handlePerson()` 明確放行（`default => null // destroy 等：放行`）。**但 React 的刪除走的是 API v2**（`api.v2.delete.web`，見 `PersonBrowserController.php:33`、`BasicInformationController.php:1611`）——全庫查無 React 對 `basicinformation.destroy` 的呼叫 | 高 | **低—中** | 與 D-5a **不同性質**：它是「未被閘門擋下的 legacy route」，不是 React 依賴。**不要因為 D-5a 而順便永久保留它**。<br>**執行時機明確定為**：環節 2 **先保留**（步驟 3 不動它），盤點列入**環節 7**；環節 7 確認無外部 caller 後，**另開一個獨立 commit 下架**，不併入環節 2 |
+| D-5a | `basicinformation/{id}/saveas`、`basicinformation/{id}/Duplicate_Collateral_Info` | 🔴 **React 正在主動呼叫**：`TabContentLoader.tsx` 與 `BasicInformationController@appEditV2` 的 payload 各有一組硬編碼 URL，餵給 `BasicInfoEditor` 的按鈕（`<a href>` 直接導航）。兩條路由**完全無 middleware** | — | **中（M）** | ⚠️ **任何環節都不得刪除或 redirect**。正確描述是「React 依賴的 legacy 端點」，**不是**「React 缺的功能」。<br>✅ **環節 7 結論：保留、移出本計畫**（詳見 §環節 7「D 類結論」）——它們是「沒有 React 版的活功能」而非重複的 Blade 頁，搬家是真的功能移植（GET→POST + 新端點 + 帶走兩個資料完整性守衛），另開任務 |
+| D-5b | `Route::resource('basicinformation')` 的 `destroy` | 環節 2 刻意保留（`LegacyBladeFormGate` 已隨該環節刪除，這條現在是無 middleware 的裸路由）。**但 React 的刪除走的是 API v2**（`api.v2.delete.web`，見 `PersonBrowserController.php:33`、`BasicInformationController.php:1611`）——全庫查無 React 對 `basicinformation.destroy` 的呼叫 | 高 | **低—中** | 與 D-5a **不同性質**：它是「未被閘門擋下的 legacy route」，不是 React 依賴。**不要因為 D-5a 而順便永久保留它**。<br>**執行時機明確定為**：環節 2 **先保留**（步驟 3 不動它），盤點列入**環節 7**。<br>✅ **環節 7 結論：確認零呼叫者、可下架，排入環節 4b**（詳見 §環節 7「D 類結論」）。⚠️ 下架前要確認 v2 軟刪除涵蓋**眾包分支**——這條 legacy 方法對眾包用戶另走 `operations` op_type 4 |
 | D-6 | `components/forms/{audit-fields,person-id-display}`、`components/{inline-time-fields,diff-table,posted-to-addr-diff,key-value-table,ai-fill-diff-table}`（7 檔 / 559 行） | legacy 表單／日誌頁元件 | — | 低 | ⚠️ **消費者跨多個環節**：`audit-fields`／`person-id-display`／`inline-time-fields` 只服務 A-20（環節 2 可刪）；`diff-table` → `posted-to-addr-diff` 鏈被 A-4／A-7／A-9 三頁使用（**環節 4a 才能刪**）；`key-value-table`／`ai-fill-diff-table` 屬 A-9／A-10（環節 4a）。**逐一 grep 確認零引用後才刪** |
 
 ---
@@ -208,7 +208,7 @@ grep -rnE "route\('(basicinformation|codes|operations|manage|view|dashboard|prof
 環節 2 會讓 `tests/Unit/VariantReplaceHookCoverageTest.php` **兩處同時紅**，這是預期行為，必須在同一 PR 內同步下調清冊並寫明理由（該測試的失敗訊息本身就這樣要求）：
 
 1. **`NON_HANDLER_HOOK_SITES`**（`:178`）登記 `app/Http/Controllers/BasicInformationProposalController.php => ['hooks' => 3]`。環節 2 步驟 5 刪掉該 controller ⇒ 檔案不存在 ⇒ 記進 `$broken` ⇒ 紅。**動作**：刪掉這一筆登記。
-2. **`EXEMPT_DELEGATES`**（`:104-110`）要求 `app/Repositories/BiogMainRepository.php` **至少 8 處**掛鉤，其中 2 處在 `altnameStoreById()`／`altnameUpdateById()`，而這兩個方法的唯一呼叫者是 `BasicInformationAltnamesController` 的 Blade 方法。若連帶清掉這兩個 repository 方法，掛鉤數 8→6，`BiogMainCreateHandler` 與 `BiogMainMutationHandler` 兩筆同時紅。**動作**：確認這兩個 repository 方法確實無其他呼叫者後，把 8 改成 6。
+2. **`EXEMPT_DELEGATES`**（`:104-110`）要求 `app/Repositories/BiogMainRepository.php` **原本至少 8 處**掛鉤，其中 2 處在 `altnameStoreById()`／`altnameUpdateById()`，而這兩個方法的唯一呼叫者是 `BasicInformationAltnamesController` 的 Blade 方法。若連帶清掉這兩個 repository 方法，掛鉤數 8→6，`BiogMainCreateHandler` 與 `BiogMainMutationHandler` 兩筆同時紅。**動作**：確認這兩個 repository 方法確實無其他呼叫者後，把 8 改成 6。✅ **環節 7b 已執行**（連 `altnameById`／`altnameDeleteById`／`parseAltnameId` 一併刪除，三處記數與 `why` 字串都已改為 6，見 §環節 7）。⚠️ 順帶查明：該測試的斷言是 `$actual < $expected`（**floor 語義**），所以記數設得**太低**抓不到——改成 7 會紅、改成 5 不會。加減掛鉤時記數必須跟著改成精確值，不能只求「不紅」。
 
 ✅ **相對地，環節 4b 是安全的**：`CodesController` 的 6 處掛鉤全在共用 `perform*`（`:1360,1547,1681,1850,1960` ＋ `:2467` 本體），「只刪薄殼」不會動到記數。
 
@@ -476,22 +476,43 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
 - `CHANGELOG.md` 完整列出 §三之四 的 `.env` 清理清單（部署者依此在各機器手動清除）並註明需 `config:clear && config:cache`。
 - `docs/migration-specs/**` 22 份加「歷史存檔」抬頭。
 
-### 環節 7（獨立，不阻塞前六個環節）— D 類缺口評估
-- **D-5a**：`saveas`／`Duplicate_Collateral_Info` 是 React 正在呼叫的 legacy 端點，評估搬進 v2 mutation／新 `/app` 端點。
-- **D-5b**：`basicinformation.destroy` 的 caller／外部契約盤點，確認無人使用後獨立 commit 下架。
-- **D-1**：`maps/index.blade.php` 是否 React 化（低優先）。
+### 環節 7（獨立，不阻塞前六個環節）— D 類缺口評估 ✅ **已完成（2026-09-14）**
 
-**環節 1.5 移交的三筆「未詳人物守衛」殘留缺口**（都是既存狀態、非該環節造成的回歸，且都需要人做政策決定）：
+分兩個 commit 執行：**7a**（三筆未詳人物守衛，`e9e8ba1f` / PR #1305）與 **7b**（孤兒清理 + 本節結論）。
 
-| # | 缺口 | 位置 | 需要決定什麼 |
-|---|---|---|---|
-| 7-U1 | **提案核准不經 mutation handler**，因此繞過守衛 | `OperationsProposalController::applyKinshipProposal()`／`applyAssocProposal()` → `BiogMainRepository::kinshipStoreById()` 等。**legacy 與 v2 共用這條路徑，兩邊一樣沒擋** | 影響僅限守衛上線前既有的 pending proposal（新提案在提交時已被擋）。要在核准分支補守衛嗎？補了之後審核者會看到「提案套用失敗」——該給什麼提示、還是改成自動退回？ |
-| 7-U2 | **`Duplicate_Collateral_Info()`** 複製 KIN_DATA／ASSOC_DATA 時會一併複製歷史 0 髒列 | `BasicInformationController::Duplicate_Collateral_Info()`；該端點無 `legacy.form` 閘門、仍在服役 | 跳過髒列並告警，還是整批拒絕複製？ |
-| 7-T1 | **`biogmains` 翻譯群組的孤兒 key**（414 個中約 301 個查無引用） | `resources/lang/{zh-TW,en}/biogmains.php` | 逐 key 人工確認（含動態組鍵）後刪除，zh-TW／en 同步。獨立 commit、獨立 review；孤兒 key 無執行期影響，不急 |
-| 7-O1 | **`BiogMainRepository::altnameStoreById()`／`altnameUpdateById()`／`altnameDestroyById()` 成為孤兒** | 環節 2 刪掉 `BasicInformationAltnamesController` 後外部呼叫者歸零，但方法仍在（各含異體字掛鉤，`VariantReplaceHookCoverageTest` 的 `EXEMPT_DELEGATES` 把 `BiogMainRepository` 釘在 8 個掛鉤，看起來像「還有用」） | 刪除三個方法並把記數調成 6，還是保留？它們是大方法、含落地替換與索引同步，屬另一層（repository）的清理，不在環節 2 的「頁面／路由／controller」範圍內 |
-| 7-U3 | **`PossessionMutationHandler`／`PostingMutationHandler` 的 update 路徑**沒有未詳人物守衛（legacy 有；它們的 create 有） | 兩個 handler | 補齊以對齊 kin／assoc，還是維持現狀？ |
+#### 7a — 三筆「未詳人物守衛」缺口 ✅ 已修
 
-- 結論寫回本文件 §二 D。
+| # | 缺口 | 結論與修法 |
+|---|---|---|
+| 7-U1 | 提案核准不經 mutation handler，繞過守衛 | ✅ 新增 `OperationsProposalController::blockUnknownPersonProposal()`，丟專屬 `UnknownPersonProposalException` 中止核准。**決定：不自動退回**——提案維持 pending、資料完全未動、理由 flash 給審核者。自動退回會替審核者做掉一個不可逆的決定，而這批提案數量有限。專屬例外類的存在理由是走 `Log::warning` 而非 `Log::error`：正常的業務拒絕不該污染告警通道 |
+| 7-U2 | `Duplicate_Collateral_Info()` 複製歷史 0 髒列 | ✅ 新增 `shouldSkipUnknownPersonRelationRow()`。**決定：跳過並記 warning，不整批拒絕**——與同函式的異體字去重器一致；複製是便利功能，少複製一條本來就壞掉的列比整個功能永久失敗好，原始髒列不動（D6）。四個迴圈各查「沒有被改寫成新 id 的那一側」。另在入口擋掉「複製未詳人物本身」（`$id = 0` 會讓兩個鏡像迴圈撈出**全庫**髒邊） |
+| 7-U3 | Possession／Posting 的 update 路徑無擁有者守衛 | ✅ 補在 3 條入口（覆寫 `handleAfterVariantReset()` + 兩條「僅改地址」快捷路徑）。**順帶修正本計畫的事實錯誤**：原文寫「legacy 有」，實查 legacy `BasicInformationPossessionController`／`OfficesController` **兩側都沒擋**（grep 已刪版本的「未詳」得 0 筆）——這不是遷移漏搬，是 v2 自己補到一半 |
+
+順帶收斂：判定抽成 `App\Support\UnknownPerson::isUnknown()`（原本四份拷貝）；`PossessionCreateHandler`／`PostingCreateHandler` 原本只擋 `0`、`-999` 可直接落庫成 `c_personid = -999`，一併修掉；修掉 `applyKinshipProposal`／`applyAssocProposal` 的 `0 ?? x` 陷阱。
+
+⚠️ **`isUnknown()` 的判定必須與「寫入時實際發生的轉型」一致**，不是與「型別看起來對不對」一致。中途改成「只接受嚴格整數語義」反而**放行**了 `'0e10'`／`'0.0'`／`'-999.0'`——它們寫進 INTEGER 欄落地就是 `0` 和 `-999`（已實測）。教訓鎖在 `tests/Unit/UnknownPersonTest.php` 的 24 案例行為表。
+
+#### 7b — 孤兒清理 ✅ 已做
+
+| # | 項目 | 結論 |
+|---|---|---|
+| 7-O1 | `BiogMainRepository` 的別名方法成為孤兒 | ✅ **刪除**。實查 `altnameById`／`altnameStoreById`／`altnameUpdateById`／`altnameDeleteById` 零非測試呼叫者（無動態派發；ALTNAME_DATA 的提案核准走 mutation handler，`applyProposal()` 只有 KIN_DATA／ASSOC_DATA 兩條特例分支）。連帶刪除只被這四個方法呼叫的 `parseAltnameId()`。`VariantReplaceHookCoverageTest` 的 `BiogMainRepository` 記數 **8 → 6**（三處）。<br>**計畫原文的筆誤**：`altnameDestroyById` 實名為 `altnameDeleteById`。<br>順帶清掉 `FormUrlEncodingTest`／`NameSearchIndexAutoSyncTest` 裡已成為死重的 `char_variant_map` fixture——它們的註解指名的消費者（`BasicInformationAltnamesController` 與這批 repository 方法）都已不存在，且經驗證移除後兩檔仍全綠 |
+| 7-T1 | `biogmains` 翻譯群組孤兒 key | 🟡 **維持延後**。約 301／414 個查無引用，但**動態組鍵 grep 不到**，逐 key 人工確認成本高、收益為零（孤兒 key 無執行期影響）。**改為留到環節 5 之後**：AdminLTE 實體下架完成、`biogmains` 群組確定沒有任何消費者時**一次整組刪除**（zh-TW／en 同步），而不是現在逐 key 猜 |
+
+#### D 類結論
+
+| # | 項目 | 結論 |
+|---|---|---|
+| D-5a | `saveas`／`Duplicate_Collateral_Info` | 🔵 **保留，移出本計畫**。兩者都是 **GET 端點卻執行寫入**，由 React `BasicInfoEditor` 用 `<a href>` 直接導航（`BasicInformationController.php:317-318` 產 payload → `EditV2.tsx:62-63`；`TabContentLoader.tsx:233-234` 另有一組硬編碼 URL）。搬進 v2 要同時：① 改成 POST（前端從 `<a>` 換成帶 CSRF 的請求）；② 新增回傳新 personid 的 `/app` 端點（現行靠 `redirect()->route('app.basicinformation.edit')`）；③ 帶走 `Duplicate_Collateral_Info()` 的 8 張子表複製邏輯與**兩個守衛**（異體字歸一去重、未詳人物髒列跳過），否則是資料完整性退化。**它們不是「重複的 Blade 頁」，是「沒有 React 版的活功能」**——難度中，另開任務 |
+| D-5b | `basicinformation.destroy` | 🟡 **可下架但有前置，排入環節 4b**。<br>**route name 零呼叫者**（`grep` 只命中 `LegacyPersonRouteRetirementTest.php:158` 的可路由性斷言），但 🔴 **`resources/js/inertia/components/PersonBrowser/BasicInfoView.tsx:192` 還留著一個休眠的 `POST /basicinformation/${personId}` + `_method=DELETE` 表單**，由 `handleDelete()` submit。它是用**模板字串拼出來的 URL，route name grep 抓不到**——正是 §環節 4b「三個方向各掃一次」的方向 ②。<br>**目前不可達**：三個使用點裡 `Show.tsx` 傳 `canEdit={false}`、`Edit.tsx` 傳 `hideDelete`，唯一沒傳 `hideDelete` 的 `TabContentLoader.tsx:248` 只在 `personId == null` 時才走到，而 `handleDelete()` 對 `!personId` 會 early return。**但它是潛伏的**：任何人日後在有 personId 的情境用 `canEdit` 且不傳 `hideDelete`，它就活了。<br>**環節 4b 前置**：先移除那個表單與按鈕（或改接 `api.v2.delete.web`）＋ `npm run build`，**之後**才能刪路由與 controller method。<br>React 的實際刪除走 `api.v2.delete.web`。`API.md` 描述的「人物主檔軟刪除」指的是 v2 那條，不是這條。⚠️ 也要確認 v2 軟刪除涵蓋**眾包分支**——這條 legacy 方法對眾包用戶另走 `operations` op_type 4，語義與 v2 不完全相同 |
+| D-1 | `maps/index.blade.php` | 🔵 **不是 legacy 頁，移出本計畫**。它正是 `app/maps`（`app.maps.index` → `HistoricalMapsController@index`）**現在服役**的頁面，所有 `maps/*` 舊 URL 早就由 `legacyRedirect()` 導向它。它是**獨立 HTML**（自帶 `<!DOCTYPE html>`、不 `@extends` 任何 AdminLTE layout），也是 `resources/js/historical-maps/` 的唯一消費者 ⇒ **環節 5 刪 AdminLTE 不會波及它**。「是否 React 化」是純前端重寫題（Leaflet + 自訂控制面板），降級為一般 backlog |
+
+#### 附帶發現 → 環節 4 前置清單
+
+- 🔴 `resources/views/codes/edit.blade.php:197` 的 JS 產 `/basicinformation/${id}/texts`，該路由已在**環節 2 實體刪除** ⇒ **現在是死連結**（只在 `LEGACY_PAGE_RETIREMENT=false` 回退時可達）。環節 4b 刪 codes Blade 時別把它當成「還能用的連結」。
+- `resources/views/manage/merge-preview.blade.php:75,120,382,404` 與 `resources/views/layouts/header-v3.blade.php:9` 也指向 legacy `basicinformation/*`（現為 302 shim，非死連結，但同屬環節 4 的清理範圍）。
+- 🔴 **方向 ② 的教訓（本環節再次踩到）**：`basicinformation.destroy` 一度被我與 review agent 雙雙判定為「全庫零呼叫者」，因為兩邊都只查了 route name；實際上 `BasicInfoView.tsx:192` 有一個用**模板字串**拼出 URL 的休眠 DELETE 表單（由 codex 查出）。**環節 4b 的「三個方向各掃一次」不是形式**——刪任何 legacy 路由前，方向 ②（URI 字串／`url()`／模板字串拼接）必須在 `resources/js/**` 也掃一遍，不是只掃 `app/`。
+- **React 元件的 legacy URL 預設值（prop fallback）也要掃**：它們在現行呼叫點都被覆寫、所以不會出事，但刪路由時同樣會變死連結。已知三處：`BasicInfoEditor.tsx:71` 的 `indexUrl = '/basicinformation'`、`PersonBanner.tsx:88` 的 `/admin/audit-logs`、以及 `chgis-map/app.js:497` 的 `/basicinformation/{id}/map-points`（**後者是刻意保留的 CHGIS 端點、有測試保護，不要誤刪**）。
 
 ---
 

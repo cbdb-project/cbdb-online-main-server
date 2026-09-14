@@ -95,16 +95,16 @@ class VariantReplaceHookCoverageTest extends TestCase {
      * 這不是免檢清單，而是**把檢查轉移到真正落庫的那一層**。純文字理由不夠：下層那一行被
      * 刪掉時，理由字串還在、測試照樣綠，例外就變成謊言——正是 S8 要防的失效模式。
      *
-     * 值是「該檔案至少要有幾個替換呼叫」。**記數是必要的**：`BiogMainRepository` 有 8 處掛鉤，
+     * 值是「該檔案至少要有幾個替換呼叫」。**記數是必要的**：`BiogMainRepository` 有 6 處掛鉤，
      * 只斷言「檔案裡有一處」的話，刪掉 `store()` 的那一處仍會被 KIN_DATA 的那處遮住而假綠。
      *
      * @var array<string,array<string,int>>
      */
     private const EXEMPT_DELEGATES = [
-        'BiogMainCreateHandler' => ['app/Repositories/BiogMainRepository.php' => 8],
+        'BiogMainCreateHandler' => ['app/Repositories/BiogMainRepository.php' => 6],
         // direct 走 repository::updateById()、proposal 走本檔的 prepareProposalPayload()，兩處都要有。
         'BiogMainMutationHandler' => [
-            'app/Repositories/BiogMainRepository.php' => 8,
+            'app/Repositories/BiogMainRepository.php' => 6,
             'app/Services/Mutations/BiogMainMutationHandler.php' => 1,
         ],
         'EntityAggregateCreateHandler' => [
@@ -146,7 +146,8 @@ class VariantReplaceHookCoverageTest extends TestCase {
             'hooks' => 6, 'why' => 'S2：代碼表 CRUD 的 5 條寫入路徑 + 共用的 applyVariantReplacement() 本體',
         ],
         'app/Repositories/BiogMainRepository.php' => [
-            'hooks' => 8, 'why' => 'S3／S6：BIOG_MAIN 寫入、親屬與社會關係的核准寫入、legacy 別名 store／update 的 strict 替換',
+            'hooks' => 6, 'why' => 'S3／S6：BIOG_MAIN 寫入、親屬與社會關係的核准寫入'
+                .'（原本 8 處；legacy 別名 store／update 的 2 處已隨 Blade 下架環節 7b 的孤兒方法刪除）',
         ],
         'app/Services/Import/OfficeImportService.php' => [
             'hooks' => 1, 'why' => 'S4：官職聚合（早於 buildPinyin）',

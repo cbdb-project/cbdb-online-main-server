@@ -192,6 +192,20 @@
 > ⚠️ `components/posted-to-addr-diff.blade.php` 曾被誤判為死碼——它被 `components/diff-table.blade.php:6` `@include`，
 > 而 `diff-table` 服務 operations／audit_logs／crowdsourcing 三個線上可達頁面，**留待該計畫環節 4a**。
 
+## Phase 4 — 人物編輯（legacy Blade 已實體下架）
+
+> ✅ **2026-09-14：legacy 人物編輯全套實體刪除**（[Blade 下架計畫](./BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md) 環節 2）。
+> `resources/views/biogmains/**`（57 檔）、12 組子資源路由與 controller、`LegacyBladeFormGate`、
+> `BasicInformationProposalController`、`BasicInformationController` 的 6 個 legacy 方法、
+> React 端的 legacy 退路（`Legacy*Button`、`buildLegacy*Url`、13 個 `*EditorIsNew` props），
+> 以及 `config/migration_flags.php` 的 15 個 `basicinformation.*` flag，全部移除。
+>
+> 人物層舊 URI 保留為 **302 導向**（觀察期語義，不用 301）；`destroy`／`saveas`／
+> `Duplicate_Collateral_Info` 三條**未被閘門擋過、無 React 對應**的路由維持原樣（見計畫 D-5、環節 7）。
+>
+> ⚠️ **自此不再有 flag 級回退**：`basicinformation.*` flag 已不存在，把值塞回 config 也不會
+> 復活 legacy 頁（計畫加了護欄測試鎖住這一點）。要回退只能 `git revert`。
+
 ## Phase 7 — 下架 AdminLTE（全部頁 `live`/`retired` 後）
 | # | 項目 | 狀態 |
 |---|---|---|

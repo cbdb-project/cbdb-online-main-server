@@ -69,7 +69,8 @@ class Navigation {
                 'person',
                 'nav.person_editing',
                 'fas fa-landmark',
-                self::url('basicinformation.index', 'basicinformation.index', 'app.basicinformation.index'),
+                // legacy 人物頁已於 Blade 下架計畫環節 2 刪除（舊 URI 僅剩 302），故直接指 React。
+                route('app.basicinformation.index', [], false),
                 ['pages' => ['Basicinformation'], 'patterns' => ['basicinformation.index', 'app.basicinformation.index']]
             ),
 

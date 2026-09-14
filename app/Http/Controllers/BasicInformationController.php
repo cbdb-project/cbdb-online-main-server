@@ -125,7 +125,6 @@ class BasicInformationController extends Controller {
             'hao' => $item->c_alt_name_chn_hao ?? '',
         ], $names->items());
 
-        $editIsNew = migration_flag_is_new('basicinformation.editor') && Route::has('app.basicinformation.edit');
 
         return Inertia::render('BasicInformation/Index', [
             'names' => [
@@ -148,14 +147,8 @@ class BasicInformationController extends Controller {
                 'count' => $f->count,
             ], is_array($dynastyFacets) ? $dynastyFacets : $dynastyFacets->all()),
             'can_add' => Auth::check() && Auth::user()->isActive(),
-            // 人物編輯器仍為 Blade（Phase 4，受 F7 硬前置）；連結模板 flag-aware。
-            'edit_template' => $editIsNew
-                ? route('app.basicinformation.edit', ['id' => '__ID__'], false)
-                : route('basicinformation.edit', ['basicinformation' => '__ID__'], false),
-            // create_url flag-aware（對齊 edit_template）：編輯器已遷移時「新增」導向 React 建立頁（單一姓名欄、後端 auto_pinyin 切分），否則 legacy。
-            'create_url' => ($editIsNew && Route::has('app.basicinformation.create'))
-                ? route('app.basicinformation.create', [], false)
-                : route('basicinformation.create', [], false),
+            'edit_template' => route('app.basicinformation.edit', ['id' => '__ID__'], false),
+            'create_url' => route('app.basicinformation.create', [], false),
             'page_translations' => [
                 'biogmains' => is_array($t = trans('biogmains')) ? $t : [],
                 'person' => is_array($t = trans('person')) ? $t : [],
@@ -256,9 +249,7 @@ class BasicInformationController extends Controller {
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
             'pinyin_endpoint' => '/api/select/search/pinyin',
-            'index_url' => migration_flag_is_new('basicinformation.index') && Route::has('app.basicinformation.index')
-                ? route('app.basicinformation.index', [], false)
-                : route('basicinformation.index', [], false),
+            'index_url' => route('app.basicinformation.index', [], false),
         ];
     }
 
@@ -267,9 +258,7 @@ class BasicInformationController extends Controller {
      * 渲染於頂部導覽列「首頁」之後（見 React Navbar，#113）。$tab 為 hub 分頁鍵（如 addresses）。
      */
     protected function editorBreadcrumbs(int $personId, string $personLabel, string $tab, string $mode): array {
-        $personIndexUrl = migration_flag_is_new('basicinformation.index') && Route::has('app.basicinformation.index')
-            ? route('app.basicinformation.index', [], false)
-            : route('basicinformation.index', [], false);
+        $personIndexUrl = route('app.basicinformation.index', [], false);
 
         return [
             ['label' => __('person.person_records'), 'url' => $personIndexUrl],
@@ -320,13 +309,8 @@ class BasicInformationController extends Controller {
             'mutate_endpoint' => route('api.v2.mutate.web', [], false),
             'delete_endpoint' => route('api.v2.delete.web', [], false),
             'pinyin_endpoint' => '/api/select/search/pinyin',
-            // #34 詳情中樞接線：存檔/取消後返回 React 詳情中樞基本資料分頁（show=new 時）；
-            // 否則回退人物列表（standalone 測試或 show 仍 old）。
-            'index_url' => migration_flag_is_new('basicinformation.show') && Route::has('app.basicinformation.show')
-                ? route('app.basicinformation.show', ['id' => $personId, 'tab' => 'basic_info'], false)
-                : (migration_flag_is_new('basicinformation.index') && Route::has('app.basicinformation.index')
-                    ? route('app.basicinformation.index', [], false)
-                    : route('basicinformation.index', [], false)),
+            // #34 詳情中樞接線：存檔/取消後返回 React 詳情中樞的基本資料分頁。
+            'index_url' => route('app.basicinformation.show', ['id' => $personId, 'tab' => 'basic_info'], false),
             'breadcrumbs' => $this->editorBreadcrumbs($personId, $personLabel, 'basic_info', 'edit'),
             'person_banner' => $this->personBannerProps($personId, 'basic_info'),
             'duplicate_collateral_url' => "/basicinformation/{$personId}/Duplicate_Collateral_Info",
@@ -1542,9 +1526,7 @@ class BasicInformationController extends Controller {
             'personId' => $personId,
             'person_label' => $personLabel,
             'initialTab' => $initialTab,
-            'index_url' => migration_flag_is_new('basicinformation.index') && Route::has('app.basicinformation.index')
-                ? route('app.basicinformation.index', [], false)
-                : route('basicinformation.index', [], false),
+            'index_url' => route('app.basicinformation.index', [], false),
             // #34 中樞改用 legacy 風格 PersonBanner（人物頭 + 子資源導航）取代 person-browser 的
             // PersonSummaryPanel/BrowserTabs；active_tab/counts 於前端以即時狀態覆蓋。
             'person_banner' => $this->personBannerProps($personId, $initialTab),
@@ -1631,12 +1613,8 @@ class BasicInformationController extends Controller {
             'temp_id' => $tempId,
             'can_create' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
             'create_endpoint' => route('api.v2.create.web', [], false),
-            'edit_template' => migration_flag_is_new('basicinformation.editor') && Route::has('app.basicinformation.edit')
-                ? route('app.basicinformation.edit', ['id' => '__ID__'], false)
-                : route('basicinformation.edit', ['basicinformation' => '__ID__'], false),
-            'index_url' => migration_flag_is_new('basicinformation.index') && Route::has('app.basicinformation.index')
-                ? route('app.basicinformation.index', [], false)
-                : route('basicinformation.index', [], false),
+            'edit_template' => route('app.basicinformation.edit', ['id' => '__ID__'], false),
+            'index_url' => route('app.basicinformation.index', [], false),
             'page_translations' => [
                 'person' => is_array($t = trans('person')) ? $t : [],
             ],

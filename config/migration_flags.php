@@ -40,28 +40,10 @@ return [
         // Phase 2 — Codes 代碼表 CRUD
         'codes' => env('MIGRATION_FLAG_CODES', 'new'),
 
-        // Phase 3/4 — 人物列表、檢視與編輯器（含 PersonBrowser 各分頁增量編輯器）
-        'basicinformation' => [
-            'index' => env('MIGRATION_FLAG_BASICINFO_INDEX', 'new'),
-            // ✅ 2026-06-26 全部翻 new 上線（使用者人工逐頁驗收通過）：React 人物編輯器已「重新對齊 legacy
-            // 編輯頁」——重建年號轉換 React 元件（EraTimeField）、補 CHGIS 地圖 place-link、對齊版面/互動、
-            // 補齊 v2 互逆鏡像（assoc/kinship 雙向同步 + #66/#70 衝突/疑似偵測）、必填/改鍵等 parity 缺口。
-            // 全量 1977 測試綠、build 綠、review agent + codex 雙閘逐環節通過。如需回退改回 'old' 即可（可逆）。
-            'show' => env('MIGRATION_FLAG_BASICINFO_SHOW', 'new'),
-            'editor' => env('MIGRATION_FLAG_BASICINFO_EDITOR', 'new'),
-            'altname' => env('MIGRATION_FLAG_BASICINFO_ALTNAME', 'new'),
-            'addresses' => env('MIGRATION_FLAG_BASICINFO_ADDRESSES', 'new'),
-            'texts' => env('MIGRATION_FLAG_BASICINFO_TEXTS', 'new'),
-            'sources' => env('MIGRATION_FLAG_BASICINFO_SOURCES', 'new'),
-            'offices' => env('MIGRATION_FLAG_BASICINFO_OFFICES', 'new'),
-            'assoc' => env('MIGRATION_FLAG_BASICINFO_ASSOC', 'new'),
-            'kinship' => env('MIGRATION_FLAG_BASICINFO_KINSHIP', 'new'),
-            'events' => env('MIGRATION_FLAG_BASICINFO_EVENTS', 'new'),
-            'entries' => env('MIGRATION_FLAG_BASICINFO_ENTRIES', 'new'),
-            'statuses' => env('MIGRATION_FLAG_BASICINFO_STATUSES', 'new'),
-            'possession' => env('MIGRATION_FLAG_BASICINFO_POSSESSION', 'new'),
-            'socialinst' => env('MIGRATION_FLAG_BASICINFO_SOCIALINST', 'new'),
-        ],
+        // Phase 3/4（人物列表、檢視與編輯器）的 15 個 basicinformation.* flag 已於 2026-09-14
+        // 隨 legacy Blade 人物編輯全套實體下架一併移除（Blade 下架計畫環節 2）：對應的舊視圖、
+        // 路由、LegacyBladeFormGate 與 12 個子資源 controller 都已刪除，flag 沒有可切回的對象。
+        // 舊 .env 裡的 MIGRATION_FLAG_BASICINFO_* 可安全刪除（清單見該計畫 §三之四）。
 
         // Phase 5 — 管理與營運工具
         'operations' => env('MIGRATION_FLAG_OPERATIONS', 'new'),

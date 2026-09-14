@@ -491,8 +491,11 @@ function boundsToLatLng(b) {
 }
 
 function loadPoints(personId) {
-    const base = cfg().pointsUrlBase || '/basicinformation';
-    const url = `${base}/${encodeURIComponent(personId)}/map-points`;
+    // Blade 端（resources/views/partials/chgis-map-assets.blade.php）傳完整 URL 模板，
+    // 內含 {id} 佔位符。原本傳的是「base」再由這裡自行接上 /{id}/map-points，那讓前端
+    // 隱含相依於 legacy 路由 basicinformation.index 的 URL 形狀。
+    const template = cfg().pointsUrlTemplate || '/basicinformation/{id}/map-points';
+    const url = template.replace('{id}', encodeURIComponent(personId));
     if (pointsRequestController) {
         pointsRequestController.abort();
     }

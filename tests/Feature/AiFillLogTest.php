@@ -6,24 +6,35 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
- * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
- * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
+ * AI 官職抽取（`POST /api/ai/posting/extract`）必須落一筆 `ai_fill_logs`。
+ *
+ * 這是唯一守著「AI 抽取有留紀錄」的測試——`ai_raw`／`ai_matched` 要有內容、`user_submitted`
+ * 在提交前必須是 null、回應要帶 `ai_fill_log_id` 讓前端之後能回寫。
+ *
+ * ── 2026-09-14（Blade 下架環節 4a-1）─────────────────────────────
+ *
+ * 本檔原有 8 條並列在 legacy-parity 群組裡。分流後：2 條已由 `AiFillLogInertiaTest` 等價覆蓋；
+ * 2 條是**自導自演**（自己下 `DB::table()->update()` 再驗它更新了，完全不執行生產碼）；
+ * 1 條（比較按鈕）**有**執行生產碼，但斷言落在 Blade 文案上，其底層的 `comparison_rows`
+ * 已由 React 側兩條更嚴的測試覆蓋；2 條已移植到 `AiFillLogInertiaTest`
+ * （guest 重導、`?search=` 的三欄 OR 過濾，並補上 legacy 從未測過的 `users.name`／
+ * `users.email` 兩個分支）。這條與 Blade 無關（該端點從來沒被封路），只是被 setUp 的
+ * opt-out 連坐，所以留在原地。
+ *
+ * ⚠️ **已知的真空白**（不是本次造成，也不在本次範圍）：被刪掉的那兩條 B 類原本想守的是
+ * 「React 編輯器提交後回寫 `ai_fill_logs.user_submitted`」，但它們用自己下 SQL 的方式寫，
+ * 從來沒真的守到。那個行為目前**沒有任何測試守**（正是 `ai-fill-logs` 全顯示 Not Submitted
+ * 那個回歸的成因）。要補的話是一條「走 v2 mutation 提交後 `user_submitted` 與 `submitted_at`
+ * 被填上、且他人的 log 不受影響」的新測試——屬新功能覆蓋而非移植，獨立排程。
  */
-#[Group('legacy-parity')]
 class AiFillLogTest extends TestCase {
     use RefreshDatabase;
 
     protected function setUp(): void {
         parent::setUp();
-
-        // 本類驗的是 legacy Blade 頁的行為。Blade 下架計畫環節 3「先封路、不刪碼」把那些
-        // 路由改成 302／410，但頁面本身還在、還部署著、還能被 kill switch 叫回來，
-        // 所以這份覆蓋在觀察期內仍有意義——局部關閉封路即可。環節 4 實體刪除時一併移除。
-        $this->useLegacyBladePages();
 
         config(['services.gemini.api_key' => 'test-api-key']);
         config(['services.gemini.api_endpoint' => 'https://example.com/api']);
@@ -33,41 +44,6 @@ class AiFillLogTest extends TestCase {
         DB::table('DYNASTIES')->insert([
             ['c_dy' => 20, 'c_dynasty_chn' => '清', 'c_dynasty' => 'Qing', 'c_start' => 1644, 'c_end' => 1911, 'c_sort' => 20],
         ]);
-    }
-
-    /**
-     * 測試訪客無法存取 AI 填充日誌頁面
-     */
-    public function test_guest_cannot_access_ai_fill_logs() {
-        $response = $this->get('/admin/ai-fill-logs');
-        $response->assertRedirect('/login');
-    }
-
-    /**
-     * 測試一般用戶無法存取 AI 填充日誌頁面
-     */
-    public function test_regular_user_cannot_access_ai_fill_logs() {
-        $user = User::factory()->create([
-            'is_active' => 1,
-            'is_admin' => 0,
-        ]);
-
-        $response = $this->actingAs($user)->get('/admin/ai-fill-logs');
-        $response->assertStatus(403);
-    }
-
-    /**
-     * 測試 Super Admin 可以存取 AI 填充日誌頁面
-     */
-    public function test_super_admin_can_access_ai_fill_logs() {
-        $user = User::factory()->create([
-            'is_active' => 1,
-            'is_admin' => 3, // ROLE_SUPER_ADMIN
-        ]);
-
-        $response = $this->actingAs($user)->get('/admin/ai-fill-logs');
-        $response->assertStatus(200);
-        $response->assertSee('AI 填充日誌');
     }
 
     /**
@@ -141,170 +117,5 @@ class AiFillLogTest extends TestCase {
         $this->assertNotNull($log->ai_raw);
         $this->assertNotNull($log->ai_matched);
         $this->assertNull($log->user_submitted);
-    }
-
-    /**
-     * 測試日誌記錄可以更新 user_submitted
-     * 直接測試 updateAiFillLog 的邏輯（透過 DB 操作驗證）
-     */
-    public function test_log_record_can_be_updated_with_user_submitted() {
-        $user = User::factory()->create([
-            'is_active' => 1,
-            'is_admin' => 1,
-        ]);
-
-        // 建立日誌記錄
-        $logId = DB::table('ai_fill_logs')->insertGetId([
-            'user_id' => $user->id,
-            'c_personid' => 1,
-            'route_name' => 'basicinformation.offices.create',
-            'route_url' => '/basicinformation/1/offices/create',
-            'source_text' => '雍正元年正月初三知新城縣',
-            'ai_raw' => json_encode(['title_str' => '知縣']),
-            'ai_matched' => json_encode([
-                'matched_fields' => ['c_firstyear' => ['value' => 1723, 'text' => '1723']],
-                'suggested_fields' => [],
-                'empty_fields' => [],
-                'statistics' => ['matched_count' => 1, 'suggested_count' => 0, 'not_found_count' => 0, 'empty_count' => 0],
-            ]),
-            'success' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        // 模擬 user_submitted 更新（與 BasicInformationOfficesController::updateAiFillLog 相同的邏輯）
-        $submittedData = [
-            'c_office_id' => 123,
-            'c_firstyear' => 1723,
-            'c_fy_month' => 1,
-            'c_fy_day' => 3,
-            'c_dy' => 20,
-        ];
-
-        $updated = DB::table('ai_fill_logs')
-            ->where('id', $logId)
-            ->where('user_id', $user->id)
-            ->update([
-                'user_submitted' => json_encode($submittedData, JSON_UNESCAPED_UNICODE),
-                'submitted_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-        $this->assertEquals(1, $updated);
-
-        $log = DB::table('ai_fill_logs')->where('id', $logId)->first();
-        $this->assertNotNull($log->user_submitted);
-        $this->assertNotNull($log->submitted_at);
-
-        $submitted = json_decode($log->user_submitted, true);
-        $this->assertEquals(123, $submitted['c_office_id']);
-        $this->assertEquals(1723, $submitted['c_firstyear']);
-    }
-
-    /**
-     * 測試安全檢查：不能更新他人的日誌
-     */
-    public function test_cannot_update_others_log_record() {
-        $user1 = User::factory()->create([
-            'is_active' => 1,
-            'is_admin' => 1,
-        ]);
-        $user2 = User::factory()->create([
-            'is_active' => 1,
-            'is_admin' => 1,
-        ]);
-
-        // user1 建立日誌
-        $logId = DB::table('ai_fill_logs')->insertGetId([
-            'user_id' => $user1->id,
-            'c_personid' => 1,
-            'route_name' => 'test',
-            'route_url' => '/test',
-            'source_text' => '測試文本',
-            'success' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        // user2 嘗試更新（WHERE user_id 不匹配，應影響 0 行）
-        $updated = DB::table('ai_fill_logs')
-            ->where('id', $logId)
-            ->where('user_id', $user2->id)
-            ->update([
-                'user_submitted' => json_encode(['c_office_id' => 999]),
-                'submitted_at' => now(),
-            ]);
-
-        $this->assertEquals(0, $updated);
-
-        // 驗證未被更新
-        $log = DB::table('ai_fill_logs')->where('id', $logId)->first();
-        $this->assertNull($log->user_submitted);
-    }
-
-    /**
-     * 測試管理頁面篩選功能
-     */
-    public function test_admin_page_filters() {
-        $admin = User::factory()->create([
-            'is_active' => 1,
-            'is_admin' => 3, // ROLE_SUPER_ADMIN
-        ]);
-
-        // 建立測試日誌
-        DB::table('ai_fill_logs')->insert([
-            'user_id' => $admin->id,
-            'c_personid' => 1,
-            'route_name' => 'test.route',
-            'route_url' => '/test',
-            'source_text' => '唐朝開元年間知縣',
-            'success' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        // 搜尋關鍵字
-        $response = $this->actingAs($admin)->get('/admin/ai-fill-logs?search=開元');
-        $response->assertStatus(200);
-        $response->assertSee('唐朝開元年間知縣');
-
-        // 搜尋不存在的關鍵字
-        $response = $this->actingAs($admin)->get('/admin/ai-fill-logs?search=不存在的文字');
-        $response->assertStatus(200);
-        $response->assertSee('暫無記錄');
-    }
-
-    /**
-     * 測試管理頁面比較功能（有 user_submitted 時顯示比較按鈕）
-     */
-    public function test_admin_page_shows_compare_button_when_submitted() {
-        $admin = User::factory()->create([
-            'is_active' => 1,
-            'is_admin' => 3, // ROLE_SUPER_ADMIN
-        ]);
-
-        // 建立有 user_submitted 的日誌
-        DB::table('ai_fill_logs')->insert([
-            'user_id' => $admin->id,
-            'c_personid' => 1,
-            'route_name' => 'test.route',
-            'route_url' => '/test',
-            'source_text' => '測試文本',
-            'ai_matched' => json_encode([
-                'matched_fields' => ['c_firstyear' => ['value' => 1723, 'text' => '1723']],
-                'suggested_fields' => [],
-                'empty_fields' => [],
-                'statistics' => ['matched_count' => 1, 'suggested_count' => 0, 'not_found_count' => 0, 'empty_count' => 0],
-            ]),
-            'user_submitted' => json_encode(['c_firstyear' => 1723]),
-            'success' => true,
-            'submitted_at' => now(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        $response = $this->actingAs($admin)->get('/admin/ai-fill-logs');
-        $response->assertStatus(200);
-        $response->assertSee('比較');
     }
 }

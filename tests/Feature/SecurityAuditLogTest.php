@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -21,20 +20,23 @@ use Tests\TestCase;
  *
  * 同時釘住一條紅線：**審計不得記錄密碼雜湊或 token 明文／雜湊**。洩漏的審計日誌不該
  * 變成第二個憑證來源。
+ *
+ * ── 2026-09-14（Blade 下架環節 4a-1）─────────────────────────────
+ *
+ * 本檔曾被列在 legacy-parity 群組裡，那是**誤標**：它一條 `assertSee`／`assertViewIs`／
+ * HTML 斷言都沒有，全部在驗 `audit_log` 的內容。當初需要 opt-out 的唯一原因是
+ * 9 條走 `PATCH /profile`／`PUT /manage/{id}`——環節 3 把那兩個 legacy 寫入端封成 410。
+ *
+ * 稽核邏輯本來就是**新舊共用**的（`UserProfileController::applyProfileUpdate()` 被 `update()`
+ * 與 `appUpdate()` 同時呼叫、`ManagementController::performUserUpdate()` 同理），所以這次改成打
+ * `app.profile.update`／`app.manage.update` 是**純 URL 抽換、零斷言強度改動**（另有 2 處
+ * `assertRedirect` 目標隨 `performUserUpdate()` 的 `$indexRoute` 一起改成 `app.manage.index`）。
+ *
+ * 這 16 條是整個 Blade 下架計畫裡最不能丟的一組——丟了會讓帳號接管無跡可循。
  */
-/**
- * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
- * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
- */
-#[Group('legacy-parity')]
 class SecurityAuditLogTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
-
-        // 本類驗的是 legacy Blade 頁的行為。Blade 下架計畫環節 3「先封路、不刪碼」把那些
-        // 路由改成 302／410，但頁面本身還在、還部署著、還能被 kill switch 叫回來，
-        // 所以這份覆蓋在觀察期內仍有意義——局部關閉封路即可。環節 4 實體刪除時一併移除。
-        $this->useLegacyBladePages();
 
         config()->set('database.default', 'sqlite');
         config()->set('database.connections.sqlite', [
@@ -153,7 +155,7 @@ class SecurityAuditLogTest extends TestCase {
 
         $this->actingAs($user)
             ->withServerVariables(['REMOTE_ADDR' => '203.0.113.9', 'HTTP_USER_AGENT' => 'ProbeBrowser/1.0'])
-            ->patch('/profile', [
+            ->patch(route('app.profile.update'), [
                 'name' => '張三',
                 'email' => 'u@example.com',
                 'avatar' => 'avatar0.png',
@@ -176,7 +178,7 @@ class SecurityAuditLogTest extends TestCase {
         $user = $this->activeUser();
         $user->refresh();
 
-        $this->actingAs($user)->patch('/profile', [
+        $this->actingAs($user)->patch(route('app.profile.update'), [
             'name' => '張三',
             'email' => 'u@example.com',
             'avatar' => 'avatar0.png',
@@ -197,7 +199,7 @@ class SecurityAuditLogTest extends TestCase {
         // email 變更可用來劫持密碼重設，等於換走帳號的復原管道。
         $user = $this->activeUser();
 
-        $this->actingAs($user)->patch('/profile', [
+        $this->actingAs($user)->patch(route('app.profile.update'), [
             'name' => '張三',
             'email' => 'moved@example.com',
             'avatar' => 'avatar0.png',
@@ -221,7 +223,7 @@ class SecurityAuditLogTest extends TestCase {
         // 「改走 email 再換密碼」是接管帳號的標準劇本，兩件事都必須各自留下紀錄。
         $user = $this->activeUser();
 
-        $this->actingAs($user)->patch('/profile', [
+        $this->actingAs($user)->patch(route('app.profile.update'), [
             'name' => '張三',
             'email' => 'moved@example.com',
             'avatar' => 'avatar0.png',
@@ -369,11 +371,11 @@ class SecurityAuditLogTest extends TestCase {
         $victim->refresh();
         $originalHash = $victim->password;
 
-        $this->actingAs($admin)->put('/manage/'.$victim->id, [
+        $this->actingAs($admin)->put(route('app.manage.update', $victim->id), [
             'is_active' => User::STATUS_ACTIVE,
             'is_admin' => User::ROLE_REGULAR,
             'delete_user' => 1,
-        ])->assertRedirect(route('manage.index'));
+        ])->assertRedirect(route('app.manage.index'));
 
         $this->assertNotNull($this->securityContextFor(
             'user_soft_deleted',
@@ -400,7 +402,7 @@ class SecurityAuditLogTest extends TestCase {
         // 只改姓名／機構不是安全事件；審計要保持信噪比，否則沒人會去看。
         $user = $this->activeUser();
 
-        $this->actingAs($user)->patch('/profile', [
+        $this->actingAs($user)->patch(route('app.profile.update'), [
             'name' => '張三豐',
             'email' => 'u@example.com',
             'institution' => '武當',
@@ -488,10 +490,10 @@ class SecurityAuditLogTest extends TestCase {
 
         $this->actingAs($admin)
             ->withServerVariables(['REMOTE_ADDR' => '192.0.2.44', 'HTTP_USER_AGENT' => 'AdminBrowser/3.0'])
-            ->put('/manage/'.$victim->id, [
+            ->put(route('app.manage.update', $victim->id), [
                 'is_active' => User::STATUS_INACTIVE,
                 'is_admin' => User::ROLE_REGULAR,
-            ])->assertRedirect(route('manage.index'));
+            ])->assertRedirect(route('app.manage.index'));
 
         $context = $this->securityContextFor('user_role_or_status_changed');
         $this->assertNotNull($context, '停用帳號必須帶請求脈絡');
@@ -514,7 +516,7 @@ class SecurityAuditLogTest extends TestCase {
 
         Log::spy();
 
-        $this->actingAs($user)->patch('/profile', [
+        $this->actingAs($user)->patch(route('app.profile.update'), [
             'name' => '張三',
             'email' => 'u@example.com',
             'avatar' => 'avatar0.png',
@@ -536,7 +538,7 @@ class SecurityAuditLogTest extends TestCase {
 
         Log::spy();
 
-        $this->actingAs($user)->patch('/profile', [
+        $this->actingAs($user)->patch(route('app.profile.update'), [
             'name' => '張三',
             'email' => 'u@example.com',
             'avatar' => 'avatar0.png',

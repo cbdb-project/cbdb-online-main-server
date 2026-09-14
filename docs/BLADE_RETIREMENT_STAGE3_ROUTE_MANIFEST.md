@@ -211,14 +211,17 @@ legacy 頁**立刻復活**——不需重新部署、不需 `git revert`。這�
 
 ### 測試分流（比照環節 1.5）
 
-`./vendor/bin/phpunit --group legacy-parity` 目前圈出 **309 個測試**（22 個檔，其中 19 個 class 級、3 個 method 級 opt-out）。環節 4 實體刪除 legacy 頁時，這批要做環節 1.5 那樣的逐測試分流：哪些改測 React 版、哪些直接刪。
+`./vendor/bin/phpunit --group legacy-parity` 原本圈出 **309 個測試**（22 個檔）。環節 4 實體刪除 legacy 頁時，這批要做環節 1.5 那樣的逐測試分流：哪些改測 React 版、哪些直接刪。
+
+**分流進度**：環節 4a-1（2026-09-14）處理了 4 個檔／28 條 ⇒ 現在是 **284 個測試**（19 個檔，16 個 class 級 + 3 個 method 級：`InertiaViewTableTest` 3 條、`OfficeCodesExportTest` 3 條、`UnidirectionalRelationshipRepairControllerTest` 2 條）。
+⚠️ 統計時**不要只 grep `Group('legacy-parity')`**——有幾個檔的 docblock 只是「提到」這個群組名，會被誤計；請用 `--group legacy-parity --list-tests` 的實測值。
 
 分流時**已知的覆蓋缺口**（現在只靠 legacy 測試守，刪掉就沒了）：
 
 | 行為 | 現在誰在守 | React 端有嗎 |
 |---|---|---|
 | `PATCH /profile` 的授權（未登入／未啟用） | `UserProfileTest`（opt-out） | ❌ `PATCH /app/profile` 無等價授權回歸 |
-| `PUT /manage/{id}` 的授權 | `SecurityAuditLogTest`／`InactiveAccountAccessTest`（opt-out） | ❌ `PUT /app/manage/{id}` 無等價授權回歸 |
+| `PUT /manage/{id}` 的授權 | `InactiveAccountAccessTest`（opt-out） | 🟡 **部分已補**：`SecurityAuditLogTest` 已於環節 4a-1 改打 `app.manage.update`（2 條，驗停用帳號與軟刪除的稽核脈絡）；**純授權**（未登入／未啟用被擋）仍只有 legacy 側的 `InactiveAccountAccessTest` |
 | legacy `codes` 的 store／update／destroy 稽核與異體字 | `CodesControllerTest`／`CodesVariantReplacementTest`（opt-out） | 部分有（`ApiV2MutateCodeTables*`），需逐項對照 |
 
 > 這三項**不是**環節 3 造成的——它們一直只有 legacy 覆蓋。列在這裡是為了讓環節 4 不會在

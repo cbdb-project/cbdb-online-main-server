@@ -35,7 +35,7 @@ use Illuminate\Http\JsonResponse;
  *    影響僅限「本守衛上線前已存在的 pending proposal」——新提案在提交時（direct 與
  *    proposal 兩種 mode）都已被擋，不會再產生。
  *  - `BasicInformationController::Duplicate_Collateral_Info()` 直接複製 KIN_DATA／
- *    ASSOC_DATA 列，來源若有歷史 0 髒列會被一併複製。該端點無 legacy.form 閘門、仍在服役。
+ *    ASSOC_DATA 列，來源若有歷史 0 髒列會被一併複製。該端點無 legacy.form 閘門（該閘門已隨環節 2 移除）、仍在服役。
  *
  * 兩者都登記在 Blade 下架計畫的環節 7（D 類缺口評估）；本次刻意不動，因為它們是
  * **既存狀態、不是本次改動造成的回歸**，且都牽涉到需要人決定的政策（核准被擋時審核者

@@ -31,7 +31,6 @@ class OperationsProposalResourceLinkTest extends TestCase {
             mkdir($compiledViewPath, 0777, true);
         }
         config(['view.compiled' => $compiledViewPath]);
-        config(['migration_flags.pages.basicinformation.altname' => 'new']);
 
         config()->set('database.default', 'sqlite');
         config()->set('database.connections.sqlite', [

@@ -64,10 +64,21 @@ Route::get('basicinformation/{id}/map-points', 'ChgisMapController@personPoints'
 
 // Legacy 人物頁：Blade 已於下架計畫環節 2 刪除。顯示頁保留路由名與 URI 並 302 導向 /app
 // 對應頁（觀察期用 302，不用 301——301 會被瀏覽器／CDN 長期快取，revert 也救不回來）；
-// 寫入端（store/update）回 410，語義沿用已下架的 LegacyBladeFormGate。
+// 寫入端（store/update）回 410，語義沿用已移除的 LegacyBladeFormGate。
 //
-// ⚠️ basicinformation.index 這個**路由名與 URI 都不可移除**：多處 helper 與
-// resources/views/partials/chgis-map-assets.blade.php 之外的呼叫點仍以它為準。
+// ⚠️ basicinformation.index 這個**路由名與 URI 都不可移除**：多處 helper 仍以它為準。
+//
+// 📌 **刻意的不對稱：人物層給 302，12 組子資源舊 URI 給 404。**
+// 子資源的 legacy URI 是「一個人物 × 一種資源 × 複合主鍵 query」的組合
+// （如 /basicinformation/{id}/altnames/edit?c_personid=..&c_alt_name_chn=..），要導向 React
+// edit-v2 就得逐段解析並轉換複合主鍵編碼——而那正是 legacy 那套自訂編碼最容易出錯的地方
+// （minus/slash/NULL 哨兵各有轉義規則）。導錯會把使用者送到**別人的**記錄，比 404 危險。
+// 人物層只有 {id} 一個整數參數，沒有這個風險，所以值得給 302。
+// 若日後確認有實際的書籤損失，再補一條 catch-all 導向（見計畫環節 7）。
+//
+// ⚠️ 由 web middleware group 的順序決定：VerifyCsrfToken 跑在這些路由閉包**之前**，
+// 所以真實世界未帶 token 的 legacy POST/PUT 會先拿到 419 而不是 410（測試環境 CSRF 跳過
+// 才看得到 410）。這與原 LegacyBladeFormGate（同樣是 route middleware）行為一致，非退化。
 Route::get('basicinformation', function (\Illuminate\Http\Request $request) {
     return redirect()->to('/app/basicinformation'.($request->getQueryString() ? '?'.$request->getQueryString() : ''), 302);
 })->name('basicinformation.index');

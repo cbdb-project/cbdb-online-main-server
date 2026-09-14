@@ -116,7 +116,7 @@
 | `Auth\{Login,Register,ForgotPassword,ResetPassword}Controller` | flag 分歧中的 Blade 分支 | — |
 | `BasicInformationController` + 12 個子資源 controller | `index/show/create/store/edit/update` 的 Blade 分支、`editQuery/updateQuery/destroyQuery` | ⚠️ **`saveas()`、`Duplicate_Collateral_Info()`、`destroy()` 未被閘門擋、仍在服役**，**不可刪**（見 D-5） |
 | `BasicInformationProposalController` | `proposalStore`, `proposalUpdate` | 兩者皆已回 410，可整檔刪除 |
-| `PersonBrowserController` | **無可刪方法**（純 React） | 🔴 **本表最危險的一項**：`PersonBrowserController.php:39-61` 用 12 個 `migration_flag_is_new('basicinformation.*')` 產生 `altnameEditorIsNew` 等 Inertia props。消費端 `Pages/PersonBrowser` 的 `TabContentLoader.tsx:88-100` 預設值全是 `= false`，`tabs/AltNamesTab.tsx:81` 為 `const useReactEditor = altnameEditorIsNew && …`。**刪掉 flag key → 全部 prop 變 `false` → 13 個 React 編輯器靜默退回唯讀分支**。不是 500，是**功能無聲消失**，測試也未必抓得到。見 §三第 3 欄 |
+| `PersonBrowserController` | **無可刪方法**（純 React） | 🔴 **本表最危險的一項**：`PersonBrowserController`（環節 2 前的 `:39-61`）用 12 個 `migration_flag_is_new('basicinformation.*')` 產生 `altnameEditorIsNew` 等 Inertia props。消費端 `Pages/PersonBrowser` 的 `TabContentLoader.tsx:88-100` 預設值全是 `= false`，`tabs/AltNamesTab.tsx:81` 為 `const useReactEditor = altnameEditorIsNew && …`。**刪掉 flag key → 全部 prop 變 `false` → 13 個 React 編輯器靜默退回唯讀分支**。不是 500，是**功能無聲消失**，測試也未必抓得到。見 §三第 3 欄 |
 
 ### B. 死碼（零引用，可直接刪）
 
@@ -383,6 +383,13 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
 
    孤兒翻譯 key **沒有執行期影響**（不會 500、不會顯示 raw key），而刪錯會讓畫面出現 raw key。依本計畫 §三第 12 欄自訂的保守策略（「留下孤兒 key 的成本 ≪ 刪錯 key」），把它獨立成一個**只動翻譯檔**的 commit，配自己的 review，比夾在這個已經 -22,000 行的環節裡安全得多。
 - **驗收**：`PersonBrowserTest`、`ApiV2Mutate*Test`、`CompositePrimaryKeyTest`、`OperationsProposalResourceLinkTest`、`VariantReplaceHookCoverage` 全綠；🔴 **必須人工開頁**確認 `/app/basicinformation/{id}` 的 13 個 React 編輯器**都還在**（props 退化不會讓任何測試變紅）、`/app/person-browser` 各分頁正常、CHGIS 浮出地圖正常。
+
+#### 環節 2 review 揪出的三件事（已修，留作後續環節的檢查項）
+
+1. 🔴 **302 shim 造成無限導向**。`appCreate()` 對眾包用戶 `redirect()->route('basicinformation.create')`——而那條路由在環節 2 之後只是一個 302 導回 `/app/basicinformation/create` 的 shim，於是 `/app → /legacy → /app → …` 無限迴圈。**而且既有測試把這個迴圈寫死成期望值**（`assertRedirect(route('basicinformation.create'))`），所以不會示警。
+   **教訓**：把 legacy 路由改成 shim 之後，**所有 `redirect()->route('<legacy 名>')` 都要一併改指 `/app`**——不只是為了避免迴圈，也因為 `laracasts/flash` 的訊息會在中間那一跳被 session 老化掉，成功／失敗提示靜默消失。環節 2 另外四處（`saveas` ×2、`destroy` ×2）同樣修掉。**環節 3 把 A-1…A-17 改成 shim 時要重跑這個檢查**：`grep -rn "redirect()->route('<該頁的 legacy 路由名>" app/`。
+2. 🔴 **子字串斷言造成假綠**。`assertStringContainsString('/basicinformation/12345/offices/edit', $url)` 會被 `/app/basicinformation/12345/offices/edit-v2` **照樣命中**（`/app` 是前綴、`-v2` 是後綴），於是同一個斷言同時接受 legacy 與 React 兩種形狀、失去鑑別力。已全部改成 `assertStringStartsWith('/app/…edit-v2')`。**環節 3／4 改任何 URL 斷言時一律用 StartsWith 或精確比對。**
+3. 🟡 **「塞回 flag 當護欄」要設 `'old'` 才有意義**。有幾個測試把 flag 設成 `'new'` 再斷言 React 行為——在 flag 已移除、行為本來就無條件的情況下那證明不了任何事。護欄的正確寫法是設 `'old'`。
 
 ### 環節 3 — 先封路，不刪碼（風險：低，**完全可逆**）
 

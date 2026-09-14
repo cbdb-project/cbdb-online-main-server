@@ -65,7 +65,7 @@ class BasicInformationController extends Controller {
         // 檢視類路由（含 React appShow/appEdit 與其 summary/tab JSON 端點）可公開；
         // 實際寫入由 /api/v2 handler 授權把關。summary/tab 與舊唯讀人物頁同樣公開，
         // 確保訪客也能檢視（編輯能力由 canEditBasicInfo + 後端 v2 授權決定）。
-        $this->middleware('auth')->except(['index', 'show', 'edit', 'appIndex', 'appShow', 'appEdit', 'summary', 'tab']);
+        $this->middleware('auth')->except(['appIndex', 'appShow', 'appEdit', 'summary', 'tab']);
     }
 
     private function normalizePersonId($id): int {
@@ -1600,11 +1600,16 @@ class BasicInformationController extends Controller {
     public function appCreate() {
         $user = Auth::user();
 
-        // BIOG_MAIN create 提案 v2 尚未支援（回 501）：可提案但不可直接寫入者導回舊版新增流程。
+        // BIOG_MAIN create 提案 v2 尚未支援（handler 回 501）：可提案但不可直接寫入者（眾包用戶）
+        // 無法在這裡新增人物。
+        //
+        // ⚠️ 這裡**不可以** redirect 到 basicinformation.create：Blade 下架計畫環節 2 之後那條
+        // 路由只是一個 302 導回 /app/basicinformation/create 的 shim，於是
+        //   /app/basicinformation/create → /basicinformation/create → /app/basicinformation/create …
+        // 成為無限導向（ERR_TOO_MANY_REDIRECTS）。而原註解所指的「舊版眾包流程」新增頁本身
+        // 也已隨該環節刪除，目的地不存在。改為直接回 501 說明。
         if ($user && !$user->canWriteDirectly() && $user->canPropose()) {
-            flash('人物新增提案請使用舊版眾包流程 @ '.Carbon::now(), 'info');
-
-            return redirect()->route('basicinformation.create');
+            abort(501, '人物新增尚不支援提案模式，請聯繫可直接寫入的編輯者代為建立。');
         }
 
         $tempId = (int) BiogMain::max('c_personid') + 1;
@@ -1665,7 +1670,9 @@ class BasicInformationController extends Controller {
 
         flash('Create success @ '.Carbon::now(), 'success');
 
-        return redirect()->route('basicinformation.edit', $new_id);
+        // 直接指 React 編輯頁：legacy 路由已是 302 shim，繞它會多一跳，而 laracasts/flash 的
+        // 訊息會在中間那個請求就被 session 老化掉——使用者看不到「另存成功」提示。
+        return redirect()->route('app.basicinformation.edit', ['id' => $new_id]);
     }
 
     //20240701新增Duplicate Collateral Info功能
@@ -2103,7 +2110,9 @@ class BasicInformationController extends Controller {
         //擴充結束
         flash('Create success @ '.Carbon::now(), 'success');
 
-        return redirect()->route('basicinformation.edit', $new_id);
+        // 直接指 React 編輯頁：legacy 路由已是 302 shim，繞它會多一跳，而 laracasts/flash 的
+        // 訊息會在中間那個請求就被 session 老化掉——使用者看不到「另存成功」提示。
+        return redirect()->route('app.basicinformation.edit', ['id' => $new_id]);
     }
 
     /**
@@ -2134,7 +2143,8 @@ class BasicInformationController extends Controller {
             $this->operationRepository->store(Auth::id(), $id, 4, 'BIOG_MAIN', $id, $biog, $ori, 2);
             flash('眾包紀錄 Delete success @ '.Carbon::now(), 'success');
 
-            return redirect()->route('basicinformation.index');
+            // 直接指 React 列表頁：理由同 saveas（避免多一跳並保住 flash 訊息）。
+            return redirect()->route('app.basicinformation.index');
         } else {
             DB::transaction(function () use ($biog, $id, $ori) {
                 $biog->save();
@@ -2158,7 +2168,8 @@ class BasicInformationController extends Controller {
 
             flash('Delete success @ '.Carbon::now(), 'success');
 
-            return redirect()->route('basicinformation.index');
+            // 直接指 React 列表頁：理由同 saveas（避免多一跳並保住 flash 訊息）。
+            return redirect()->route('app.basicinformation.index');
         }
     }
 }

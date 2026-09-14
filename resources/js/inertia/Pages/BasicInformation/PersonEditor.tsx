@@ -13,7 +13,7 @@ import SelectionDialog from '../../components/SelectionDialog';
  *
  * 與 PersonBrowser/Index 共用同一組分頁引擎（BrowserTabs + TabContentLoader），但：
  *   - 聚焦單一人物（無左側搜尋/人物列表 sidebar）；
- *   - basic_info 分頁進場即可直接錄入（basicInfoStartEditing）；
+ *   - basic_info 分頁進場即可直接錄入（內嵌 BasicInfoEditor，無需再點「編輯」）；
  *   - 12 子資源分頁各自帶 React 錄入/編輯/刪除（Blade 下架計畫環節 2 起無條件啟用，不再有 flag）。
  * 資料端點指向「編輯者/訪客可用」的 app.basicinformation.summary/.tab（非 superadmin-only）。
  */

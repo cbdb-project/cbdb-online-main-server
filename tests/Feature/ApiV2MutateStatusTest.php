@@ -696,4 +696,72 @@ class ApiV2MutateStatusTest extends TestCase {
         $response = $this->postJson('/api/v2/mutate', $this->statusPayload());
         $response->assertStatus(404);
     }
+
+    // ── 稽核欄語義（AGENTS.md §1.2）─────────────────────────────
+
+    /**
+     * update 不得覆寫 `c_created_by` / `c_created_date`，且必須蓋上 `c_modified_*`。
+     *
+     * 這是 #844 的回歸。原斷言在 `EventStatusWriteActionsTest`，該檔隨 Blade 下架計畫
+     * 環節 2 刪除（走 legacy 路由）。結構上由 `AbstractPersonSubresourceMutationHandler`
+     * 的 `unset()` 與 `disallowed_fields` 422 保障，但**這張表的直接斷言**原本只存在於
+     * 那個 legacy 檔裡，補在這裡。
+     */
+    #[Test]
+    public function testUpdatePreservesCreationAuditFieldsAndStampsModification(): void {
+        $this->actingAs($this->makeUser(email: 'status-audit@example.com'));
+        $this->seedStatus([
+            'c_created_by' => 'original-author',
+            'c_created_date' => '2020-01-01',
+            'c_modified_by' => null,
+            'c_modified_date' => null,
+        ]);
+
+        // 一般 update（未送稽核欄）：建檔欄不動、修改欄被蓋上。
+        $this->postJson('/api/v2/mutate', $this->statusPayload())->assertOk();
+
+        $row = DB::table('STATUS_DATA')->first();
+        $this->assertSame('original-author', $row->c_created_by, 'update 不得覆寫 c_created_by');
+        $this->assertSame('2020-01-01', (string) $row->c_created_date, 'update 不得覆寫 c_created_date');
+        $this->assertNotNull($row->c_modified_by, 'update 必須蓋上 c_modified_by');
+        $this->assertNotNull($row->c_modified_date, 'update 必須蓋上 c_modified_date');
+    }
+
+    /**
+     * 客戶端**主動送**稽核欄時也不得改到建檔資訊。
+     *
+     * 上面那個測試只涵蓋「沒送」的情況，所以抓不到這條路徑。實測結果：v2 在**更前面**
+     * 就用欄位白名單擋掉了，回 422 `disallowed_fields: c_created_by, c_created_date`——
+     * 而不是靜默剝除（handler 裡的 `unset($updateData['c_created_by'], …)` 是第二道防線，
+     * 拿掉它這個測試也仍綠）。這裡刻意斷言**確切機制**：422 + 具名的 disallowed_fields，
+     * 因為「被擋下並告知欄名」與「靜默吞掉」對使用者是兩種不同的體驗，退化了要看得出來。
+     *
+     * AGENTS.md §1.2：`c_created_*` 只在 create 蓋、之後永遠沿用。
+     */
+    #[Test]
+    public function testClientSuppliedCreationAuditFieldsCannotOverwriteThem(): void {
+        $this->actingAs($this->makeUser(email: 'status-audit-injected@example.com'));
+        $this->seedStatus([
+            'c_created_by' => 'original-author',
+            'c_created_date' => '2020-01-01',
+        ]);
+
+        $response = $this->postJson('/api/v2/mutate', $this->statusPayload([
+            'changes' => [
+                'c_notes' => '順便改備註',
+                'c_created_by' => 'attacker',
+                'c_created_date' => '1999-12-31',
+            ],
+        ]));
+
+        $response->assertStatus(422)
+            ->assertJson(['ok' => false])
+            ->assertJsonFragment(['changes' => ['disallowed_fields: c_created_by, c_created_date']]);
+
+        $row = DB::table('STATUS_DATA')->first();
+        $this->assertSame('original-author', $row->c_created_by, 'c_created_by 不得被客戶端值覆寫');
+        $this->assertSame('2020-01-01', (string) $row->c_created_date, 'c_created_date 不得被客戶端值覆寫');
+        // 整筆被擋 ⇒ 同批夾帶的合法欄位也不該寫進去（不是部分成功）。
+        $this->assertNotSame('順便改備註', $row->c_notes, '被擋下時不得部分套用');
+    }
 }

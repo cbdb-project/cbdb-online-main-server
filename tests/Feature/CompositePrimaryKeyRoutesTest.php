@@ -151,6 +151,42 @@ class CompositePrimaryKeyRoutesTest extends TestCase {
     }
 
     /**
+     * `APP_EDIT_ROUTE_MAP` 必須涵蓋所有需要「編輯連結」的子資源表。
+     *
+     * 這是原 `edit_route_map_covers_all_resource_tables`（驗 legacy `EDIT_ROUTE_MAP`）的
+     * 承接。同檔另一個測試驗的是反方向——「map 裡的路由名都存在」；**兩個方向都要有**：
+     * 少了這一半，漏掉一張表時 `buildResourceEditUrl()` 只會安靜回 null，operations 的
+     * 「查閱」連結整個消失，而不會有任何測試變紅。
+     */
+    #[Test]
+    public function app_edit_route_map_covers_all_subresource_tables(): void {
+        $requiredTables = [
+            'ALTNAME_DATA',
+            'BIOG_ADDR_DATA',
+            'TEXT_DATA',
+            'BIOG_TEXT_DATA',
+            'BIOG_SOURCE_DATA',
+            'POSTED_TO_OFFICE_DATA',
+            'POSTED_TO_ADDR_DATA',
+            'ASSOC_DATA',
+            'KIN_DATA',
+            'EVENTS_DATA',
+            'STATUS_DATA',
+            'ENTRY_DATA',
+            'POSSESSION_DATA',
+            'BIOG_INST_DATA',
+        ];
+
+        foreach ($requiredTables as $table) {
+            $this->assertArrayHasKey(
+                $table,
+                CompositePrimaryKey::APP_EDIT_ROUTE_MAP,
+                "APP_EDIT_ROUTE_MAP 缺少 '{$table}'——buildResourceEditUrl() 會安靜回 null，編輯連結整個消失"
+            );
+        }
+    }
+
+    /**
      * legacy 子資源路由已全數下架（Blade 下架計畫環節 2）。
      *
      * 這個測試是「不要偷偷加回來」的護欄：legacy 表單路由連同視圖、controller、

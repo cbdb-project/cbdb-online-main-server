@@ -1425,36 +1425,6 @@ class OperationsController extends Controller {
         if (empty($payload)) {
             throw new \RuntimeException(__('operations.restore_empty_data'));
         }
-        // 經緯度歸零：還原歷史快照時同樣要做。
-        //
-        // 這**刻意不同於** AGENTS.md §1.3 對異體字替換的處理（restore 不做內容替換），
-        // 而理由不是隨意選的：那條豁免存在是因為「歷史字形本身就是事實」——D6 之下既有列
-        // 合法地帶著變體形，改寫還原內容會造出一列從未存在過的字形，那是**資訊的損失**。
-        // `0,0` 不屬於這一類：它不承載任何資訊（`CoordinateValidator` 判它為 zero_axis、
-        // 不可連結），而且會**主動製造錯誤答案**（v1 的鄰近地點自連接讓所有 0,0 列互為鄰居）。
-        // 還原一個 0,0 快照不是還原一個歷史值，是重新武裝一個 bug。
-        //
-        // 而且 restore 本來就不是位元級忠實重放：下面幾行就會把 `c_modified_*` 與
-        // `updated_at` 蓋成還原人與此刻（§1.2「還原也是一次實際寫入」）。§1.3 的豁免針對的是
-        // **內容替換**，不是「restore 神聖不可改」——同一個方法裡的
-        // `assertCharVariantMapWritable()` 與樹成環守衛就是結構驗證照跑的先例。
-        //
-        // 非數值的座標（`"0e0"`）在這裡選擇中止還原而不是靜默清成 NULL：快照裡有個不是數的
-        // 座標是壞資料，該讓還原者看到，而不是由系統代為決定丟掉它。
-        if (CoordinatePairNormalizer::handles($table)) {
-            $invalidCoordinates = CoordinatePairNormalizer::invalidColumns($payload, $table);
-            if ($invalidCoordinates !== []) {
-                throw new \RuntimeException(__('coordinate.not_numeric', [
-                    'columns' => implode('、', array_keys($invalidCoordinates)),
-                ]));
-            }
-            $coordinateResult = CoordinatePairNormalizer::normalizeRow($payload, $table);
-            $payload = $coordinateResult['data'];
-            $this->coordinateClearedOnRestore = array_merge(
-                $this->coordinateClearedOnRestore,
-                $coordinateResult['cleared']
-            );
-        }
 
         if (in_array('updated_at', array_keys($payload))) {
             $payload['updated_at'] = Carbon::now();
@@ -1472,6 +1442,44 @@ class OperationsController extends Controller {
         $query = DB::table($table)->where($conditions);
         if (!$query->exists()) {
             throw new \RuntimeException(__('operations.restore_row_not_found'));
+        }
+        // 位置刻意排在「目標列存在」檢查之後、與下面兩道結構守衛並列：否則「列已經不在了」
+        // 加上「快照裡的座標是壞值」會報出座標訊息，而還原者真正需要知道的是前者。
+        // 經緯度歸零：還原歷史快照時同樣要做。
+        //
+        // 這**刻意不同於** AGENTS.md §1.3 對異體字替換的處理（restore 不做內容替換），
+        // 而理由不是隨意選的：那條豁免存在是因為「歷史字形本身就是事實」——D6 之下既有列
+        // 合法地帶著變體形，改寫還原內容會造出一列從未存在過的字形，那是**資訊的損失**。
+        // `0,0` 不屬於這一類：它不承載任何資訊（`CoordinateValidator` 判它為 zero_axis、
+        // 不可連結），而且會**主動製造錯誤答案**（v1 的鄰近地點自連接讓所有 0,0 列互為鄰居）。
+        // 還原一個 0,0 快照不是還原一個歷史值，是重新武裝一個 bug。
+        //
+        // 而且 restore 本來就不是位元級忠實重放：下面幾行就會把 `c_modified_*` 與
+        // `updated_at` 蓋成還原人與此刻（§1.2「還原也是一次實際寫入」）。§1.3 的豁免針對的是
+        // **內容替換**，不是「restore 神聖不可改」——同一個方法裡的
+        // `assertCharVariantMapWritable()` 與樹成環守衛就是結構驗證照跑的先例。
+        //
+        // 非數值的座標（`"0e0"`）在這裡選擇中止還原而不是靜默清成 NULL：快照裡有個不是數的
+        // 座標是壞資料，不該由系統代為決定丟掉它。
+        //
+        // 要說清楚這與核准端的差別：核准被擋下時審核者可以「退回提案請人修正」，是個可行
+        // 動作；而還原者**改不動已存的 `operations` 快照**，所以這條等於把那一筆還原永久
+        // 封死，只能走資料庫備份。之所以仍選中止，是因為替代方案更糟（靜默把一個不明值
+        // 變成 NULL，或讓 MariaDB 把它轉成 0）。實務風險很低：快照是 JSON 編碼的資料庫
+        // 讀取結果，座標欄只會是 float 或 null。
+        if (CoordinatePairNormalizer::handles($table)) {
+            $invalidCoordinates = CoordinatePairNormalizer::invalidColumns($payload, $table);
+            if ($invalidCoordinates !== []) {
+                throw new \RuntimeException(__('coordinate.not_numeric', [
+                    'columns' => implode('、', array_keys($invalidCoordinates)),
+                ]));
+            }
+            $coordinateResult = CoordinatePairNormalizer::normalizeRow($payload, $table);
+            $payload = $coordinateResult['data'];
+            $this->coordinateClearedOnRestore = array_merge(
+                $this->coordinateClearedOnRestore,
+                $coordinateResult['cleared']
+            );
         }
 
         // char_variant_map 是對照表本身：還原一筆被改／被刪的對照，可能重新引入環或
@@ -1521,10 +1529,18 @@ class OperationsController extends Controller {
         // 而且 restore 本來就不是位元級忠實重放：下面幾行就會把 `c_modified_*` 與
         // `updated_at` 蓋成還原人與此刻（§1.2「還原也是一次實際寫入」）。§1.3 的豁免針對的是
         // **內容替換**，不是「restore 神聖不可改」——同一個方法裡的
-        // `assertCharVariantMapWritable()` 與樹成環守衛就是結構驗證照跑的先例。
+        // `assertCharVariantMapWritable()` 就是結構驗證照跑的先例。
+        //（樹成環守衛只掛在 restoreUpdate，不在本方法：重建一列被刪的資料不會把別人
+        // 搬到它之下。）
         //
         // 非數值的座標（`"0e0"`）在這裡選擇中止還原而不是靜默清成 NULL：快照裡有個不是數的
-        // 座標是壞資料，該讓還原者看到，而不是由系統代為決定丟掉它。
+        // 座標是壞資料，不該由系統代為決定丟掉它。
+        //
+        // 要說清楚這與核准端的差別：核准被擋下時審核者可以「退回提案請人修正」，是個可行
+        // 動作；而還原者**改不動已存的 `operations` 快照**，所以這條等於把那一筆還原永久
+        // 封死，只能走資料庫備份。之所以仍選中止，是因為替代方案更糟（靜默把一個不明值
+        // 變成 NULL，或讓 MariaDB 把它轉成 0）。實務風險很低：快照是 JSON 編碼的資料庫
+        // 讀取結果，座標欄只會是 float 或 null。
         if (CoordinatePairNormalizer::handles($table)) {
             $invalidCoordinates = CoordinatePairNormalizer::invalidColumns($payload, $table);
             if ($invalidCoordinates !== []) {

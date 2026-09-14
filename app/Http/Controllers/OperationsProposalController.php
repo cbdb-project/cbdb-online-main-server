@@ -950,7 +950,7 @@ class OperationsProposalController extends Controller {
      * @param array<string,mixed> $data
      * @return array<string,mixed>
      */
-    protected function normalizeCoordinatesForApproval(string $table, array $data): array {
+    protected function normalizeCoordinatesForApproval(string $table, array $data, bool $dataIsCompleteRow = false): array {
         // **先擋掉「根本不是數」的座標值，再歸一。**
         //
         // `CoordinatePairNormalizer` 對 `"0e0"`／`"east"` 這類值刻意整對不動，前提是下游的
@@ -982,7 +982,7 @@ class OperationsProposalController extends Controller {
         // 而 `REASON_PARTNER` 的定義正是「系統丟掉了一個真的值」，它自己的註解寫著
         // 這個原因**必須**能傳到使用者眼前。旁邊的 invalidColumns() 會大聲中止，
         // 這一條卻靜默，那是不對稱的。
-        $result = CoordinatePairNormalizer::normalizeRow($data, $table);
+        $result = CoordinatePairNormalizer::normalizeRow($data, $table, $dataIsCompleteRow);
         $this->coordinateClearedOnApproval = array_merge(
             $this->coordinateClearedOnApproval,
             $result['cleared']
@@ -1017,7 +1017,9 @@ class OperationsProposalController extends Controller {
         // 歷史遺留 payload（那些在落地替換上線前送出的提案）補網；依 D8 重複套用是幂等的。
         $data = $this->replaceVariantsForApproval($table, $data);
         // 經緯度歸零（見 normalizeCoordinatesForApproval 的註解：對歷史遺留 payload 補網）。
-        $data = $this->normalizeCoordinatesForApproval($table, $data);
+        // **整列模式**：$data 就是下面要 INSERT 的那一列，缺席的那一軸必然落庫成 NULL，
+        // 所以半截對在這裡就該清掉。與 CodeTableCreateHandler 的 create 對稱。
+        $data = $this->normalizeCoordinatesForApproval($table, $data, true);
 
         $data = $this->assignAutoKeyIfNeeded($table, $keyColumns, $data);
         $data = $this->enforceAuditFieldsForCreate($table, $data);

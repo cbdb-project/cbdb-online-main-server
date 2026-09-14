@@ -1,14 +1,11 @@
 import React, { useState } from 'react';
 import TabPager from '../shared/TabPager';
-import LegacyCreateButton from '../shared/LegacyCreateButton';
-import LegacyEditButton from '../shared/LegacyEditButton';
-import LegacyDeleteButton from '../shared/LegacyDeleteButton';
 import { NavButton } from '../../ui/NavButton';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
 import { getCsrfToken } from '../shared/csrf';
-import { buildEditV2CreateUrl, buildEditV2EditUrl } from '../shared/legacyEditUrl';
+import { buildEditV2CreateUrl, buildEditV2EditUrl } from '../shared/editorUrl';
 import SubresourceTable from '../../PersonEditorShared/SubresourceTable';
 import { useTranslation } from '../../../hooks/useTranslation';
 import { Button } from '../../ui/Button';
@@ -41,8 +38,6 @@ interface Props {
     /** 可提案但不可直接寫入（眾包用戶）。 */
     canPropose?: boolean;
     postCE?: boolean;
-    /** 由 PersonBrowser 透過 props 注入的遷移開關（basicinformation.socialinst）。 */
-    socialInstEditorIsNew?: boolean;
     personId?: number | null;
     createEndpoint?: string;
     mutateEndpoint?: string;
@@ -56,7 +51,6 @@ export default function InstitutionsTab({
     canEdit,
     canPropose = false,
     postCE,
-    socialInstEditorIsNew = false,
     personId = null,
     createEndpoint = '',
     mutateEndpoint = '',
@@ -73,7 +67,7 @@ export default function InstitutionsTab({
 
     // 新編輯器在 flag=new 且（可直接編輯 或 可提案）且必要端點齊全時啟用。
     const useReactEditor =
-        socialInstEditorIsNew && (canEdit || canPropose) && personId != null && !!createEndpoint && !!mutateEndpoint && !!deleteEndpoint;
+        (canEdit || canPropose) && personId != null && !!createEndpoint && !!mutateEndpoint && !!deleteEndpoint;
     // 可直接寫入者走 direct；否則（僅可提案）走 proposal。
     const proposalMode = !canEdit && canPropose;
     const createHref = buildEditV2CreateUrl('social_institutions', personId);
@@ -124,9 +118,7 @@ export default function InstitutionsTab({
                         {t('add_btn')}
                     </NavButton>
                 </div>
-            ) : (
-                <LegacyCreateButton tabKey="social_institutions" canEdit={canEdit} />
-            )}
+            ) : null}
 
             <SubresourceTable
                 items={pageItems}
@@ -145,12 +137,7 @@ export default function InstitutionsTab({
                         <NavButton size="sm" variant="outline" href={editHref(item)}>{t('edit_btn')}</NavButton>
                         <Button size="sm" variant="destructive" onClick={() => { setDeleteError(null); setDeleteTarget(item); }}>{t('delete_btn')}</Button>
                     </span>
-                ) : (
-                    <span style={actionCellStyle}>
-                        <LegacyEditButton tabKey="social_institutions" pk={item.pk} canEdit={canEdit} />
-                        <LegacyDeleteButton tabKey="social_institutions" pk={item.pk} canEdit={canEdit} />
-                    </span>
-                )) : undefined}
+                ) : null) : undefined}
             />
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} showAll={showAll} onToggleShowAll={() => setShowAll(!showAll)} totalItems={totalItems} />
 

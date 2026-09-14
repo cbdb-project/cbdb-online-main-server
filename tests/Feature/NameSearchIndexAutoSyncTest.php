@@ -5,26 +5,11 @@ namespace Tests\Feature;
 use App\Models\BiogMain;
 use App\Models\User;
 use App\Services\CharVariantMapService;
-use App\Support\CompositePrimaryKey;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
-/**
- * @legacy-parity 本類耦合 legacy Blade 人物表單路由（setUp 呼叫 useLegacyPersonForms()
- * 把 basicinformation.* flag 撥回 'old' 以越過 LegacyBladeFormGate），將隨
- * docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md 環節 2 連同 legacy 路由一併刪除。
- *
- * 環節 1.5 分流結論：**needs-v2-first** — 含資料完整性行為，必須先有 v2 等價覆蓋才能刪。
- * 已補齊：ApiV2AltnameNameIndexSyncTest（5 個 ALTNAME_DATA 案例的 v2 等價，含「索引須與異體字落地後的字形一致」）。本檔另 8 個 BIOG_MAIN 案例走 Observer、不依賴 flag，刪檔時須先搬走。
- *
- * ⚠️ 本檔有 **8 個測試不依賴 flag**（flag=new 下實測仍綠），環節 2 刪檔前**必須先搬走**，
- * 否則會連帶失去覆蓋：`test_altname_with_spaced_parentheses_creates_space_free_index`、`test_creating_person_automatically_creates_index`、`test_deleting_person_removes_all_indexes`、`test_index_table_does_not_exist_gracefully_handles`、`test_person_with_parentheses_creates_correct_index`、`test_person_with_spaced_parentheses_creates_space_free_index`、`test_updating_person_name_reindexes`、`test_updating_person_non_name_fields_does_not_reindex`。
- *
- * 新測試請一律寫在 v2 mutation API 路徑上，不要再擴充本檔。
- */
 /**
  * 姓名搜尋索引自動同步測試
  *
@@ -33,11 +18,9 @@ use Tests\TestCase;
  * - BiogMain：使用 Eloquent + Observer 自動觸發
  * - ALTNAME_DATA：使用 BasicInformationAltnamesController + NameSearchIndexService（因復合主鍵改用 Query Builder）
  */
-#[Group('legacy-parity')]
 class NameSearchIndexAutoSyncTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
-        $this->useLegacyPersonForms(); // 本類測 legacy Blade CRUD 行為，撥回 flag=old 越過下架閘門
 
         // 設定使用 SQLite in-memory 資料庫
         config()->set('database.default', 'sqlite');
@@ -319,224 +302,6 @@ class NameSearchIndexAutoSyncTest extends TestCase {
     }
 
     // ===== AltnameData 測試 =====
-
-    #[Test]
-    public function test_creating_altname_automatically_creates_index(): void {
-        $user = $this->createActiveExpert();
-
-        // 先創建人物
-        BiogMain::create([
-            'c_personid' => 2001,
-            'c_name_chn' => '蘇軾',
-        ]);
-
-        // 透過實際 Controller 路由新增別名，確保使用生產流程與索引服務
-        $this->actingAs($user)
-            ->post('/basicinformation/2001/altnames', [
-                'c_sequence' => 1,
-                'c_alt_name_type_code' => 4,
-                'c_alt_name_chn' => '子瞻',
-            ])
-            ->assertStatus(302);
-
-        // 檢查別名索引是否創建
-        $indexExists = DB::table('CBDB__NAME_FTS')
-            ->where('c_personid', 2001)
-            ->where('name_type_code', 4)
-            ->where('search_term', '子瞻')
-            ->exists();
-
-        $this->assertTrue($indexExists, '新增別名後手動調用索引服務應該創建索引');
-    }
-
-    #[Test]
-    public function test_updating_altname_reindexes(): void {
-        $user = $this->createActiveExpert();
-
-        BiogMain::create([
-            'c_personid' => 2002,
-            'c_name_chn' => '蘇軾',
-        ]);
-
-        // 透過生產路由新增別名
-        $this->actingAs($user)
-            ->post('/basicinformation/2002/altnames', [
-                'c_sequence' => 1,
-                'c_alt_name_type_code' => 5,
-                'c_alt_name_chn' => '東坡居士',
-            ])
-            ->assertStatus(302);
-
-        // 使用生產路由更新別名，觸發控制器內的索引更新流程
-        $this->actingAs($user)
-            ->put('/basicinformation/2002/altnames/2002-1-東坡居士-5', [
-                'c_sequence' => 1,
-                'c_alt_name_type_code' => 5,
-                'c_alt_name_chn' => '東坡先生',
-            ])
-            ->assertStatus(302);
-
-        // 檢查舊索引已刪除
-        $oldExists = DB::table('CBDB__NAME_FTS')
-            ->where('c_personid', 2002)
-            ->where('search_term', '東坡居士')
-            ->exists();
-
-        $this->assertFalse($oldExists, '舊別名索引應該被刪除');
-
-        // 檢查新索引已創建
-        $newExists = DB::table('CBDB__NAME_FTS')
-            ->where('c_personid', 2002)
-            ->where('search_term', '東坡先生')
-            ->exists();
-
-        $this->assertTrue($newExists, '新別名索引應該被創建');
-    }
-
-    #[Test]
-    public function test_creating_altname_with_variant_char_indexes_replaced_value(): void {
-        // 迴歸測試：CBDB__NAME_FTS 索引須與 ALTNAME_DATA 實際落地的值一致（都是異體字
-        // 落地替換後的值），而不是替換前的原始輸入——見
-        // docs/CHAR_VARIANT_MAP_CALL_SITE_WIRING_PLAN.md 步驟 5「實作時發現的第四個
-        // 掛鉤點」段落記錄的既存索引同步 bug。
-        $user = $this->createActiveExpert();
-
-        BiogMain::create([
-            'c_personid' => 2010,
-            'c_name_chn' => '測試人物',
-        ]);
-
-        $this->actingAs($user)
-            ->post('/basicinformation/2010/altnames', [
-                'c_sequence' => 1,
-                'c_alt_name_type_code' => 4,
-                'c_alt_name_chn' => '淸公',
-            ])
-            ->assertStatus(302);
-
-        $this->assertDatabaseHas('ALTNAME_DATA', [
-            'c_personid' => 2010,
-            'c_alt_name_chn' => '清公',
-        ]);
-
-        $indexedReplaced = DB::table('CBDB__NAME_FTS')
-            ->where('c_personid', 2010)
-            ->where('name_type_code', 4)
-            ->where('search_term', '清公')
-            ->exists();
-        $indexedOriginal = DB::table('CBDB__NAME_FTS')
-            ->where('c_personid', 2010)
-            ->where('search_term', '淸公')
-            ->exists();
-
-        $this->assertTrue($indexedReplaced, '索引應以落地替換後的字形建立');
-        $this->assertFalse($indexedOriginal, '索引不應殘留替換前的字形');
-    }
-
-    #[Test]
-    public function test_updating_altname_with_variant_char_reindexes_replaced_value(): void {
-        $user = $this->createActiveExpert();
-
-        BiogMain::create([
-            'c_personid' => 2011,
-            'c_name_chn' => '測試人物',
-        ]);
-
-        $this->actingAs($user)
-            ->post('/basicinformation/2011/altnames', [
-                'c_sequence' => 1,
-                'c_alt_name_type_code' => 5,
-                'c_alt_name_chn' => '舊號',
-            ])
-            ->assertStatus(302);
-
-        $this->actingAs($user)
-            ->put('/basicinformation/2011/altnames/2011-1-舊號-5', [
-                'c_sequence' => 1,
-                'c_alt_name_type_code' => 5,
-                'c_alt_name_chn' => '厰記',
-            ])
-            ->assertStatus(302);
-
-        $this->assertDatabaseHas('ALTNAME_DATA', [
-            'c_personid' => 2011,
-            'c_alt_name_chn' => '廠記',
-        ]);
-
-        $indexedReplaced = DB::table('CBDB__NAME_FTS')
-            ->where('c_personid', 2011)
-            ->where('search_term', '廠記')
-            ->exists();
-        $indexedOriginal = DB::table('CBDB__NAME_FTS')
-            ->where('c_personid', 2011)
-            ->where('search_term', '厰記')
-            ->exists();
-
-        $this->assertTrue($indexedReplaced, '更新後索引應以落地替換後的字形重建');
-        $this->assertFalse($indexedOriginal, '索引不應殘留替換前的字形');
-    }
-
-    #[Test]
-    public function test_deleting_altname_removes_index(): void {
-        $user = $this->createActiveExpert();
-
-        BiogMain::create([
-            'c_personid' => 2003,
-            'c_name_chn' => '李白',
-        ]);
-
-        // 新增別名（生產路由）
-        $this->actingAs($user)
-            ->post('/basicinformation/2003/altnames', [
-                'c_sequence' => 1,
-                'c_alt_name_type_code' => 4,
-                'c_alt_name_chn' => '太白',
-            ])
-            ->assertStatus(302);
-
-        // 確認索引已創建
-        $this->assertTrue(
-            DB::table('CBDB__NAME_FTS')
-                ->where('c_personid', 2003)
-                ->where('name_type_code', 4)
-                ->where('search_term', '太白')
-                ->exists(),
-            '別名索引應該已創建'
-        );
-
-        // 刪除別名（生產路由），並讓控制器負責清理索引
-        $deleteUrl = CompositePrimaryKey::buildUrl(
-            'basicinformation.altnames.destroy.query',
-            ['id' => 2003],
-            [
-                'c_personid' => 2003,
-                'c_sequence' => 1,
-                'c_alt_name_chn' => '太白',
-                'c_alt_name_type_code' => 4,
-            ]
-        );
-
-        $this->actingAs($user)
-            ->delete($deleteUrl)
-            ->assertStatus(302);
-
-        // 檢查別名索引已刪除
-        $indexExists = DB::table('CBDB__NAME_FTS')
-            ->where('c_personid', 2003)
-            ->where('name_type_code', 4)
-            ->where('search_term', '太白')
-            ->exists();
-
-        $this->assertFalse($indexExists, '刪除別名後手動調用服務應該移除對應索引');
-
-        // 但本名索引應該保留
-        $mainNameExists = DB::table('CBDB__NAME_FTS')
-            ->where('c_personid', 2003)
-            ->whereNull('name_type_code')
-            ->exists();
-
-        $this->assertTrue($mainNameExists, '本名索引應該保留');
-    }
 
     // ===== 括號處理測試 =====
 

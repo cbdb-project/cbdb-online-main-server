@@ -76,9 +76,11 @@ class PersonMapPointsService {
                 'first_year' => $row->c_firstyear,
                 'last_year' => $row->c_lastyear,
                 'label' => $this->displayName($nameChn, $nameEn, 'addr_id:' . $row->c_addr_id),
-                // 該地址記錄頁（編輯查詢頁，相對 URL，供地圖 popup 開新分頁）
+                // 該地址記錄的 React 編輯器（相對 URL，供地圖 popup 開新分頁）。
+                // 原本指向 legacy `basicinformation.addresses.edit.query`，該路由已於
+                // Blade 下架計畫環節 2 刪除。
                 'url' => CompositePrimaryKey::buildUrl(
-                    'basicinformation.addresses.edit.query',
+                    'app.basicinformation.addresses.editv2',
                     ['id' => $personId],
                     [
                         'c_personid' => $personId,
@@ -140,9 +142,11 @@ class PersonMapPointsService {
                 'first_year' => $info['first_year'] ?? null,
                 'last_year' => $info['last_year'] ?? null,
                 'label' => $officeName ? ($officeName . ' · ' . $placeName) : $placeName,
-                // 該官職任命記錄頁（編輯查詢頁，相對 URL，供地圖 popup 開新分頁）
+                // 該官職任命記錄的 React 編輯器（相對 URL，供地圖 popup 開新分頁）。
+                // 原本指向 legacy `basicinformation.offices.edit.query`，該路由已於
+                // Blade 下架計畫環節 2 刪除。
                 'url' => CompositePrimaryKey::buildUrl(
-                    'basicinformation.offices.edit.query',
+                    'app.basicinformation.offices.editv2',
                     ['id' => $personId],
                     [
                         'c_office_id' => (int) $officeId,

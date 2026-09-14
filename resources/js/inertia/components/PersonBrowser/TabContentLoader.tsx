@@ -36,19 +36,6 @@ interface Props {
     /** basic_info 分頁進場即進入編輯狀態（編輯主界面用；PersonBrowser 不傳 → 維持原行為）。 */
     basicInfoStartEditing?: boolean;
     /** flag=new 時 basic_info 改為「檢視 + 編輯按鈕導向獨立 BasicInfoEditor（含年號轉換）」。 */
-    basicInfoEditorIsNew?: boolean;
-    altnameEditorIsNew?: boolean;
-    addressesEditorIsNew?: boolean;
-    textsEditorIsNew?: boolean;
-    sourcesEditorIsNew?: boolean;
-    officesEditorIsNew?: boolean;
-    assocEditorIsNew?: boolean;
-    kinshipEditorIsNew?: boolean;
-    eventsEditorIsNew?: boolean;
-    entriesEditorIsNew?: boolean;
-    statusesEditorIsNew?: boolean;
-    possessionEditorIsNew?: boolean;
-    socialInstEditorIsNew?: boolean;
     postCE?: boolean;
     onSelectPerson?: (personId: number) => void;
     onBasicInfoSaved?: () => void;
@@ -85,19 +72,6 @@ export default function TabContentLoader({
     canEditBasicInfo,
     canProposeEdits = false,
     basicInfoStartEditing = false,
-    basicInfoEditorIsNew = false,
-    altnameEditorIsNew = false,
-    addressesEditorIsNew = false,
-    textsEditorIsNew = false,
-    sourcesEditorIsNew = false,
-    officesEditorIsNew = false,
-    assocEditorIsNew = false,
-    kinshipEditorIsNew = false,
-    eventsEditorIsNew = false,
-    entriesEditorIsNew = false,
-    statusesEditorIsNew = false,
-    possessionEditorIsNew = false,
-    socialInstEditorIsNew = false,
     postCE = false,
     onSelectPerson,
     onBasicInfoSaved,
@@ -230,9 +204,10 @@ export default function TabContentLoader({
             };
         };
 
-        // flag=new：直接內嵌獨立 BasicInfoEditor（落地即可編輯，含年號轉換），對齊 legacy
-        // /basicinformation/{id}/edit「打開即錄入」；不再「檢視＋編輯按鈕跳轉」。
-        if (basicInfoEditorIsNew && personId != null) {
+        // 直接內嵌獨立 BasicInfoEditor（落地即可編輯，含年號轉換）；不是「檢視＋編輯按鈕跳轉」。
+        // 原本以 basicInfoEditorIsNew（basicinformation.editor flag）決定，Blade 下架計畫
+        // 環節 2 移除該 flag 後改為無條件——下面的 BasicInfoView 只剩「沒有 personId」的退路。
+        if (personId != null) {
             const ff = (basicData?.form?.fields ?? {}) as Record<string, unknown>;
             const initialFields: Record<string, string> = {};
             const initialLabels: Record<string, string> = {};
@@ -288,14 +263,13 @@ export default function TabContentLoader({
         );
     }
 
-    // 別名分頁：注入 React 編輯器所需端點與遷移開關
+    // 別名分頁：注入 React 編輯器所需端點
     if (activeTab === 'alt_names') {
         return (
             <AltNamesTab
                 data={state.data}
                 canEdit={canEditBasicInfo}
                 canPropose={canProposeEdits}
-                altnameEditorIsNew={altnameEditorIsNew}
                 personId={personId}
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}
@@ -313,7 +287,6 @@ export default function TabContentLoader({
                 canEdit={canEditBasicInfo}
                 postCE={postCE}
                 canPropose={canProposeEdits}
-                addressesEditorIsNew={addressesEditorIsNew}
                 personId={personId}
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}
@@ -330,7 +303,6 @@ export default function TabContentLoader({
                 data={state.data}
                 canEdit={canEditBasicInfo}
                 canPropose={canProposeEdits}
-                textsEditorIsNew={textsEditorIsNew}
                 personId={personId}
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}
@@ -347,7 +319,6 @@ export default function TabContentLoader({
                 data={state.data}
                 canEdit={canEditBasicInfo}
                 canPropose={canProposeEdits}
-                sourcesEditorIsNew={sourcesEditorIsNew}
                 personId={personId}
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}
@@ -365,7 +336,6 @@ export default function TabContentLoader({
                 canEdit={canEditBasicInfo}
                 postCE={postCE}
                 canPropose={canProposeEdits}
-                officesEditorIsNew={officesEditorIsNew}
                 personId={personId}
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}
@@ -383,7 +353,6 @@ export default function TabContentLoader({
                 canEdit={canEditBasicInfo}
                 postCE={postCE}
                 canPropose={canProposeEdits}
-                assocEditorIsNew={assocEditorIsNew}
                 personId={personId}
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}
@@ -401,7 +370,6 @@ export default function TabContentLoader({
                 data={state.data}
                 canEdit={canEditBasicInfo}
                 canPropose={canProposeEdits}
-                kinshipEditorIsNew={kinshipEditorIsNew}
                 personId={personId}
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}
@@ -419,7 +387,6 @@ export default function TabContentLoader({
                 data={state.data}
                 canEdit={canEditBasicInfo}
                 canPropose={canProposeEdits}
-                eventsEditorIsNew={eventsEditorIsNew}
                 personId={personId}
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}
@@ -436,7 +403,6 @@ export default function TabContentLoader({
                 data={state.data}
                 canEdit={canEditBasicInfo}
                 canPropose={canProposeEdits}
-                entriesEditorIsNew={entriesEditorIsNew}
                 personId={personId}
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}
@@ -455,7 +421,6 @@ export default function TabContentLoader({
                 canEdit={canEditBasicInfo}
                 postCE={postCE}
                 canPropose={canProposeEdits}
-                statusesEditorIsNew={statusesEditorIsNew}
                 personId={personId}
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}
@@ -472,7 +437,6 @@ export default function TabContentLoader({
                 data={state.data}
                 canEdit={canEditBasicInfo}
                 canPropose={canProposeEdits}
-                possessionEditorIsNew={possessionEditorIsNew}
                 personId={personId}
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}
@@ -490,7 +454,6 @@ export default function TabContentLoader({
                 canEdit={canEditBasicInfo}
                 postCE={postCE}
                 canPropose={canProposeEdits}
-                socialInstEditorIsNew={socialInstEditorIsNew}
                 personId={personId}
                 createEndpoint={createEndpoint}
                 mutateEndpoint={mutateEndpoint}

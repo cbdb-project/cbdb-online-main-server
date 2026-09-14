@@ -155,7 +155,7 @@ class CompositePrimaryKeyTest extends TestCase {
     public function build_url_preserves_null_values_as_null_string(): void {
         // buildUrl() 應將 null 值轉為 'NULL' 字串，避免 http_build_query 丟棄
         $url = CompositePrimaryKey::buildUrl(
-            'basicinformation.altnames.edit.query',
+            'app.basicinformation.altnames.editv2',
             ['id' => 12345],
             [
                 'c_personid' => 12345,
@@ -175,7 +175,7 @@ class CompositePrimaryKeyTest extends TestCase {
     public function build_url_preserves_null_for_addresses_route(): void {
         // BIOG_ADDR_DATA 的 c_sequence 也可為 null
         $url = CompositePrimaryKey::buildUrl(
-            'basicinformation.addresses.edit.query',
+            'app.basicinformation.addresses.editv2',
             ['id' => 100],
             [
                 'c_personid' => 100,
@@ -195,7 +195,7 @@ class CompositePrimaryKeyTest extends TestCase {
     public function build_url_preserves_null_for_events_route(): void {
         // EVENTS_DATA 的 c_sequence 也可為 null
         $url = CompositePrimaryKey::buildUrl(
-            'basicinformation.events.edit.query',
+            'app.basicinformation.events.editv2',
             ['id' => 200],
             [
                 'c_personid' => 200,
@@ -213,7 +213,7 @@ class CompositePrimaryKeyTest extends TestCase {
     public function build_url_preserves_null_for_statuses_route(): void {
         // STATUS_DATA 的 c_sequence 也可為 null
         $url = CompositePrimaryKey::buildUrl(
-            'basicinformation.statuses.edit.query',
+            'app.basicinformation.statuses.editv2',
             ['id' => 300],
             [
                 'c_personid' => 300,
@@ -231,7 +231,7 @@ class CompositePrimaryKeyTest extends TestCase {
     public function build_url_preserves_multiple_null_values(): void {
         // ENTRY_DATA 有多個可能為 null 的欄位
         $url = CompositePrimaryKey::buildUrl(
-            'basicinformation.entries.edit.query',
+            'app.basicinformation.entries.editv2',
             ['id' => 400],
             [
                 'c_personid' => 400,
@@ -258,7 +258,7 @@ class CompositePrimaryKeyTest extends TestCase {
     #[Test]
     public function build_url_does_not_alter_non_null_values(): void {
         $url = CompositePrimaryKey::buildUrl(
-            'basicinformation.altnames.edit.query',
+            'app.basicinformation.altnames.editv2',
             ['id' => 12345],
             [
                 'c_personid' => 12345,
@@ -917,34 +917,6 @@ class CompositePrimaryKeyTest extends TestCase {
 
     // === EDIT_ROUTE_MAP 測試 ===
 
-    #[Test]
-    public function edit_route_map_covers_all_resource_tables(): void {
-        $requiredTables = [
-            'ALTNAME_DATA',
-            'BIOG_ADDR_DATA',
-            'TEXT_DATA',
-            'BIOG_TEXT_DATA',
-            'BIOG_SOURCE_DATA',
-            'POSTED_TO_OFFICE_DATA',
-            'POSTED_TO_ADDR_DATA',
-            'ASSOC_DATA',
-            'KIN_DATA',
-            'EVENTS_DATA',
-            'STATUS_DATA',
-            'ENTRY_DATA',
-            'POSSESSION_DATA',
-            'BIOG_INST_DATA',
-        ];
-
-        foreach ($requiredTables as $table) {
-            $this->assertArrayHasKey(
-                $table,
-                CompositePrimaryKey::EDIT_ROUTE_MAP,
-                "EDIT_ROUTE_MAP should contain '{$table}'"
-            );
-        }
-    }
-
     // === buildResourceEditUrl 測試 ===
 
     #[Test]
@@ -1024,16 +996,6 @@ class CompositePrimaryKeyTest extends TestCase {
         $this->assertStringContainsString('c_assoc_code=197', $url);
         $this->assertStringContainsString('c_assoc_id=3767', $url);
         $this->assertStringContainsString('c_assoc_first_year=-9999', $url);
-    }
-
-    #[Test]
-    public function it_falls_back_to_legacy_edit_url_when_subresource_flag_is_old(): void {
-        config()->set('migration_flags.pages.basicinformation.offices', 'old');
-        $url = CompositePrimaryKey::buildResourceEditUrl('POSTED_TO_OFFICE_DATA', '448-130', 12345);
-
-        $this->assertNotNull($url);
-        $this->assertStringContainsString('/basicinformation/12345/offices/edit', $url);
-        $this->assertStringNotContainsString('/app/', $url);
     }
 
     // === RESOURCE_ID_SCHEMA_ALIAS 與 getResourceIdSchemaTable 測試 ===

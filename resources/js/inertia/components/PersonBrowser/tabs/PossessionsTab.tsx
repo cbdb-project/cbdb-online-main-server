@@ -1,14 +1,11 @@
 import React, { useState } from 'react';
 import TabPager from '../shared/TabPager';
-import LegacyCreateButton from '../shared/LegacyCreateButton';
-import LegacyEditButton from '../shared/LegacyEditButton';
-import LegacyDeleteButton from '../shared/LegacyDeleteButton';
 import { NavButton } from '../../ui/NavButton';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
 import { getCsrfToken } from '../shared/csrf';
-import { buildEditV2CreateUrl, buildEditV2EditUrl } from '../shared/legacyEditUrl';
+import { buildEditV2CreateUrl, buildEditV2EditUrl } from '../shared/editorUrl';
 import SubresourceTable from '../../PersonEditorShared/SubresourceTable';
 import { useTranslation } from '../../../hooks/useTranslation';
 import { Button } from '../../ui/Button';
@@ -36,8 +33,6 @@ interface Props {
     canEdit: boolean;
     /** 可提案但不可直接寫入（眾包用戶）。 */
     canPropose?: boolean;
-    /** 由 PersonBrowser 透過 props 注入的遷移開關（basicinformation.possession）。 */
-    possessionEditorIsNew?: boolean;
     personId?: number | null;
     createEndpoint?: string;
     mutateEndpoint?: string;
@@ -50,7 +45,6 @@ export default function PossessionsTab({
     data,
     canEdit,
     canPropose = false,
-    possessionEditorIsNew = false,
     personId = null,
     createEndpoint = '',
     mutateEndpoint = '',
@@ -66,7 +60,7 @@ export default function PossessionsTab({
     const [deleteError, setDeleteError] = useState<string | null>(null);
 
     // 新編輯器在 flag=new 且（可直接編輯 或 可提案）且必要端點齊全時啟用。
-    const useReactEditor = possessionEditorIsNew && (canEdit || canPropose) && personId != null && !!createEndpoint && !!mutateEndpoint && !!deleteEndpoint;
+    const useReactEditor = (canEdit || canPropose) && personId != null && !!createEndpoint && !!mutateEndpoint && !!deleteEndpoint;
     // 可直接寫入者走 direct；否則（僅可提案）走 proposal。
     const proposalMode = !canEdit && canPropose;
     const createHref = buildEditV2CreateUrl('possessions', personId);
@@ -117,9 +111,7 @@ export default function PossessionsTab({
                         {t('add_btn')}
                     </NavButton>
                 </div>
-            ) : (
-                <LegacyCreateButton tabKey="possessions" canEdit={canEdit} />
-            )}
+            ) : null}
 
             <SubresourceTable
                 items={pageItems}
@@ -136,12 +128,7 @@ export default function PossessionsTab({
                         <NavButton size="sm" variant="outline" href={editHref(item)}>{t('edit_btn')}</NavButton>
                         <Button size="sm" variant="destructive" onClick={() => { setDeleteError(null); setDeleteTarget(item); }}>{t('delete_btn')}</Button>
                     </span>
-                ) : (
-                    <span style={actionCellStyle}>
-                        <LegacyEditButton tabKey="possessions" pk={item.pk} canEdit={canEdit} />
-                        <LegacyDeleteButton tabKey="possessions" pk={item.pk} canEdit={canEdit} />
-                    </span>
-                )) : undefined}
+                ) : null) : undefined}
             />
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} showAll={showAll} onToggleShowAll={() => setShowAll(!showAll)} totalItems={totalItems} />
 

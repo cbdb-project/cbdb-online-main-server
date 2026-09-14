@@ -433,49 +433,32 @@ class CompositePrimaryKey {
         return $params;
     }
 
-    /**
-     * 資源表名對應的查詢參數模式編輯路由名稱
-     *
-     * 用於 Operations 模組等需要根據資源表名生成編輯連結的場景。
-     */
-    public const EDIT_ROUTE_MAP = [
-        'ALTNAME_DATA' => 'basicinformation.altnames.edit.query',
-        'BIOG_ADDR_DATA' => 'basicinformation.addresses.edit.query',
-        'TEXT_DATA' => 'basicinformation.texts.edit.query',
-        'BIOG_TEXT_DATA' => 'basicinformation.texts.edit.query',
-        'BIOG_SOURCE_DATA' => 'basicinformation.sources.edit.query',
-        'POSTED_TO_OFFICE_DATA' => 'basicinformation.offices.edit.query',
-        'POSTED_TO_ADDR_DATA' => 'basicinformation.offices.edit.query',
-        'ASSOC_DATA' => 'basicinformation.assoc.edit.query',
-        'KIN_DATA' => 'basicinformation.kinship.edit.query',
-        'EVENTS_DATA' => 'basicinformation.events.edit.query',
-        'STATUS_DATA' => 'basicinformation.statuses.edit.query',
-        'ENTRY_DATA' => 'basicinformation.entries.edit.query',
-        'POSSESSION_DATA' => 'basicinformation.possession.edit.query',
-        'BIOG_INST_DATA' => 'basicinformation.socialinst.edit.query',
-    ];
 
     /**
-     * 資源表 → [React edit-v2 路由名, 對應 migration flag key]。
-     * 當該子資源 flag=new 且路由存在時，buildResourceEditUrl 改導向 React /app edit-v2（帶完整 PK query，
-     * edit-v2 controller 以「全 PK 皆存在」判定 edit 模式並載入該列），否則沿用 legacy .edit.query。
-     * 修「新介面（如 /app/operations）點子資源仍開 legacy 編輯頁」。
+     * 資源表 → React edit-v2 路由名。
+     *
+     * buildResourceEditUrl 一律導向 React /app edit-v2（帶完整 PK query，edit-v2 controller 以
+     * 「全 PK 皆存在」判定 edit 模式並載入該列）。
+     *
+     * 原本這裡是 [路由名, migration flag key] 二元組，flag=old 時退回 legacy `.edit.query`；
+     * Blade 下架計畫環節 2 刪除 legacy 子資源路由後那個退路已不存在（再產生也只會 404），
+     * 故連同 EDIT_ROUTE_MAP 一併移除。
      */
     public const APP_EDIT_ROUTE_MAP = [
-        'ALTNAME_DATA' => ['app.basicinformation.altnames.editv2', 'basicinformation.altname'],
-        'BIOG_ADDR_DATA' => ['app.basicinformation.addresses.editv2', 'basicinformation.addresses'],
-        'TEXT_DATA' => ['app.basicinformation.texts.editv2', 'basicinformation.texts'],
-        'BIOG_TEXT_DATA' => ['app.basicinformation.texts.editv2', 'basicinformation.texts'],
-        'BIOG_SOURCE_DATA' => ['app.basicinformation.sources.editv2', 'basicinformation.sources'],
-        'POSTED_TO_OFFICE_DATA' => ['app.basicinformation.offices.editv2', 'basicinformation.offices'],
-        'POSTED_TO_ADDR_DATA' => ['app.basicinformation.offices.editv2', 'basicinformation.offices'],
-        'ASSOC_DATA' => ['app.basicinformation.assoc.editv2', 'basicinformation.assoc'],
-        'KIN_DATA' => ['app.basicinformation.kinship.editv2', 'basicinformation.kinship'],
-        'EVENTS_DATA' => ['app.basicinformation.events.editv2', 'basicinformation.events'],
-        'STATUS_DATA' => ['app.basicinformation.statuses.editv2', 'basicinformation.statuses'],
-        'ENTRY_DATA' => ['app.basicinformation.entries.editv2', 'basicinformation.entries'],
-        'POSSESSION_DATA' => ['app.basicinformation.possession.editv2', 'basicinformation.possession'],
-        'BIOG_INST_DATA' => ['app.basicinformation.socialinst.editv2', 'basicinformation.socialinst'],
+        'ALTNAME_DATA' => 'app.basicinformation.altnames.editv2',
+        'BIOG_ADDR_DATA' => 'app.basicinformation.addresses.editv2',
+        'TEXT_DATA' => 'app.basicinformation.texts.editv2',
+        'BIOG_TEXT_DATA' => 'app.basicinformation.texts.editv2',
+        'BIOG_SOURCE_DATA' => 'app.basicinformation.sources.editv2',
+        'POSTED_TO_OFFICE_DATA' => 'app.basicinformation.offices.editv2',
+        'POSTED_TO_ADDR_DATA' => 'app.basicinformation.offices.editv2',
+        'ASSOC_DATA' => 'app.basicinformation.assoc.editv2',
+        'KIN_DATA' => 'app.basicinformation.kinship.editv2',
+        'EVENTS_DATA' => 'app.basicinformation.events.editv2',
+        'STATUS_DATA' => 'app.basicinformation.statuses.editv2',
+        'ENTRY_DATA' => 'app.basicinformation.entries.editv2',
+        'POSSESSION_DATA' => 'app.basicinformation.possession.editv2',
+        'BIOG_INST_DATA' => 'app.basicinformation.socialinst.editv2',
     ];
 
     /**
@@ -720,18 +703,9 @@ class CompositePrimaryKey {
     public static function buildResourceEditUrl(string $resource, string $resourceId, $personId): ?string {
         $upperResource = strtoupper($resource);
 
-        $routeName = self::EDIT_ROUTE_MAP[$upperResource] ?? null;
+        $routeName = self::APP_EDIT_ROUTE_MAP[$upperResource] ?? null;
         if (!$routeName) {
             return null;
-        }
-
-        // flag-aware：子資源 flag=new 且 React edit-v2 路由存在時，改導向 /app edit-v2（帶完整 PK query → edit 模式）。
-        $appRoute = self::APP_EDIT_ROUTE_MAP[$upperResource] ?? null;
-        if ($appRoute !== null
-            && function_exists('migration_flag_is_new')
-            && migration_flag_is_new($appRoute[1])
-            && \Illuminate\Support\Facades\Route::has($appRoute[0])) {
-            $routeName = $appRoute[0];
         }
 
         // parseStoredResourceId() 內部已透過 getResourceIdSchemaTable() 處理別名對應

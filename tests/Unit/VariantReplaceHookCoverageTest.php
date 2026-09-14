@@ -172,11 +172,11 @@ class VariantReplaceHookCoverageTest extends TestCase {
         'app/Services/PostingAutofillService.php' => [
             'hooks' => 2, 'why' => 'S4：年號與官名的兩形查表',
         ],
+        // 已下架：app/Http/Controllers/BasicInformationProposalController.php（原 3 個掛鉤）
+        // 於 Blade 下架計畫環節 2 連同 legacy 人物提案路由一併刪除——該提案入口沒有欄位白名單、
+        // 會把稽核欄等任意表單欄原樣存進提案 payload，v2 的 /api/v2/mutate(mode=proposal) 取代它。
         'app/Services/Import/TextImportService.php' => [
             'hooks' => 3, 'why' => '文獻聚合：書名（早於拼音派生）、主列其餘文本欄、TEXT_INSTANCE_DATA 版本列整列',
-        ],
-        'app/Http/Controllers/BasicInformationProposalController.php' => [
-            'hooks' => 3, 'why' => '前階段既有：提案 payload 的姓名／別名 strict 替換（不經 repository，本階段未改動但仍是落地點）',
         ],
     ];
 

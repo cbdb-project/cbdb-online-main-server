@@ -1678,4 +1678,39 @@ class ApiV2MutateTest extends TestCase {
         $response->assertStatus(401);
         $this->assertStringContainsString('Invalid API token', $response->getContent());
     }
+
+    // ── 未知 resource ────────────────────────────────────────
+
+    /**
+     * 不在 handler registry 裡的 resource 名一律被拒，不得靜默落庫或 500。
+     *
+     * 這是 BasicInformationProposalTest::testUnknownResourceTypeReturnsNotFound 的 v2 等價
+     * 覆蓋（Blade 下架計畫環節 2）。原測試打 legacy `basicinformation.proposal.store`，該
+     * 路由與 BasicInformationProposalController 已一併刪除；v2 的對應行為是
+     * MutationController 解析不到 handler 時的 **501「目前尚未支援此變更模式」**，
+     * 原本零測試覆蓋。
+     *
+     * 這裡刻意斷言實際契約（501 + errors.resource/mode/operation），不是我們希望的形狀：
+     * 狀態碼與 errors 結構是對外契約的一部分（見 API.md），測試該鎖住現況，
+     * 要改就連 API.md 一起改。
+     */
+    #[Test]
+    public function testUnknownResourceIsRejected(): void {
+        $this->actingAs($this->makeUser(email: 'unknown-resource@example.com'));
+
+        foreach (['/api/v2/mutate', '/api/v2/create', '/api/v2/delete'] as $endpoint) {
+            $this->postJson($endpoint, [
+                'resource' => 'not_a_real_resource',
+                'person_id' => 138841,
+                'mode' => 'direct',
+                'operation' => 'update',
+                'target' => ['pk' => ['c_personid' => 138841]],
+                'changes' => ['c_notes' => 'x'],
+            ])->assertStatus(501)
+                ->assertJson(['ok' => false])
+                ->assertJsonPath('errors.resource', 'not_a_real_resource');
+        }
+
+        $this->assertSame(0, DB::table('operations')->count(), '被拒的請求不得留下 operations 列');
+    }
 }

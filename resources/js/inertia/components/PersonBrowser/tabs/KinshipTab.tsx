@@ -1,14 +1,11 @@
 import React, { useState } from 'react';
 import TabPager from '../shared/TabPager';
-import LegacyCreateButton from '../shared/LegacyCreateButton';
-import LegacyEditButton from '../shared/LegacyEditButton';
-import LegacyDeleteButton from '../shared/LegacyDeleteButton';
 import { NavButton } from '../../ui/NavButton';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
 import { getCsrfToken } from '../shared/csrf';
-import { buildEditV2CreateUrl, buildEditV2EditUrl } from '../shared/legacyEditUrl';
+import { buildEditV2CreateUrl, buildEditV2EditUrl } from '../shared/editorUrl';
 import SubresourceTable from '../../PersonEditorShared/SubresourceTable';
 import MirrorDeleteMultipleNotice, { MirrorDeleteMultiple } from '../../PersonEditorShared/MirrorDeleteMultipleNotice';
 import { APP_THEME } from '../../../theme';
@@ -38,8 +35,6 @@ interface Props {
     canEdit: boolean;
     /** 可提案但不可直接寫入（眾包用戶）。 */
     canPropose?: boolean;
-    /** 由 PersonBrowser 透過 props 注入的遷移開關（basicinformation.kinship）。 */
-    kinshipEditorIsNew?: boolean;
     personId?: number | null;
     createEndpoint?: string;
     mutateEndpoint?: string;
@@ -57,7 +52,6 @@ export default function KinshipTab({
     data,
     canEdit,
     canPropose = false,
-    kinshipEditorIsNew = false,
     personId = null,
     createEndpoint = '',
     mutateEndpoint = '',
@@ -87,7 +81,7 @@ export default function KinshipTab({
     // 新編輯器在 flag=new 且（可直接編輯 或 可提案）且必要端點齊全時啟用。
     // #34：新增/編輯導向獨立 edit-v2 編輯器頁（非 person-browser 內聯 modal）；刪除仍於列表內聯確認。
     const useReactEditor =
-        kinshipEditorIsNew && (canEdit || canPropose) && personId != null && !!createEndpoint && !!mutateEndpoint && !!deleteEndpoint;
+        (canEdit || canPropose) && personId != null && !!createEndpoint && !!mutateEndpoint && !!deleteEndpoint;
     // 可直接寫入者走 direct；否則（僅可提案）走 proposal。
     const proposalMode = !canEdit && canPropose;
     const createHref = buildEditV2CreateUrl('kinship', personId);
@@ -152,9 +146,7 @@ export default function KinshipTab({
                         {t('add_btn')}
                     </NavButton>
                 </div>
-            ) : (
-                <LegacyCreateButton tabKey="kinship" canEdit={canEdit} />
-            )}
+            ) : null}
 
             <SubresourceTable
                 items={pageItems}
@@ -171,12 +163,7 @@ export default function KinshipTab({
                         <NavButton size="sm" variant="outline" href={editHref(item)}>{t('edit_btn')}</NavButton>
                         <Button size="sm" variant="destructive" disabled={deleting || deleteFlowOpen} onClick={() => { setDeleteError(null); setDeleteTarget(item); }}>{t('delete_btn')}</Button>
                     </span>
-                ) : (
-                    <span style={actionCellStyle}>
-                        <LegacyEditButton tabKey="kinship" pk={item.pk} canEdit={canEdit} />
-                        <LegacyDeleteButton tabKey="kinship" pk={item.pk} canEdit={canEdit} />
-                    </span>
-                )) : undefined}
+                ) : null) : undefined}
             />
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} showAll={showAll} onToggleShowAll={() => setShowAll(!showAll)} totalItems={totalItems} />
 

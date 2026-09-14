@@ -10,28 +10,12 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
-/**
- * @legacy-parity 本類耦合 legacy Blade 人物表單路由（setUp 呼叫 useLegacyPersonForms()
- * 把 basicinformation.* flag 撥回 'old' 以越過 LegacyBladeFormGate），將隨
- * docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md 環節 2 連同 legacy 路由一併刪除。
- *
- * 環節 1.5 分流結論：**legacy-only** — 可隨環節 2 直接刪除。
- * 稽核欄語義（§1.2）已由 ApiV2MutateSourceTest／ApiV2DeleteSourceTest 覆蓋。
- *
- * ⚠️ 本檔有 **5 個測試不依賴 flag**（flag=new 下實測仍綠），環節 2 刪檔前**必須先搬走**，
- * 否則會連帶失去覆蓋：`testEditViewDisplaysCreationAndModificationInfo`、`testSourceDeleteRemovesRowAndStoresOriginal`、`testSourceStoreAndUpdateIgnoreProposalMetaFields`、`testSourceStoreWritesAuditFieldsAndOperations`、`testSourceUpdatePreservesCreationAndSetsModification`。
- *
- * 新測試請一律寫在 v2 mutation API 路徑上，不要再擴充本檔。
- */
-#[Group('legacy-parity')]
 class BasicInformationSourcesControllerTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
-        $this->useLegacyPersonForms(); // 本類測 legacy Blade CRUD 行為，撥回 flag=old 越過下架閘門
 
         if (!extension_loaded('pdo_sqlite')) {
             $this->markTestSkipped('pdo_sqlite extension is required for this test.');
@@ -232,35 +216,6 @@ class BasicInformationSourcesControllerTest extends TestCase {
     }
 
     #[Test]
-    public function testEditViewDisplaysCreationAndModificationInfo(): void {
-        $row = (object) [
-            'c_personid' => 777,
-            'c_textid' => 888,
-            'c_pages' => 'A-1',
-            'c_notes' => 'view-note',
-            'c_main_source' => 1,
-            'c_self_bio' => 0,
-            'c_created_by' => 'Creator User',
-            'c_created_date' => '2024-02-01 12:00:00',
-            'c_modified_by' => 'Editor User',
-            'c_modified_date' => '2024-02-03 08:30:00',
-        ];
-
-        $html = view('biogmains.sources.edit', [
-            'id' => 777,
-            'row' => $row,
-            'res' => ['text_str' => 'Dummy Text'],
-            'page_title' => 'Basicinformation',
-            'page_description' => '基本信息表 出處',
-            'page_url' => '/basicinformation/777/sources',
-            'archer' => "<li><a href='#'>Sources</a></li>",
-        ])->render();
-
-        $this->assertStringContainsString('Creator User/2024-02-01 12:00:00', $html);
-        $this->assertStringContainsString('Editor User/2024-02-03 08:30:00', $html);
-    }
-
-    #[Test]
     public function testSourceDeleteRemovesRowAndStoresOriginal(): void {
         $repository = new BiogMainRepository();
         $request = new Request([
@@ -336,138 +291,6 @@ class BasicInformationSourcesControllerTest extends TestCase {
             'c_self_bio' => 0,
             'c_created_by' => 'Seeder',
             'c_created_date' => now(),
-        ]);
-    }
-
-    #[Test]
-    public function updateQuery_changing_c_pages_succeeds(): void {
-        $this->actingAs($this->createWriterUser());
-
-        $this->seedSourceRow(100, 200, 'old-page');
-
-        // 查詢參數帶原始 PK，表單 body 帶新的 c_pages
-        $response = $this->patch(
-            route('basicinformation.sources.update.query', ['id' => 100])
-            .'?'.http_build_query(['c_personid' => 100, 'c_textid' => 200, 'c_pages' => 'old-page']),
-            [
-                'c_textid' => 200,
-                'c_pages' => 'new-page',
-                'c_notes' => '',
-                'c_main_source' => 0,
-                'c_self_bio' => 0,
-                'action' => 'save',
-            ]
-        );
-
-        $response->assertRedirect();
-
-        // 舊記錄已被更新為新的 c_pages
-        $this->assertDatabaseMissing('BIOG_SOURCE_DATA', [
-            'c_personid' => 100,
-            'c_textid' => 200,
-            'c_pages' => 'old-page',
-        ]);
-        $this->assertDatabaseHas('BIOG_SOURCE_DATA', [
-            'c_personid' => 100,
-            'c_textid' => 200,
-            'c_pages' => 'new-page',
-        ]);
-    }
-
-    #[Test]
-    public function updateQuery_changing_c_textid_succeeds(): void {
-        $this->actingAs($this->createWriterUser());
-
-        $this->seedSourceRow(100, 300, 'page1');
-
-        // 查詢參數帶原始 c_textid=300，表單 body 帶新的 c_textid=400
-        $response = $this->patch(
-            route('basicinformation.sources.update.query', ['id' => 100])
-            .'?'.http_build_query(['c_personid' => 100, 'c_textid' => 300, 'c_pages' => 'page1']),
-            [
-                'c_textid' => 400,
-                'c_pages' => 'page1',
-                'c_notes' => '',
-                'c_main_source' => 0,
-                'c_self_bio' => 0,
-                'action' => 'save',
-            ]
-        );
-
-        $response->assertRedirect();
-
-        $this->assertDatabaseMissing('BIOG_SOURCE_DATA', [
-            'c_personid' => 100,
-            'c_textid' => 300,
-        ]);
-        $this->assertDatabaseHas('BIOG_SOURCE_DATA', [
-            'c_personid' => 100,
-            'c_textid' => 400,
-            'c_pages' => 'page1',
-        ]);
-    }
-
-    #[Test]
-    public function updateQuery_personid_mismatch_returns_400(): void {
-        $this->actingAs($this->createWriterUser());
-
-        $this->seedSourceRow(100, 200, 'p1');
-
-        // 路徑 id=100，但查詢參數 c_personid=999
-        $response = $this->patch(
-            route('basicinformation.sources.update.query', ['id' => 100])
-            .'?'.http_build_query(['c_personid' => 999, 'c_textid' => 200, 'c_pages' => 'p1']),
-            [
-                'c_textid' => 200,
-                'c_pages' => 'p1',
-                'c_notes' => '',
-                'c_main_source' => 0,
-                'c_self_bio' => 0,
-                'action' => 'save',
-            ]
-        );
-
-        $response->assertStatus(400);
-    }
-
-    #[Test]
-    public function updateQuery_with_null_pages_query_hits_null_row(): void {
-        $this->actingAs($this->createWriterUser());
-
-        $this->seedSourceRow(100, 200, null, 'null-page-row');
-        $this->seedSourceRow(100, 200, '', 'empty-page-row');
-
-        $response = $this->patch(
-            route('basicinformation.sources.update.query', ['id' => 100])
-            .'?'.http_build_query(['c_personid' => 100, 'c_textid' => 200, 'c_pages' => 'NULL']),
-            [
-                'c_textid' => 200,
-                'c_pages' => 'new-page',
-                'c_notes' => 'updated-from-null',
-                'c_main_source' => 0,
-                'c_self_bio' => 0,
-                'action' => 'save',
-            ]
-        );
-
-        $response->assertRedirect();
-
-        $this->assertDatabaseMissing('BIOG_SOURCE_DATA', [
-            'c_personid' => 100,
-            'c_textid' => 200,
-            'c_pages' => null,
-        ]);
-        $this->assertDatabaseHas('BIOG_SOURCE_DATA', [
-            'c_personid' => 100,
-            'c_textid' => 200,
-            'c_pages' => '',
-            'c_notes' => 'empty-page-row',
-        ]);
-        $this->assertDatabaseHas('BIOG_SOURCE_DATA', [
-            'c_personid' => 100,
-            'c_textid' => 200,
-            'c_pages' => 'new-page',
-            'c_notes' => 'updated-from-null',
         ]);
     }
 }

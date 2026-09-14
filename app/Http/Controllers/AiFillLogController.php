@@ -148,14 +148,18 @@ class AiFillLogController extends Controller {
         $aiMatched = $log->ai_matched ? json_decode($log->ai_matched, true) : null;
         $statistics = is_array($aiMatched) ? ($aiMatched['statistics'] ?? null) : null;
 
-        // 人物連結（依類別指向對應子資源頁；相對 URL 避免混合內容）。
-        $personRoute = match ($category) {
-            'assoc' => 'basicinformation.assoc.index',
-            'status' => 'basicinformation.statuses.index',
-            default => 'basicinformation.offices.index',
+        // 人物連結（依類別指向 React 人物頁的對應分頁；相對 URL 避免混合內容）。
+        // 原本指向 legacy `basicinformation.{assoc,statuses,offices}.index`，那些路由已於
+        // Blade 下架計畫環節 2 刪除。舊碼有 Route::has() 保護，所以不會 500——但 person_url
+        // 會靜默變成 null、連結整個消失（Pages/Admin/AiFillLogs/Index.tsx 直接用它），
+        // 是測試抓不到的無聲退化，故一併改指 /app。
+        $personTab = match ($category) {
+            'assoc' => 'associations',
+            'status' => 'statuses',
+            default => 'postings',
         };
-        $personUrl = ($log->c_personid && Route::has($personRoute))
-            ? route($personRoute, ['basicinformation' => $log->c_personid], false)
+        $personUrl = ($log->c_personid && Route::has('app.basicinformation.show'))
+            ? route('app.basicinformation.show', ['id' => $log->c_personid, 'tab' => $personTab], false)
             : null;
 
         return [

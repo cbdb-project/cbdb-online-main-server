@@ -25,13 +25,30 @@ Auth::routes();
 // （$user->is_active = 2 早被註解），啟用信自 2021-08 起停發 → 沒有合法用途。
 // 日後若要恢復啟用信，應另建一次性、有期限的 email_verifications 表，不得重用
 // confirmation_token，且不得 Auth::login()。
-Route::get('operations', ['as' => 'operations.index', 'uses' => 'OperationsController@index'])
-    ->middleware('legacy.page:app.operations.index');
+// ── Blade 下架環節 4a：唯讀頁已實體刪除，舊 URI 只留 302 導向 ──────────────
+//
+// 這些路由原本掛 `legacy.page:app.*`（環節 3 封路、視圖仍在、kill switch 可叫回）。
+// 環節 4a 刪掉視圖與對應的 Blade controller 方法之後，**不能再留那個 middleware**：
+// 它有兩條 fail-open 路徑（導向目標不存在時放行、kill switch 關閉時放行），
+// 視圖不存在會讓那兩條變成 500 而不是「看到舊頁」。所以改成純 redirect closure——
+// 沒有可掉下去的 controller。
+//
+// 🔴 **這批頁面自此沒有任何 kill switch 級回退**：`LEGACY_PAGE_RETIREMENT=false`
+// 對它們已無作用，要回到 Blade 只能 git revert 並重新部署。
+//
+// route name 一律保留：書籤／外部連結繼續可用（302 並保留 query string），
+// 且 `route('operations.index')` 這類既有呼叫端不必全部改。
+
+Route::get('operations', function (\Illuminate\Http\Request $request) {
+    return redirect()->to('/app/operations'.($request->getQueryString() ? '?'.$request->getQueryString() : ''), 302);
+})->name('operations.index');
 Route::get('app/operations', ['as' => 'app.operations.index', 'uses' => 'OperationsController@appIndex'])->middleware('inertia');
 Route::post('locale', 'LocaleController@switch')->name('locale.switch')->middleware('throttle:20,1');
 
 Route::get('home', 'HomeController@index')->name('home');
-Route::get('dashboard', 'DashboardController@index')->middleware(['auth', 'legacy.page:app.dashboard'])->name('dashboard');
+Route::get('dashboard', function (\Illuminate\Http\Request $request) {
+    return redirect()->to('/app/dashboard'.($request->getQueryString() ? '?'.$request->getQueryString() : ''), 302);
+})->name('dashboard');
 Route::get('app/dashboard', 'DashboardController@appIndex')
     ->middleware(['auth', 'inertia'])
     ->name('app.dashboard');
@@ -51,8 +68,12 @@ Route::middleware(['auth.optional'])->post('api/v2/proposals/{operation}/resubmi
 Route::middleware(['auth.optional'])->match(['get', 'post'], 'api/v2/get', 'Api\\MutationController@get')->name('api.v2.get.web');
 // #79：社會關係／親屬「對面互逆鏡像」現況偵測（缺邊/多條），供編輯器行內提示用。
 Route::middleware(['auth.optional'])->post('api/v2/relationship/opposite-edges', 'Api\\MutationController@oppositeEdges')->name('api.v2.relationship.opposite-edges.web');
-Route::get('view', 'ViewTableController@index')->middleware(['auth', 'legacy.page:app.view.index'])->name('view.index');
-Route::get('view/{key}', 'ViewTableController@show')->middleware(['auth', 'legacy.page:app.view.show'])->name('view.show');
+Route::get('view', function (\Illuminate\Http\Request $request) {
+    return redirect()->to('/app/view'.($request->getQueryString() ? '?'.$request->getQueryString() : ''), 302);
+})->name('view.index');
+Route::get('view/{key}', function (\Illuminate\Http\Request $request, string $key) {
+    return redirect()->to('/app/view/'.$key.($request->getQueryString() ? '?'.$request->getQueryString() : ''), 302);
+})->name('view.show');
 
 // CHGIS 地圖：底圖圖磚與下載狀態（與地址/官職列表頁同等公開）
 Route::get('chgis-map/tiles/{z}/{x}/{y}', 'ChgisMapController@tile')
@@ -307,10 +328,14 @@ Route::match(['put', 'patch'], 'app/manage/{manage}', 'ManagementController@appU
     ->name('app.manage.update');
 
 // GET 導向 React、POST（legacy 表單送出）回 410；原本是 match(['get','post']) 同一條。
-Route::get('merge-preview', 'MergePreviewController@index')
-    ->middleware('legacy.page:app.merge-preview.index')->name('merge-preview.index');
-Route::post('merge-preview', 'MergePreviewController@index')
-    ->middleware('legacy.page:gone')->name('merge-preview.store');
+Route::get('merge-preview', function (\Illuminate\Http\Request $request) {
+    return redirect()->to('/app/merge-preview'.($request->getQueryString() ? '?'.$request->getQueryString() : ''), 302);
+})->name('merge-preview.index');
+// legacy merge-preview 表單的 POST 端點：原本指向 `MergePreviewController@index`
+// （Blade 版用 POST 回同一頁顯示結果），環節 3 已封成 410。環節 4a-3 刪掉該方法後
+// 必須改成 closure——否則 kill switch 一關就會 500（`RouteActionsExistTest` 抓到的正是這個）。
+Route::post('merge-preview', fn () => abort(410, '舊版合併預覽表單已停用，請改用 /app/merge-preview。'))
+    ->name('merge-preview.store');
 Route::get('app/merge-preview', 'MergePreviewController@appIndex')->name('app.merge-preview.index')->middleware('inertia');
 
 // 原本這裡是 `Route::resource('operations', ...)`，但 OperationsController 只實作 index()
@@ -349,8 +374,9 @@ Route::middleware('auth')->group(function () {
     // ── 暫不公開：僅管理員可訪問 ──────────────────────────────────────
     Route::middleware('superadmin')->group(function () {
         // 最近眾包錄入記錄
-        Route::get('crowdsourcing', ['as' => 'crowdsourcing.index', 'uses' => 'CrowdsourcingController@index'])
-            ->middleware('legacy.page:app.crowdsourcing.index');
+        Route::get('crowdsourcing', function (\Illuminate\Http\Request $request) {
+            return redirect()->to('/app/crowdsourcing'.($request->getQueryString() ? '?'.$request->getQueryString() : ''), 302);
+        })->name('crowdsourcing.index');
         Route::get('app/crowdsourcing', ['as' => 'app.crowdsourcing.index', 'uses' => 'CrowdsourcingController@appIndex'])->middleware('inertia');
         // 同 operations（#1250）：CrowdsourcingController 只有 index()／appIndex()／
         // confirm()／reject() 與一個空的 store()，resource 生出的 create／show／edit／
@@ -468,8 +494,9 @@ Route::middleware('auth')->group(function () {
     Route::post('query-playground/answer-from-nl-stream', 'QueryPlaygroundController@answerFromNLStream')
         ->middleware('throttle:qa-answer')
         ->name('query-playground.answer-from-nl-stream');
-    Route::get('query-playground/nl-query-logs', 'QueryPlaygroundController@nlQueryLogs')
-        ->middleware('legacy.page:app.query-playground.nl-query-logs')->name('query-playground.nl-query-logs');
+    Route::get('query-playground/nl-query-logs', function (\Illuminate\Http\Request $request) {
+        return redirect()->to('/app/query-playground/nl-query-logs'.($request->getQueryString() ? '?'.$request->getQueryString() : ''), 302);
+    })->name('query-playground.nl-query-logs');
     Route::get('app/query-playground/nl-query-logs', 'QueryPlaygroundController@appNlQueryLogs')
         ->middleware('inertia')
         ->name('app.query-playground.nl-query-logs');
@@ -486,13 +513,15 @@ Route::middleware('auth')->group(function () {
     Route::post('api/ai/code-lookup/suggest', 'CodeLookupController@suggest')->name('ai.code-lookup.suggest');
 
     // AI 填充日誌（管理員工具）
-    Route::get('admin/ai-fill-logs', 'AiFillLogController@index')
-        ->middleware('legacy.page:app.admin.ai-fill-logs')->name('admin.ai-fill-logs');
+    Route::get('admin/ai-fill-logs', function (\Illuminate\Http\Request $request) {
+        return redirect()->to('/app/admin/ai-fill-logs'.($request->getQueryString() ? '?'.$request->getQueryString() : ''), 302);
+    })->name('admin.ai-fill-logs');
     Route::get('app/admin/ai-fill-logs', 'AiFillLogController@appIndex')
         ->middleware('inertia')
         ->name('app.admin.ai-fill-logs');
-    Route::get('admin/audit-logs', 'AdminAuditLogController@index')
-        ->middleware('legacy.page:app.admin.audit-logs')->name('admin.audit-logs');
+    Route::get('admin/audit-logs', function (\Illuminate\Http\Request $request) {
+        return redirect()->to('/app/admin/audit-logs'.($request->getQueryString() ? '?'.$request->getQueryString() : ''), 302);
+    })->name('admin.audit-logs');
     // Inertia + React 版（與舊 Blade 版並存；側邊欄指向由 migration flag 控制）
     Route::get('app/admin/audit-logs', 'AdminAuditLogController@appIndex')
         ->middleware('inertia')

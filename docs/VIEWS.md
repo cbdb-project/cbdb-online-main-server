@@ -1,8 +1,8 @@
 # View 一覽表
 
-本文件整理系統目前註冊的檢視表。路徑格式為 `/view/{key}`，對應資料來源與簡要功能如下。若需調整查詢或欄位，請同步更新 `config/view_tables.php`、`config/view_table_searchable.php` 以及此文件。
+本文件整理系統目前註冊的檢視表。路徑格式為 `/app/view/{key}`（舊 URL `/view/{key}` 只剩 302 導向），對應資料來源與簡要功能如下。若需調整查詢或欄位，請同步更新 `config/view_tables.php`、`config/view_table_searchable.php` 以及此文件。
 
-| Key (`/view/{key}`) | View 名稱 | 顯示標題 | 概要 |
+| Key (`/app/view/{key}`) | View 名稱 | 顯示標題 | 概要 |
 | --- | --- | --- | --- |
 | `altname-data` | `View_AltnameData` | 別名資料檢視 | 彙整 ALTNAME_DATA 及別名類型、來源文本資訊。 |
 | `assoc-data` | `View_AssociationData` | 社會關係資料檢視 | 展開 ASSOC_DATA 與親屬、機構、主題、地址等關聯資訊。 |

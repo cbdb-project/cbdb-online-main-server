@@ -10,9 +10,15 @@
     `LegacyBladeFormGate`、以及那 15 個 `MIGRATION_FLAG_BASICINFO_*` flag 全部不存在了。
     舊 URI 只剩 302 導向（顯示頁）／410（寫入端）。**把 flag 塞回 config 不會復活它們**（有護欄測試鎖住）。
     唯三例外：`saveas`、`Duplicate_Collateral_Info`（React 編輯器正在呼叫）與 `destroy`。
-  - **其餘頁面（`codes`／`view`／`operations`／`manage`／`crowdsourcing`／`admin.*`／`merge-preview`／
-    `profile`／`dashboard`／`nl-query-logs`）已於環節 3 封路但未刪碼**：Blade 視圖與 controller 都還在，
-    只是請求不再抵達 controller（顯示頁 302、legacy 寫入端 410）。逐條清單見
+  - **唯讀頁（`operations`／`dashboard`／`view`／`merge-preview`／`crowdsourcing`／`nl-query-logs`／
+    `admin.audit-logs`／`admin.ai-fill-logs`）已於環節 4a 實體刪除**：16 個 Blade 檔與 9 個
+    controller 方法都不存在了，舊 URI 只剩 **redirect closure**（302 並保留 query string）。
+    🔴 **它們沒有 kill switch 級回退**——`LEGACY_PAGE_RETIREMENT=false` 對它們無作用
+    （已不掛封路 middleware），要回到 Blade 只能 git revert 並重新部署。
+  - **表單／寫入頁（`codes` 全套／`manage`／`profile`／`admin.explainsql`／3 個 batch-load／
+    `admin.cbdb-table-maintenance`／`admin.unidirectional-relationship-repair`）仍是「封路但未刪碼」**：
+    Blade 視圖與 controller 都還在，只是請求不再抵達 controller（顯示頁 302、legacy 寫入端 410），
+    kill switch 可以把它們叫回來。這批屬環節 4b，尚未執行。逐條清單見
     [docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md](./docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md)。
   - 🔴 **回退鍵已經不是 migration flag**：這批頁面翻 `MIGRATION_FLAG_*=old` **沒有任何效果**
     （封路 middleware 不讀 flag）。要回退請設 **`LEGACY_PAGE_RETIREMENT=false`** 並

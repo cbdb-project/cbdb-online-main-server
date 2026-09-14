@@ -498,32 +498,8 @@ class QueryPlaygroundController extends Controller {
         }, $conversationHistory);
     }
 
-    /**
-     * 顯示自然語言查詢日誌（僅管理員）
-     *
-     * @param Request $request
-     * @return \Illuminate\View\View
-     */
-    public function nlQueryLogs(Request $request) {
-        if (!Auth::user()->isSuperAdmin()) {
-            abort(403, 'Unauthorized. Super admin access required.');
-        }
-
-        $logs = $this->buildNlQueryLogsQuery($request)->paginate(20)->withQueryString();
-
-        return view('query_playground.nl_query_logs', [
-            'page_title' => '自然語言查詢日誌',
-            'page_title_key' => 'NL Query Logs',
-            'page_url' => route('query-playground.nl-query-logs'),
-            'logs' => $logs,
-            'users' => $this->nlQueryLogUsers(),
-            'filters' => [
-                'search' => $request->input('search'),
-                'success' => $request->input('success'),
-                'user_id' => $request->input('user_id'),
-            ],
-        ]);
-    }
+    // nlQueryLogs() 是 legacy Blade 版，已隨 Blade 下架環節 4a-3 連同視圖一併刪除。
+    // 共用的取資料 helper 全部保留給 appNlQueryLogs() 使用。
 
     /**
      * NL 查詢日誌列表（Inertia + React 版，僅 Super Admin）。

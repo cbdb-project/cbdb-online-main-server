@@ -112,17 +112,8 @@ class CrowdsourcingController extends Controller {
         return $lists;
     }
 
-    public function index() {
-        $lists = $this->buildCrowdsourcingLists();
-
-        return view('crowdsourcing.index', [
-            'lists' => $lists,
-            'page_title' => __('nav.crowdsourcing_records'),
-            'page_title_key' => 'Crowdsourcing',
-            'page_description' => __('nav.crowdsourcing_records_desc'),
-            'page_url' => '/crowdsourcing',
-        ]);
-    }
+    // index() 是 legacy Blade 版，已隨 Blade 下架環節 4a-3 連同視圖一併刪除。
+    // 共用的取資料 helper 全部保留給 appIndex() 使用。
 
     public function appIndex() {
         // 一次取回全部（不 cap），前端做搜尋/排序/每頁筆數。

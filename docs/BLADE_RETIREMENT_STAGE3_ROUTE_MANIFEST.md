@@ -28,7 +28,27 @@ php artisan route:list --json
 | ⚫ **不在本環節** | 11 | 同一批 controller 上但不屬 A-1…A-17 的頁面路由 |
 | **合計** | **65** | 該批 controller 上的全部 legacy（非 `app/*`）路由 |
 
-> 封路數 = 22 + 11 + 2 = **35**（與 `LegacyBladePageRetirementTest` 寫死的清單逐條吻合）。
+> **環節 3 當時的算式**：封路數 = 22 + 11 + 2 = **35**（與 `LegacyBladePageRetirementTest`
+> 寫死的清單逐條吻合）。下方「合計 65」那一行同屬當時的數字。
+>
+> ⚠️ **2026-09-14 更新（環節 4a-3）**：其中 **10 條已改成 closure、不再掛 `legacy.page`**
+> ——9 條唯讀顯示頁是 **redirect** closure，`POST merge-preview` 是直接 **`abort(410)`** closure。
+> 原因是它們的 Blade 視圖與 controller 方法已實體刪除：
+> 留著那個 middleware 會讓它的兩條 fail-open 路徑（導向目標不存在時放行、kill switch 關閉時放行）
+> 變成 500 而不是「看到舊頁」。
+>
+> **現況**：封路身分清單 = 35 − 10 = **25**（13 條 GET→302 + 12 條非 GET／空方法→410），
+> 與 `exactly_the_manifested_routes_are_gated()` 寫死的 25 條逐條吻合。
+> **在正常封路設定下**（`LEGACY_PAGE_RETIREMENT=true`）對外可觀測的行為完全不變：那 10 條裡的
+> **9 條唯讀 GET** 改由 closure 產生同樣的 302（並保留 query string），`POST /merge-preview`
+> 則維持 410（只是從 `legacy.page:gone` 換成 closure 直接 `abort(410)`）。
+> 302 的總數不變、410 的總數也不變。
+>
+> ⚠️ **kill switch 關閉時行為確實變了，而那正是重點**：以前關掉會看到 Blade 頁，
+> 現在那 10 條照樣 302／410（頁面已不存在）。見下方 🔴。
+>
+> 🔴 **那 9 條唯讀頁自此沒有 kill switch 級回退**（`LEGACY_PAGE_RETIREMENT=false` 對它們無作用），
+> 見 `LegacyBladePageRetirementTest::legacy_readonly_pages_redirect_without_the_kill_switch()`。
 > 35 + 19 + 11 = 65，與 `route:list` 實測總數相符——**讀者可以自行驗證有沒有漏**。
 
 ---
@@ -177,7 +197,11 @@ LEGACY_PAGE_RETIREMENT=false
 php artisan config:clear && php artisan config:cache
 ```
 
-legacy 頁**立刻復活**——不需重新部署、不需 `git revert`。這正是環節 4 實體刪除之後就再也沒有的能力，所以它本身有測試守著（`LegacyBladePageRetirementTest::the_kill_switch_restores_the_legacy_pages` 驗 middleware 讓開，`InertiaViewTableTest::test_kill_switch_restores_the_legacy_view_page` 以完整 fixtures 驗**legacy 頁真的渲染**）。
+legacy 頁**立刻復活**——不需重新部署、不需 `git revert`。
+
+🔴 **但這只適用於「碼還在」的那批**：環節 4a-3 已實體刪除 9 條唯讀頁的視圖與 controller 方法，本開關對它們**無作用**（它們已不掛封路 middleware，改成純 redirect closure）。現在 kill switch 能叫回的只剩**表單／寫入頁**（`codes` 全套／`manage`／`profile`／`admin.explainsql`／3 個 batch-load／`cbdb-table-maintenance`／`unidirectional-repair`），也就是環節 4b 的範圍。
+
+這個能力本身有測試守著：`LegacyBladePageRetirementTest::the_kill_switch_restores_the_legacy_pages()` 用 `/admin/explainsql` 斷言 `assertOk()`（該頁在精簡 schema 下也能真的渲染），`migration_flags_no_longer_reopen_gated_legacy_pages()` 末尾再以 `assertViewIs('admin.explain_sql')` 證明回到的是 **Blade 版**；反面則由 `legacy_readonly_pages_redirect_without_the_kill_switch()` 釘住「那 9 條叫不回來」。
 
 ### 為什麼需要這個開關（執行中發現的）
 

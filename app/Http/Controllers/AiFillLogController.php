@@ -76,30 +76,8 @@ class AiFillLogController extends Controller {
             ->get();
     }
 
-    /**
-     * AI 填充日誌列表（舊 Blade 版，僅 Super Admin）
-     */
-    public function index(Request $request) {
-        $this->guard();
-
-        $logs = $this->buildQuery($request)->paginate(20)->withQueryString();
-        foreach ($logs as $log) {
-            $this->attachComparison($log);
-        }
-
-        return view('admin.ai_fill_logs.index', [
-            'page_title' => __('admin.ai_fill_logs'),
-            'page_title_key' => 'AI 填充日誌',
-            'page_url' => route('admin.ai-fill-logs'),
-            'logs' => $logs,
-            'users' => $this->logUsers(),
-            'filters' => [
-                'search' => $request->input('search'),
-                'user_id' => $request->input('user_id'),
-                'category' => $request->input('category'),
-            ],
-        ]);
-    }
+    // index() 是 legacy Blade 版，已隨 Blade 下架環節 4a-3 連同視圖一併刪除。
+    // 共用的取資料 helper 全部保留給 appIndex() 使用。
 
     /**
      * AI 填充日誌列表（Inertia + React 版）。授權/篩選與 Blade 版一致；

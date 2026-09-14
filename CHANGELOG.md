@@ -4,6 +4,32 @@
 
 ## 2026-09
 
+### Blade 下架環節 4a：legacy 唯讀頁實體刪除（Blade 與 controller 共刪約 3.8k 行，整個 commit 淨 −3697）
+
+計畫：[docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)
+
+- **對使用者的影響**：`/operations`、`/dashboard`、`/view`、`/view/{key}`、`/merge-preview`、
+  `/crowdsourcing`、`/query-playground/nl-query-logs`、`/admin/audit-logs`、`/admin/ai-fill-logs`
+  這 9 個舊 URL **書籤仍然可用**（302 導向 `/app` 對應頁並保留 query string），但背後的
+  Blade 頁已不存在。
+- 🔴 **這 9 條沒有 kill switch 級回退**：`LEGACY_PAGE_RETIREMENT=false` 對它們**無作用**
+  （已改成 redirect closure、不掛封路 middleware）。要回到 Blade 只能 `git revert` 並重新部署。
+  仍可用 kill switch 叫回的只剩**表單／寫入頁**（codes 全套／manage／profile／admin.explainsql／
+  3 個 batch-load／cbdb-table-maintenance／unidirectional-repair），那批屬環節 4b、尚未執行。
+- **刪除內容**：16 個 Blade 檔（9 個視圖 + `components/{diff-table,posted-to-addr-diff,
+  key-value-table,ai-fill-diff-table}` + 環節 2 遺留的 3 個孤兒元件）與 9 個 Blade controller 方法。
+  共用的取資料 helper（`buildOperationsListing()` 等）全部保留給 React 版。
+- **未登入打舊 URL 多一跳**：`/dashboard` 與 `/view` 的 `auth` middleware 一併移除（redirect
+  不需授權），所以變成 302 → `/app/dashboard` → 302 → `/login`。好處是 Laravel 記下的
+  intended URL 變成 `/app/dashboard`，登入後直接落在 React 頁。
+- **刪除前先做了測試分流**（環節 4a-1／4a-2，共 87 條）：legacy 側 3923 行 vs React 側 920 行，
+  直接刪會是實質覆蓋損失。最大的陷阱是 `OperationsIndexLinksTest` 的 17 條**本來就是 React 測試**
+  （只是住在 legacy 檔、被 setUp 的 opt-out 連坐），整檔刪掉會毀掉它們。
+  分流後測試數幾乎不變而**斷言數增加約 400**。
+- **順帶修掉**：`POST merge-preview` 也指向被刪的方法且掛 `legacy.page:gone`——kill switch 一關
+  就會 500。由 `RouteActionsExistTest` 抓到，已改成 closure 直接 410。
+
+
 ### Blade 下架：legacy 頁面全面封路，人物編輯全套實體刪除
 
 計畫與逐條清單：[docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)、[docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md](./docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md)

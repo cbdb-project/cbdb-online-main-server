@@ -727,29 +727,8 @@ class OperationsController extends Controller {
         ];
     }
 
-    public function index(Request $request) {
-        $data = $this->buildOperationsListing($request);
-        $lists = $data['lists'];
-        $proposalsOnly = $data['proposalsOnly'];
-        $statusFilters = $data['statusFilters'];
-        $historyContext = $data['historyContext'];
-
-        $pageTitle = $proposalsOnly ? __('nav.recent_proposals') : __('nav.recent_operations');
-        $pageDescription = $proposalsOnly ? __('operations.page_desc_proposals') : __('operations.page_desc_operations');
-        $pageUrl = $proposalsOnly ? '/operations?proposals_only=1' : '/operations';
-        $pageTitleKey = $proposalsOnly ? 'OperationsProposals' : 'NewUpdate';
-
-        return view('operations.index', [
-            'lists' => $lists,
-            'page_title' => $pageTitle,
-            'page_title_key' => $pageTitleKey,
-            'page_description' => $pageDescription,
-            'page_url' => $pageUrl,
-            'proposals_only' => $proposalsOnly,
-            'status_filters' => $statusFilters,
-            'history_context' => $historyContext,
-        ]);
-    }
+    // index() 是 legacy Blade 版，已隨 Blade 下架環節 4a-3 連同視圖一併刪除。
+    // 共用的取資料 helper 全部保留給 appIndex() 使用。
 
     public function appIndex(Request $request) {
         $data = $this->buildOperationsListing($request);

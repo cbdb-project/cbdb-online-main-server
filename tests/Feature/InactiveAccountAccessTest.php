@@ -116,7 +116,9 @@ class InactiveAccountAccessTest extends TestCase {
     public function inactive_session_is_forbidden_on_auth_routes(): void {
         $user = $this->makeUser(User::STATUS_INACTIVE);
 
-        foreach (['/profile', '/api-tokens', '/dashboard'] as $path) {
+        // `/dashboard` 自 Blade 下架環節 4a-3 起是純 redirect closure（Blade 頁已刪、不掛 auth），
+        // 所以這裡改打 `/app/dashboard`——那才是實際受保護的路由。
+        foreach (['/profile', '/api-tokens', '/app/dashboard'] as $path) {
             $this->actingAs($user)->get($path)
                 ->assertForbidden();
         }

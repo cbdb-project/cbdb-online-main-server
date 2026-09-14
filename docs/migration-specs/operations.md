@@ -7,6 +7,10 @@
 > （顯示頁 302／寫入端 410，封路 middleware **不讀 migration flag**，回退鍵是
 > `LEGACY_PAGE_RETIREMENT=false`）。現況請看
 > [BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](../BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)。
+> 🔴 **本頁的 Blade 版已於環節 4a-3 實體刪除**（視圖與 controller 方法都不存在了），
+> 所以它**沒有任何回退鍵**——上面提到的 `LEGACY_PAGE_RETIREMENT=false` 對本頁無作用。
+> 舊 URI 只剩 302 導向 `/app` 對應頁。
+
 
 > 舊頁 = `operations.index`（Blade，無 auth middleware，內部依 Auth::check 條件顯示）；新頁 = `app.operations.index`（Inertia）。flag = `operations`。
 > 同一頁依 `proposals_only` 切換「最近操作」/「最近提案」兩模式（nav 兩個節點共用同一 flag）。

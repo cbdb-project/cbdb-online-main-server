@@ -7,6 +7,10 @@
 > （顯示頁 302／寫入端 410，封路 middleware **不讀 migration flag**，回退鍵是
 > `LEGACY_PAGE_RETIREMENT=false`）。現況請看
 > [BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](../BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)。
+> 🔴 **本頁的 Blade 版已於環節 4a-3 實體刪除**（視圖與 controller 方法都不存在了），
+> 所以它**沒有任何回退鍵**——上面提到的 `LEGACY_PAGE_RETIREMENT=false` 對本頁無作用。
+> 舊 URI 只剩 302 導向 `/app` 對應頁。
+
 
 > 舊頁 = `query-playground.nl-query-logs`（Blade）；新頁 = `app.query-playground.nl-query-logs`
 > （Inertia）。flag = `query-playground.nl-query-logs`（預設 old）。授權：Super Admin（403）。

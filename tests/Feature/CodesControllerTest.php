@@ -17,8 +17,16 @@ use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
- * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
+ * ⚠️ **本類目前是混的（Blade 下架環節 4b-2c-1 之後）**：52 條裡 **20 條寫入面已改打
+ * `/app/codes/*`（React）**，**32 條讀取面仍打 legacy Blade**（它們斷言視圖變數與 HTML，
+ * 要逐條對應 Inertia prop，留給環節 4b-2c-2）。
+ *
+ * 🔴 **所以類級的 `#[Group('legacy-parity')]` 現在是暫時的誤標**：那個 group 的既定用途是
+ * 「舊版下線時一鍵清理」，而那 20 條測的已經是**活的 React 路徑**，被一鍵掃掉就是刪掉活覆蓋。
+ * **這個狀態只允許存在到 4b-2c-2**——那一輪把剩下 32 條也移植完，屆時整個類級屬性與
+ * `useLegacyBladePages()` 一起拿掉。在那之前不要對這個 group 做整批刪除。
+ *
+ * @legacy-parity 剩下 32 條讀取面驗的是 legacy Blade 頁，以 useLegacyBladePages() 局部關閉環節 3 的封路。
  */
 #[Group('legacy-parity')]
 class CodesControllerTest extends TestCase {
@@ -29,9 +37,10 @@ class CodesControllerTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
 
-        // 本類驗的是 legacy Blade 頁的行為。Blade 下架計畫環節 3「先封路、不刪碼」把那些
-        // 路由改成 302／410，但頁面本身還在、還部署著、還能被 kill switch 叫回來，
-        // 所以這份覆蓋在觀察期內仍有意義——局部關閉封路即可。環節 4 實體刪除時一併移除。
+        // 只有**剩下 32 條讀取面**需要這個 opt-out（環節 3「先封路、不刪碼」把那些路由改成
+        // 302／410，頁面本身還在、還能被 kill switch 叫回來）。已於環節 4b-2c-1 改打
+        // `/app/codes/*` 的那 20 條寫入面**不需要**它——app 路由沒掛封路 middleware，
+        // 這行對它們是 no-op。環節 4b-2c-2 移植完剩下那批之後整行移除。
         $this->useLegacyBladePages();
 
         config(['codes.tables' => ['TEST_CODES', 'TEXT_CODES', 'POSSESSION_DATA', 'CBDB__NAME_FTS', 'APPOINTMENT_CODE_TYPE_REL', 'OFFICE_CODE_TYPE_REL', 'APPOINTMENT_TYPES', 'ADDR_CODES']]);
@@ -146,10 +155,10 @@ class CodesControllerTest extends TestCase {
             'description' => 'guest attempt',
         ];
 
-        $response = $this->from('/codes/TEST_CODES/create')
-            ->post('/codes/TEST_CODES', $payload);
+        $response = $this->from('/app/codes/TEST_CODES/create')
+            ->post('/app/codes/TEST_CODES', $payload);
 
-        $response->assertRedirect('/codes/TEST_CODES/create');
+        $response->assertRedirect('/app/codes/TEST_CODES/create');
         $this->assertEmpty($this->operationSpy->calls);
     }
 
@@ -171,10 +180,10 @@ class CodesControllerTest extends TestCase {
             'description' => 'inactive attempt',
         ];
 
-        $response = $this->from('/codes/TEST_CODES/create')
-            ->post('/codes/TEST_CODES', $payload);
+        $response = $this->from('/app/codes/TEST_CODES/create')
+            ->post('/app/codes/TEST_CODES', $payload);
 
-        $response->assertRedirect('/codes/TEST_CODES/create');
+        $response->assertRedirect('/app/codes/TEST_CODES/create');
         $this->assertEmpty($this->operationSpy->calls);
     }
 
@@ -190,12 +199,12 @@ class CodesControllerTest extends TestCase {
         $user->is_active = 1;
         $this->actingAs($user);
 
-        $response = $this->from('/codes/TEST_CODES/create')->post('/codes/TEST_CODES', [
+        $response = $this->from('/app/codes/TEST_CODES/create')->post('/app/codes/TEST_CODES', [
             'code_id' => 'A2',
             'description' => 'missing sub key',
         ]);
 
-        $response->assertRedirect('/codes/TEST_CODES/create');
+        $response->assertRedirect('/app/codes/TEST_CODES/create');
         $response->assertSessionHasErrors(['missing_keys']);
         $this->assertEmpty($this->operationSpy->calls);
         $this->assertEmpty($this->fakeDb->tables['TEST_CODES']);
@@ -218,9 +227,14 @@ class CodesControllerTest extends TestCase {
             'code_sub' => 'B3',
             'description' => 'active stored',
         ];
-        $response = $this->post('/codes/TEST_CODES', $expectedInsert);
+        $response = $this->post('/app/codes/TEST_CODES', $expectedInsert);
 
-        $response->assertRedirect(route('codes.edit', [
+        // ⚠️ 新增成功的重導目標 Blade 與 React **不同**：Blade 的 `store()` 傳
+        // `$editRoute = 'codes.edit'`（吃得下 `{id}` 路徑段）⇒ 落在新列的編輯頁；
+        // `appStore()` 兩個參數都傳 `'app.codes.show'`，而那條路由**沒有 `{id}` 段**
+        // ⇒ 落在列表頁並把 id 掛成 query（`?id=…`）。見 `appStore()` 的註解與
+        // `CodesCreateInertiaTest::store_inserts_row_and_redirects`。這裡照 React 實況斷言。
+        $response->assertRedirect(route('app.codes.show', [
             'table_name' => 'TEST_CODES',
             'id' => 'A3_._B3',
         ]));
@@ -253,9 +267,10 @@ class CodesControllerTest extends TestCase {
             'c_title_chn' => '範例',
         ];
 
-        $response = $this->post('/codes/TEXT_CODES', $payload);
+        $response = $this->post('/app/codes/TEXT_CODES', $payload);
 
-        $response->assertRedirect(route('codes.edit', [
+        // 重導目標的 Blade／React 差異見上一條測試的說明。
+        $response->assertRedirect(route('app.codes.show', [
             'table_name' => 'TEXT_CODES',
             'id' => 'T100',
         ]));
@@ -294,7 +309,7 @@ class CodesControllerTest extends TestCase {
         // §D-6：TEXT_CODES.c_title 為 Tier 1，手打 lv 應靜默轉 lü
         $this->actingAs($this->activeUser());
 
-        $this->post('/codes/TEXT_CODES', [
+        $this->post('/app/codes/TEXT_CODES', [
             'c_textid' => 'T200',
             'c_title' => 'Lvzhai Shier Bian',
             'c_title_chn' => '呂齋十二辨',
@@ -310,7 +325,7 @@ class CodesControllerTest extends TestCase {
         $this->actingAs($this->activeUser());
         $this->fakeDb->tables['TEXT_CODES'][] = ['c_textid' => 'T300', 'c_title' => 'old', 'c_title_chn' => '舊'];
 
-        $this->put('/codes/TEXT_CODES/T300', [
+        $this->put('/app/codes/TEXT_CODES/T300', [
             'c_textid' => 'T300',
             'c_title' => 'Nvzhen Kao',
             'c_title_chn' => '女真考',
@@ -325,7 +340,7 @@ class CodesControllerTest extends TestCase {
         // §D-6：ADDR_CODES.c_name 為 Tier 2（可能含西文），後端不轉——交前端彈窗
         $this->actingAs($this->activeUser());
 
-        $this->post('/codes/ADDR_CODES', [
+        $this->post('/app/codes/ADDR_CODES', [
             'c_addr_id' => '900',
             'c_name' => 'Lvchuan',
             'c_name_chn' => '呂川',
@@ -340,7 +355,7 @@ class CodesControllerTest extends TestCase {
         // TEST_CODES 不在 code_table_mutations config → 任何欄皆不歸一化
         $this->actingAs($this->activeUser());
 
-        $this->post('/codes/TEST_CODES', [
+        $this->post('/app/codes/TEST_CODES', [
             'code_id' => 'A9',
             'code_sub' => 'B9',
             'description' => 'lvzhai test',
@@ -361,13 +376,13 @@ class CodesControllerTest extends TestCase {
         $user->is_active = 1;
         $this->actingAs($user);
 
-        $response = $this->post('/codes/POSSESSION_DATA/proposal', [
+        $response = $this->post('/app/codes/POSSESSION_DATA/proposal', [
             'c_possession_record_id' => 3,
             'c_possession_desc' => 'proposal row',
             '__proposal_comment' => 'pk override',
         ]);
 
-        $response->assertRedirect('/codes/POSSESSION_DATA');
+        $response->assertRedirect('/app/codes/POSSESSION_DATA');
         $this->assertCount(1, $this->operationSpy->calls);
         $call = $this->operationSpy->calls[0];
         $this->assertSame(Operation::TYPE_PROPOSAL_CREATE, $call['op_type']);
@@ -791,15 +806,45 @@ class CodesControllerTest extends TestCase {
         $response->assertSee('/codes/APPOINTMENT_TYPES/T001/edit');
         $response->assertDontSee('href="/codes/APPOINTMENT_TYPES/T001_._', false);
 
+    }
+
+    /**
+     * ── 2026-09-15（Blade 下架環節 4b-2c-1）─────────────────────────
+     *
+     * 從上一條測試**拆出來**的寫入面（codex 查出）。原本它跟「列表頁的連結長相」混在同一條，
+     * 於是整條被歸進「讀取面、留給 4b-2c-2」，結果**全 repo 唯一驗「單欄主鍵表的
+     * `operations.resource_id` 不可被寫成複合鍵形式 `T002_._…`」的斷言，仍然只跑 legacy 端點**。
+     *
+     * 這條不變量與 Blade／React 無關（`performStore` 是共用的），但既然 legacy 端點即將實體
+     * 刪除，它必須在 React 端點上成立。列表頁那半（`keyColumns` view 變數與 HTML 連結）
+     * 留在原測試裡，隨其餘 32 條讀取面在 4b-2c-2 一起移植。
+     *
+     * 重導目標照 React 實況：`appStore()` 的 `$editRoute` 也是 `app.codes.show`，
+     * 而那條路由沒有 `{id}` 段 ⇒ 落在列表頁並把 id 掛成 query。
+     */
+    #[Test]
+    public function testSingleColumnPrimaryKeyStoreRecordsAScalarOperationResourceId() {
+        $user = new User([
+            'name' => 'appt-admin',
+            'email' => 'appt-admin2@example.com',
+            'confirmation_token' => Str::random(32),
+        ]);
+        $user->id = 52;
+        $user->is_active = 1;
+        $this->actingAs($user);
+
         $this->operationSpy->calls = [];
 
-        $storeResponse = $this->post('/codes/APPOINTMENT_TYPES', [
+        $storeResponse = $this->post('/app/codes/APPOINTMENT_TYPES', [
             'c_appt_type_code' => 'T002',
             'c_appt_type_desc' => 'Desc 2',
             'c_appt_type_desc_chn' => '描述二',
         ]);
 
-        $storeResponse->assertRedirect(route('codes.edit', ['table_name' => 'APPOINTMENT_TYPES', 'id' => 'T002']));
+        $storeResponse->assertRedirect(route('app.codes.show', [
+            'table_name' => 'APPOINTMENT_TYPES',
+            'id' => 'T002',
+        ]));
         $this->assertCount(1, $this->operationSpy->calls);
         $this->assertSame('T002', $this->operationSpy->calls[0]['resource_id']);
     }
@@ -823,10 +868,10 @@ class CodesControllerTest extends TestCase {
             '__proposal_comment' => 'Please review',
         ];
 
-        $response = $this->from('/codes/TEST_CODES/create')
-            ->post('/codes/TEST_CODES/proposal', $payload);
+        $response = $this->from('/app/codes/TEST_CODES/create')
+            ->post('/app/codes/TEST_CODES/proposal', $payload);
 
-        $response->assertRedirect(route('codes.show', ['table_name' => 'TEST_CODES']));
+        $response->assertRedirect(route('app.codes.show', ['table_name' => 'TEST_CODES']));
 
         $this->assertCount(1, $this->operationSpy->calls);
         $call = $this->operationSpy->calls[0];
@@ -859,7 +904,7 @@ class CodesControllerTest extends TestCase {
             '__proposal_comment' => 'Please review',
         ];
 
-        $this->post('/codes/TEST_CODES/proposal', $payload);
+        $this->post('/app/codes/TEST_CODES/proposal', $payload);
         $this->assertCount(1, $this->operationSpy->calls);
         $call = $this->operationSpy->calls[0];
 
@@ -877,77 +922,20 @@ class CodesControllerTest extends TestCase {
 
         $this->operationSpy->calls = [];
 
-        $response = $this->from('/codes/TEST_CODES/create')
-            ->post('/codes/TEST_CODES/proposal', $payload);
+        $response = $this->from('/app/codes/TEST_CODES/create')
+            ->post('/app/codes/TEST_CODES/proposal', $payload);
 
-        $response->assertRedirect('/codes/TEST_CODES/create');
+        $response->assertRedirect('/app/codes/TEST_CODES/create');
         $response->assertSessionHas('_old_input.code_id', 'PX');
         $this->assertEmpty($this->operationSpy->calls);
     }
-
-    #[Test]
-    public function testProposalOwnerCanViewEditFormForCreateProposal() {
-        $user = new User([
-            'name' => 'proposer',
-            'email' => 'proposer@example.com',
-            'confirmation_token' => Str::random(32),
-        ]);
-        $user->id = 13;
-        $user->is_active = 1;
-        $this->actingAs($user);
-
-        DB::table('operations')->delete();
-        $resourceData = [
-            'code_id' => 'PX',
-            'code_sub' => '01',
-            'description' => 'Proposal',
-            '__key_columns' => ['code_id', 'code_sub'],
-            '__review_status' => 'pending',
-            '__proposal_meta' => [
-                'submitted_by' => $user->name,
-                'submitted_by_id' => $user->id,
-                'submitted_at' => Carbon::now()->format('Y-m-d H:i:s'),
-            ],
-        ];
-        DB::table('operations')->insert([
-            'id' => 2,
-            'user_id' => $user->id,
-            'resource' => 'TEST_CODES',
-            'resource_id' => 'PX_._01',
-            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
-            'resource_data' => json_encode($resourceData),
-            'resource_original' => json_encode([]),
-            'created_at' => Carbon::now()->format('Y-m-d H:i:s'),
-            'updated_at' => Carbon::now()->format('Y-m-d H:i:s'),
-        ]);
-
-        $controller = new class (app(CodesRepository::class), $this->operationSpy, $resourceData, $user) extends CodesController {
-            private $mockOperation;
-
-            public function __construct($codesRepository, $operationRepository, array $resourceData, User $user) {
-                parent::__construct($codesRepository, $operationRepository);
-                $this->mockOperation = [
-                    'id' => 2,
-                    'resource' => 'TEST_CODES',
-                    'op_type' => Operation::TYPE_PROPOSAL_CREATE,
-                    'resource_data' => json_encode($resourceData),
-                    'resource_original' => json_encode([]),
-                    'user_id' => $user->id,
-                ];
-            }
-
-            protected function findOperationOrAbort(int $operationId): array {
-                return $this->mockOperation;
-            }
-        };
-
-        $view = $controller->proposalEdit('TEST_CODES', 2);
-        $this->assertSame('codes.proposal-edit', $view->getName());
-        $data = $view->getData();
-        $this->assertSame('PX', $data['values']['code_id']);
-        $this->assertSame('01', $data['values']['code_sub']);
-        $this->assertSame('Proposal', $data['values']['description']);
-    }
+    // ── 2026-09-15（Blade 下架環節 4b-2c-1）─────────────────────────
+    // 這裡原本有 testProposalOwnerCanViewEditFormForCreateProposal。它**不打 HTTP**：
+    // new 一個匿名子類覆蓋 findOperationOrAbort()，直接呼叫 $controller->proposalEdit()
+    // 並斷言 $view->getName() === 'codes.proposal-edit'——那個斷言本身就是 Blade 專屬的。
+    // 已移植到 tests/Feature/CodesProposalEditInertiaTest.php 的
+    // composite_key_create_proposal_renders_both_key_columns()（打真正的路由、走授權），
+    // 那裡同時補上了本 repo 缺的「create 提案 ＋ 複合主鍵」形狀。
 
     #[Test]
     public function testActiveUserCanSubmitUpdateProposal() {
@@ -972,10 +960,10 @@ class CodesControllerTest extends TestCase {
             '__proposal_comment' => 'Need approval',
         ];
 
-        $response = $this->from('/codes/TEST_CODES/UX_._02/edit')
-            ->post('/codes/TEST_CODES/UX_._02/proposal', $payload);
+        $response = $this->from('/app/codes/TEST_CODES/UX_._02/edit')
+            ->post('/app/codes/TEST_CODES/UX_._02/proposal', $payload);
 
-        $response->assertRedirect(route('codes.edit', ['table_name' => 'TEST_CODES', 'id' => 'UX_._02']));
+        $response->assertRedirect(route('app.codes.edit', ['table_name' => 'TEST_CODES', 'id' => 'UX_._02']));
 
         $this->assertCount(1, $this->operationSpy->calls);
         $call = $this->operationSpy->calls[0];
@@ -1023,7 +1011,7 @@ class CodesControllerTest extends TestCase {
         ]);
 
         $response = $this->from(route('app.operations.index', ['proposals_only' => 1]))
-            ->delete(route('codes.proposals.cancel', ['table_name' => 'TEST_CODES', 'operation' => 4]));
+            ->delete(route('app.codes.proposals.cancel', ['table_name' => 'TEST_CODES', 'operation' => 4]));
 
         $response->assertRedirect(route('app.operations.index', ['proposals_only' => 1]));
 
@@ -1072,8 +1060,8 @@ class CodesControllerTest extends TestCase {
             'updated_at' => Carbon::now()->subDay()->format('Y-m-d H:i:s'),
         ]);
 
-        $response = $this->from(route('codes.proposals.edit', ['table_name' => 'TEST_CODES', 'operation' => 3]))
-            ->patch(route('codes.proposals.update', ['table_name' => 'TEST_CODES', 'operation' => 3]), [
+        $response = $this->from(route('app.codes.proposals.edit', ['table_name' => 'TEST_CODES', 'operation' => 3]))
+            ->patch(route('app.codes.proposals.update', ['table_name' => 'TEST_CODES', 'operation' => 3]), [
                 'code_id' => 'PX',
                 'code_sub' => '02',
                 'description' => 'Updated proposal',
@@ -1121,8 +1109,8 @@ class CodesControllerTest extends TestCase {
             'updated_at' => Carbon::now()->subDay()->format('Y-m-d H:i:s'),
         ]);
 
-        $this->from(route('codes.proposals.edit', ['table_name' => 'TEXT_CODES', 'operation' => 8]))
-            ->patch(route('codes.proposals.update', ['table_name' => 'TEXT_CODES', 'operation' => 8]), [
+        $this->from(route('app.codes.proposals.edit', ['table_name' => 'TEXT_CODES', 'operation' => 8]))
+            ->patch(route('app.codes.proposals.update', ['table_name' => 'TEXT_CODES', 'operation' => 8]), [
                 'c_textid' => 'T500',
                 'c_title' => 'Lvzhai',
             ])->assertRedirect(route('app.operations.index', ['proposals_only' => 1]));
@@ -1211,11 +1199,11 @@ class CodesControllerTest extends TestCase {
         $user->is_active = 1;
         $this->actingAs($user);
 
-        $response = $this->put('/codes/TEST_CODES/A1_._X1', [
+        $response = $this->put('/app/codes/TEST_CODES/A1_._X1', [
             'description' => 'Updated',
         ]);
 
-        $response->assertRedirect(route('codes.edit', [
+        $response->assertRedirect(route('app.codes.edit', [
             'table_name' => 'TEST_CODES',
             'id' => 'A1_._X1',
         ]));
@@ -1247,9 +1235,9 @@ class CodesControllerTest extends TestCase {
         $user->is_active = 1;
         $this->actingAs($user);
 
-        $response = $this->delete('/codes/TEST_CODES/A1_._X1');
+        $response = $this->delete('/app/codes/TEST_CODES/A1_._X1');
 
-        $response->assertRedirect(route('codes.show', ['table_name' => 'TEST_CODES']));
+        $response->assertRedirect(route('app.codes.show', ['table_name' => 'TEST_CODES']));
 
         // 封堵在刪除前直接 return，故不會記錄任何刪除 operation。
         $this->assertCount(0, $this->operationSpy->calls);
@@ -1270,11 +1258,11 @@ class CodesControllerTest extends TestCase {
         $user->is_active = 1;
         $this->actingAs($user);
 
-        $response = $this->from('/codes/TEST_CODES/A1_._X1/edit')->put('/codes/TEST_CODES/A1_._X1', [
+        $response = $this->from('/app/codes/TEST_CODES/A1_._X1/edit')->put('/app/codes/TEST_CODES/A1_._X1', [
             'description' => 'Updated',
         ]);
 
-        $response->assertRedirect('/codes/TEST_CODES/A1_._X1/edit');
+        $response->assertRedirect('/app/codes/TEST_CODES/A1_._X1/edit');
         $response->assertSessionHasErrors(['duplicate']);
         $response->assertSessionHas('_old_input.description', 'Updated');
         $this->assertEmpty($this->operationSpy->calls);

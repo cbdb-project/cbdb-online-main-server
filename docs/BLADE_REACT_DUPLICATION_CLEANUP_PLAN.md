@@ -618,11 +618,71 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
     ③ 短路 `recordOperation()` 尾端的 `audit_log` 寫入 ⇒ **4 條紅**；
     ④ 拆掉 `performDestroy()` 的「刪除已停用」護欄 ⇒ **1 條紅**。
     legacy-parity 211 → **183**。
-  - **4b-2c 待做**：codes 讀取面（`CodesControllerTest` 52 條、`CodesBooleanFilterIntegrationTest`
-    5 條、`OperationsIndexLinksTest` 剩的 1 條）。這批**不能照抄 4b-2b 的前綴替換**——
-    它們大量斷言 Blade 視圖變數（`testViewReceivesFilterSortDirVariables`、
-    `testToggleOffLinkPreservesRawErrorColumn`、`testCreateViewPlacesPrimaryKeyFirstWithDefaultValue`
-    等）與 HTML，要逐條決定對應的 Inertia prop。
+  - **4b-2c-1 ✅ 已完成（2026-09-15）——`CodesControllerTest` 的寫入面 20 條**：
+    該檔 52 條裡有 **19 條沒有任何視圖斷言**（只有 `assertRedirect`／`assertDatabase*`／
+    `assertSame`／`assertCount`），技術上與 4b-2b 同型 ⇒ URI 與 route name 前綴替換；
+    **另有 1 條移植後刪除**、**1 條從讀寫混合的測試裡拆出寫入面**（兩者見下）。
+    檔案 52 →（刪 1）51 →（拆出 1）**52**；寫入面 **20 條**、讀取面 **32 條**。
+    （初稿我把這句寫成「20 條沒有視圖斷言 ＋ 另外 1 條移植」＝ 21，與「只刪 1 條」矛盾；
+    被 review 用逐方法 diff 指正為 19＋1。）
+    🔴 **codex 再抓出一條漏網**：`testSingleColumnPrimaryKeyUsesSchemaPrimaryIndexForLinksAndOperationIds`
+    因為**同時**斷言列表頁 HTML **和** store 之後的 `operations.resource_id`，被我整條歸進
+    「讀取面、留到 4b-2c-2」——於是**全 repo 唯一驗「單欄主鍵表的 `resource_id` 不可被寫成
+    複合鍵形式 `T002_._…`」的斷言，仍然只跑 legacy 端點**。已把寫入面拆成
+    `testSingleColumnPrimaryKeyStoreRecordsAScalarOperationResourceId()` 打 `/app/codes/*`，
+    列表那半留在原測試隨 4b-2c-2 一起移植。
+    **教訓：分流的判準不能是「這條測試有沒有視圖斷言」，而是「這條測試裡的每一個斷言分別屬於哪一面」。**
+    鑑別力實測：把 `getKeyColumns()` 的 schema primary index 分支拿掉 ⇒ 拆出來那條與原測試**都紅**。
+    🔴 **兩條在替換後立刻紅，而且紅得有價值**：`testActiveUserStoreLogsOperation` 與
+    `testStoreFillsCreateAuditFieldsWhenAvailable` 原本斷言 `route('codes.edit', ['id' => …])`，
+    機械替換成 `app.codes.edit` 之後實際拿到的是 **`/app/codes/{table}?id=…`**
+    ——正是 4b-2b 記下的 `appStore()` 過期接線（`$editRoute` 也傳 `app.codes.show`，
+    那條路由沒有 `{id}` 段）。**這證明前綴替換不能無腦做**：route name 相同不代表
+    兩邊的重導目標相同。已改成照 React 實況斷言並在測試裡寫明差異來源。
+    另外 1 條是真正的移植：`testProposalOwnerCanViewEditFormForCreateProposal` **不打 HTTP**
+    ——new 一個匿名子類覆蓋 `findOperationOrAbort()`、直接呼叫 `proposalEdit()` 並斷言
+    `$view->getName() === 'codes.proposal-edit'`（Blade 專屬，且繞過路由與授權）。
+    同檔的 React 版 `CodesProposalEditInertiaTest::proposal_edit_renders_with_values()`
+    已覆蓋大部分，但差**兩件事**：原測試是 **create 提案**（`values` 只能從 `resource_data`
+    還原，沒有現成資料列可回退）且用**複合主鍵**（`code_id`+`code_sub`），既有那條是
+    update ＋ 單欄主鍵 ⇒ 先補
+    `composite_key_create_proposal_renders_both_key_columns()`，**再**刪 legacy 那條。
+    ⚠️ **刻意不宣稱「有一條只有它才抓得到的 mutation」**：實測把 `values` 來源改成
+    `resource_original` 是**兩條一起紅**，幾種收窄 `$columns` 的 mutation 也是。
+    它的價值是**形狀覆蓋**（create ＋ 複合主鍵這個組合移植後沒有別的測試踩得到，
+    而「`__key_columns` 只還原了第一個鍵欄」這類 bug 單欄主鍵的測試永遠看不見）。
+    legacy-parity **183 → 183**（刪 1 條、拆出 1 條剛好抵銷；而且 `#[Group]` 是類級的，
+    32 條讀取面還在同一檔 ⇒ 這個數字要等 4b-2c-2 才會真的掉下來）。
+    🔴 **這 20 條現在坐在一個類級 `#[Group('legacy-parity')]` 底下，而那個 group 的既定用途是
+    「舊版下線時一鍵清理」——它們測的已經是 React 路徑，被那一鍵掃掉就是刪掉活的覆蓋。**
+    這個風險只存在於 4b-2c-1 與 4b-2c-2 之間（4b-2c-2 會把剩下 32 條也移植完，屆時整個類級
+    屬性與 `useLegacyBladePages()` 一起拿掉）。**4b-2c-2 必須做完，不可停在這裡**；
+    在那之前，類的 docblock 與 `setUp()` 註解已改成明講「本類目前是混的：20 條打 React、
+    32 條仍打 Blade」，不再宣稱整類都驗 legacy。
+    📌 **順帶記錄一個覆蓋缺口**：`CodesController::proposalEdit()`（Blade 版）現在
+    **全 repo 零測試覆蓋**——唯一覆蓋它的就是本環節刪掉的那條。這與 4b「封路但未刪碼」的
+    姿態一致（請求根本到不了它），但 `LEGACY_PAGE_RETIREMENT=false` 回退會重新暴露一個
+    沒有測試的方法。4b-4 刪掉它時這筆自然消失。
+  - **4b-2c-2 待做**：codes 讀取面（`CodesControllerTest` 剩的 32 條、
+    `CodesBooleanFilterIntegrationTest` 5 條、`OperationsIndexLinksTest` 剩的 1 條）。
+    這批**不能照抄前綴替換**——它們斷言 Blade 視圖變數與 HTML。已測繪出 prop 對照：
+    `filters`→`filters`、`sortBy`→`sort_by`、`sortDir`→`sort_dir`、
+    `booleanEnabled`→`boolean_enabled`、`booleanFilterAvailable`→`boolean_filter_available`、
+    `filterErrors`→`filter_errors`、`filterDescriptions`→`filter_descriptions`、
+    `useCursorPagination`→`use_cursor`、`keyColumns`→`key_columns`。
+    🔴 **`appliedFilters`（3 條）沒有對應的 prop，而且這不是斷言換法的問題、是 parity 落差**
+    （初稿我寫「改成斷言分頁連結、比原本更強」——**兩個前提都不成立**，review 實測推翻）：
+    - 它在共用 payload 的第 798 行，有**兩個**消費者：分頁 `appends`（第 763–764 行）
+      **以及** `resources/views/codes/show.blade.php:15` 的
+      `$linkFilters = $appliedFilters ?? $filters;`（驅動欄位排序／篩選連結，不只分頁）。
+    - **Inertia payload 裡根本沒有分頁連結可斷言**：`meta` 只有
+      `current_page`／`last_page`／`per_page`／`total`／`from`／`to`，`cursor` 是原始 id。
+    - React 的導覽是**前端**組的：`resources/js/inertia/Pages/Codes/Show.tsx` 的 `visit()`
+      用 `Object.entries(useFilters).filter(([, v]) => v !== '')`——判準是**非空**，不是
+      **已套用**。布林語法錯誤的欄位是非空的 ⇒ **React 會把它回灌進 URL**，Blade 不會。
+    ⇒ 這是**生產行為的決定**，不是移植動作：要嘛補一個 `applied_filters` prop 並讓 `visit()`
+    改用它，要嘛明知並接受這個分歧（後果是「壞掉的篩選條件黏在網址上、每次換頁都再報一次錯」，
+    不是資料損壞）。**4b-2c-2 開工前要先拍板**，那 3 條測試的移植形式取決於這個決定。
   - **4b-3 待做**：manage／profile／admin 側（`ManagePagesLoadTest` 12、`UserProfileTest` 17、
     `InactiveAccountAccessTest` 20、`AdminExplainSqlTest` 6、3 個 batch-load 共 68、
     `UnidirectionalRelationshipRepairControllerTest` 2）。

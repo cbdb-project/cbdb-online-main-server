@@ -368,18 +368,17 @@ class CodesController extends Controller {
 
         return $request->boolean('filter_bool');
     }
-
-    public function index() {
-        $data = $this->codesrepostory->codes();
-
-        return view('codes.index', [
-            'page_title' => __('nav.all_tables'),
-            'page_title_key' => '全部表格',
-            'page_description' => __('nav.all_tables_desc'),
-            'page_url' => '/codes',
-            'data' => $data,
-        ]);
-    }
+    // ── 2026-09-15（Blade 下架環節 4b-4a）─────────────────────────────
+    //
+    // 這裡原本有 10 個 legacy Blade 方法：index／show／create／edit／proposalEdit
+    // （render view）與 store／update／destroy／proposalStore／proposalUpdate（薄殼）。
+    // 視圖已實體刪除，舊 URI 只剩 302／410 的 closure（見 routes/web.php）。
+    //
+    // 🔴 **刻意留下、不可連坐刪除的**：
+    //  - `export()`：`codes.export` **沒掛過 legacy.page**，是 React 版正在用的端點。
+    //  - `proposalUpdateExisting()`／`proposalCancel()`：**不是薄殼**——legacy 與 app
+    //    四條路由指向的是同一個方法（見環節 4b-2b）。
+    //  - 所有 `perform*()`：那是 Blade 與 React 共用的寫入實作，React 端仍在用。
 
     /**
      * Inertia + React 版：代碼表總覽。
@@ -415,26 +414,6 @@ class CodesController extends Controller {
         }
 
         return '/codes/' . $tableName;
-    }
-
-    public function show(Request $request, $table_name) {
-        $table = $this->guardTable($table_name);
-        $search = trim((string) $request->query('search', ''));
-
-        try {
-            $payload = $this->buildShowPayload($request, $table, $search);
-        } catch (\PDOException $e) {
-            flash('找不到該資料表', 'warning');
-
-            return redirect()->back();
-        }
-
-        return view('codes.show', array_merge([
-            'page_title' => $table,
-            'page_description' => '',
-            'page_url' => '/codes',
-            'archer' => "<li class='breadcrumb-item'><a href='/codes'>全部表格</a></li>",
-        ], $payload));
     }
 
     /**
@@ -868,67 +847,6 @@ class CodesController extends Controller {
         ]);
     }
 
-    public function edit($table_name, $id) {
-        //        dd($table_name);
-        $table = $this->guardTable($table_name);
-        if ($this->isReadOnlyTable($table)) {
-            flash('該代碼表為只讀，禁止編輯。', 'warning');
-
-            return redirect()->route('app.codes.show', ['table_name' => $table]);
-        }
-        if ($table) {
-            try {
-                $keyColumns = $this->getKeyColumns($table);
-                $conditions = $this->buildConditionsFromId($keyColumns, $id);
-
-                $query = DB::table($table);
-                foreach ($conditions as $column => $value) {
-                    $query->where($column, $value);
-                }
-                $data = $query->first();
-
-                // 舊版操作紀錄可能以 '-' 分隔複合鍵（如 "4005-7531"），
-                // 若以標準 '_._' 分隔找不到，嘗試用 '-' 重新解析
-                if (!$data && count($keyColumns) > 1
-                    && !str_contains($id, '_._') && str_contains($id, '-')) {
-                    $fallbackConditions = $this->buildConditionsFromId($keyColumns, str_replace('-', '_._', $id));
-                    if (count($fallbackConditions) > count($conditions)) {
-                        $fallbackQuery = DB::table($table);
-                        foreach ($fallbackConditions as $col => $val) {
-                            $fallbackQuery->where($col, $val);
-                        }
-                        $data = $fallbackQuery->first();
-                    }
-                }
-
-                if (!$data) {
-                    flash('找不到該筆資料', 'warning');
-
-                    return redirect()->back();
-                }
-
-                $rowArray = $this->convertRowToArray($data);
-                $rowArray = $this->orderAuditFieldsForDisplay($rowArray);
-                $compositeId = $this->buildCompositeId($keyColumns, $rowArray);
-
-                return view('codes.edit', [
-                    'page_title' => '編輯',
-                    'page_description' => '',
-                    'page_url' => '/codes',
-                    'archer' => "<li class='breadcrumb-item'><a href='/codes'>全部表格</a></li><li class='breadcrumb-item'><a href='/codes/".rawurlencode($table)."'>".e($table)."</a></li>",
-                    'id' => $compositeId, 'row' => $rowArray,
-                    'table' => $table]);
-            } catch (\PDOException $e) {
-                flash('找不到該資料表', 'warning');
-
-                return redirect()->back();
-            }
-
-        }
-
-        return redirect()->route('app.codes.index');
-    }
-
     /**
      * Inertia + React 版：編輯表單頁。
      */
@@ -1308,12 +1226,6 @@ class CodesController extends Controller {
         ]);
     }
 
-    public function update(Request $request, $table_name, $id) {
-        $table = $this->guardTable($table_name);
-
-        return $this->performUpdate($request, $table, $id, 'codes.show', 'codes.edit');
-    }
-
     /**
      * Inertia + React 版：直接更新（與 Blade update 共用 performUpdate）。
      */
@@ -1437,43 +1349,6 @@ class CodesController extends Controller {
         return redirect()->route($editRoute, ['table_name' => $table, 'id' => $id]);
     }
 
-    //20210315增加table_name等於SOCIAL_INSTITUTION_CODES的例外判斷式，將預設遮除的第1個欄位呈現。
-    public function create($table_name) {
-        //        dd($table_name);
-        $table = $this->guardTable($table_name);
-        if ($this->isReadOnlyTable($table)) {
-            flash('該代碼表為只讀，禁止新增。', 'warning');
-
-            return redirect()->route('app.codes.show', ['table_name' => $table]);
-        }
-        $columns = $this->getTableColumns($table);
-        $keyColumns = $this->getKeyColumns($table);
-        $columns = $this->orderColumnsForCreate($columns, $keyColumns);
-
-        $defaults = [];
-        $firstKey = $keyColumns[0] ?? null;
-        if ($firstKey && in_array($firstKey, $columns, true)) {
-            $nextValue = $this->guessNextKeyValue($table, $firstKey);
-            if ($nextValue !== null) {
-                $defaults[$firstKey] = $nextValue;
-            }
-        }
-
-        $firstColumn = $columns[0] ?? null;
-        $id = $firstColumn && isset($defaults[$firstColumn]) ? $defaults[$firstColumn] : null;
-
-        return view('codes.create', [
-            'page_title' => '新增',
-            'page_description' => '',
-            'page_url' => '/codes',
-            'archer' => "<li class='breadcrumb-item'><a href='/codes'>Codes</a></li><li class='breadcrumb-item'><a href='/codes/".rawurlencode($table)."'>".e($table)."</a></li>",
-            'row' => $columns,
-            'id' => $id,
-            'defaults' => $defaults,
-            'table' => $table,
-        ]);
-    }
-
     /**
      * Inertia + React 版：新增表單頁。
      */
@@ -1534,12 +1409,6 @@ class CodesController extends Controller {
                 'codes' => is_array($t = trans('codes')) ? $t : [],
             ],
         ]);
-    }
-
-    public function proposalStore(Request $request, $table_name) {
-        $table = $this->guardTable($table_name);
-
-        return $this->performProposalStore($request, $table, 'codes.show');
     }
 
     /**
@@ -1635,34 +1504,6 @@ class CodesController extends Controller {
         $this->flashCoordinateNotices($coordinateCleared, []);
 
         return redirect()->route($showRoute, ['table_name' => $table]);
-    }
-
-    public function proposalEdit($table_name, $operationId) {
-        $table = $this->guardTable($table_name);
-        $operation = $this->findOperationOrAbort((int) $operationId);
-        $payload = $this->ensureProposalEditable($operation, $table);
-
-        $columns = Schema::getColumnListing($table);
-        $values = [];
-        foreach ($columns as $column) {
-            $values[$column] = $payload[$column] ?? '';
-        }
-
-        return view('codes.proposal-edit', [
-            'table' => $table,
-            'columns' => $columns,
-            'values' => $values,
-            'operationId' => $operation['id'],
-            'keyColumns' => $payload['__key_columns'] ?? $this->getKeyColumns($table),
-            'proposalMeta' => $payload['__proposal_meta'] ?? [],
-            'reviewStatus' => $payload['__review_status'] ?? 'pending',
-            'reviewComment' => $payload['__review_comment'] ?? null,
-            'isCreateProposal' => (int) $operation['op_type'] === Operation::TYPE_PROPOSAL_CREATE,
-            'page_title' => 'Codes',
-            'page_description' => $table . ' ' . __('admin.proposal_adjustment'),
-            'page_url' => route('codes.show', ['table_name' => $table]),
-            'archer' => "<li class='breadcrumb-item'><a href='/codes'>全部表格</a></li><li class='breadcrumb-item'><a href='/codes/".rawurlencode($table)."'>".e($table)."</a></li><li class='breadcrumb-item active'>提案調整</li>",
-        ]);
     }
 
     /**
@@ -1869,13 +1710,6 @@ class CodesController extends Controller {
         return redirect()->route('app.operations.index', ['proposals_only' => 1]);
     }
 
-    //20210315增加table_name等於SOCIAL_INSTITUTION_CODES的例外判斷式，將預設自動增加的$id遮除。
-    public function store(Request $request, $table_name) {
-        $table = $this->guardTable($table_name);
-
-        return $this->performStore($request, $table, 'codes.show', 'codes.edit');
-    }
-
     /**
      * Inertia + React 版：直接儲存（與 Blade store 共用 performStore）。
      */
@@ -2010,12 +1844,6 @@ class CodesController extends Controller {
         return redirect()->route($editRoute, ['table_name' => $table, 'id' => $id]);
     }
 
-    public function proposalUpdate(Request $request, $table_name, $id) {
-        $table = $this->guardTable($table_name);
-
-        return $this->performProposalUpdate($request, $table, $id, 'codes.edit');
-    }
-
     /**
      * Inertia + React 版：提交修改提案（與 Blade proposalUpdate 共用）。
      */
@@ -2095,12 +1923,6 @@ class CodesController extends Controller {
         $this->flashCoordinateNotices($coordinateCleared, $originalRow);
 
         return redirect()->route($editRoute, ['table_name' => $table, 'id' => $id]);
-    }
-
-    public function destroy($table_name, $id) {
-        $table = $this->guardTable($table_name);
-
-        return $this->performDestroy($table, $id, 'codes.show');
     }
 
     /**

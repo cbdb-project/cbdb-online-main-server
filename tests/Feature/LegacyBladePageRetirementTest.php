@@ -71,8 +71,9 @@ class LegacyBladePageRetirementTest extends TestCase {
     /**
      * 仍由 `legacy.page` middleware 封路的顯示頁（視圖還在，kill switch 可叫回）。
      *
-     * ⚠️ **已實體刪除的 9 條唯讀頁不在這裡**——它們改成 redirect closure，見
-     * `deletedReadonlyPageProvider()`。兩者對 302 行為而言等價（都是 302 + 同一目標），
+     * ⚠️ **已實體刪除的 14 條顯示頁不在這裡**——它們改成 redirect closure，見
+     * `deletedLegacyPageProvider()`（4a-3 的 9 條唯讀頁 + 4b-4a 的 5 條 codes 頁；
+     * 名稱從 `deletedReadonlyPageProvider` 改過來，因為 codes 的 create／edit 不是唯讀頁）。兩者對 302 行為而言等價（都是 302 + 同一目標），
      * 所以下面那條 302 測試同時吃兩個 provider；但**回退能力完全不同**，
      * 所以身分清單（`exactly_the_manifested_routes_are_gated()`）只含這一批。
      *
@@ -83,15 +84,8 @@ class LegacyBladePageRetirementTest extends TestCase {
      */
     public static function gatedDisplayPageProvider(): array {
         return [
-            // 環節 4b-1 收斂後才封得起來：它是 React operations 頁「修改提案」連結的目標，
-            // 而 OperationsController 產那個 payload 時**沒有 Route::has() 保護**——
-            // 所以得先把那一行改指 app.codes.proposals.edit 才能封這條。
-            'codes proposal edit' => ['/codes/ADDR_CODES/proposals/1/edit', '/app/codes/ADDR_CODES/proposals/1/edit'],
+            // codes 的 5 條顯示頁已於環節 4b-4a **實體刪除**，移到 deletedLegacyPageProvider()。
             'profile' => ['/profile', '/app/profile'],
-            'codes index' => ['/codes', '/app/codes'],
-            'codes show' => ['/codes/ADDR_CODES', '/app/codes/ADDR_CODES'],
-            'codes create' => ['/codes/ADDR_CODES/create', '/app/codes/ADDR_CODES/create'],
-            'codes edit' => ['/codes/ADDR_CODES/1/edit', '/app/codes/ADDR_CODES/1/edit'],
             'manage index' => ['/manage', '/app/manage'],
             'manage edit' => ['/manage/1/edit', '/app/manage/1/edit'],
             'explainsql' => ['/admin/explainsql', '/app/admin/explainsql'],
@@ -105,7 +99,7 @@ class LegacyBladePageRetirementTest extends TestCase {
 
     #[Test]
     #[DataProvider('gatedDisplayPageProvider')]
-    #[DataProvider('deletedReadonlyPageProvider')]
+    #[DataProvider('deletedLegacyPageProvider')]
     public function legacy_display_pages_redirect_to_the_react_equivalent(string $from, string $to): void {
         $this->actingAs($this->superAdmin())
             ->get($from)
@@ -144,6 +138,64 @@ class LegacyBladePageRetirementTest extends TestCase {
         $this->assertSame(['page' => '3', 'sort_by' => 'c_addr_id'], $params);
     }
 
+    /**
+     * ── 2026-09-15（環節 4b-4a 的 review 抓到兩個 bug，這是它們的回歸測試）─────
+     *
+     * 第一版把 302 目標**手拼成字串**（`'/app/codes/'.rawurlencode($t).'/'.$id.'/edit'`），
+     * 產生兩個對舊 `RetireLegacyBladePage` 的退化：
+     *  1. 五條裡有一條（`proposals/{operation}/edit`）**漏拼 query string**；
+     *  2. `$id` **完全沒編碼**（`$table_name` 有，不一致）——代碼表已支援文本主鍵，
+     *     `$id = '慎'` 會讓 `Location` 吐裸 UTF-8，`a%2Fb` 更會被解成真的路徑分隔。
+     *
+     * 現在一律走 `route($target, $request->route()->parameters(), false)`。
+     * `redirects_preserve_the_query_string()` 只驗 `codes.show`，抓不到第 1 點，故另立本條。
+     */
+    #[Test]
+    public function codes_redirects_preserve_the_query_string_and_encode_the_id(): void {
+        $user = $this->superAdmin();
+
+        // ① 五條顯示頁**全部**要保留 query string（第一版只有四條）。
+        $withQs = [
+            '/codes?a=1',
+            '/codes/ADDR_CODES?a=1',
+            '/codes/ADDR_CODES/create?a=1',
+            '/codes/ADDR_CODES/1/edit?a=1',
+            '/codes/ADDR_CODES/proposals/1/edit?a=1',
+        ];
+        foreach ($withQs as $uri) {
+            $location = (string) $this->actingAs($user)->get($uri)->headers->get('Location');
+            $this->assertStringContainsString('a=1', $location, "{$uri} 的導向丟掉了 query string");
+        }
+
+        // ② 文本主鍵要被 rawurlencode，不可原樣吐進 Location。
+        $location = (string) $this->actingAs($user)->get('/codes/ALTNAME_DATA/'.rawurlencode('慎').'/edit')
+            ->headers->get('Location');
+        $this->assertStringContainsString(rawurlencode('慎'), $location);
+        $this->assertStringNotContainsString('慎', $location, 'Location 必須是 ASCII URI-reference');
+
+        // ③ 🔴 **`/`、`=`、`&` 刻意原樣通過，不要「順手修掉」**（codex 提出後實測確認的取捨）。
+        //
+        // `route($target, $params, false)` 會 rawurlencode 但**只放行** `/ ? & # %`——
+        // 而這正是被移除的 `RetireLegacyBladePage`（`app/Http/Middleware/…:80-81`）做的事，
+        // 一字不差。所以這不是本環節引入的退化，是**刻意的 parity**。
+        //
+        // 而且不能改：codes 的 `{id}` 是 `where('id', '.*')`，`operations.resource_id` 對複合主鍵
+        // 存的就是 `c_personid=108625&c_merged_from_personid=404794` 這種**帶 `=` 與 `&`** 的格式
+        // （見 OperationsIndexLinksTest::test_codes_edit_page_resolves_the_right_composite_row）。
+        // 先 rawurlencode 再交給 route() 會把那個格式改寫成 `%3D`／`%26`，等於單方面改掉一個
+        // 出現在 operations payload 裡的 URL 形狀。
+        //
+        //（`?` 與 `#` 在真實請求裡永遠到不了 `$id`——它們在 HTTP 層就已經是 query／fragment 的
+        // 起點，所以那兩個字元只在「用 route() 產連結」時才可能出現，不在本 closure 的輸入域。）
+        $composite = 'c_personid=108625&c_merged_from_personid=404794';
+        $location = (string) $this->actingAs($user)->get('/codes/MERGED_PERSON_DATA/'.$composite.'/edit')
+            ->headers->get('Location');
+        $this->assertStringContainsString($composite, $location, '複合主鍵的 =／& 必須原樣通過');
+
+        $location = (string) $this->actingAs($user)->get('/codes/T/a/b/edit')->headers->get('Location');
+        $this->assertStringEndsWith('/app/codes/T/a/b/edit', $location);
+    }
+
     // ── legacy 寫入端 → 410 ──────────────────────────────────
 
     /**
@@ -159,7 +211,9 @@ class LegacyBladePageRetirementTest extends TestCase {
             'batch books pinyin' => ['post', '/admin/batch-load-book-titles/update-pinyin'],
             'batch offices store' => ['post', '/admin/batch-load-offices'],
             'batch social store' => ['post', '/admin/batch-load-social-institutes'],
-            // 與上面那條 GET proposal-edit 同 URI 家族，一起封（manifest 的 A 類）。
+            // codes 這 7 條自環節 4b-4a 起是 `abort(410)` 的 closure，不再是 middleware
+            // ——**狀態碼一樣，但 kill switch 對它們已無作用**（同 4a-3 的 merge-preview POST）。
+            // 專屬測試見 legacy_codes_endpoints_stay_retired_without_the_kill_switch()。
             'codes proposal update' => ['patch', '/codes/ADDR_CODES/proposals/1'],
             'codes proposal cancel' => ['delete', '/codes/ADDR_CODES/proposals/1'],
             'codes store' => ['post', '/codes/ADDR_CODES'],
@@ -260,8 +314,6 @@ class LegacyBladePageRetirementTest extends TestCase {
     #[Test]
     public function exactly_the_manifested_routes_are_gated(): void {
         $expected = [
-            'DELETE codes/{table_name}/proposals/{operation}',
-            'DELETE codes/{table_name}/{id}',
             'DELETE manage/{manage}',
             'GET admin/batch-load-book-titles',
             'GET admin/batch-load-offices',
@@ -269,17 +321,11 @@ class LegacyBladePageRetirementTest extends TestCase {
             'GET admin/cbdb-table-maintenance',
             'GET admin/explainsql',
             'GET admin/unidirectional-relationship-repair',
-            'GET codes',
-            'GET codes/{table_name}',
-            'GET codes/{table_name}/create',
-            'GET codes/{table_name}/proposals/{operation}/edit',
-            'GET codes/{table_name}/{id}/edit',
             'GET manage',
             'GET manage/create',
             'GET manage/{manage}',
             'GET manage/{manage}/edit',
             'GET profile',
-            'PATCH codes/{table_name}/proposals/{operation}',
             'PATCH profile',
             'POST admin/batch-load-book-titles',
             'POST admin/batch-load-book-titles/undo',
@@ -287,11 +333,7 @@ class LegacyBladePageRetirementTest extends TestCase {
             'POST admin/batch-load-offices',
             'POST admin/batch-load-social-institutes',
             'POST admin/explainsql',
-            'POST codes/{table_name}',
-            'POST codes/{table_name}/proposal',
             'POST manage',
-            'POST|PATCH codes/{table_name}/{id}/proposal',
-            'PUT|PATCH codes/{table_name}/{id}',
             'PUT|PATCH manage/{manage}',
         ];
 
@@ -368,13 +410,17 @@ class LegacyBladePageRetirementTest extends TestCase {
     /**
      * 🔴 **封路不讀 migration flag**——這是回退鍵改變的核心，值得寫死。
      *
-     * 環節 3 之前，`codes` 這批頁面把 `MIGRATION_FLAG_*` 翻回 `old` 就會回到 Blade 版；
+     * 環節 3 之前，這批頁面把 `MIGRATION_FLAG_*` 翻回 `old` 就會回到 Blade 版；
      * 環節 3 之後 `legacy.page` middleware 排在 controller 之前、且完全不看 flag，所以翻 flag
-     * **沒有任何效果**。這不只是行為差異，而是一個**安全**陳述：
-     * `docs/CODES_SORT_FILTER_AUTH_GATE.md` 記載「Blade 版 `codes/{table_name}` 是無門檻的深分頁
-     * 排序查詢」，而它重新暴露的條件已經從「翻 flag」變成「`LEGACY_PAGE_RETIREMENT=false`」。
+     * **沒有任何效果**。
      *
-     * 沒有這條測試，那份文檔就只是另一句會再次過時的話。
+     * 📌 **本測試原本還背著一個安全陳述**：`docs/CODES_SORT_FILTER_AUTH_GATE.md` 記載
+     * 「Blade 版 `codes/{table_name}` 是無門檻的深分頁排序查詢」，而重新暴露它的鑰匙從
+     * 「翻 flag」變成了「`LEGACY_PAGE_RETIREMENT=false`」。**環節 4b-4a 之後那個缺口不存在了**
+     * ——Blade `show()` 連同視圖一起實體刪除，兩把鑰匙都開不了。所以這裡不再宣稱那件事，
+     * 相關覆蓋改由 `legacy_codes_endpoints_stay_retired_without_the_kill_switch()` 承擔。
+     *
+     * 這條測試現在守的是剩下 21 條**仍掛 `legacy.page`** 的路由：flag 對它們無效。
      */
     #[Test]
     public function migration_flags_no_longer_reopen_gated_legacy_pages(): void {
@@ -409,17 +455,18 @@ class LegacyBladePageRetirementTest extends TestCase {
         // 顯示頁：仍然 302。涵蓋兩種 middleware 組合——純 legacy.page（codes／manage／explainsql）
         // 與「`auth` 併掛」（`/profile`，順序敏感：auth 若排在封路之後，未登入請求會先被導到 /login）。
         //
-        // ⚠️ 原本這裡還列了 /operations、/dashboard、/view/dynasties，但它們自環節 4a-3 起
-        // 是 redirect closure——**不管 flag 怎麼翻都會 302**，放在這個測試裡是空轉斷言，
-        // 而且會讓「auth 併掛」那個組合變成完全沒被覆蓋（唯一還是 auth + legacy.page 的
-        // 顯示頁就是 /profile）。它們的行為由 legacy_readonly_pages_redirect_without_the_kill_switch() 守。
-        foreach (['/codes', '/codes/DYNASTIES', '/admin/explainsql', '/manage', '/profile'] as $uri) {
+        // ⚠️ 原本這裡還列了 /operations、/dashboard、/view/dynasties（環節 4a-3 起是 redirect
+        // closure），以及 /codes、/codes/DYNASTIES（環節 4b-4a 起同樣是 closure）——
+        // **不管 flag 怎麼翻都會 302**，放在這個測試裡是空轉斷言。
+        // 同一個道理在 4a-3 就寫過一次，4b-4a 又犯了一次（review 抓到）：
+        // **每次把某批路由從 middleware 改成 closure，都要回頭看這個迴圈。**
+        foreach (['/admin/explainsql', '/manage', '/profile'] as $uri) {
             $this->actingAs($user)
                 ->get($uri)
                 ->assertStatus(302, "翻 flag 不應讓 {$uri} 回到 Blade 版（封路 middleware 不讀 flag）");
         }
 
-        // 寫入端（`legacy.page:gone`）同樣不讀 flag：33 條封路裡有 19 條是這型，
+        // 寫入端（`legacy.page:gone`）同樣不讀 flag：21 條封路裡有 12 條是這型，
         // 只驗導向型會漏掉一半。
         foreach ([['patch', '/profile'], ['post', '/codes/DYNASTIES']] as [$method, $uri]) {
             $this->actingAs($user)
@@ -438,10 +485,54 @@ class LegacyBladePageRetirementTest extends TestCase {
     }
 
     /**
+     * 🔴 環節 4b-4a：codes 全套 Blade（5 個視圖 + 10 個 controller 方法）**已實體刪除**，
+     * 所以那 12 條 legacy 路由改成 closure、**不再受 kill switch 控制**。
+     *
+     * 與 4a-3 的 9 條唯讀頁同一個理由：**光看 302／410 的狀態碼分辨不出來**。
+     *
+     * ⚠️ **這條測試的鑑別力邊界**（review 實測）：把 `abort(410)` 改成 `abort(404)` 會紅；
+     * 但**把路由重新掛回 `legacy.page:gone` 卻照綠**——kill switch 關閉時那個 middleware
+     * 會 fail-open 落到 closure，狀態碼一模一樣。抓得到「掛回 middleware」的只有
+     * `exactly_the_manifested_routes_are_gated()` 的身分清單。兩條缺一不可。
+     * 若日後有人照舊 runbook 設 `LEGACY_PAGE_RETIREMENT=false` 想叫回 codes 編輯頁，
+     * 這條測試是唯一寫死「不能」的地方。
+     */
+    #[Test]
+    public function legacy_codes_endpoints_stay_retired_without_the_kill_switch(): void {
+        config(['legacy_page_retirement.enabled' => false]);
+        $user = $this->superAdmin();
+
+        // 顯示頁：仍 302（不會回到 Blade）。
+        foreach (['/codes', '/codes/ADDR_CODES', '/codes/ADDR_CODES/create',
+            '/codes/ADDR_CODES/1/edit', '/codes/ADDR_CODES/proposals/1/edit'] as $uri) {
+            $this->actingAs($user)->get($uri)
+                ->assertStatus(302, "kill switch 關閉不應讓 {$uri} 回到 Blade");
+        }
+
+        // 寫入端：仍 410。
+        foreach ([['post', '/codes/ADDR_CODES'], ['put', '/codes/ADDR_CODES/1'],
+            ['delete', '/codes/ADDR_CODES/1'], ['post', '/codes/ADDR_CODES/proposal'],
+            ['post', '/codes/ADDR_CODES/1/proposal'], ['patch', '/codes/ADDR_CODES/proposals/1'],
+            ['delete', '/codes/ADDR_CODES/proposals/1']] as [$method, $uri]) {
+            $this->actingAs($user)->{$method}($uri, [])
+                ->assertStatus(410, "kill switch 關閉不應讓 {$method} {$uri} 復活");
+        }
+    }
+
+    /**
      * @return array<string, array{0: string, 1: string}>
      */
-    public static function deletedReadonlyPageProvider(): array {
+    public static function deletedLegacyPageProvider(): array {
         return [
+            // ── 環節 4b-4a 刪除的 codes 顯示頁（5 條）────────────────────
+            // 與下面 4a-3 那 9 條同一個處置：視圖與 controller 方法都已不存在，
+            // 舊 URI 只剩 redirect closure ⇒ **沒有 kill switch 級回退**。
+            'codes index' => ['/codes', '/app/codes'],
+            'codes show' => ['/codes/ADDR_CODES', '/app/codes/ADDR_CODES'],
+            'codes create' => ['/codes/ADDR_CODES/create', '/app/codes/ADDR_CODES/create'],
+            'codes edit' => ['/codes/ADDR_CODES/1/edit', '/app/codes/ADDR_CODES/1/edit'],
+            'codes proposal edit' => ['/codes/ADDR_CODES/proposals/1/edit', '/app/codes/ADDR_CODES/proposals/1/edit'],
+            // ── 環節 4a-3 刪除的唯讀頁（9 條）─────────────────────────
             'dashboard' => ['/dashboard', '/app/dashboard'],
             'operations' => ['/operations', '/app/operations'],
             'view index' => ['/view', '/app/view'],
@@ -456,9 +547,10 @@ class LegacyBladePageRetirementTest extends TestCase {
 
     /**
      * 🔴 環節 4a-3 的核心行為變化：這 9 條唯讀頁的 Blade 視圖與 controller 方法**已實體刪除**，
+     *（4b-4a 起 provider 裡另有 codes 的 5 條，合計 14 條；下面這條測試同時吃它們。）
      * 所以它們改成純 redirect closure、**不再受 kill switch 控制**。
      *
-     * 為什麼值得一條專屬測試：其餘 33 條封路的賣點是「`LEGACY_PAGE_RETIREMENT=false` 就能
+     * 為什麼值得一條專屬測試：其餘 21 條封路的賣點是「`LEGACY_PAGE_RETIREMENT=false` 就能
      * 即時叫回 Blade 頁」。這 9 條沒有那個能力了——而**光看 302 的狀態碼分辨不出來**。
      * 若日後有人誤以為 kill switch 能救回它們（例如照著舊 runbook 操作），
      * 這條測試是唯一寫死「不能」的地方。
@@ -467,7 +559,7 @@ class LegacyBladePageRetirementTest extends TestCase {
      * ——那條原本證明「關掉封路後 Blade 頁真的渲染」，而該能力現在確實不存在。
      */
     #[Test]
-    #[DataProvider('deletedReadonlyPageProvider')]
+    #[DataProvider('deletedLegacyPageProvider')]
     public function legacy_readonly_pages_redirect_without_the_kill_switch(string $from, string $to): void {
         $user = $this->superAdmin();
 

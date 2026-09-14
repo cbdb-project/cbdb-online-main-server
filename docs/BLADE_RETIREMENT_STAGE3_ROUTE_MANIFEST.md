@@ -17,6 +17,26 @@ php artisan route:list --json
 2. 該路由名或 URI 是否出現在**PHP 端產生給 React 的 payload** 裡（`grep -rn "route('<名>'" app/`）——這類 grep `resources/js` 抓不到；
 3. 該 URI 是否被 React 硬編碼（`grep -rn "'/<uri>" resources/js/inertia`）。
 
+## 🔴 現況（2026-09-15，環節 4b-4a 之後）——讀本文件前先看這段
+
+本文件記錄的是**環節 3 當時**的封路清單。此後有三次結構性變化，**表格內的「處置」欄已不完全成立**：
+
+| 環節 | 變化 | 對本文件的影響 |
+|---|---|---|
+| 4a-3 | 9 條唯讀頁 Blade **實體刪除**，改 redirect closure | 那 9 條不再掛 `legacy.page`，**沒有 kill switch 回退** |
+| 4b-1 | 3 條 `codes.proposals.*` 與 5 條 batch-load 寫入端收斂後補封 | 「不動」19 → 11 |
+| **4b-4a** | **`codes` 全套（12 條）Blade 實體刪除**，改 closure | **那 12 條不再掛 `legacy.page`、沒有 kill switch 回退** |
+
+⇒ **目前仍掛 `legacy.page` 的只剩 21 條**（`manage` 7、`profile` 2、`admin.explainsql` 2、
+3 個 batch-load 共 8、`admin.cbdb-table-maintenance` 1、`admin.unidirectional-relationship-repair` 1）。
+權威清單是 `LegacyBladePageRetirementTest::exactly_the_manifested_routes_are_gated()` 的 `$expected`
+——**那份會紅，本文件不會**，所以兩者衝突時以測試為準。
+
+⚠️ **4b-4b（其餘頁面的實體刪除）的硬前置**：
+- `admin/unidirectional-relationship-repair/{kinship,assoc}` 這兩條 POST **沒有 `app.` 雙胞胎**，
+  React 修復頁直接呼叫它們 ⇒ 刪那條 GET 時**不可連坐**。
+- `admin/cbdb-table-maintenance/{rebuild,progress}` 同理。
+
 ## 分類與處置
 
 | 處置 | 條數 | 說明 |
@@ -37,9 +57,12 @@ php artisan route:list --json
 > 留著那個 middleware 會讓它的兩條 fail-open 路徑（導向目標不存在時放行、kill switch 關閉時放行）
 > 變成 500 而不是「看到舊頁」。
 >
-> **現況**：封路身分清單 = 35 − 10（環節 4a-3 改 closure）+ 8（環節 4b-1 收斂後新封）= **33**
-> （14 條 GET→302 + 19 條寫入端→410），與 `exactly_the_manifested_routes_are_gated()`
-> 寫死的 33 條逐條吻合。「不動」那組因此從 19 條降為 **11 條**。
+> **環節 4b-1 當時**：封路身分清單 = 35 − 10（環節 4a-3 改 closure）+ 8（4b-1 收斂後新封）= **33**
+> （14 條 GET→302 + 19 條寫入端→410）。「不動」那組因此從 19 條降為 **11 條**。
+>
+> **現況（環節 4b-4a 之後）**：再減 12（codes 全套改 closure）= **21**
+> （9 條 GET→302 + 12 條寫入端→410），與 `exactly_the_manifested_routes_are_gated()`
+> 寫死的清單逐條吻合。
 > **在正常封路設定下**（`LEGACY_PAGE_RETIREMENT=true`）對外可觀測的行為完全不變：那 10 條裡的
 > **9 條唯讀 GET** 改由 closure 產生同樣的 302（並保留 query string），`POST /merge-preview`
 > 則維持 410（只是從 `legacy.page:gone` 換成 closure 直接 `abort(410)`）。
@@ -51,8 +74,12 @@ php artisan route:list --json
 > 🔴 **那 9 條唯讀頁自此沒有 kill switch 級回退**（`LEGACY_PAGE_RETIREMENT=false` 對它們無作用），
 > 見 `LegacyBladePageRetirementTest::legacy_readonly_pages_redirect_without_the_kill_switch()`。
 > 環節 3 當時：35 + 19 + 11 = 65，與 `route:list` 實測總數相符。
-> **現況（環節 4a-3 + 4b-1 之後）**：33 封路 + 11 不動 + 10 closure（9 redirect + 1 abort）
-> + 11 不在範圍 = 65，總數不變——**讀者可以自行驗證有沒有漏**。
+> **現況（環節 4a-3 + 4b-1 + 4b-4a 之後）**：**21** 封路 + **11** 不動
+> + **22** closure（4a-3 的 10 條：9 redirect + 1 abort；4b-4a 的 12 條：5 redirect + 7 abort）
+> + **11** 不在範圍 = 65，總數不變——**讀者可以自行驗證有沒有漏**。
+> （第一版我只在文件頂部加了「現況 21」的段落，卻沒改這個算式，於是同一份文件裡
+> 33 與 21 並存、而且這行還邀請讀者自行驗算——review 抓到。**改數字要把整份文件的
+> 算式一起改完。**）
 
 ---
 

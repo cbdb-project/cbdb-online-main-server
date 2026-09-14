@@ -813,7 +813,94 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
     📌 三個 batch-load 的 `formProps()`／`resultsProp()` 輔助方法補上 `->component(...)`：
     少了它，結果頁被換成別的 Inertia 元件時那批測試會照樣讀 props 而不報錯。
 
-  - **4b-4 待做**：實體刪除。
+  - **4b-4a ✅ 已完成（2026-09-15）——codes 全套實體刪除（不可逆）**：
+    刪除 **5 個 Blade 視圖**（`codes/{index,show,create,edit,proposal-edit}.blade.php`，共 1017 行）
+    與 `CodesController` 的 **10 個 legacy 方法**（`index`／`show`／`create`／`edit`／
+    `proposalEdit` 這 5 個 render view，加上 `store`／`update`／`destroy`／`proposalStore`／
+    `proposalUpdate` 這 5 個薄殼）。
+
+    **12 條 legacy 路由改成 closure**（不再掛 `legacy.page`），比照環節 4a-3：
+    5 條顯示 GET → **302** 並保留 query string；7 條寫入端 → **410**。route name 全部保留。
+    🔴 **codes 自此沒有任何 kill switch 級回退**——`LEGACY_PAGE_RETIREMENT=false` 對它無作用。
+    護欄：新增 `LegacyBladePageRetirementTest::legacy_codes_endpoints_stay_retired_without_the_kill_switch()`
+    ——**光看 302／410 的狀態碼分辨不出來**，這是唯一寫死「不能」的地方（同 4a-3 的理由）。
+    封路身分清單 33 → **21**。
+
+    ⚠️ **刻意留著、不可連坐刪除的三組**（每一組都在 controller 裡留了指路註解）：
+    - `export()`：`codes.export` **沒掛過 `legacy.page`**，是 React 版正在呼叫的端點。
+    - `proposalUpdateExisting()`／`proposalCancel()`：**不是薄殼**——`app.codes.proposals.*`
+      指向的是同一個方法（環節 4b-2b 查出、4b-2c-1 再次確認）。
+    - 全部 `perform*()`：Blade 與 React 共用的寫入實作。
+
+    📌 **flag-aware 的字串回退不會變成死連結**：`code_table_edit_url()`、
+    `Navigation::codeItem()`、`CodesController::codesIdTemplate()`／`codesActionUrl()`／
+    `codesIndexUrl()` 在 flag=old 時回傳 `/codes/...` 字串（不是 `route()`，所以不會拋
+    `RouteNotFoundException`），而那些 URI 現在會 302 到 React 版。**這正是把顯示頁留成
+    redirect closure 而不是整條刪掉的理由之一。** 那些回退本身的收斂屬環節 4d。
+
+    ✅ **順帶關掉一個安全缺口**：`docs/CODES_SORT_FILTER_AUTH_GATE.md` 記錄的
+    「Blade `show()` 沒有 sort/filter 登入門檻、`LEGACY_PAGE_RETIREMENT=false` 會把無門檻的
+    深分頁排序查詢重新暴露」——**那個取捨隨 `show()` 一起消失了**。
+    `AGENTS.md` 的高風險備忘與該文件 §1／§7 都已改寫。
+
+    📌 **三個既有的孤兒方法**（`rowMatchesAfterNormalization`／`splitKeyColumnsByVariantScope`／
+    `variantProposalResourceIdPattern`）**在本次刪除之前就已零呼叫**（實測 `git stash` 後計數同為 0），
+    不是 4b-4a 造成的。
+    ⚠️ 我一度寫「其中 `rowMatchesAfterNormalization` 仍被測試引用」——**不成立**
+    （`grep -rn ... tests/` 零命中；那是同檔的 delegate wrapper 與 `VariantEquivalentLookup`
+    內部自呼造成的錯覺）。三個都是純孤兒，留給環節 5 之後的整體清理。
+
+    🔴 **review 抓到兩個我自己寫出來的 bug（都在 closure 裡，已修＋補回歸測試）**：
+    第一版把 302 目標**手拼成字串**，於是 ① 五條裡有一條（`proposals/{operation}/edit`）
+    **漏拼 query string**（而它還留了一個沒用到的 `$request` 參數，那就是漏寫的痕跡）；
+    ② **`$id` 完全沒編碼**（`$table_name` 有，不一致）——代碼表**已支援文本主鍵**，
+    `$id = '慎'` 會讓 `Location` 吐裸 UTF-8，`a%2Fb` 更會被解成真的路徑分隔，
+    而 `Location` 必須是 ASCII URI-reference。
+    ⇒ 改成一律走 `route($target, $request->route()->parameters(), false)` ——**那正是舊
+    `RetireLegacyBladePage` 做的事**，一次補齊編碼與 QS，順帶消掉硬編碼的 `/app/codes` 字面值。
+    新增回歸測試 `codes_redirects_preserve_the_query_string_and_encode_the_id()`
+    （既有的 `redirects_preserve_the_query_string()` 只驗 `codes.show`，抓不到第 ① 點）。
+    **教訓：把 middleware 換成手寫 closure 時，要逐項對照原 middleware 做了什麼，不要憑印象。**
+
+    ⚠️ **codex 接著提議「連 `/`、`?`、`#`、`%` 也一起先 rawurlencode」——實測後決定不改**：
+    `route()` 只放行那幾個字元，而**那正是被移除的 middleware 的行為**（`RetireLegacyBladePage:80-81`
+    就是同樣兩行），所以不是本環節引入的退化。而且不能改：codes 的 `{id}` 是 `where('id','.*')`，
+    `operations.resource_id` 對複合主鍵存的就是 `c_personid=108625&c_merged_from_personid=404794`
+    這種**帶 `=` 與 `&`** 的格式，先編碼會把它改寫成 `%3D`／`%26`——等於單方面改掉一個出現在
+    operations payload 裡的 URL 形狀。（`?` 與 `#` 在真實請求裡永遠到不了 `$id`：它們在 HTTP 層
+    就已經是 query／fragment 的起點。）取捨與理由都釘進了回歸測試的第 ③ 段。
+
+    📌 **鑑別力邊界（review 實測，已寫進測試註解）**：`abort(410)`→`abort(404)` ⇒ 新測試紅；
+    但**把路由重新掛回 `legacy.page:gone` 卻照綠**——kill switch 關閉時那個 middleware 會
+    fail-open 落到 closure，狀態碼一模一樣。抓得到「掛回 middleware」的只有
+    `exactly_the_manifested_routes_are_gated()` 的身分清單。**兩條缺一不可。**
+
+    ⚠️ **另外三類殘留（都已修）**：
+    - `migration_flags_no_longer_reopen_gated_legacy_pages()` 的迴圈仍含 `/codes`、
+      `/codes/DYNASTIES`、`post /codes/DYNASTIES`——它們現在是 closure，**不管 flag 怎麼翻都
+      302／410**，是空轉斷言。**同一個道理 4a-3 就寫過一次，4b-4a 又犯了一次**：
+      每次把某批路由從 middleware 改成 closure，都要回頭看那個迴圈。
+      該測試的 docblock 也還背著「安全缺口的鑰匙是 kill switch」那句已被本環節推翻的話。
+    - **數字沒跟著改**：測試檔的「33 條封路」「19 條寫入型」「已刪除的 9 條」→ 21／12／14；
+      manifest 頂部我加了「現況 21」卻沒改下方的算式，於是同一份文件裡 33 與 21 並存，
+      而且那行還邀請讀者自行驗算。**改數字要把整份文件的算式一起改完。**
+    - `deletedReadonlyPageProvider` 改名為 `deletedLegacyPageProvider`：codes 的
+      `create`／`edit` 不是唯讀頁，原名已成誤導。
+    - `API.md:1259` 的站內撤回路徑補上 `/app` 前綴（那條 legacy URI 現在焊死成 410，
+      屬 AGENTS.md「改變路由／錯誤碼必須同步 API.md」的範圍）。
+
+    📌 **順帶記下、留給環節 5**：`resources/lang/{zh-TW,en}/codes.php` 因本次刪除新增 9 個孤兒
+    key（`text_codes_copy_hint`、`addr_copy_hint`、`no_textid_msg`、`load_{no_data,success,failed}_alert`、
+    `loading_author`、`person_search_placeholder`、`filter_chip_examples`）——React 端用的是短 key，
+    這批只服務已刪的 Blade。孤兒 key 總數 12 → 21。
+
+  - **4b-4b 待做**：其餘表單／寫入頁的實體刪除（`manage` 7 條、`profile` 2 條、
+    `admin.explainsql` 2 條、3 個 batch-load 共 8 條、`admin.cbdb-table-maintenance` 1 條、
+    `admin.unidirectional-relationship-repair` 1 條，合計**仍掛 `legacy.page` 的 21 條**）。
+    🔴 **硬前置**：`admin/unidirectional-relationship-repair/{kinship,assoc}` 與
+    `admin/cbdb-table-maintenance/{rebuild,progress}` 這幾條 **沒有 `app.` 雙胞胎**，
+    React 頁面直接呼叫它們 ⇒ 刪對應的 GET 時**不可連坐**。
+    連同 `TestCase::useLegacyBladePages()`（自 4b-3 起零呼叫點）一起刪。
 **每刪一條 route 前，用三個方向各掃一次** `app/`、`resources/js/`、`tests/`：① **route name**（`route('x')`）、② **URI prefix**（`url('crowdsourcing/…')`、字串拼接——`CrowdsourcingController.php:183-184` 就是這型，route name grep 抓不到）、③ **controller action**。並把結果列進該 commit 的刪除清單。另外 `grep -rn "RouteName\|routeName" app/Http/Controllers` 找 `listRouteName()` 這類**回傳路由名字串**的分支
 - **4c 認證與入口**：auth 4 頁、welcome（同時移除 4 個 Auth controller 與 `WelcomeController` 的 flag 分支）
 - **4d flag 機制收尾**：刪 `config/migration_flags.php`、`migration_flag()`／`migration_flag_is_new()`、`Navigation::url()` 的 flag 參數與 `active.pages`／`active.patterns`、`HandleInertiaRequests::profileUrl()` 分支；改寫 §三第 15 欄列出的全部測試。

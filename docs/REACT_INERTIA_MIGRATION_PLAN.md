@@ -64,10 +64,10 @@
 
 ## 一、現況基線（實測）
 
-`resources/views/**` 共 **105 個 `.blade.php`**。三套渲染世界並存：
+`resources/views/**` 原有 **105 個 `.blade.php`**（本節撰寫時的基線；2026-09-14 環節 1 刪除 3 個死碼後為 **102**，後續數量以 [Blade 下架計畫](./BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md) 為準）。三套渲染世界並存：
 
 1. **AdminLTE 3 / Blade**（約 95%）：全部 `@extends('layouts.dashboard-v3')`。
-2. **舊版 Bootstrap 3 Blade**：`layouts/app.blade.php`，目前**僅** `biogmains/basicinformation/show.blade.php` 仍在用。
+2. **舊版 Bootstrap 3 Blade**：`layouts/app.blade.php`。原本**僅** `biogmains/basicinformation/show.blade.php` 在用，該死碼已於 2026-09-14（[Blade 下架計畫](./BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md) 環節 1）刪除，故此 layout **現已零消費端**；實體刪除排在該計畫環節 5（Phase 7）與 AdminLTE 一併執行。
 3. **React / Inertia（已上線）**：Query Playground、Person Browser、Search-by-Entry、View Tables，皆走 `/app/*` 路由。
 
 後端渲染比：`Inertia::render` 5 處（React，精確）對 `view()` 約 90 餘處（Blade，概估）。
@@ -168,7 +168,7 @@
 - 含**輪詢/非同步**頁面：改用 React 狀態 + Inertia partial reload 或既有 SSE/輪詢端點。
 
 ### Phase 6 — 認證頁與入口（**S**）
-- `auth/{login,register,passwords/email,passwords/reset}`、`welcome`。刪除已確認的死碼 `home.blade.php`、`auth/register2.blade.php`（遷移前再次確認無引用）。
+- `auth/{login,register,passwords/email,passwords/reset}`、`welcome`。死碼 `home.blade.php`、`auth/register2.blade.php` ✅ **已於 2026-09-14 刪除**（[Blade 下架計畫](./BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md) 環節 1／Backlog P6-C1、P6-C2）。
 
 ### Phase 7 — 下架 AdminLTE（**M**）
 - 移除 `admin-lte`/`jquery`/`bootstrap`/`datatables.net-bs4`/Select2 主題、`layouts/dashboard-v3` 全套、`resources/js/app.js` 的 Vue 掛載與相關 jQuery 程式。

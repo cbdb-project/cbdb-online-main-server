@@ -184,8 +184,13 @@
 | P6-3 | auth/passwords/email | `Auth::routes()` | **done**（2026-06-22，flag auth.passwords old，忘記密碼） |
 | P6-4 | auth/passwords/reset | `Auth::routes()` | **done**（2026-06-22，flag auth.passwords old，重設密碼，token/email 透傳） |
 | P6-5 | welcome | `/`（WelcomeController） | **done**（2026-06-22，flag welcome old，landing） |
-| P6-C1 | 刪除死碼 home.blade.php | — | todo | **僅刪 view**；`/home` route/redirect 仍活躍，不可動 |
-| P6-C2 | 刪除死碼 auth/register2.blade.php | — | todo | 已確認無引用 |
+| P6-C1 | 刪除死碼 home.blade.php | — | **retired**（2026-09-14，環節 1） | **僅刪 view**；`/home` route/redirect 仍活躍、未動（`RedirectIfAuthenticated` 與 **三個** Auth controller——Login／Register／ResetPassword——的 `$redirectTo` 都硬寫 `/home`，React 端 AuthLayout／Profile Edit 也連到它） |
+| P6-C2 | 刪除死碼 auth/register2.blade.php | — | **retired**（2026-09-14，環節 1） | 已確認無引用 |
+| P6-C3 | 刪除死碼 biogmains/basicinformation/show.blade.php | — | **retired**（2026-09-14，環節 1） | `view('biogmains.basicinformation.show')` 全庫零呼叫；本列為環節 1 新增（原不在帳本） |
+
+> 📌 P6-C1/C2/C3 的執行依據與後續環節見 [docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)。
+> ⚠️ `components/posted-to-addr-diff.blade.php` 曾被誤判為死碼——它被 `components/diff-table.blade.php:6` `@include`，
+> 而 `diff-table` 服務 operations／audit_logs／crowdsourcing 三個線上可達頁面，**留待該計畫環節 4a**。
 
 ## Phase 7 — 下架 AdminLTE（全部頁 `live`/`retired` 後）
 | # | 項目 | 狀態 |

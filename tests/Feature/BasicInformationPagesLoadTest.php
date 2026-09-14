@@ -6,15 +6,30 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Testing\AssertableInertia as Assert;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
+/**
+ * @legacy-parity 本類耦合 legacy Blade 人物表單路由（setUp 呼叫 useLegacyPersonForms()
+ * 把 basicinformation.* flag 撥回 'old' 以越過 LegacyBladeFormGate），將隨
+ * docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md 環節 2 連同 legacy 路由一併刪除。
+ *
+ * 環節 1.5 分流結論：**legacy-only** — 可隨環節 2 直接刪除。
+ * 純 Blade 頁面渲染。注意同檔另有 3 個 /app/* Inertia 案例不依賴 flag，刪檔時須先搬走、勿連帶刪除。
+ *
+ * ⚠️ 本檔有 **3 個測試不依賴 flag**（flag=new 下實測仍綠），環節 2 刪檔前**必須先搬走**，
+ * 否則會連帶失去覆蓋：`test_app_basicinformation_index_localizes_column_headers`、`test_app_basicinformation_index_renders_inertia`、`test_basicinformation_create_page_loads`。
+ *
+ * 新測試請一律寫在 v2 mutation API 路徑上，不要再擴充本檔。
+ */
 /**
  * 测试 BasicInformation 相关页面能正常加载（不出现 500 错误）
  *
  * 使用 in-memory SQLite 数据库，灌入最小化测试数据
  * 只验证 HTTP 状态码，不检查具体内容
  */
+#[Group('legacy-parity')]
 class BasicInformationPagesLoadTest extends TestCase {
     protected $user;
     protected $adminUser;

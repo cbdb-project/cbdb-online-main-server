@@ -6,6 +6,7 @@ use App\Models\Operation;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
+use App\Services\Mutations\Concerns\BlocksUnknownPersonRelations;
 use App\Services\Mutations\Concerns\ResolvesKinshipReversePair;
 use App\Support\CompositePrimaryKey;
 use Illuminate\Http\JsonResponse;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class KinshipCreateHandler extends AbstractPersonSubresourceCreateHandler {
+    use BlocksUnknownPersonRelations;
     use ResolvesKinshipReversePair;
 
     /** 暫存本次互逆配對碼：未送覆寫＝權威 c_kin_pair1；送合法覆寫＝使用者選的反向碼（已驗證）。 */
@@ -20,6 +22,29 @@ class KinshipCreateHandler extends AbstractPersonSubresourceCreateHandler {
 
     /** #70：本次是否強制收斂對面疑似漂移鏡像（meta.force）；handle() 設定、finally 清除。預設 false＝偵測疑似。 */
     private bool $forceMirror = false;
+
+    /**
+     * 「未詳」人物（personid 0）守衛：與 legacy BasicInformationKinshipController 的 4 道 flash 攔截等價。
+     * 見 Concerns\BlocksUnknownPersonRelations 的說明（含為何 v2 原本缺這一段）。
+     */
+    protected function handleAfterVariantReset(string $resource, string $mode, string $operation, int $personId, array $targetPk, array $changes, array $meta = []): JsonResponse {
+        // 授權必須先判：否則匿名／無權限者送 personid=0 會收到 422 而不是 401/403，
+        // 洩漏「這個 id 不合法」並偏離父類的錯誤優先序。父類稍後會再判一次——
+        // authorizeDirect()／authorizeProposal() 是純檢查、無副作用，重複呼叫安全。
+        $authorizationError = $mode === 'proposal' ? $this->authorizeProposal() : $this->authorizeDirect();
+        if ($authorizationError) {
+            return $authorizationError;
+        }
+
+        if ($blocked = $this->blockUnknownOwner($personId, '親屬', '新增')) {
+            return $blocked;
+        }
+        if ($blocked = $this->blockUnknownRelationTarget($changes, $targetPk, 'c_kin_id', '親屬')) {
+            return $blocked;
+        }
+
+        return parent::handleAfterVariantReset($resource, $mode, $operation, $personId, $targetPk, $changes, $meta);
+    }
 
     public function __construct(
         OperationRepository $operationRepository,

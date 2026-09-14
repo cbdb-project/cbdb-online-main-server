@@ -7,9 +7,23 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
+/**
+ * @legacy-parity 本類耦合 legacy Blade 人物表單路由（setUp 呼叫 useLegacyPersonForms()
+ * 把 basicinformation.* flag 撥回 'old' 以越過 LegacyBladeFormGate），將隨
+ * docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md 環節 2 連同 legacy 路由一併刪除。
+ *
+ * 環節 1.5 分流結論：**legacy-only** — 可隨環節 2 直接刪除。
+ * 合併機構 ID（"123-4"）是 legacy 表單欄位格式，v2 分欄傳送；[n/a] 哨兵與 -999→0 已由 ApiV2MutateAssociationTest／CompositePrimaryKeyTest 覆蓋；__proposal_comment 對應 v2 的 meta.comment，已有 ApiV2MutateEntryTest／ApiV2CreateEntryTest 覆蓋。
+ *
+ * 本檔 **全部測試都依賴 legacy 路由**（flag=new 下全紅），環節 2 可整檔刪除。
+ *
+ * 新測試請一律寫在 v2 mutation API 路徑上，不要再擴充本檔。
+ */
+#[Group('legacy-parity')]
 class ProposalNormalizationTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();

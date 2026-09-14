@@ -736,4 +736,63 @@ class ApiV2MutateAltnameTest extends TestCase {
         // Only one proposal in the operations table
         $this->assertSame(1, DB::table('operations')->where('resource', 'ALTNAME_DATA')->count());
     }
+
+    // ── 括號正規化（全形→半形；拼音欄另補空格）────────────────
+
+    /**
+     * v2 等價覆蓋（Blade 下架計畫環節 1.5）：對應
+     * BasicInformationAltnamesControllerTest::testUpdateQueryNormalizesPinyinBrackets。
+     * `AltnameMutationHandler::preprocessUpdateData()` 的 `BracketNormalizer::normalizeAltname()`
+     * 接線原本在 v2 零覆蓋。
+     */
+    #[Test]
+    public function testUpdateNormalizesBrackets(): void {
+        $this->actingAs($this->makeUser(email: 'update-bracket@example.com'));
+        $this->seedAltname();
+
+        $this->postJson('/api/v2/mutate', $this->altnamePayload([
+            'changes' => [
+                'c_alt_name_chn' => '升卿（一作陞卿）',
+                'c_alt_name' => 'Shengqing(Yizuoshengqing)',
+            ],
+        ]))->assertStatus(200);
+
+        $row = DB::table('ALTNAME_DATA')->where('c_personid', 1000)->first();
+        $this->assertNotNull($row);
+        $this->assertSame('升卿(一作陞卿)', $row->c_alt_name_chn, '中文欄：全形→半形，且不加空格');
+        $this->assertSame('Shengqing (Yizuoshengqing)', $row->c_alt_name, '拼音欄：全形→半形並補空格');
+    }
+
+    /**
+     * 括號正規化後撞上既有列的鍵 → 必須擋，不能靜默覆寫或炸唯一鍵。
+     *
+     * 對應 legacy 的 `bracket_conflict` 攔截（BiogMainRepository:3914 →
+     * BasicInformationAltnamesController:273）。v2 走的是同一套改鍵衝突偵測，
+     * 但**測資從來沒用過全形括號**，所以「正規化之後才撞鍵」這條路徑等於沒測過。
+     */
+    #[Test]
+    public function testUpdateBlocksKeyConflictCausedByBracketNormalization(): void {
+        $this->actingAs($this->makeUser(email: 'update-bracket-conflict@example.com'));
+        $this->seedAltname();
+        // 既有列的鍵已是半形形式；下面把另一列改成等價的全形寫法，正規化後會與它相撞。
+        $this->seedAltname([
+            'c_alt_name_chn' => '升卿(一作陞卿)',
+            'c_alt_name_type_code' => 4,
+            'c_sequence' => 9,
+        ]);
+
+        $response = $this->postJson('/api/v2/mutate', $this->altnamePayload([
+            'changes' => ['c_alt_name_chn' => '升卿（一作陞卿）', 'c_alt_name_type_code' => 4],
+        ]));
+
+        // 精確鎖定「改鍵撞既有列」這一種失敗：只斷言 409/422 會被無關的驗證錯誤矇混過去。
+        // 註：errors 的鍵字面就是 'target.pk'（含點號、非巢狀），故用 fragment 而非 assertJsonPath。
+        $response->assertStatus(409)
+            ->assertJson(['ok' => false])
+            ->assertJsonFragment(['target.pk' => ['conflict']]);
+
+        // 原列未被動、也沒有多出第三列
+        $this->assertDatabaseHas('ALTNAME_DATA', ['c_personid' => 1000, 'c_alt_name_chn' => '子美']);
+        $this->assertSame(2, DB::table('ALTNAME_DATA')->where('c_personid', 1000)->count());
+    }
 }

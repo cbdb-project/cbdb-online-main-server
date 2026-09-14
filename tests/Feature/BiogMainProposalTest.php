@@ -8,9 +8,24 @@ use App\Services\CharVariantMapService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
+/**
+ * @legacy-parity 本類耦合 legacy Blade 人物表單路由（setUp 呼叫 useLegacyPersonForms()
+ * 把 basicinformation.* flag 撥回 'old' 以越過 LegacyBladeFormGate），將隨
+ * docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md 環節 2 連同 legacy 路由一併刪除。
+ *
+ * 環節 1.5 分流結論：**legacy-only** — 可隨環節 2 直接刪除。
+ * legacy Blade 提案建立；異體字替換與「名不可清空」等不變量已由 ApiV2MutateTest／ApiV2CreateBiogMainTest 覆蓋。
+ *
+ * ⚠️ 本檔有 **6 個測試不依賴 flag**（flag=new 下實測仍綠），環節 2 刪檔前**必須先搬走**，
+ * 否則會連帶失去覆蓋：`testApproveAllowsProposalKeepingMingziEmptyWhenRowEmpty`、`testApproveBiogMainCreateProposalCreatesViaHandler`、`testApproveBiogMainCreateProposalRejectedWhenPersonIdExists`、`testApproveBiogMainDeleteProposalSoftDeletesInsteadOfPhysicalDelete`、`testApproveBiogMainProposalUpdatesTable`、`testApproveRejectsProposalThatWouldClearExistingMingzi`。
+ *
+ * 新測試請一律寫在 v2 mutation API 路徑上，不要再擴充本檔。
+ */
+#[Group('legacy-parity')]
 class BiogMainProposalTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();

@@ -964,4 +964,40 @@ class ApiV2CreateAssociationTest extends TestCase {
         $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 2000]);
         $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 2000, 'c_assoc_code' => 101, 'c_assoc_id' => 1000]);
     }
+
+    // ── 「未詳」人物（personid 0）守衛 ───────────────────────
+
+    /**
+     * 這一組是 UnknownPersonKinshipAssocBlockTest 的 v2 等價覆蓋（Blade 下架計畫環節 1.5）。
+     *
+     * 背景：legacy controller 從一開始就擋「對未詳人物建關係／把未詳人物當成關係對象」，
+     * 但 v2 的 kinship／association handler **原本沒有這道守衛**（同族的 Possession／Posting
+     * 反而有），是分流時才發現的實質缺口。守衛已補在
+     * App\Services\Mutations\Concerns\BlocksUnknownPersonRelations。
+     */
+
+    #[Test]
+    public function testCreateBlocksUnknownOwnerPerson(): void {
+        $this->actingAs($this->makeUser(email: 'assoc-unknown-owner@example.com'));
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'person_id' => 0,
+            'target' => ['pk' => ['c_personid' => 0]],
+        ]))->assertStatus(422)
+            ->assertJsonFragment(['person_id' => ['unknown_person_not_allowed']]);
+
+        $this->assertSame(0, DB::table('ASSOC_DATA')->count(), '被擋下時不得留下任何列（含鏡像）');
+    }
+
+    #[Test]
+    public function testCreateBlocksUnknownAssocTarget(): void {
+        $this->actingAs($this->makeUser(email: 'assoc-unknown-target@example.com'));
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'target' => ['pk' => ['c_assoc_id' => 0]],
+        ]))->assertStatus(422)
+            ->assertJsonFragment(['c_assoc_id' => ['unknown_person_not_allowed']]);
+
+        $this->assertSame(0, DB::table('ASSOC_DATA')->count());
+    }
 }

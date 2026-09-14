@@ -7,14 +7,29 @@ use App\Repositories\BiogMainRepository;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
+/**
+ * @legacy-parity 本類耦合 legacy Blade 人物表單路由（setUp 呼叫 useLegacyPersonForms()
+ * 把 basicinformation.* flag 撥回 'old' 以越過 LegacyBladeFormGate），將隨
+ * docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md 環節 2 連同 legacy 路由一併刪除。
+ *
+ * 環節 1.5 分流結論：**legacy-only** — 可隨環節 2 直接刪除。
+ * v2 對應覆蓋見 ApiV2MutateKinshipTest／ApiV2MutateAssociationTest。
+ *
+ * ⚠️ 本檔有 **2 個測試不依賴 flag**（flag=new 下實測仍綠），環節 2 刪檔前**必須先搬走**，
+ * 否則會連帶失去覆蓋：`assoc_store_allows_non_unknown_person`、`kinship_store_allows_non_unknown_person`。
+ *
+ * 新測試請一律寫在 v2 mutation API 路徑上，不要再擴充本檔。
+ */
 /**
  * 「未詳」人物（person ID = 0）不能新增或修改親屬、社會關係記錄
  *
  * @see https://github.com/cbdb-project/cbdb-online-main-server/issues/930
  */
+#[Group('legacy-parity')]
 class UnknownPersonKinshipAssocBlockTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();

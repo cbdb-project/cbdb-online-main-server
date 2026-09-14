@@ -11,6 +11,7 @@ use App\Repositories\OperationRepository;
 use App\Services\CharVariantMapService;
 use App\Support\BasicInformationHistory;
 use App\Support\CompositePrimaryKey;
+use App\Support\CoordinatePairNormalizer;
 use App\Support\EntityAggregateRegistry;
 use App\Support\SelfReferencingTreeGuard;
 use Carbon\Carbon;
@@ -1372,6 +1373,8 @@ class OperationsController extends Controller {
             });
             $this->recordRestoreOperation($operation, (array) $result);
             flash(__('operations.restore_success', ['time' => Carbon::now()]), 'success');
+            // 還原若順手把座標歸零了，還原者必須看見。
+            $this->flashCoordinateNoticesOnRestore();
         } catch (\Throwable $e) {
             Log::error('Operation restore failed', [
                 'operation_id' => $operation->id,
@@ -1422,6 +1425,37 @@ class OperationsController extends Controller {
         if (empty($payload)) {
             throw new \RuntimeException(__('operations.restore_empty_data'));
         }
+        // 經緯度歸零：還原歷史快照時同樣要做。
+        //
+        // 這**刻意不同於** AGENTS.md §1.3 對異體字替換的處理（restore 不做內容替換），
+        // 而理由不是隨意選的：那條豁免存在是因為「歷史字形本身就是事實」——D6 之下既有列
+        // 合法地帶著變體形，改寫還原內容會造出一列從未存在過的字形，那是**資訊的損失**。
+        // `0,0` 不屬於這一類：它不承載任何資訊（`CoordinateValidator` 判它為 zero_axis、
+        // 不可連結），而且會**主動製造錯誤答案**（v1 的鄰近地點自連接讓所有 0,0 列互為鄰居）。
+        // 還原一個 0,0 快照不是還原一個歷史值，是重新武裝一個 bug。
+        //
+        // 而且 restore 本來就不是位元級忠實重放：下面幾行就會把 `c_modified_*` 與
+        // `updated_at` 蓋成還原人與此刻（§1.2「還原也是一次實際寫入」）。§1.3 的豁免針對的是
+        // **內容替換**，不是「restore 神聖不可改」——同一個方法裡的
+        // `assertCharVariantMapWritable()` 與樹成環守衛就是結構驗證照跑的先例。
+        //
+        // 非數值的座標（`"0e0"`）在這裡選擇中止還原而不是靜默清成 NULL：快照裡有個不是數的
+        // 座標是壞資料，該讓還原者看到，而不是由系統代為決定丟掉它。
+        if (CoordinatePairNormalizer::handles($table)) {
+            $invalidCoordinates = CoordinatePairNormalizer::invalidColumns($payload, $table);
+            if ($invalidCoordinates !== []) {
+                throw new \RuntimeException(__('coordinate.not_numeric', [
+                    'columns' => implode('、', array_keys($invalidCoordinates)),
+                ]));
+            }
+            $coordinateResult = CoordinatePairNormalizer::normalizeRow($payload, $table);
+            $payload = $coordinateResult['data'];
+            $this->coordinateClearedOnRestore = array_merge(
+                $this->coordinateClearedOnRestore,
+                $coordinateResult['cleared']
+            );
+        }
+
         if (in_array('updated_at', array_keys($payload))) {
             $payload['updated_at'] = Carbon::now();
         } elseif ($this->hasColumn($table, 'updated_at')) {
@@ -1475,6 +1509,36 @@ class OperationsController extends Controller {
             throw new \RuntimeException(__('operations.restore_no_delete_data'));
         }
         $payload = $this->filterColumns($table, $target);
+        // 經緯度歸零：還原歷史快照時同樣要做。
+        //
+        // 這**刻意不同於** AGENTS.md §1.3 對異體字替換的處理（restore 不做內容替換），
+        // 而理由不是隨意選的：那條豁免存在是因為「歷史字形本身就是事實」——D6 之下既有列
+        // 合法地帶著變體形，改寫還原內容會造出一列從未存在過的字形，那是**資訊的損失**。
+        // `0,0` 不屬於這一類：它不承載任何資訊（`CoordinateValidator` 判它為 zero_axis、
+        // 不可連結），而且會**主動製造錯誤答案**（v1 的鄰近地點自連接讓所有 0,0 列互為鄰居）。
+        // 還原一個 0,0 快照不是還原一個歷史值，是重新武裝一個 bug。
+        //
+        // 而且 restore 本來就不是位元級忠實重放：下面幾行就會把 `c_modified_*` 與
+        // `updated_at` 蓋成還原人與此刻（§1.2「還原也是一次實際寫入」）。§1.3 的豁免針對的是
+        // **內容替換**，不是「restore 神聖不可改」——同一個方法裡的
+        // `assertCharVariantMapWritable()` 與樹成環守衛就是結構驗證照跑的先例。
+        //
+        // 非數值的座標（`"0e0"`）在這裡選擇中止還原而不是靜默清成 NULL：快照裡有個不是數的
+        // 座標是壞資料，該讓還原者看到，而不是由系統代為決定丟掉它。
+        if (CoordinatePairNormalizer::handles($table)) {
+            $invalidCoordinates = CoordinatePairNormalizer::invalidColumns($payload, $table);
+            if ($invalidCoordinates !== []) {
+                throw new \RuntimeException(__('coordinate.not_numeric', [
+                    'columns' => implode('、', array_keys($invalidCoordinates)),
+                ]));
+            }
+            $coordinateResult = CoordinatePairNormalizer::normalizeRow($payload, $table);
+            $payload = $coordinateResult['data'];
+            $this->coordinateClearedOnRestore = array_merge(
+                $this->coordinateClearedOnRestore,
+                $coordinateResult['cleared']
+            );
+        }
         if ($this->hasColumn($table, 'created_at') && !isset($payload['created_at'])) {
             $payload['created_at'] = Carbon::now();
         }
@@ -1628,6 +1692,27 @@ class OperationsController extends Controller {
         $excludeId = isset($conditions['id']) ? (int) $conditions['id'] : null;
 
         CharVariantMapService::assertWritable($payload, $excludeId);
+    }
+
+    /**
+     * 本次還原過程中被歸零的座標欄（欄名 → 原因）。
+     *
+     * 控制器每個 request 一個實例，所以不需要 reset。
+     *
+     * @var array<string,string>
+     */
+    protected array $coordinateClearedOnRestore = [];
+
+    /**
+     * 把還原過程中的座標歸零通知 flash 給還原者。
+     *
+     * 必須說：還原一個帶 `x=113.5, y=0` 的半髒快照時，那個真實的 113.5 會被一併清掉，
+     * 而還原者的意圖是「把資料變回快照的樣子」——系統沒有照字面做，就要講。
+     */
+    protected function flashCoordinateNoticesOnRestore(): void {
+        foreach (CoordinatePairNormalizer::buildNotices($this->coordinateClearedOnRestore) as $notice) {
+            flash($notice, 'warning');
+        }
     }
 
     protected function filterColumns($table, array $data) {

@@ -122,9 +122,9 @@
 
 | 檔案 | 行數 | 證據 | 備註 |
 |---|---|---|---|
-| `resources/views/home.blade.php` | 17 | `view('home')` 只存在於 `HomeController.php:26` 的**註解**；`index()` 實際是 `redirect('/basicinformation')` | **只刪 view**；`/home` 路由與 redirect 仍活躍，**不可動**（Backlog P6-C1） |
-| `resources/views/auth/register2.blade.php` | 12 | 全庫零引用 | Backlog P6-C2 |
-| `resources/views/biogmains/basicinformation/show.blade.php` | 17 | `view('biogmains.basicinformation.show')` 零呼叫 | 併入環節 2 一起刪 |
+| `resources/views/home.blade.php` | 17 | 判定當時，`view('home')` 只存在於 `HomeController::index()` 內一行**被註解掉的程式**；`index()` 實際是 `redirect('/basicinformation')` | ✅ **已於環節 1 刪除**（Backlog P6-C1）。該註解一併移除、順手清掉同檔未被使用的 `BiogMainRepository` 注入。**`/home` 路由與 redirect 未動**（三個 Auth controller 的 `$redirectTo`、`RedirectIfAuthenticated`、React 端 AuthLayout／Profile Edit 都依賴它） |
+| `resources/views/auth/register2.blade.php` | 12 | 全庫零引用（信件樣板孤兒，無 Mailable／`Mail::send` 送資料進去） | ✅ **已於環節 1 刪除**（Backlog P6-C2） |
+| `resources/views/biogmains/basicinformation/show.blade.php` | 17 | `view('biogmains.basicinformation.show')` 零呼叫 | ✅ **已於環節 1 刪除**（Backlog P6-C3；原不在帳本，環節 1 新增） |
 
 > ⚠️ `components/posted-to-addr-diff.blade.php`（141 行）**不是死碼**——它被 `components/diff-table.blade.php:6` `@include`，而 `diff-table` 又被三個**線上可達、無閘門**的頁面使用：`operations/index.blade.php:505,510`（A-4）、`admin/audit_logs/index.blade.php:292`（A-9）、`crowdsourcing/index.blade.php:88`（A-7）。已改列 D-6，隨環節 4a 一併刪。
 
@@ -149,7 +149,7 @@
 | D-1 | `maps/index.blade.php`（103 行） | `GET app/maps` → `HistoricalMapsController@index`。**掛在 `/app/*` 但其實是 Blade**；為 `resources/js/historical-maps/app.js`（Leaflet 全螢幕）的宿主殼，**不套 AdminLTE、不依賴 jQuery/Bootstrap** | 高 | **低（S）** | Phase 7 **不必**急著動——它不依賴 AdminLTE，不阻擋下架。若要 React 化：改成 Inertia 頁並沿用同一支 JS 即可。注意它引用 Leaflet 的 CDN CSS |
 | D-2 | `cbdbapi/person.blade.php` | v1 API 回應樣板 | — | — | **明確排除**，永久保留（改為純 Response 組裝屬另一議題） |
 | D-3 | `biogmains/_chgis_map_assets`（**僅此一檔**） | 被 `inertia.blade.php:36` `@include`，React 根模板依賴 | 高 | **中**（非「低」） | 搬離 `biogmains/` 命名空間（→ `resources/views/partials/chgis-map-assets.blade.php`），避免刪 `biogmains/**` 時誤刪。這是環節 2 的第一步。<br>⚠️ **`_place_link.blade.php` 不屬於本列**——它只被兩個 legacy Blade `@include`，隨 A-20 刪除（見 §二 C）。<br>⚠️ 難度是**中**不是低：它含 `route('basicinformation.index')`、`@push`／`@stack` 配對、`ChgisMapManager` 容器解析、`@vite` 入口；而且 `chgis-map/app.js:494-495` **目前只接受 base URL**（`${base}/${id}/map-points`），改用 `basicinformation.map-points` 需**同時改 JS 讓它接受完整 URL template**，不是只換一個 route 名 |
-| D-4 | `layouts/{app,dashboard-v3,header-v3,footer,sidebar-v3,partials/sidebar-node}`（837 行） | AdminLTE 殼 | 高 | **低**（A 全清後自動成孤兒） | 隨環節 5（Phase 7）一併刪 |
+| D-4 | `layouts/{app,dashboard-v3,header-v3,footer,sidebar-v3,partials/sidebar-node}`（837 行） | AdminLTE 殼 | 高 | **低**（A 全清後自動成孤兒） | 隨環節 5（Phase 7）一併刪。<br>📌 **`layouts/app.blade.php` 自環節 1 起已無任何消費端**（原唯一消費者 `biogmains/basicinformation/show.blade.php` 已刪）——但**仍不在環節 1/2 範圍**，維持排在環節 5 一併清，以免零散更動 layout |
 | D-5a | `basicinformation/{id}/saveas`、`basicinformation/{id}/Duplicate_Collateral_Info` | 🔴 **React 正在主動呼叫**：`TabContentLoader.tsx:260-261` 把 `saveasUrl`／`duplicateCollateralUrl` 直接寫成這兩條 legacy URL，餵給 BasicInfoEditor 的按鈕。兩條路由（`routes/web.php:161-162`）**完全無 middleware** | — | **中（M）** | ⚠️ **任何環節都不得刪除或 redirect**。正確描述是「React 依賴的 legacy 端點」，**不是**「React 缺的功能」。環節 7 的任務：評估把這兩條寫入邏輯搬進 v2 mutation／新 `/app` 端點，**搬完才能刪** |
 | D-5b | `Route::resource('basicinformation')` 的 `destroy` | 被 `LegacyBladeFormGate::handlePerson()` 明確放行（`default => null // destroy 等：放行`）。**但 React 的刪除走的是 API v2**（`api.v2.delete.web`，見 `PersonBrowserController.php:33`、`BasicInformationController.php:1611`）——全庫查無 React 對 `basicinformation.destroy` 的呼叫 | 高 | **低—中** | 與 D-5a **不同性質**：它是「未被閘門擋下的 legacy route」，不是 React 依賴。**不要因為 D-5a 而順便永久保留它**。<br>**執行時機明確定為**：環節 2 **先保留**（步驟 3 不動它），盤點列入**環節 7**；環節 7 確認無外部 caller 後，**另開一個獨立 commit 下架**，不併入環節 2 |
 | D-6 | `components/forms/{audit-fields,person-id-display}`、`components/{inline-time-fields,diff-table,posted-to-addr-diff,key-value-table,ai-fill-diff-table}`（7 檔 / 559 行） | legacy 表單／日誌頁元件 | — | 低 | ⚠️ **消費者跨多個環節**：`audit-fields`／`person-id-display`／`inline-time-fields` 只服務 A-20（環節 2 可刪）；`diff-table` → `posted-to-addr-diff` 鏈被 A-4／A-7／A-9 三頁使用（**環節 4a 才能刪**）；`key-value-table`／`ai-fill-diff-table` 屬 A-9／A-10（環節 4a）。**逐一 grep 確認零引用後才刪** |

@@ -22,4 +22,6 @@ return [
     'cleared_blank' => '「:column」留空，視為 NULL',
     'cleared_zero' => '「:column」是 0，視為 NULL（0,0 不是有效座標）',
     'cleared_with_partner' => '「:column」一併視為 NULL（經緯度必須成對，另一軸為空或 0）',
+
+    'not_numeric' => '座標欄位（:columns）必須是數值。「0e0」「east」這類寫法會被資料庫靜默轉成 0，所以不接受；要清空請直接留白。',
 ];

@@ -25,4 +25,6 @@ return [
     'cleared_blank' => '":column" was left empty and is treated as NULL',
     'cleared_zero' => '":column" was 0 and is treated as NULL (0,0 is not a valid coordinate)',
     'cleared_with_partner' => '":column" is treated as NULL as well (longitude and latitude go together, and the other axis was empty or 0)',
+
+    'not_numeric' => 'The coordinate field(s) :columns must be numeric. Forms like "0e0" or "east" are silently coerced to 0 by the database, so they are rejected; leave the field empty to clear it.',
 ];

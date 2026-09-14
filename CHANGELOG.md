@@ -38,6 +38,7 @@
 - **人物編輯全套已實體刪除**（-22,000 行）：`resources/views/biogmains/**`、12 組子資源路由與 controller、`LegacyBladeFormGate`、15 個 `MIGRATION_FLAG_BASICINFO_*` flag。舊 URI 只剩導向；`saveas`／`Duplicate_Collateral_Info`／`destroy` 三條例外仍在服役。
 - **其餘頁面只封路、未刪碼**：Blade 視圖與 controller 都還在，可用 kill switch 叫回。
 - 🔴 **回退鍵變了**：這批頁面翻 `MIGRATION_FLAG_*=old` **不再有效果**。要回退請設 **`LEGACY_PAGE_RETIREMENT=false`** 並 `php artisan config:clear && php artisan config:cache`——不需重新部署、不需 git revert。
+  - 📌 **後續（2026-09-15，環節 4b-4b）**：**這句話已失效**。legacy 頁面全部實體刪除後，`legacy.page` 已無任何掛載點，`LEGACY_PAGE_RETIREMENT=false` 也叫不回它們；要回到 Blade 只能 git revert 並重新部署。
 - **部署者請順手清除各機器 `.env` 的 15 個失效變數**：`MIGRATION_FLAG_BASICINFO_{INDEX,SHOW,EDITOR,ALTNAME,ADDRESSES,TEXTS,SOURCES,OFFICES,ASSOC,KINSHIP,EVENTS,ENTRIES,STATUSES,POSSESSION,SOCIALINST}`，以及早已失效的 `MIGRATION_FLAG_WIKI_MAINTENANCE`。留著無執行期影響，但會誤導維護者。
 - **順帶修掉的既存問題**：
   - v2 的 kinship／association handler **從來沒有**「未詳人物（personid 0）不得建立關係」守衛（legacy controller 有、同族的 Possession／Posting 也有）——等於走 React 編輯器本來就擋不住。已補在 6 個掛點，並刻意修掉 legacy 的 `-999` 繞過漏洞。

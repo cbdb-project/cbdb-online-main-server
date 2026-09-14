@@ -27,8 +27,9 @@ use Tests\TestCase;
  * HTML 斷言都沒有，全部在驗 `audit_log` 的內容。當初需要 opt-out 的唯一原因是
  * 9 條走 `PATCH /profile`／`PUT /manage/{id}`——環節 3 把那兩個 legacy 寫入端封成 410。
  *
- * 稽核邏輯本來就是**新舊共用**的（`UserProfileController::applyProfileUpdate()` 被 `update()`
- * 與 `appUpdate()` 同時呼叫、`ManagementController::performUserUpdate()` 同理），所以這次改成打
+ * 稽核邏輯本來就是**新舊共用**的（`UserProfileController::applyProfileUpdate()` 當時被
+ * `update()` 與 `appUpdate()` 同時呼叫、`ManagementController::performUserUpdate()` 同理；
+ * 📌 兩個 legacy 方法已於環節 4b-4b 實體刪除，現在只剩 `app*()` 呼叫它們），所以這次改成打
  * `app.profile.update`／`app.manage.update` 是**純 URL 抽換、零斷言強度改動**（另有 2 處
  * `assertRedirect` 目標隨 `performUserUpdate()` 的 `$indexRoute` 一起改成 `app.manage.index`）。
  *

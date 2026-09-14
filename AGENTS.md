@@ -23,14 +23,26 @@
     `proposalUpdateExisting()`／`proposalCancel()`（**不是薄殼**，`app.codes.proposals.*`
     指向的是同一個方法）、以及所有 `perform*()`（Blade 與 React 共用的寫入實作）。
   - **其餘表單／寫入頁（`manage`／`profile`／`admin.explainsql`／3 個 batch-load／
-    `admin.cbdb-table-maintenance`／`admin.unidirectional-relationship-repair`）仍是「封路但未刪碼」**：
-    Blade 視圖與 controller 都還在，只是請求不再抵達 controller（顯示頁 302、legacy 寫入端 410），
-    kill switch 可以把它們叫回來。這批屬環節 4b-4b，尚未執行。逐條清單見
-    [docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md](./docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md)。
-  - 🔴 **回退鍵已經不是 migration flag**：這批頁面翻 `MIGRATION_FLAG_*=old` **沒有任何效果**
-    （封路 middleware 不讀 flag）。要回退請設 **`LEGACY_PAGE_RETIREMENT=false`** 並
-    `php artisan config:clear && php artisan config:cache`——不需重新部署、不需 git revert。
-    對**已被 `legacy.page` 封路的那批頁面**而言，migration flag 現在只影響**連結指向**（側邊欄、payload 裡的 URL），不影響舊頁能否開啟；**`auth.*`／`welcome` 未封路**（flag 分支在 controller 內部），它們的 flag 仍然決定渲染 Blade 或 React（見 `tests/Feature/AuthPagesInertiaTest.php`）。
+    `admin.cbdb-table-maintenance`／`admin.unidirectional-relationship-repair`）已於環節 4b-4b
+    實體刪除**：10 個 Blade 視圖與 16 個 legacy controller 方法都不存在了，
+    舊 URI 只剩 **302 導向／410**。
+    ⚠️ **刻意留著的兩組**（它們**沒有 `app.` 雙胞胎**，React 頁面直接呼叫）：
+    `admin/cbdb-table-maintenance/{rebuild,progress}`、
+    `admin/unidirectional-relationship-repair/{kinship,assoc}`。
+    另外 3 個 batch-load 的 `store()`／`undo()`／`updatePinyin()` 是 legacy 與 app **共用的
+    同一個方法**，只刪了 legacy 那邊的路由接線。
+  - 🔴🔴 **回退鍵已經不存在了（2026-09-15，環節 4b-4b）**：
+    - 翻 `MIGRATION_FLAG_*=old` **沒有效果**（封路 middleware 從來不讀 flag）。
+    - **設 `LEGACY_PAGE_RETIREMENT=false` 現在也沒有效果**——所有 legacy 頁面都已改成
+      redirect／`abort(410)` 的 closure，**`legacy.page` 一條路由都沒掛**（護欄：
+      `LegacyBladePageRetirementTest::no_route_is_gated_by_the_retirement_middleware_any_more()`
+      與 `neither_the_kill_switch_nor_migration_flags_bring_legacy_pages_back()`）。
+      **舊 runbook 裡「翻 kill switch 即可回退」那一步已作廢**；要回到 Blade 只能 git revert
+      並重新部署。`RetireLegacyBladePage` 與 `config/legacy_page_retirement.php` 目前是死碼，
+      待專屬環節移除。
+    - migration flag 現在只影響**連結指向**（側邊欄、payload 裡的 URL）；
+      **`auth.*`／`welcome` 例外**（flag 分支在 controller 內部、未封路），它們的 flag
+      仍然決定渲染 Blade 或 React（見 `tests/Feature/AuthPagesInertiaTest.php`）。
   - 少數頁面本就無 flag：Query Playground 主頁 `/query-playground` 硬導向 `/app/query-playground`；
     外部資料庫引用瀏覽器 `/external-db-link` 硬導向 `/app/external-db-link`（Blade 版已刪）。
   - AdminLTE 實體下架（環節 5）尚未執行。

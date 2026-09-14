@@ -894,13 +894,93 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
     `loading_author`、`person_search_placeholder`、`filter_chip_examples`）——React 端用的是短 key，
     這批只服務已刪的 Blade。孤兒 key 總數 12 → 21。
 
-  - **4b-4b 待做**：其餘表單／寫入頁的實體刪除（`manage` 7 條、`profile` 2 條、
-    `admin.explainsql` 2 條、3 個 batch-load 共 8 條、`admin.cbdb-table-maintenance` 1 條、
-    `admin.unidirectional-relationship-repair` 1 條，合計**仍掛 `legacy.page` 的 21 條**）。
-    🔴 **硬前置**：`admin/unidirectional-relationship-repair/{kinship,assoc}` 與
-    `admin/cbdb-table-maintenance/{rebuild,progress}` 這幾條 **沒有 `app.` 雙胞胎**，
-    React 頁面直接呼叫它們 ⇒ 刪對應的 GET 時**不可連坐**。
-    連同 `TestCase::useLegacyBladePages()`（自 4b-3 起零呼叫點）一起刪。
+  - **4b-4b ✅ 已完成（2026-09-15）——其餘 Blade 頁實體刪除（不可逆）；`legacy.page` 歸零**：
+    刪除 **10 個 Blade 視圖**（`manage/{index,edit,_role-descriptions}`、`profile/edit`、
+    `admin/{explain_sql,batch_load_book_titles,batch_load_offices,batch_load_social_institutes,
+    cbdb-table-maintenance,unidirectional-relationship-repair}`）與 **16 個 legacy controller 方法**
+    （`ManagementController` 7、`UserProfileController` 2、`AdminExplainSqlController` 2、
+    3 個 batch-load 的 `showForm()` 各 1、`CbdbTableMaintenanceController::index()`、
+    `UnidirectionalRelationshipRepairController::index()`）。
+
+    **21 條路由改成 closure** ⇒ **仍掛 `legacy.page` 的路由為 0**（實測 `Route::getRoutes()`）。
+    `resources/views/{manage,profile,admin}` 三個目錄自此不存在。
+
+    ⚠️ **刻意留著、不可連坐刪除的**：
+    - `admin/cbdb-table-maintenance/{rebuild,progress}`、
+      `admin/unidirectional-relationship-repair/{kinship,assoc}`：**沒有 `app.` 雙胞胎**，
+      React 版把那幾個 route name 直接組進 `urls` prop／直接呼叫。
+    - 3 個 batch-load 的 `store()`／`undo()`／`updatePinyin()`：legacy 與 app **共用同一個方法**，
+      只刪了 legacy 那邊的路由接線。
+    - `ManagementController::performUserUpdate()`、`UserProfileController::rules()`／
+      `applyProfileUpdate()`、`AdminExplainSqlController::runExplain()` 等共用實作。
+    - route name 全部保留：`ManagementController::appIndex()` 的 `edit_template` 與
+      `HandleInertiaRequests::profileUrl()` 都還有**真的 `route('manage.edit')`／
+      `route('profile.edit')` 呼叫**（flag-aware 分支，收斂屬環節 4d）。
+
+    🔴🔴 **本環節最重要的後果：kill switch 已無作用對象**。
+    `LEGACY_PAGE_RETIREMENT=false` 從「即時叫回 Blade 頁」變成**完全沒有效果**——
+    沒有任何路由掛 `legacy.page`。這是安全／維運相關的陳述，因為 `AGENTS.md`、
+    `config/*.php` 檔頭、`.env.example`、`CHANGELOG` 長期告訴維運者「翻那個開關即可回退」。
+    已逐處改正（歷史條目照專案慣例**加註不改寫**）：`AGENTS.md`、
+    `config/legacy_page_retirement.php`、`config/migration_flags.php`、
+    `app/Support/Navigation.php`、`.env.example`、`CHANGELOG.md`。
+
+    護欄同步改寫：`LegacyBladePageRetirementTest` 的 4 條測試（身分清單、兩條 kill switch、
+    flag 護欄）在沒有任何封路路由之後**全部變成空轉**，換成 2 條寫死新事實的測試——
+    `no_route_is_gated_by_the_retirement_middleware_any_more()` 與
+    `neither_the_kill_switch_nor_migration_flags_bring_legacy_pages_back()`
+    （後者把兩個開關同時打到「最可能叫回 Blade」的位置，再斷言 7 條顯示頁仍 302 到 React、
+    5 條寫入端仍 410）。
+
+    📌 **`RetireLegacyBladePage`、`config/legacy_page_retirement.php`、
+    `TestCase::useLegacyBladePages()`（自 4b-3 起零呼叫點）自此都是死碼**。
+    刪除它們會連帶影響 `.env` 與部署 runbook，值得**單獨一輪**（4b-4c），不混進本環節。
+    三處都已加上 🔴 檔頭註記——特別是 middleware：**不要把 `legacy.page` 掛回任何路由**，
+    它的兩條 fail-open 路徑在視圖已刪的世界裡只會產生 500。
+
+    🔴 **review 抓到我漏改了 9 處「翻 kill switch 可以回退」的陳述**，其中最嚴重的是
+    `docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md` 的 kill switch 那一節——它是**可執行的
+    runbook**（含 `.env` + `config:cache` 的 bash block），照著做只會什麼都沒發生。
+    **在檔頭寫一句「本文件是純歷史文件」不足以中和一段照著做就會失敗的操作步驟**，
+    已把整節包進 `<details>` 並在上方加紅字。其餘：`README.md`（×2，曝光度最高）、
+    `config/migration_flags.php`（**與我同一次編輯的同檔上方自相矛盾**）、
+    `config/legacy_page_retirement.php`（我把紅字**插進了句子中間**，整段重寫）、
+    `.env.example`（紅字加在最底下，而維運者是由上往下掃到變數名就停——已移到區段頂端）、
+    `docs/REACT_INERTIA_MIGRATION_PLAN.md` ×4、`docs/REACT_MIGRATION_BACKLOG.md`、
+    `docs/PINYIN_SAVE_NORMALIZE_DESIGN.md`。
+    **教訓：改一句安全陳述時，要 grep 那個變數名把全庫掃過一遍，而不是只改自己想得到的地方。**
+    ⚠️ 我用腳本批次加註記時**重跑了一次失敗的腳本**，於是 `REACT_INERTIA_MIGRATION_PLAN.md`
+    有 4 處註記被加了兩遍、還出現巢狀的「〔原文：〔原文：…〕…〕」（codex 抓到）。已去重。
+    **批次改文件的腳本要寫成幂等的（或先 `git checkout` 再重跑），不要直接重跑。**
+
+    🔴 **codex 抓到一個真的行為退化，而我與 review agent 都推論錯了**：
+    `ManagementController` 的 `auth` 是寫在**建構式**裡的（`$this->middleware('auth')`），
+    不在路由上——方法刪掉、路由改成 closure 之後那道 `auth` 就跟著消失了。
+    review agent 說「manage/* 本來就沒有 route-level auth，訪客本來就拿 302／410」，
+    我也照 middleware 清單的順序推論「封路先跑」，**兩個推論都被量測推翻**：
+    實測 HEAD vs 改動後，7 條 `/manage*` 的訪客行為從**全部 302 → `/login`** 變成
+    302 → `/app/manage`（顯示頁）或 **410**（寫入端）。
+    ⇒ 把那 7 條包進 `Route::middleware('auth')->group()`，並新增
+    `legacy_manage_routes_still_bounce_guests_to_login()` 把實際行為釘死。
+    （`/profile` 那兩條不受影響：auth 掛在路由群組上而非建構式。）
+    📌 環節 4a-3 對 `/dashboard` 做的是**相反**的選擇（刻意拿掉 auth，讓登入後的 intended URL
+    落在 React 頁）——那是有文件與測試的決定；這裡沒有理由改變行為，所以維持與刪除前一致。
+    **教訓：把 controller 換成 closure 時，要檢查建構式 middleware；而且授權這種事要量，不要推。**
+
+    📌 **本環節新製造的孤兒（都留給環節 5，先記下來免得重新調查）**：
+    - **6 個 layout Blade 檔全部變成零可達**：`layouts/{app,dashboard-v3,header-v3,sidebar-v3,
+      footer,partials/sidebar-node}`——倖存視圖（`auth/*`、`welcome`、`maps/index`、
+      `cbdbapi/person`、`inertia`、`partials/chgis-map-assets`）**沒有任何一個 `@extends`**。
+      連帶 `AppServiceProvider` 的 `View::composer('layouts.dashboard-v3', …)` 成為永不觸發的死碼。
+    - **約 250 個翻譯 key 變孤兒**（`admin.batch_*`／`admin.manage_*`／`admin.table_maint_*`／
+      `admin.unidirect_*`／`admin.explain_*`／`common.token_*`／`common.avatar*` 等）。
+      加上 4b-4a 的 21 個，孤兒 key 的量級已從「幾十」變成「**幾百**」——環節 5 的翻譯清理
+      要按群組整批處理，不要逐 key 猜。
+
+    📌 **兩則不影響行為的小瑕（已知並接受）**：`manage.destroy`／`manage.create` 的 410 訊息
+    指向的 `/app/manage/{manage}`／`/app/manage` 其實沒有對應的 DELETE／新增頁（刪除實際走
+    `appUpdate()`）；410 訊息語言從 middleware 的中文變成 closure 的英文——與 4a／4b-4a 的
+    closure 一致，非退化，但是一個對外可觀測的改變。
 **每刪一條 route 前，用三個方向各掃一次** `app/`、`resources/js/`、`tests/`：① **route name**（`route('x')`）、② **URI prefix**（`url('crowdsourcing/…')`、字串拼接——`CrowdsourcingController.php:183-184` 就是這型，route name grep 抓不到）、③ **controller action**。並把結果列進該 commit 的刪除清單。另外 `grep -rn "RouteName\|routeName" app/Http/Controllers` 找 `listRouteName()` 這類**回傳路由名字串**的分支
 - **4c 認證與入口**：auth 4 頁、welcome（同時移除 4 個 Auth controller 與 `WelcomeController` 的 flag 分支）
 - **4d flag 機制收尾**：刪 `config/migration_flags.php`、`migration_flag()`／`migration_flag_is_new()`、`Navigation::url()` 的 flag 參數與 `active.pages`／`active.patterns`、`HandleInertiaRequests::profileUrl()` 分支；改寫 §三第 15 欄列出的全部測試。

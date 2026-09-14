@@ -225,10 +225,11 @@ public const BIOG_MAIN_PINYIN_V_FIELDS = ['c_surname', 'c_mingzi', 'c_name'];
    已不存在——**沒有任何 flag 能把它們翻回來**，所以也不需要「回退檢查清單」那一條。
    - ⚠️ 仍活著的例外：`saveas()`／`Duplicate_Collateral_Info()`（見 §4.1 下一條，**不接受手打拼音**，
      值來自來源列）與 v1 token API。兩者與本項無關。
-   - ⚠️ 其餘 legacy 頁面（codes／manage／profile 等）是**封路但未刪碼**，而它們的回退鍵是
-     `LEGACY_PAGE_RETIREMENT=false`（**不是** migration flag）。若日後真的動用那個 kill switch，
-     `CodesController` 的手打拼音面會重新可達——那屬於本文 §5 記入待辦的 Phase B（Code 表），
-     不是本項。
+   - ✅ **2026-09-15（Blade 下架環節 4b-4a／4b-4b）更新**：其餘 legacy 頁面（codes／manage／
+     profile 等）**都已實體刪除**（原文寫「封路但未刪碼、回退鍵是 `LEGACY_PAGE_RETIREMENT=false`」
+     ——已不成立）。`CodesController` 的 Blade 手打拼音面（`edit()`／`update()`）隨 codes 全套一起
+     刪除，**那個 kill switch 也已無作用對象**，所以它再也不會重新可達。
+     本文 §5 記入待辦的 Phase B（Code 表）因此只需針對 React 版的 `/app/codes` 寫入面。
 
 2. ~~**Legacy `/api/v1/add`、`/api/v1/update`（程式化整合 API，非 UI）**~~ — **已於資安加固 P2-8
    整組刪除，本節不再適用。**

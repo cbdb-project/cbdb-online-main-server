@@ -15,27 +15,11 @@ class ManagementController extends Controller {
     public function __construct() {
         $this->middleware('auth');
     }
-
-    /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function index(Request $request) {
-        if (!Auth::user()->isAdmin()) {
-            return redirect('/home');
-        }
-
-        [$data, $inactiveUsers] = $this->buildUserListing($request);
-
-        return view('manage.index', [
-            'data' => $data,
-            'inactiveUsers' => $inactiveUsers,
-            'page_title' => __('nav.user_management'),
-            'page_title_key' => '用戶管理',
-            'page_description' => __('nav.user_management_desc'),
-        ]);
-    }
+    // ── 2026-09-15（Blade 下架環節 4b-4b）─────────────────────────────
+    //
+    // 這裡原本有 7 個 legacy Blade 方法（index／create／store／edit／show／update／destroy）。
+    // 視圖已實體刪除，舊 URI 只剩 302／410 的 closure（見 routes/web.php）。
+    // 🔴 **`performUserUpdate()` 等共用實作與全部 `app*()` 方法都留著**——React 版仍在用。
 
     /**
      * Inertia + React 版：使用者管理列表（與 Blade index 共用 buildUserListing）。
@@ -140,63 +124,6 @@ class ManagementController extends Controller {
     }
 
     /**
-     * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function create() {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
-     */
-    public function store(Request $request) {
-        //
-    }
-
-    /**
-     * Display the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function show($id) {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function edit($id) {
-        if (!Auth::user()->canManageUsers()) {
-            flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
-
-            return redirect()->back();
-        }
-
-        $user = User::find($id);
-
-        if (!$user) {
-            flash('用戶不存在 @ '.Carbon::now(), 'error');
-
-            return redirect()->route('app.manage.index');
-        }
-
-        return view('manage.edit', [
-            'user' => $user,
-            'page_title' => '編輯用戶',
-            'page_description' => __('admin.manage_edit_desc', ['name' => $user->name]),
-        ]);
-    }
-
-    /**
      * Update the specified resource in storage.
      *
      * @param  \Illuminate\Http\Request  $request
@@ -240,24 +167,6 @@ class ManagementController extends Controller {
                 'admin' => is_array($t = trans('admin')) ? $t : [],
             ],
         ]);
-    }
-
-    public function update(Request $request, $id) {
-        if (!Auth::user()->canManageUsers()) {
-            flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
-
-            return redirect()->back();
-        }
-
-        $user = User::find($id);
-
-        if (!$user) {
-            flash('用戶不存在 @ '.Carbon::now(), 'error');
-
-            return redirect()->route('app.manage.index');
-        }
-
-        return $this->performUserUpdate($request, $user, 'manage.index');
     }
 
     /**
@@ -405,15 +314,5 @@ class ManagementController extends Controller {
             before: $before,
             after: $after
         );
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function destroy($id) {
-        //
     }
 }

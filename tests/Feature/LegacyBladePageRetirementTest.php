@@ -69,20 +69,24 @@ class LegacyBladePageRetirementTest extends TestCase {
     // ── 顯示頁 → 302 導向 /app ─────────────────────────────────
 
     /**
-     * 仍由 `legacy.page` middleware 封路的顯示頁（視圖還在，kill switch 可叫回）。
+     * ── 2026-09-15（環節 4b-4b）：這個 provider 的名稱與「為什麼要分兩批」都已過時 ──
      *
-     * ⚠️ **已實體刪除的 14 條顯示頁不在這裡**——它們改成 redirect closure，見
-     * `deletedLegacyPageProvider()`（4a-3 的 9 條唯讀頁 + 4b-4a 的 5 條 codes 頁；
-     * 名稱從 `deletedReadonlyPageProvider` 改過來，因為 codes 的 create／edit 不是唯讀頁）。兩者對 302 行為而言等價（都是 302 + 同一目標），
-     * 所以下面那條 302 測試同時吃兩個 provider；但**回退能力完全不同**，
-     * 所以身分清單（`exactly_the_manifested_routes_are_gated()`）只含這一批。
+     * 它原本叫 `gatedDisplayPageProvider`，意思是「**仍由 `legacy.page` 封路**、視圖還在、
+     * kill switch 可叫回」，與 `deletedLegacyPageProvider()`（已實體刪除、改 closure）
+     * 分開放的理由是**回退能力完全不同**、而且只有前者進得了身分清單。
      *
-     * 把兩批分開放是刻意的：混在同一個 provider 裡只能靠註解區分，
-     * 下一個人很容易把 9 條當成 gated 而去改 manifest。
+     * 🔴 **環節 4b-4b 之後兩個理由都不成立了**：所有 legacy 頁面都已實體刪除、
+     * 沒有任何路由掛 `legacy.page`、身分清單那條測試也換成了「必須是空的」。
+     * 兩個 provider 現在性質完全一樣，**只剩「哪個環節刪的」這個歷史差別**。
+     *
+     * 刻意**不合併**：它們是各環節的刪除清單，分開放才看得出「哪一批是什麼時候沒的」，
+     * 而下面那條 302 測試本來就同時吃兩個 provider，覆蓋沒有缺口。
+     * 名稱已改成不再宣稱 gated（原 `deletedReadonlyPageProvider` 也改過——codes 的
+     * create／edit 不是唯讀頁）。
      *
      * @return array<string, array{0: string, 1: string}>
      */
-    public static function gatedDisplayPageProvider(): array {
+    public static function stage4bDeletedDisplayPageProvider(): array {
         return [
             // codes 的 5 條顯示頁已於環節 4b-4a **實體刪除**，移到 deletedLegacyPageProvider()。
             'profile' => ['/profile', '/app/profile'],
@@ -98,7 +102,7 @@ class LegacyBladePageRetirementTest extends TestCase {
     }
 
     #[Test]
-    #[DataProvider('gatedDisplayPageProvider')]
+    #[DataProvider('stage4bDeletedDisplayPageProvider')]
     #[DataProvider('deletedLegacyPageProvider')]
     public function legacy_display_pages_redirect_to_the_react_equivalent(string $from, string $to): void {
         $this->actingAs($this->superAdmin())
@@ -112,7 +116,7 @@ class LegacyBladePageRetirementTest extends TestCase {
     public function redirects_are_temporary_not_permanent(): void {
         $user = $this->superAdmin();
 
-        foreach (self::gatedDisplayPageProvider() as $label => [$from]) {
+        foreach (self::stage4bDeletedDisplayPageProvider() as $label => [$from]) {
             $status = $this->actingAs($user)->get($from)->status();
             $this->assertSame(302, $status, "{$label} 必須是 302，不得是 301");
         }
@@ -196,12 +200,55 @@ class LegacyBladePageRetirementTest extends TestCase {
         $this->assertStringEndsWith('/app/codes/T/a/b/edit', $location);
     }
 
+    /**
+     * ── 2026-09-15（環節 4b-4b，codex 查出）─────────────────────────────
+     *
+     * 🔴 **把 controller 換成 closure 會弄丟「建構式 middleware」。**
+     *
+     * `ManagementController` 的 `auth` 是寫在**建構式**裡的（`$this->middleware('auth')`），
+     * 不在路由上。方法刪掉、路由改成 closure 之後那道 `auth` 就跟著消失了——實測 HEAD vs
+     * 改動後的訪客行為：7 條 `/manage*` 原本**全部 302 → /login**，變成 302 → `/app/manage`
+     * 或 **410**。
+     *
+     * ⚠️ **我與 review agent 都曾憑 middleware 清單的順序推論「訪客本來就拿 302／410」，
+     * 是量測推翻了那個推論。** 這條測試把實際行為釘死，免得日後再靠讀順序猜。
+     *
+     *（`/profile` 那兩條不受影響：它們在 `Route::middleware('auth')->group` 裡，
+     * auth 掛在路由上而非建構式。）
+     */
+    #[Test]
+    public function legacy_manage_routes_still_bounce_guests_to_login(): void {
+        foreach ([
+            ['get', '/manage'],
+            ['get', '/manage/create'],
+            ['get', '/manage/1'],
+            ['get', '/manage/1/edit'],
+            ['post', '/manage'],
+            ['put', '/manage/1'],
+            ['delete', '/manage/1'],
+        ] as [$method, $uri]) {
+            $this->{$method}($uri, [])
+                ->assertRedirect(route('login'), "訪客打 {$method} {$uri} 應導向登入頁，而不是直接拿到 302／410");
+        }
+
+        // 對照：`/profile` 的 auth 掛在路由群組上，本來就不受 controller 刪除影響。
+        $this->get('/profile')->assertRedirect(route('login'));
+        $this->patch('/profile', [])->assertRedirect(route('login'));
+    }
+
     // ── legacy 寫入端 → 410 ──────────────────────────────────
 
     /**
+     * legacy 寫入端 → 410。
+     *
+     * ── 2026-09-15（環節 4b-4b）：原名 `gatedWriteEndpointProvider` ────────────
+     * 這些端點現在全部是 `abort(410)` 的 closure，**不再由 `legacy.page:gone` 封路**
+     *（狀態碼一樣，但 kill switch 對它們已無作用）。名稱與敘述同步改掉，免得下一個人
+     * 以為還能靠翻開關讓它們復活。
+     *
      * @return array<string, array{0: string, 1: string}>
      */
-    public static function gatedWriteEndpointProvider(): array {
+    public static function retiredWriteEndpointProvider(): array {
         return [
             // 環節 4b-1 收斂後才封得起來（manifest 的 B 類）：3 個 batch-load controller 的
             // listRouteName() 原本依 $request->is('app/*') 回傳 redirect 目標，legacy POST 走
@@ -233,7 +280,7 @@ class LegacyBladePageRetirementTest extends TestCase {
     }
 
     #[Test]
-    #[DataProvider('gatedWriteEndpointProvider')]
+    #[DataProvider('retiredWriteEndpointProvider')]
     public function legacy_write_endpoints_are_gone(string $method, string $uri): void {
         $this->actingAs($this->superAdmin())
             ->{$method}($uri, [])
@@ -306,37 +353,22 @@ class LegacyBladePageRetirementTest extends TestCase {
     }
 
     /**
-     * 封路的**身分**必須與 manifest 逐條吻合——不只是數量。
+     * ── 2026-09-15（Blade 下架環節 4b-4b）─────────────────────────────
      *
-     * 只鎖數量擋得住「零散加掛」，卻擋不住「換掛」：把某條該封的拿掉、同時誤封另一條，
-     * 數字還是 35、測試照綠。所以這裡寫死完整清單，diff 會直接指出該改 manifest 哪一行。
+     * 🔴 **`legacy.page` 封路清單自此為空**：環節 4a-3／4b-4a／4b-4b 把 44 條路由
+     * 全部改成 closure，middleware 不再掛在任何路由上。
+     *
+     * 這條測試因此從「清單與 manifest 逐條吻合」變成「**必須是空的**」。
+     * 它仍然值得存在：日後若有人把 `legacy.page` 掛回任何路由（例如想「暫時封一下某頁」），
+     * 這裡會立刻紅——那個 middleware 的兩條 fail-open 路徑（導向目標不存在時放行、
+     * kill switch 關閉時放行）在視圖已刪的世界裡只會產生 500，不會產生「看到舊頁」。
+     *
+     * ⚠️ **`RetireLegacyBladePage` 與 `config/legacy_page_retirement.php` 自此是死碼**
+     *（無任何路由掛載）。刪除它們、以及 `TestCase::useLegacyBladePages()`（自環節 4b-3 起
+     * 零呼叫點），留給專屬的收尾環節做——那會連帶影響 `.env`／部署 runbook，值得單獨一輪。
      */
     #[Test]
-    public function exactly_the_manifested_routes_are_gated(): void {
-        $expected = [
-            'DELETE manage/{manage}',
-            'GET admin/batch-load-book-titles',
-            'GET admin/batch-load-offices',
-            'GET admin/batch-load-social-institutes',
-            'GET admin/cbdb-table-maintenance',
-            'GET admin/explainsql',
-            'GET admin/unidirectional-relationship-repair',
-            'GET manage',
-            'GET manage/create',
-            'GET manage/{manage}',
-            'GET manage/{manage}/edit',
-            'GET profile',
-            'PATCH profile',
-            'POST admin/batch-load-book-titles',
-            'POST admin/batch-load-book-titles/undo',
-            'POST admin/batch-load-book-titles/update-pinyin',
-            'POST admin/batch-load-offices',
-            'POST admin/batch-load-social-institutes',
-            'POST admin/explainsql',
-            'POST manage',
-            'PUT|PATCH manage/{manage}',
-        ];
-
+    public function no_route_is_gated_by_the_retirement_middleware_any_more(): void {
         $gated = [];
         foreach (Route::getRoutes() as $route) {
             foreach ($route->gatherMiddleware() as $m) {
@@ -350,138 +382,83 @@ class LegacyBladePageRetirementTest extends TestCase {
         }
 
         sort($gated);
-        sort($expected);
 
         $this->assertSame(
-            $expected,
+            [],
             $gated,
-            '封路清單與 docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md 不符；'
-            .'加減或改動封路路由時請同步更新該文件與本清單。'
+            'legacy.page 已於環節 4b-4b 全面退場；若要重新掛上，請先確認對應的 Blade 視圖還在'
+            .'——視圖不存在時那個 middleware 的 fail-open 路徑只會產生 500。'
         );
     }
-    // ── kill switch ──────────────────────────────────────────
 
     /**
-     * 封路可用 config 開關即時關閉——這是環節 3「可逆」的實際兌現方式。
+     * ── 2026-09-15（環節 4b-4b）：kill switch 已無作用對象 ────────────────
      *
-     * 觀察期間若發現某個 React 頁有問題，把 `LEGACY_PAGE_RETIREMENT=false` 一翻、
-     * 清 config 快取，legacy 頁立刻復活：**不需重新部署、不需 git revert**。
-     * 環節 4 實體刪除之後就再也沒有這個能力，所以它值得有測試守著。
+     * 原本這裡有三條測試：`the_kill_switch_restores_the_legacy_pages()`、
+     * `the_kill_switch_also_restores_legacy_write_endpoints()`、
+     * `migration_flags_no_longer_reopen_gated_legacy_pages()`。它們驗的都是
+     * 「封路可以用 config 即時關閉／flag 關不掉」——**在沒有任何路由掛封路之後，
+     * 三條都變成空轉**（不管 config 與 flag 怎麼設，closure 都照樣 302／410）。
+     *
+     * 取而代之的是這一條：把「**兩個開關都已經沒有作用**」直接寫死。
+     * 這是安全相關的陳述——`AGENTS.md` 與部署 runbook 長期告訴維運者
+     * 「設 `LEGACY_PAGE_RETIREMENT=false` 就能叫回 Blade 頁」，現在那句話已經不成立。
      */
     #[Test]
-    public function the_kill_switch_restores_the_legacy_pages(): void {
+    public function neither_the_kill_switch_nor_migration_flags_bring_legacy_pages_back(): void {
         $user = $this->superAdmin();
 
-        // 預設：封路生效
-        $this->actingAs($user)->get('/admin/explainsql')->assertStatus(302);
-
+        // 兩個開關同時打到「最有可能叫回 Blade」的位置。
         config(['legacy_page_retirement.enabled' => false]);
-
-        // 關掉之後請求應抵達原 legacy controller。
-        //
-        // 這個測試只證明「middleware 讓開了」——它用 /dashboard，而該頁在本檔的精簡 schema
-        // 下渲染會因缺表而 5xx，所以**必須連 5xx 一起排除**，否則 500 也會讓
-        // assertNotSame(302)/assertNotSame(410) 通過，變成假綠。
-        //
-        // 「legacy 頁真的復活並渲染成 **Blade**」的實證在同檔的
-        // migration_flags_no_longer_reopen_gated_legacy_pages()——它末尾對 /admin/explainsql
-        // 斷言 assertViewIs('admin.explain_sql')。
-        //（原本指向 InertiaViewTableTest::test_kill_switch_restores_the_legacy_view_page，
-        //  該測試已隨環節 4a-3 刪除——/view 的 Blade 頁不存在了，那個能力也不存在了。）
-        // 用 /admin/explainsql：它不查業務表，在本檔的精簡 schema 下也能真的渲染，
-        // 所以可以斷言 assertOk()——比「不是 302 也不是 410」有意義得多。
-        $this->actingAs($user)->get('/admin/explainsql')->assertOk();
-    }
-
-    /** 寫入端的 410 同樣受 kill switch 控制。 */
-    #[Test]
-    public function the_kill_switch_also_restores_legacy_write_endpoints(): void {
-        $user = $this->superAdmin();
-
-        $this->actingAs($user)->patch('/profile', [])->assertStatus(410);
-
-        config(['legacy_page_retirement.enabled' => false]);
-
-        $status = $this->actingAs($user)->patch('/profile', [])->status();
-        $this->assertNotSame(410, $status);
-        $this->assertLessThan(500, $status, '同理：5xx 會讓上面那個斷言變成假綠');
-    }
-
-    /**
-     * 🔴 **封路不讀 migration flag**——這是回退鍵改變的核心，值得寫死。
-     *
-     * 環節 3 之前，這批頁面把 `MIGRATION_FLAG_*` 翻回 `old` 就會回到 Blade 版；
-     * 環節 3 之後 `legacy.page` middleware 排在 controller 之前、且完全不看 flag，所以翻 flag
-     * **沒有任何效果**。
-     *
-     * 📌 **本測試原本還背著一個安全陳述**：`docs/CODES_SORT_FILTER_AUTH_GATE.md` 記載
-     * 「Blade 版 `codes/{table_name}` 是無門檻的深分頁排序查詢」，而重新暴露它的鑰匙從
-     * 「翻 flag」變成了「`LEGACY_PAGE_RETIREMENT=false`」。**環節 4b-4a 之後那個缺口不存在了**
-     * ——Blade `show()` 連同視圖一起實體刪除，兩把鑰匙都開不了。所以這裡不再宣稱那件事，
-     * 相關覆蓋改由 `legacy_codes_endpoints_stay_retired_without_the_kill_switch()` 承擔。
-     *
-     * 這條測試現在守的是剩下 21 條**仍掛 `legacy.page`** 的路由：flag 對它們無效。
-     */
-    #[Test]
-    public function migration_flags_no_longer_reopen_gated_legacy_pages(): void {
-        $user = $this->superAdmin();
-
-        // 把整批頁面 flag 全翻回 old——封路仍然生效。
-        //
-        // ⚠️ **必須遞迴**：`pages` 含 `admin`／`auth`／`query-playground` 三個巢狀群組，
-        // 非遞迴的 array_map 會把 `pages.admin` 從陣列壓成字串 'old'，於是
-        // `migration_flag('admin.explain-sql')` 的 Arr::get 中途撞到字串回 null、
-        // 落到 `migration_flags.default`——覆寫變成空轉。
         $flipToOld = static function (array $pages) use (&$flipToOld): array {
             return array_map(
                 static fn ($value) => is_array($value) ? $flipToOld($value) : 'old',
                 $pages
             );
         };
-        // ⚠️ default 刻意釘成 **'new'**（與覆寫值相反）：若釘成 'old'，下面的
-        // `assertSame('old', ...)` 就分不出「遞迴覆寫成功」與「解析失敗後 fallback 到 default」
-        // ——兩者都會回 'old'，斷言照綠。設成 'new' 之後，只有真的讀到覆寫值才會是 'old'。
         config([
             'migration_flags.default' => 'new',
             'migration_flags.pages' => $flipToOld((array) config('migration_flags.pages', [])),
         ]);
-
-        // 覆寫真的生效了（否則下面整個測試是空轉）。
+        // 覆寫真的生效了（否則整條測試是空轉）。
+        //
+        // ⚠️ **`migration_flags.default` 刻意釘成 'new'（與覆寫值相反）**：若釘成 'old'，
+        // 下面兩條 `assertSame('old', ...)` 就分不出「遞迴覆寫成功」與「解析失敗後 fallback
+        // 到 default」——兩者都會回 'old'，斷言照綠。
+        //（`pages` 含 `admin`／`auth`／`query-playground` 三個巢狀群組，非遞迴的 array_map
+        // 會把 `pages.admin` 從陣列壓成字串，於是 `migration_flag('admin.explain-sql')` 的
+        // Arr::get 中途撞到字串回 null、落到 default——所以 flipToOld 必須遞迴。）
         $this->assertSame('old', migration_flag('codes'), '扁平 key 的覆寫必須生效');
         $this->assertSame('old', migration_flag('admin.explain-sql'), '巢狀群組的覆寫必須也生效');
         // 反面對照：沒被覆寫的未知 key 才會拿到 default，證明上面兩條不是 fallback。
         $this->assertSame('new', migration_flag('a-key-that-does-not-exist'));
 
-        // 顯示頁：仍然 302。涵蓋兩種 middleware 組合——純 legacy.page（codes／manage／explainsql）
-        // 與「`auth` 併掛」（`/profile`，順序敏感：auth 若排在封路之後，未登入請求會先被導到 /login）。
-        //
-        // ⚠️ 原本這裡還列了 /operations、/dashboard、/view/dynasties（環節 4a-3 起是 redirect
-        // closure），以及 /codes、/codes/DYNASTIES（環節 4b-4a 起同樣是 closure）——
-        // **不管 flag 怎麼翻都會 302**，放在這個測試裡是空轉斷言。
-        // 同一個道理在 4a-3 就寫過一次，4b-4a 又犯了一次（review 抓到）：
-        // **每次把某批路由從 middleware 改成 closure，都要回頭看這個迴圈。**
-        foreach (['/admin/explainsql', '/manage', '/profile'] as $uri) {
-            $this->actingAs($user)
-                ->get($uri)
-                ->assertStatus(302, "翻 flag 不應讓 {$uri} 回到 Blade 版（封路 middleware 不讀 flag）");
+        // 顯示頁：仍 302，且導向的是 React 版。
+        foreach ([
+            '/codes' => '/app/codes',
+            '/manage' => '/app/manage',
+            '/profile' => '/app/profile',
+            '/admin/explainsql' => '/app/admin/explainsql',
+            '/admin/batch-load-book-titles' => '/app/admin/batch-load-book-titles',
+            '/admin/cbdb-table-maintenance' => '/app/admin/cbdb-table-maintenance',
+            '/admin/unidirectional-relationship-repair' => '/app/admin/unidirectional-relationship-repair',
+        ] as $from => $to) {
+            $this->actingAs($user)->get($from)
+                ->assertStatus(302, "{$from} 不該因為任何開關而回到 Blade")
+                ->assertRedirect($to);
         }
 
-        // 寫入端（`legacy.page:gone`）同樣不讀 flag：21 條封路裡有 12 條是這型，
-        // 只驗導向型會漏掉一半。
-        foreach ([['patch', '/profile'], ['post', '/codes/DYNASTIES']] as [$method, $uri]) {
-            $this->actingAs($user)
-                ->{$method}($uri, [])
-                ->assertStatus(410, "翻 flag 不應讓 {$method} {$uri} 復活");
+        // 寫入端：仍 410。
+        foreach ([
+            ['post', '/codes/ADDR_CODES'],
+            ['put', '/manage/1'],
+            ['patch', '/profile'],
+            ['post', '/admin/explainsql'],
+            ['post', '/admin/batch-load-book-titles'],
+        ] as [$method, $uri]) {
+            $this->actingAs($user)->{$method}($uri, [])
+                ->assertStatus(410, "{$method} {$uri} 不該因為任何開關而復活");
         }
-
-        // 對照：真正的鑰匙是 kill switch，且它與 flag 無關（flag 此刻仍是 old）。
-        // 斷言 assertViewIs 而非只看 200——把「回到 **Blade 版**」寫實，
-        // 免得日後這條路由被改成回 Inertia 時測試還是綠的。
-        config(['legacy_page_retirement.enabled' => false]);
-        $this->actingAs($user)
-            ->get('/admin/explainsql')
-            ->assertOk()
-            ->assertViewIs('admin.explain_sql');
     }
 
     /**

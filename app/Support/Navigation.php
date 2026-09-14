@@ -24,7 +24,8 @@ use Illuminate\Support\Facades\Schema;
  *  - 🔴 **現況（2026-09）**：config 裡每個已知頁面都明設 'new'，`'default' => 'old'` 只影響
  *    **config 沒列到的 key**。而且多數 legacy 頁面已被 `legacy.page` middleware 封路，
  *    所以把 flag 翻回 'old' 只會讓本類產出指向一個已被封路的舊 URL——**多繞一跳（302 回 /app）、
- *    不會真的回到 Blade**（回退鍵是 LEGACY_PAGE_RETIREMENT=false）。
+ *    不會真的回到 Blade**。🔴 **2026-09-15（環節 4b-4b）起連 LEGACY_PAGE_RETIREMENT=false
+ *    也回不去**——legacy 頁面全數實體刪除，舊 URI 只剩 302／410 的 closure。
  *    ⚠️ 例外：auth.* 與 welcome 未封路，其 flag 仍決定渲染 Blade 或 React；
  *    basicinformation.* 的 flag 已隨環節 2 刪除，相關節點恆指 /app。
  *

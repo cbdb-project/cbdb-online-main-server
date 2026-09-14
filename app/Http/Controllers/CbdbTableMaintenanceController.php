@@ -57,19 +57,9 @@ class CbdbTableMaintenanceController extends Controller {
 
         return $stats;
     }
-
-    public function index(Request $request) {
-        $stats = $this->buildTableStats();
-
-        return view('admin.cbdb-table-maintenance', [
-            'page_title' => __('admin.table_maintenance'),
-            'page_title_key' => 'CBDB 內部表維護',
-            'page_description' => __('admin.table_maintenance_desc'),
-            'page_url' => route('admin.cbdb-table-maintenance'),
-            'tables' => $this->tables,
-            'stats' => $stats,
-        ]);
-    }
+    // ── 2026-09-15（Blade 下架環節 4b-4b）─────────────────────────────
+    // legacy index() 已刪。🔴 **`rebuild()` 與 `getNameFtsProgress()` 必須留著**——
+    // 它們**沒有 `app.` 雙胞胎**，React 版 `appIndex()` 直接把那兩個 route name 組進 urls prop。
 
     public function appIndex(Request $request) {
         $stats = $this->buildTableStats();

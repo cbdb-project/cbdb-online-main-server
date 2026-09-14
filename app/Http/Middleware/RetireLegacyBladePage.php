@@ -8,6 +8,21 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 
 /**
+ * 🔴🔴 **2026-09-15（Blade 下架環節 4b-4b）起：本 middleware 已無任何掛載點，是死碼。**
+ *
+ * 所有 legacy Blade 頁面都已實體刪除，舊 URI 改由 `routes/web.php` 的 closure 直接
+ * redirect／`abort(410)`。護欄：
+ * `LegacyBladePageRetirementTest::no_route_is_gated_by_the_retirement_middleware_any_more()`。
+ *
+ * ⚠️ **不要把 `legacy.page` 掛回任何路由**：本類有兩條 fail-open 路徑（導向目標不存在時
+ * 放行 + `Log::warning`、kill switch 關閉時放行），而視圖都已經不存在——落下去只會得到
+ * **500**，不會得到「看到舊頁」。需要封某條路由時請直接寫 closure。
+ *
+ * 本類與 `config/legacy_page_retirement.php` 待專屬環節（4b-4c）一併移除。
+ *
+ * ── 以下是它服役時的說明（歷史）─────────────────────────────────
+ */
+/**
  * Legacy Blade 頁面封路閘門（Blade 下架計畫環節 3）。
  *
  * 「先封路、不刪碼」：legacy 路由與 Blade 視圖都留著，但請求不再抵達 controller——

@@ -282,11 +282,19 @@ Route::get('app/text/{id}/edit', 'TextEntityController@appEdit')
     ->middleware('inertia')->name('app.text.edit')->whereNumber('id');
 Route::get('codes/{table_name}/create', 'CodesController@create')->middleware('legacy.page:app.codes.create')->name('codes.create');
 Route::post('codes/{table_name}/proposal', 'CodesController@proposalStore')->middleware('legacy.page:gone')->name('codes.propose.store');
-// ⚠️ **不掛封路 middleware**：這條是 React /app/operations 的「修改提案」連結目標
-// （OperationsController 產 payload 時 route() 它，且無 Route::has() 保護，刪了整頁 500）。
-Route::get('codes/{table_name}/proposals/{operation}/edit', 'CodesController@proposalEdit')->name('codes.proposals.edit');
-Route::patch('codes/{table_name}/proposals/{operation}', 'CodesController@proposalUpdateExisting')->name('codes.proposals.update');
-Route::delete('codes/{table_name}/proposals/{operation}', 'CodesController@proposalCancel')->name('codes.proposals.cancel');
+// ✅ **環節 4b-1 已收斂**：這三條原本不掛封路 middleware，因為 React /app/operations 的
+// 「修改提案」與「撤回」連結**都**指向它們（`OperationsController::serializeOperationRow()`
+// 的 `urls.edit_proposal` 與 `urls.cancel_proposal` 兩個三元式的 else 分支），
+// 而那兩行 `route()` 都**沒有 Route::has() 保護**——刪了會讓整頁 500。
+// 4b-1 把兩行都改指 `app.codes.proposals.*`（React 版早就存在、授權同等），
+// 所以這三條現在封得起來：GET→302、PATCH／DELETE→410。
+// 回歸測試：`OperationsIndexLinksTest::test_code_table_proposal_urls_point_at_the_react_endpoints_and_are_reachable()`。
+Route::get('codes/{table_name}/proposals/{operation}/edit', 'CodesController@proposalEdit')
+    ->middleware('legacy.page:app.codes.proposals.edit')->name('codes.proposals.edit');
+Route::patch('codes/{table_name}/proposals/{operation}', 'CodesController@proposalUpdateExisting')
+    ->middleware('legacy.page:gone')->name('codes.proposals.update');
+Route::delete('codes/{table_name}/proposals/{operation}', 'CodesController@proposalCancel')
+    ->middleware('legacy.page:gone')->name('codes.proposals.cancel');
 Route::match(['post', 'patch'], 'codes/{table_name}/{id}/proposal', 'CodesController@proposalUpdate')->middleware('legacy.page:gone')->name('codes.propose.update')->where('id', '.*');
 Route::get('codes/{table_name}/{id}/edit', 'CodesController@edit')->middleware('legacy.page:app.codes.edit')->name('codes.edit')->where('id', '.*');
 Route::match(['put', 'patch'], 'codes/{table_name}/{id}', 'CodesController@update')->middleware('legacy.page:gone')->name('codes.update')->where('id', '.*');
@@ -431,9 +439,12 @@ Route::middleware('auth')->group(function () {
         ->name('app.admin.explainsql.explain');
     Route::get('admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@showForm')
         ->middleware('legacy.page:app.admin.batch-load-book-titles')->name('admin.batch-load-book-titles');
-    Route::post('admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@store')->name('admin.batch-load-book-titles.store');
-    Route::post('admin/batch-load-book-titles/undo', 'AdminBatchLoadBookTitlesController@undo')->name('admin.batch-load-book-titles.undo');
-    Route::post('admin/batch-load-book-titles/update-pinyin', 'AdminBatchLoadBookTitlesController@updatePinyin')->name('admin.batch-load-book-titles.update-pinyin');
+    Route::post('admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@store')
+        ->middleware('legacy.page:gone')->name('admin.batch-load-book-titles.store');
+    Route::post('admin/batch-load-book-titles/undo', 'AdminBatchLoadBookTitlesController@undo')
+        ->middleware('legacy.page:gone')->name('admin.batch-load-book-titles.undo');
+    Route::post('admin/batch-load-book-titles/update-pinyin', 'AdminBatchLoadBookTitlesController@updatePinyin')
+        ->middleware('legacy.page:gone')->name('admin.batch-load-book-titles.update-pinyin');
     // Inertia + React 版（store/undo 重用既有方法，依請求路徑決定重導）
     Route::get('app/admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@appShowForm')
         ->middleware('inertia')->name('app.admin.batch-load-book-titles');
@@ -449,7 +460,8 @@ Route::middleware('auth')->group(function () {
         ->name('app.admin.batch-load-book-titles.check-rare-chars');
     Route::get('admin/batch-load-social-institutes', 'AdminBatchLoadSocialInstitutesController@showForm')
         ->middleware('legacy.page:app.admin.batch-load-social-institutes')->name('admin.batch-load-social-institutes');
-    Route::post('admin/batch-load-social-institutes', 'AdminBatchLoadSocialInstitutesController@store')->name('admin.batch-load-social-institutes.store');
+    Route::post('admin/batch-load-social-institutes', 'AdminBatchLoadSocialInstitutesController@store')
+        ->middleware('legacy.page:gone')->name('admin.batch-load-social-institutes.store');
     // Inertia + React 版（store 重用，依請求路徑重導）
     Route::get('app/admin/batch-load-social-institutes', 'AdminBatchLoadSocialInstitutesController@appShowForm')
         ->middleware('inertia')->name('app.admin.batch-load-social-institutes');
@@ -457,7 +469,8 @@ Route::middleware('auth')->group(function () {
         ->middleware('inertia')->name('app.admin.batch-load-social-institutes.store');
     Route::get('admin/batch-load-offices', 'AdminBatchLoadOfficesController@showForm')
         ->middleware('legacy.page:app.admin.batch-load-offices')->name('admin.batch-load-offices');
-    Route::post('admin/batch-load-offices', 'AdminBatchLoadOfficesController@store')->name('admin.batch-load-offices.store');
+    Route::post('admin/batch-load-offices', 'AdminBatchLoadOfficesController@store')
+        ->middleware('legacy.page:gone')->name('admin.batch-load-offices.store');
     // Inertia + React 版（store 重用，依請求路徑重導）
     Route::get('app/admin/batch-load-offices', 'AdminBatchLoadOfficesController@appShowForm')
         ->middleware('inertia')->name('app.admin.batch-load-offices');

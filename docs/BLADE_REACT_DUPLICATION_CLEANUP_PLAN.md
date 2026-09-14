@@ -25,9 +25,10 @@
   4. 刪 `basicinformation.*` flag key 會讓 `PersonBrowserController` 的 12 個 `*EditorIsNew` prop 全變 `false` ⇒ **13 個 React 編輯器靜默退回唯讀／退回指向 404 的 legacy 按鈕**，無 500、測試不會紅；
   5. 用 `Route::redirect`（= `any()`）封 codes 寫入端 ⇒ POST 被 redirect 降級成 GET、**body 靜默丟失**。環節 3 一律「顯示頁 GET→302、legacy 寫入端→410」；
   6. `login`／`register` 的**路由層不可碰**——`route('login')` 被 `Handler.php` 與 `Authenticate` middleware 依賴，名字一掉＝全站未登入請求 500；
-  7. **有一批「長得像 legacy、其實是 React 正在用的 action endpoint」**：`crowdsourcing/{id}/confirm｜reject`（**GET 動詞的寫入端**，React 直接 `<a href>`）、`operations/{op}/restore｜approve｜reject｜cancel`、`codes.proposals.cancel`。按 prefix 套封路規則會直接命中它們 ⇒ **環節 3 必須逐條列 route manifest**；
+  7. **有一批「長得像 legacy、其實是 React 正在用的 action endpoint」**：`crowdsourcing/{id}/confirm｜reject`（**GET 動詞的寫入端**，React 直接 `<a href>`）、`operations/{op}/restore｜approve｜reject｜cancel`、`codes.proposals.cancel`。按 prefix 套封路規則會直接命中它們 ⇒ **環節 3 必須逐條列 route manifest**（`codes.proposals.*` 已於環節 4b-1 把 payload 改指 `app.*` 後封路）；
   8. **觀察期不要用 301**——301 會被瀏覽器／CDN 長期快取，`git revert` 只還原伺服器，「完全可逆」在 301 之下不成立。觀察期用 302，確定永久下架才升 301；
-  9. 🔴 **最隱蔽的一類**：有一批 legacy URL 是**由 PHP controller 組進 Inertia payload**、React 只是 `<a href={row.urls.x}>`——grep `resources/js` **完全抓不到**。已知 4 組（見 §三之二），其中 `OperationsController.php:1104` 的 `route('codes.proposals.edit')` **無 `Route::has()` 保護，刪路由＝`/app/operations` 整頁 500**。
+  9. 🔴 **最隱蔽的一類**：有一批 legacy URL 是**由 PHP controller 組進 Inertia payload**、React 只是 `<a href={row.urls.x}>`——grep `resources/js` **完全抓不到**。已知 4 組（見 §三之二），其中 `OperationsController` 的 `route('codes.proposals.edit')` **與** `route('codes.proposals.cancel')` 兩行都**無 `Route::has()` 保護，刪路由＝`/app/operations` 整頁 500**。✅ 兩行都已於環節 4b-1 改指 `app.codes.proposals.*`。
+     🔴 **教訓**：我在 4b-1 只看了 manifest 的 B 類那一格（它寫「legacy 這條 DELETE 實際無人呼叫」，而那只對 entity 提案成立），就把 DELETE 封成 410 ⇒ codes 表提案的提案人無法撤回自己的提案，且**全套測試皆綠**。而**正確資訊一直在本文件的 §三之二裡**（它明寫 `codes.proposals.cancel` ← `OperationsController`「非 entity proposal 走這條」）。**兩份文件衝突時要自己驗，不要挑一份信。**
 - 清除的核心取捨：一旦刪除舊 Blade，`migration_flags` 承諾的「翻回 `old` 即時回退」就**永久消失**。因此本計畫採**兩段式**：先封路（可逆）→ 觀察 → 再刪碼（不可逆）。
 
 ---
@@ -194,7 +195,7 @@
 |---|---|---|---|---|---|
 | 1 | `crowdsourcing/{id}/confirm`、`/reject`（**GET 動詞的寫入端**） | `CrowdsourcingController.php:183-184`（`url()` **字串拼接**，route name grep 抓不到） | `Pages/Admin/Crowdsourcing/Index.tsx:225,231` | 審核按鈕全壞 | 環節 3 排除；環節 4a 前先遷到 `/app` 或 POST 化 |
 | 2 | `operations/{op}/restore`、`/approve`、`/reject`、`/cancel` | `OperationsController.php:1043-1052` | `Pages/Admin/Operations/Index.tsx` | 還原／審核按鈕全壞 | 排除，**不得 redirect／刪除** |
-| 3 | **`codes.proposals.edit`** | `OperationsController.php:1104`（`return route('codes.proposals.edit', …)`，**無 `Route::has()` 保護**） | `Pages/Admin/Operations/Index.tsx:414-418` 的「修改提案」按鈕 | 🔴 **`RouteNotFoundException` → `/app/operations` 整頁 500**（不是壞連結，是產 payload 時就炸） | ⚠️ §二 A 原把 `proposalEdit` 列為可刪——**錯**。環節 4b 刪 `codes.proposals.edit` 前，**必須先**把這行改成 `app.codes.proposals.edit`（該路由已存在，`routes/web.php:315-316`） |
+| 3 | **`codes.proposals.edit`** | `OperationsController.php:1104`（`return route('codes.proposals.edit', …)`，**無 `Route::has()` 保護**） | `Pages/Admin/Operations/Index.tsx:414-418` 的「修改提案」按鈕 | 🔴 **`RouteNotFoundException` → `/app/operations` 整頁 500**（不是壞連結，是產 payload 時就炸） | ⚠️ §二 A 原把 `proposalEdit` 列為可刪——**錯**。<br>✅ **環節 4b-1 已完成**：該行已改指 `app.codes.proposals.edit`。<br>🔴 **當時這一格還漏了一條同型的**：`urls.cancel_proposal` 的 else 分支也 `route('codes.proposals.cancel')` 且同樣無保護。本文件 §三之二的下一列**有**記到它，但 manifest 的 B 類那一格寫「legacy 這條實際無人呼叫」（那只對 entity 提案成立），我在 4b-1 挑了 manifest 信 ⇒ 封出一個回歸。兩行現在都已改指 `app.*`，並有回歸測試 `OperationsIndexLinksTest::test_code_table_proposal_urls_point_at_the_react_endpoints_and_are_reachable()` |
 | 4 | `basicinformation.assoc.index`／`statuses.index`／`offices.index` | `AiFillLogController.php:152-158`（`prepareLog()` 的 `$personRoute`） | `Pages/Admin/AiFillLogs/Index.tsx:188` 的 `person_url` | 有 `Route::has()` 保護 ⇒ **不會 500，但 `person_url` 靜默變 `null`、連結消失**（又一個「無聲退化」） | 🔴 **環節 2 必須同步**把這三個 route name 改成 `/app` 對應頁（`app.basicinformation.show` + `tab` 參數） |
 
 **因此 §三第 13c 欄的 grep 必須配一條 PHP 端的**：
@@ -399,7 +400,9 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
 > ＋ `tests/Feature/LegacyBladePageRetirementTest`（59 個測試，含逐條身分斷言）
 >
 > **實測分類**：`php artisan route:list --json` 取出該批 controller 上的 **65 條** legacy（非 `app/*`）路由，逐條判定後
-> **35 條封路**（22 條 GET→302、13 條→410）、**19 條不動**、**11 條不在本環節範圍**（v1 token API 與 Query Playground 共用後端）。不動的理由分三級：
+> **環節 3 當時**：**35 條封路**（22 條 GET→302、13 條→410）、**19 條不動**、**11 條不在本環節範圍**（v1 token API 與 Query Playground 共用後端）。
+> **現況**：環節 4a-3 把 10 條改成 closure、環節 4b-1 新封 8 條 ⇒ **33 條封路、11 條不動**。
+> 環節 3 當時不動的理由分三級：
 > 只有 1 條真的「動了就壞」、6 條是「封了不會壞但 `listRouteName()` 收斂還沒做」、12 條是 React 正在呼叫的
 > action endpoint——其中 `crowdsourcing/{id}/confirm|reject` 是 **GET 動詞的寫入端**，按 prefix
 > 套規則會直接命中）。測試逐條驗證「該封的封了、該留的一條都沒被誤掛」，並鎖住總數 35。
@@ -434,7 +437,7 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
 |---|---|---|---|
 | `crowdsourcing/{id}/confirm`、`/reject` | `routes/web.php:435-436`（**GET mutation**） | `CrowdsourcingController.php:183-184` 產 `confirm_url`／`reject_url` | `Pages/Admin/Crowdsourcing/Index.tsx:225,231` 直接 `<a href>` |
 | `operations/{operation}/restore`、`/approve`、`/reject`、`/cancel` | `routes/web.php:370-373, 399` | `OperationsController.php:1043-1052` 的 `urls` payload | `Pages/Admin/Operations/Index.tsx` |
-| `codes.proposals.cancel` | `routes/web.php:363` | `OperationsController.php:1052`（非 entity proposal 走這條） | 同上 |
+| `codes.proposals.cancel` | `routes/web.php` | `OperationsController::serializeOperationRow()` 的 `urls.cancel_proposal`（**非 entity proposal 走這條**） | ✅ 環節 4b-1 已改指 `app.codes.proposals.cancel`。<br>🔴 **本表這一格一直是對的，但 manifest 的 B 類那一格寫「legacy 這條實際無人呼叫」——我信了 manifest、沒回頭看本表，結果封出一個回歸。兩份文件衝突時要自己驗。** |
 
 > ⚠️ 特別注意 crowdsourcing 的 confirm／reject 是 **GET 動詞的寫入端**——按「GET 一律導向」的規則會直接命中它。這正是「不能按 prefix 套規則」的理由。
 >
@@ -513,7 +516,38 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
       一鍵跳進 React `/app/operations`。kill switch 關閉時這是「半 Blade 半 React」的體驗；
       若 4b 要保持「關掉就是純 Blade」需另行處理。
 **同時刪**環節 2 保留下來的 `biogmains/defense.blade.php`（若走 (a) 方案）與 D-6 中的 `components/{diff-table,posted-to-addr-diff,key-value-table,ai-fill-diff-table}`（它們的最後消費者就在這一批）
-- **4b 表單／寫入頁**：codes 全套、manage、profile、admin/explainsql、3 個 batch-load、cbdb-table-maintenance、unidirectional-repair（⚠️ 只刪薄殼，`perform*` 全留）。**每刪一條 route 前，用三個方向各掃一次** `app/`、`resources/js/`、`tests/`：① **route name**（`route('x')`）、② **URI prefix**（`url('crowdsourcing/…')`、字串拼接——`CrowdsourcingController.php:183-184` 就是這型，route name grep 抓不到）、③ **controller action**。並把結果列進該 commit 的刪除清單。另外 `grep -rn "RouteName\|routeName" app/Http/Controllers` 找 `listRouteName()` 這類**回傳路由名字串**的分支
+- **4b 表單／寫入頁**：codes 全套、manage、profile、admin/explainsql、3 個 batch-load、cbdb-table-maintenance、unidirectional-repair（⚠️ 只刪薄殼，`perform*` 全留）。
+  範圍比 4a 大兩倍以上（**223 條 legacy-parity 測試、15 個檔、約 9.9k 行**），故再拆四個子環節：
+  - **4b-1 ✅ 已完成（2026-09-14）——路由收斂（前置，不刪任何碼）**：
+    manifest 記錄的兩組「封了不會壞，但收斂還沒做」已處理完畢。
+    🔴 **A 類（動了就壞）**：`OperationsController` 產「修改提案」連結那一行原本用
+    `route('codes.proposals.edit')` 且**沒有 `Route::has()` 保護**——那條 legacy 路由一旦消失
+    會拋 `RouteNotFoundException` 讓 `/app/operations` **整頁 500**。已改指早就存在的
+    `app.codes.proposals.edit`，於是三條 `codes/{t}/proposals/{op}` 都封得起來了。
+    🔴 **B 類**：3 個 batch-load controller 的 `listRouteName()` 依 `$request->is('app/*')`
+    二選一，legacy POST 走 legacy 分支會**多一跳 302**，而 `laracasts/flash` 只活一個請求
+    ⇒ 匯入結果的提示被 session 老化掉、**靜默消失**。已收斂成一律回 `app.admin.*`，
+    那 5 條 POST 因此封成 410。
+    封路身分清單 25 → **33**，「不動」那組 19 → **11**。
+    ⚠️ **連帶的回退語義變化**：`listRouteName()` 收斂後，即使 kill switch 關閉，
+    3 個 batch-load 的 legacy POST 完成也會**落在 React 列表**——「關掉就是純 Blade」
+    再破一個洞（與上面 `proposal-edit.blade.php:54` 同型）。4b-4 刪掉那些頁面時一併消失。
+    🔴 **這一輪最重要的教訓**：我照抄了 manifest 的一句錯誤陳述（「legacy 這條 DELETE
+    實際無人呼叫」——那只對 entity 提案成立），把 `codes.proposals.cancel` 封成 410，
+    結果 **codes 表提案的提案人無法從 `/app/operations` 撤回自己的提案**，而且
+    **全套測試皆綠**（`serializeOperationRow()` 的兩個三元式 else 分支零覆蓋）。
+    已改指 React 版並補上回歸測試
+    `OperationsIndexLinksTest::test_code_table_proposal_urls_point_at_the_react_endpoints_and_are_reachable()`
+    ——它同時驗「字串指 /app」與「實際打得動（非 410／404）」。
+    **manifest 的每一格理由都要自己驗，不要照抄。**
+    ⚠️ 過程中踩到一次：用 regex 改 `listRouteName()` 時 `.*?` 跨了方法邊界、**吃掉了鄰近的
+    `showForm()`／`appShowForm()`**（`RouteActionsExistTest` 與 React 側 Inertia 測試一起抓到）。
+    改用行定位重做。**動 controller 方法一律用行定位，不要用跨行 regex。**
+    另一次：把 `route('admin.batch-load-*')` 全域替換成 `app.*`，結果連
+    `$this->get(...)`（刻意打 Blade 頁）也被改掉 ⇒ 只能改 `assertRedirect(...)` 內的。
+  - **4b-2／4b-3 待做**：codes 側與 manage／profile／admin 側的測試分流。
+  - **4b-4 待做**：實體刪除。
+**每刪一條 route 前，用三個方向各掃一次** `app/`、`resources/js/`、`tests/`：① **route name**（`route('x')`）、② **URI prefix**（`url('crowdsourcing/…')`、字串拼接——`CrowdsourcingController.php:183-184` 就是這型，route name grep 抓不到）、③ **controller action**。並把結果列進該 commit 的刪除清單。另外 `grep -rn "RouteName\|routeName" app/Http/Controllers` 找 `listRouteName()` 這類**回傳路由名字串**的分支
 - **4c 認證與入口**：auth 4 頁、welcome（同時移除 4 個 Auth controller 與 `WelcomeController` 的 flag 分支）
 - **4d flag 機制收尾**：刪 `config/migration_flags.php`、`migration_flag()`／`migration_flag_is_new()`、`Navigation::url()` 的 flag 參數與 `active.pages`／`active.patterns`、`HandleInertiaRequests::profileUrl()` 分支；改寫 §三第 15 欄列出的全部測試。
   ⚠️ **刪 config 前先掃「未知 key fallback」**：`config/migration_flags.php:37-104` 的每個已知頁面都有明文預設 `new`，所以 CI（`cp .env.example .env`，`.env.example` 無 `MIGRATION_FLAG_*`）**跑的就是 new 路徑**——`'default' => 'old'` 只影響**不在 config 裡的 key**。真正要找的是「`migration_flag_is_new('某個 config 沒列的 key')` 因而永遠回 false」的呼叫點：`grep -roE "migration_flag(_is_new)?\('[^']+'\)" app/ resources/` 取出所有 key，逐一比對 `config/migration_flags.php` 是否列出，對不上的先處理。

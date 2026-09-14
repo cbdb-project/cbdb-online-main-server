@@ -81,9 +81,21 @@ class AdminBatchLoadBookTitlesController extends Controller {
         ]);
     }
 
-    /** 依目前請求路徑決定 store/undo 完成後的列表路由（Blade vs Inertia 共用 store/undo）。 */
+    /**
+     * store/undo 完成後的列表路由：**一律指 React 版**。
+     *
+     * 原本依 `$request->is('app/*')` 二選一。環節 3 把 legacy GET 封成 302 之後，那個 legacy
+     * 分支就有害了：legacy POST 完成 → redirect 到 legacy 列表 → 再被封路 302 到 `/app/...`
+     * ⇒ **多一跳**，而 `laracasts/flash` 只活一個請求，所以匯入結果的成功／失敗提示會被
+     * session 老化掉、**靜默消失**（使用者看不到「匯入了幾筆」）。
+     *
+     * 收斂成一律回 `app.*` 之後，legacy POST 也直接落到 React 列表、flash 保得住，
+     * 那幾條 POST 才能在環節 4b 安全下架（manifest 的 B 類就是在等這個）。
+     *
+     * $request 保留在簽章裡（呼叫端已傳），但不再影響結果。
+     */
     protected function listRouteName(Request $request): string {
-        return $request->is('app/*') ? 'app.admin.batch-load-book-titles' : 'admin.batch-load-book-titles';
+        return 'app.admin.batch-load-book-titles';
     }
 
     /**

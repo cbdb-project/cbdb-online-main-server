@@ -19,6 +19,19 @@ use Tests\TestCase;
  * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
  */
 #[Group('legacy-parity')]
+/**
+ * ⚠️ **環節 4b-1 收斂**：`listRouteName()` 原本依 `$request->is('app/*')` 二選一，現在**一律**
+ * 回傳 `app.admin.*`。理由：環節 3 把 legacy GET 封成 302 之後，legacy POST 完成 → redirect 到
+ * legacy 列表 → 再被封路 302 ⇒ 多一跳，而 `laracasts/flash` 只活一個請求，所以匯入結果的
+ * 成功／失敗提示會被 session 老化掉、**靜默消失**。
+ *
+ * 所以本檔的 `assertRedirect(route('admin.batch-load-book-titles'))` 都改成 `app.admin.batch-load-book-titles`
+ * ——那是收斂**刻意造成**的行為變化，不是回歸。
+ *
+ * ⚠️ 只改 `assertRedirect(...)`：其餘 `$this->get(route('admin.batch-load-book-titles'))` 是**刻意**打
+ * legacy Blade 頁（本檔以 useLegacyBladePages() 局部關閉封路），要驗的正是 Blade 的渲染，
+ * 不能一併改掉。本檔的完整分流留到 4b 的測試分流階段。
+ */
 class AdminBatchLoadBookTitlesTest extends TestCase {
     use SeedsPinyinDictionary;
 
@@ -235,7 +248,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'entries' => "12345\t測試稿: 卷一\t54321",
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $response->assertRedirect(route('app.admin.batch-load-book-titles'));
 
         $record = DB::table('TEXT_CODES')->where('c_textid', 54322)->first();
         $this->assertNotNull($record);
@@ -274,7 +287,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'entries' => "abc\t\n",
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $response->assertRedirect(route('app.admin.batch-load-book-titles'));
 
         $followUp = $this->get(route('admin.batch-load-book-titles'));
         $followUp->assertSee('匯入失敗');
@@ -372,7 +385,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'entries' => "12345\t測試稿\t",
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $response->assertRedirect(route('app.admin.batch-load-book-titles'));
         $response->assertSessionHas('batch_errors');
         $errors = $response->getSession()->get('batch_errors', []);
         $this->assertNotEmpty($errors);
@@ -393,7 +406,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'entries' => "9999999\t測試書\t700",
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $response->assertRedirect(route('app.admin.batch-load-book-titles'));
         $errors = $response->getSession()->get('batch_errors', []);
         $this->assertNotEmpty($errors);
         $this->assertStringContainsString('不存在於 BIOG_MAIN', implode("\n", $errors));
@@ -412,7 +425,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'entries' => "200\t測試書\t8888888",
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $response->assertRedirect(route('app.admin.batch-load-book-titles'));
         $errors = $response->getSession()->get('batch_errors', []);
         $this->assertNotEmpty($errors);
         $this->assertStringContainsString('不存在於 TEXT_CODES', implode("\n", $errors));
@@ -431,7 +444,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'entries' => "201\t測試書\tabc",
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $response->assertRedirect(route('app.admin.batch-load-book-titles'));
         $errors = $response->getSession()->get('batch_errors', []);
         $this->assertNotEmpty($errors);
         $this->assertStringContainsString('必須為整數', implode("\n", $errors));
@@ -450,7 +463,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'entries' => "204\t四書講義(屠錫光)\t703",
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $response->assertRedirect(route('app.admin.batch-load-book-titles'));
         $this->assertEmpty($response->getSession()->get('batch_errors', []));
         $this->assertSame(2, DB::table('TEXT_CODES')->count());
     }
@@ -471,7 +484,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'entries' => $entries,
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $response->assertRedirect(route('app.admin.batch-load-book-titles'));
         $errors = $response->getSession()->get('batch_errors', []);
         $this->assertNotEmpty($errors);
         // Only the seeded TEXT_CODES row remains: nothing from this batch was inserted
@@ -494,7 +507,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'entries' => "260\t𰻞瑣獻納稿\t760",
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $response->assertRedirect(route('app.admin.batch-load-book-titles'));
         $errors = $response->getSession()->get('batch_errors', []);
         $this->assertNotEmpty($errors);
         $this->assertStringContainsString('無拼音對應', implode("\n", $errors));
@@ -517,7 +530,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'force' => '1',
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $response->assertRedirect(route('app.admin.batch-load-book-titles'));
         $this->assertEmpty($response->getSession()->get('batch_errors', []));
         $this->assertSame(2, DB::table('TEXT_CODES')->count());
     }
@@ -535,7 +548,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'force' => '1',
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $response->assertRedirect(route('app.admin.batch-load-book-titles'));
         $errors = $response->getSession()->get('batch_errors', []);
         $this->assertStringContainsString('不存在於 BIOG_MAIN', implode("\n", $errors));
         $this->assertSame(1, DB::table('TEXT_CODES')->count());
@@ -554,7 +567,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'entries' => "280\t莊巵言\t780\n280\t易繫詞講\t780",
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $response->assertRedirect(route('app.admin.batch-load-book-titles'));
         $this->assertEmpty($response->getSession()->get('batch_errors', []));
 
         $rows = DB::table('TEXT_CODES')->where('c_textid', '>', 780)->orderBy('c_textid')->get();
@@ -575,7 +588,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'entries' => "290\t臺灣府志\t790\n290\t淨土錄\t790",
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $response->assertRedirect(route('app.admin.batch-load-book-titles'));
         $this->assertEmpty($response->getSession()->get('batch_errors', []));
 
         $rows = DB::table('TEXT_CODES')->where('c_textid', '>', 790)->orderBy('c_textid')->get();
@@ -597,7 +610,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'entries' => "291\t東坡集峯卷一\t791",
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $response->assertRedirect(route('app.admin.batch-load-book-titles'));
         $this->assertSame([], $response->getSession()->get('batch_errors', []));
 
         $record = DB::table('TEXT_CODES')->where('c_textid', '>', 791)->orderByDesc('c_textid')->first();
@@ -622,7 +635,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'entries' => "293\t靑瑣稿\t793",
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $response->assertRedirect(route('app.admin.batch-load-book-titles'));
         $this->assertEmpty($response->getSession()->get('batch_errors', []));
 
         $record = DB::table('TEXT_CODES')->where('c_textid', '>', 793)->orderByDesc('c_textid')->first();
@@ -647,7 +660,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'entries' => "294\t頴集\t794",
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $response->assertRedirect(route('app.admin.batch-load-book-titles'));
         $this->assertEmpty($response->getSession()->get('batch_errors', []));
 
         $record = DB::table('TEXT_CODES')->where('c_textid', '>', 794)->orderByDesc('c_textid')->first();
@@ -673,7 +686,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'entries' => "295\t淸厰集\t795",
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $response->assertRedirect(route('app.admin.batch-load-book-titles'));
         $this->assertEmpty($response->getSession()->get('batch_errors', []));
 
         $record = DB::table('TEXT_CODES')->where('c_textid', '>', 795)->orderByDesc('c_textid')->first();
@@ -698,7 +711,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'entries' => "296\t愼獄集\t796",
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $response->assertRedirect(route('app.admin.batch-load-book-titles'));
         $this->assertEmpty($response->getSession()->get('batch_errors', []));
 
         $record = DB::table('TEXT_CODES')->where('c_textid', '>', 796)->orderByDesc('c_textid')->first();
@@ -721,7 +734,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'entries' => $entries,
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $response->assertRedirect(route('app.admin.batch-load-book-titles'));
         $this->assertEmpty($response->getSession()->get('batch_errors', []));
 
         $results = $response->getSession()->get('batch_results', []);
@@ -749,7 +762,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'entries' => "292\t净土錄\t792",
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $response->assertRedirect(route('app.admin.batch-load-book-titles'));
         $errors = $response->getSession()->get('batch_errors', []);
         $this->assertNotEmpty($errors);
         $this->assertStringContainsString('簡體字形', implode("\n", $errors));
@@ -774,7 +787,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'force' => '1',
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $response->assertRedirect(route('app.admin.batch-load-book-titles'));
         $this->assertEmpty($response->getSession()->get('batch_errors', []));
         $record = DB::table('TEXT_CODES')->where('c_textid', '>', 793)->orderByDesc('c_textid')->first();
         $this->assertNotNull($record);
@@ -796,7 +809,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
             'entries' => "261\t測試稿: 卷靑\t761",
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-book-titles'));
+        $response->assertRedirect(route('app.admin.batch-load-book-titles'));
         $this->assertEmpty($response->getSession()->get('batch_errors', []));
     }
 
@@ -819,7 +832,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $undo = $this->post(route('admin.batch-load-book-titles.undo'), [
             'batch_id' => $batchId,
         ]);
-        $undo->assertRedirect(route('admin.batch-load-book-titles'));
+        $undo->assertRedirect(route('app.admin.batch-load-book-titles'));
         $toast = $undo->getSession()->get('toast', []);
         $this->assertStringContainsString('共刪除 2 筆', $toast['msg'] ?? '');
         $this->assertSame('success', $toast['type'] ?? '');
@@ -869,7 +882,7 @@ class AdminBatchLoadBookTitlesTest extends TestCase {
         $undo = $this->post(route('admin.batch-load-book-titles.undo'), [
             'batch_id' => '20990101000000-DEADBE',
         ]);
-        $undo->assertRedirect(route('admin.batch-load-book-titles'));
+        $undo->assertRedirect(route('app.admin.batch-load-book-titles'));
         $toast = $undo->getSession()->get('toast', []);
         $this->assertStringContainsString('找不到對應批次', $toast['msg'] ?? '');
         $this->assertSame('warning', $toast['type'] ?? '');

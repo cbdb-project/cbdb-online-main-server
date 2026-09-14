@@ -456,7 +456,28 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
 
 ### 環節 4 — A-1…A-19 Blade 實體刪除（風險：中，**不可逆**）
 拆成 4 個子環節，各自跑完整雙 gate：
-- **4a 唯讀頁**：dashboard、operations、view、admin/audit-logs、admin/ai-fill-logs、nl-query-logs、crowdsourcing、merge-preview。**同時刪**環節 2 保留下來的 `biogmains/defense.blade.php`（若走 (a) 方案）與 D-6 中的 `components/{diff-table,posted-to-addr-diff,key-value-table,ai-fill-diff-table}`（它們的最後消費者就在這一批）
+- **4a 唯讀頁**：dashboard、operations、view、admin/audit-logs、admin/ai-fill-logs、nl-query-logs、crowdsourcing、merge-preview。
+  拆成三個子環節，因為風險不在刪碼（9 個 Blade action 全是薄殼或被 React 嚴格涵蓋的重複實作），
+  而在測試：legacy 側 3923 行 vs React 側 920 行，4:1。
+  - **4a-1 ✅ 已完成（2026-09-14）**：`SecurityAuditLogTest`（16 條全 C，且 legacy-parity 標記是**誤標**——
+    整檔零 HTML 斷言，純 URL 抽換即可）、`AdminAuditLogHistoryFilterTest`、`AiFillLogTest`（8→1）。
+    `--group legacy-parity` 309 → 284。
+  - **4a-2 ✅ 已完成（2026-09-14）**：`OperationsIndex{Diff,Filter,Links,Resilience}Test` 四檔 59 → 58 條，
+    全部改打 `/app/operations` 並讀 Inertia props。`--group legacy-parity` 284 → **226**。
+    🔴 **最大的陷阱是 K 類**：`OperationsIndexLinksTest` 的 17 條**本來就是 React 測試**
+    （透過 `firstResourceLink()`／`firstRow()` 打 `/app/operations`），只是住在 legacy 檔、被 setUp 的
+    opt-out 連坐——整檔刪掉會毀掉它們。
+    ⚠️ **轉換時差點把斷言轉弱**：`diff_source` 是 `resource_diff ?? resource_original`，
+    fixture 的 `resource_original` 非空，所以 `assertNotNull($diff)` 在 resource_id 解析失敗時也會過。
+    改成斷言每個 diff row 的 `current` 不是 `(未取得)`、且至少一欄 `matches_current`，並加**誘餌列**
+    （否則只插一列時「WHERE 整組拿掉」也會撈到那唯一一列）才真的有鑑別力。
+    順帶揭露一條原本就過寬的 legacy 斷言：`assertSee('...&c_assoc_id=202', false)` 只是**前綴**比對，
+    實際 URL 帶完整 9 欄 PK。
+    唯一保留的 legacy 耦合是 `test_legacy_codes_edit_page_resolves_the_right_composite_row`
+    （要開 legacy codes 編輯頁確認 id 解析，該頁屬 4b），已單獨掛 `#[Group('legacy-parity')]`。
+  - **4a-3 待做**：實體刪除 9 個視圖 + 7 個元件 + 9 條路由 + 9 個 Blade controller 方法，
+    並移除 `InertiaViewTableTest` 的 3 條 kill-switch 實證測試（那個能力屆時才真的消失）。
+**同時刪**環節 2 保留下來的 `biogmains/defense.blade.php`（若走 (a) 方案）與 D-6 中的 `components/{diff-table,posted-to-addr-diff,key-value-table,ai-fill-diff-table}`（它們的最後消費者就在這一批）
 - **4b 表單／寫入頁**：codes 全套、manage、profile、admin/explainsql、3 個 batch-load、cbdb-table-maintenance、unidirectional-repair（⚠️ 只刪薄殼，`perform*` 全留）。**每刪一條 route 前，用三個方向各掃一次** `app/`、`resources/js/`、`tests/`：① **route name**（`route('x')`）、② **URI prefix**（`url('crowdsourcing/…')`、字串拼接——`CrowdsourcingController.php:183-184` 就是這型，route name grep 抓不到）、③ **controller action**。並把結果列進該 commit 的刪除清單。另外 `grep -rn "RouteName\|routeName" app/Http/Controllers` 找 `listRouteName()` 這類**回傳路由名字串**的分支
 - **4c 認證與入口**：auth 4 頁、welcome（同時移除 4 個 Auth controller 與 `WelcomeController` 的 flag 分支）
 - **4d flag 機制收尾**：刪 `config/migration_flags.php`、`migration_flag()`／`migration_flag_is_new()`、`Navigation::url()` 的 flag 參數與 `active.pages`／`active.patterns`、`HandleInertiaRequests::profileUrl()` 分支；改寫 §三第 15 欄列出的全部測試。

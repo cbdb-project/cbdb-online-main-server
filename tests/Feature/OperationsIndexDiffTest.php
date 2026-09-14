@@ -8,67 +8,34 @@ use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
+use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
- * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
+ * `/app/operations` 的 diff 計算：`resource_id` 舊格式必須解得開，才查得到 DB 現況。
+ *
+ * 這四個 ALTNAME_DATA 分支（3-key dash、3-key `_._`、名字含 `-` 而編碼成 `(minus)`、
+ * 以及 4-key legacy）是 #834 主鍵遷移的專屬回歸。`buildOperationsListing()` 是 Blade 與
+ * React 共用的，所以不變量本身與頁面無關——但 `OperationsInertiaTest` 那筆 fixture 是
+ * `TEST_RES` + 空 `resource_id`，**完全不走 resource_id 解析分支**，所以這批不能丟。
+ *
+ * ── 2026-09-14（Blade 下架環節 4a-2）─────────────────────────────
+ *
+ * 本檔原本打 legacy `/operations` 並自建 Blade stub（layouts/dashboard + operations/index +
+ * `view.paths` 覆寫 + FileViewFinder 抽換），斷言 `viewData('lists')` 的 `resource_diff`。
+ * 現改打 `/app/operations` 並斷言 Inertia prop `lists[].diff_source`
+ * （`serializeOperationRow()` 裡的 `resource_diff ?? resource_original`），整組 stub 一併移除。
+ *
+ * 同批刪掉 1 條 A 類（空資料集回 200，已由 `OperationsInertiaTest::index_renders_component`
+ * 以同樣的「未插任何列」斷言覆蓋）。
  */
-#[Group('legacy-parity')]
 class OperationsIndexDiffTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
 
-        // 本類驗的是 legacy Blade 頁的行為。Blade 下架計畫環節 3「先封路、不刪碼」把那些
-        // 路由改成 302／410，但頁面本身還在、還部署著、還能被 kill switch 叫回來，
-        // 所以這份覆蓋在觀察期內仍有意義——局部關閉封路即可。環節 4 實體刪除時一併移除。
-        $this->useLegacyBladePages();
-
         config()->set('database.default', 'sqlite');
         config()->set('database.connections.sqlite.database', ':memory:');
-
-        $tempBase = sys_get_temp_dir() . '/laravel-test-views-' . uniqid();
-        $layoutsDir = $tempBase . '/layouts';
-        $operationsDir = $tempBase . '/operations';
-        if (!is_dir($layoutsDir)) {
-            mkdir($layoutsDir, 0777, true);
-        }
-        if (!is_dir($operationsDir)) {
-            mkdir($operationsDir, 0777, true);
-        }
-
-        file_put_contents(
-            $layoutsDir . '/dashboard.blade.php',
-            <<<BLADE
-<!doctype html>
-<html lang="zh-Hant">
-<head><meta charset="utf-8"><title>Test Layout</title></head>
-<body>
-@yield('content')
-</body>
-</html>
-BLADE
-        );
-
-        file_put_contents(
-            $operationsDir . '/index.blade.php',
-            <<<BLADE
-@extends('layouts.dashboard')
-
-@section('content')
-    <h1>最近編輯列表</h1>
-@endsection
-BLADE
-        );
-
-        $compiledPath = sys_get_temp_dir() . '/laravel-views-' . uniqid();
-        mkdir($compiledPath, 0777, true);
-
-        config()->set('view.paths', [$tempBase]);
-        config()->set('view.compiled', $compiledPath);
-        app('view')->setFinder(new \Illuminate\View\FileViewFinder(app('files'), [$tempBase]));
 
         Schema::create('users', function (Blueprint $table) {
             $table->increments('id');
@@ -95,6 +62,14 @@ BLADE
             $table->smallInteger('rate')->default(0);
         });
 
+        // React 路徑的 serializeOperationRow() 會解析受影響人物的姓名（legacy Blade 版
+        // 由視圖自己處理，所以原本的 stub 沒碰到這張表）。
+        Schema::create('BIOG_MAIN', function (Blueprint $table) {
+            $table->integer('c_personid')->primary();
+            $table->string('c_name')->nullable();
+            $table->string('c_name_chn')->nullable();
+        });
+
         Schema::create('OFFICE_CODES', function (Blueprint $table) {
             $table->integer('c_office_id')->primary();
             $table->string('c_office_chn')->nullable();
@@ -116,6 +91,7 @@ BLADE
         Schema::dropIfExists('OFFICE_TYPE_TREE');
         Schema::dropIfExists('OFFICE_CODE_TYPE_REL');
         Schema::dropIfExists('OFFICE_CODES');
+        Schema::dropIfExists('BIOG_MAIN');
         Schema::dropIfExists('operations');
         Schema::dropIfExists('users');
 
@@ -133,6 +109,74 @@ BLADE
             $table->string('c_alt_name')->nullable();
             $table->string('c_alt_name_chn')->nullable();
         });
+
+        // 誘餌列：與各測試的目標列同表、不同 PK，且 c_sequence 刻意不同。
+        //
+        // 為什麼需要：只插一列的話「WHERE 條件整組寫錯／整組拿掉」也會撈到那唯一一列，
+        // 於是 `matches_current` 照樣為 true——`assertDiffResolvedCurrentRow()` 的
+        // 「證明撈到的是**正確那一列**」就只是一句空話。有了誘餌，撈錯列時
+        // c_sequence 對不上，matches_current 會是 false。
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 999999,
+            'c_sequence' => 87,
+            'c_alt_name_type_code' => 99,
+            'c_alt_name' => 'Decoy',
+            'c_alt_name_chn' => '誘餌',
+        ]);
+    }
+
+    /**
+     * 打 `/app/operations` 並取回 `lists` prop。
+     *
+     * 取代原本的 `$response->viewData('lists')`——React 側同一份資料來自
+     * `serializeOperationRow()`，欄位名有一處不同：`resource_diff` → `diff_source`
+     * （值是 `resource_diff ?? resource_original`）。
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function appOperationsLists(string $query = ''): array {
+        $lists = null;
+
+        $this->get('/app/operations' . $query)
+            ->assertOk()
+            ->assertInertia(function (Assert $page) use (&$lists) {
+                $lists = $page->component('Admin/Operations/Index')->toArray()['props']['lists'];
+            });
+
+        return $lists;
+    }
+
+    /**
+     * 斷言 diff 真的**查到了 DB 現況**，而不只是「diff_source 非 null」。
+     *
+     * ⚠️ 這是本次轉換踩到的坑：`diff_source` 是 `resource_diff ?? resource_original`，
+     * 而這批 fixture 的 `resource_original` 都非空——所以即使 resource_id 解析失敗、
+     * 現況查詢被略過，`diff_source` 仍然非 null。用 `assertNotNull($diff)` 的話，
+     * 把 `parseStoredResourceId()` 整段 no-op 掉測試照樣綠（實測確認過）。
+     *
+     * 真正的鑑別欄位是每個 diff row 的 `current`：解析失敗時它是 `'(未取得)'`
+     * （`OperationsController:2368`）。所以這裡斷言「沒有任何一欄是 (未取得)」
+     * 且「至少有一欄 matches_current」——後者代表現況值真的跟 after 值對上了。
+     *
+     * @param array<int, array<string, mixed>> $lists
+     */
+    protected function assertDiffResolvedCurrentRow(array $lists, string $because): void {
+        $this->assertNotEmpty($lists, $because.'：operations 列表不該是空的');
+
+        $rows = $lists[0]['diff_source']['rows'] ?? null;
+        $this->assertNotEmpty($rows, $because.'：diff 應有 rows');
+
+        $currents = array_column($rows, 'current');
+        $this->assertNotContains(
+            '(未取得)',
+            $currents,
+            $because.'：現況欄出現 (未取得) 代表 resource_id 沒解開、DB 現況查詢被略過'
+        );
+        $this->assertContains(
+            true,
+            array_column($rows, 'matches_current'),
+            $because.'：至少要有一欄的現況值與 after 值對上，才證明撈到的是正確那一列'
+        );
     }
 
     protected function actingAsAdmin(): User {
@@ -168,16 +212,9 @@ BLADE
             'updated_at' => Carbon::now(),
         ]);
 
-        $response = $this->get('/operations');
-        $response->assertStatus(200)->assertSee('最近編輯列表');
-    }
-
-    #[Test]
-    public function test_operations_index_handles_empty_result_set(): void {
-        $this->actingAsAdmin();
-
-        $response = $this->get('/operations');
-        $response->assertStatus(200)->assertSee('最近編輯列表');
+        // 關聯列撈不到時只要不整頁 500 即可；順便確認那一列真的有被列出
+        // （若被靜默吞掉，pagination.total 會是 0 而不是 1）。
+        $this->assertCount(1, $this->appOperationsLists());
     }
 
     // -------------------------------------------------------
@@ -222,14 +259,7 @@ BLADE
             'updated_at' => Carbon::now(),
         ]);
 
-        $response = $this->get('/operations');
-        $response->assertStatus(200);
-
-        // 驗證 controller 正確查到 DB 資料並計算差異
-        $lists = $response->viewData('lists');
-        $this->assertNotEmpty($lists);
-        $diff = $lists[0]->getAttribute('resource_diff');
-        $this->assertNotNull($diff, '3-key dash 格式應能查到 DB 資料並產生差異比對');
+        $this->assertDiffResolvedCurrentRow($this->appOperationsLists(), '3-key dash 格式應能查到 DB 資料並產生差異比對');
     }
 
     #[Test]
@@ -271,13 +301,7 @@ BLADE
             'updated_at' => Carbon::now(),
         ]);
 
-        $response = $this->get('/operations');
-        $response->assertStatus(200);
-
-        $lists = $response->viewData('lists');
-        $this->assertNotEmpty($lists);
-        $diff = $lists[0]->getAttribute('resource_diff');
-        $this->assertNotNull($diff, '3-key _._  格式應能查到 DB 資料並產生差異比對');
+        $this->assertDiffResolvedCurrentRow($this->appOperationsLists(), '3-key _._  格式應能查到 DB 資料並產生差異比對');
     }
 
     #[Test]
@@ -319,13 +343,7 @@ BLADE
             'updated_at' => Carbon::now(),
         ]);
 
-        $response = $this->get('/operations');
-        $response->assertStatus(200);
-
-        $lists = $response->viewData('lists');
-        $this->assertNotEmpty($lists);
-        $diff = $lists[0]->getAttribute('resource_diff');
-        $this->assertNotNull($diff, '3-key dash 含 (minus) 編碼應能查到 DB 資料並產生差異比對');
+        $this->assertDiffResolvedCurrentRow($this->appOperationsLists(), '3-key dash 含 (minus) 編碼應能查到 DB 資料並產生差異比對');
     }
 
     #[Test]
@@ -367,12 +385,6 @@ BLADE
             'updated_at' => Carbon::now(),
         ]);
 
-        $response = $this->get('/operations');
-        $response->assertStatus(200);
-
-        $lists = $response->viewData('lists');
-        $this->assertNotEmpty($lists);
-        $diff = $lists[0]->getAttribute('resource_diff');
-        $this->assertNotNull($diff, '既有 4-key 格式應繼續正常運作');
+        $this->assertDiffResolvedCurrentRow($this->appOperationsLists(), '既有 4-key 格式應繼續正常運作');
     }
 }

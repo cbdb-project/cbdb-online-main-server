@@ -6,23 +6,34 @@ use App\Models\Operation;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
+use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
- * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
+ * `/app/operations` 的篩選：每一條都驗**結果集是否符合該篩選的契約**，不是只驗頁面回 200。
+ *
+ * 注意契約本身有兩種方向：多數條目是「要真的縮小結果集」，但空字串 editor、非法 `op_type`、
+ * 以及 proposals 模式忽略 `op_type` 這三條的契約**恰恰是不縮小**（非法值要等同無篩選，
+ * 而不是回空集——那是很容易寫錯的一邊）。
+ *
+ * 覆蓋 `buildOperationsListing()` 的 13 個查詢分支：editor 的數字／文字／空字串三態、
+ * op_type 的多選／非法值／proposals 模式忽略、history 過濾的四種認領路徑（含鏡像列經
+ * `audit_log.row_pk` 與舊資料經 `resource_id` LIKE 的回退）、預設隱藏提案、
+ * status+editor 交集、以及提案備註的標籤語義。
+ *
+ * ── 2026-09-14（Blade 下架環節 4a-2）─────────────────────────────
+ *
+ * 本檔原本打 legacy `/operations` 並讀 `viewData('lists')`，現改打 `/app/operations`
+ * 並讀 Inertia prop。`buildOperationsListing()` 本來就是新舊共用，所以不變量完全不動。
+ *
+ * 🔴 **一個 prop 差異**：React 列**沒有 `user_id`**（`serializeOperationRow()` 只輸出
+ * `user_name`，而且訪客時故意降級成 `'User {id}'`）。所以 editor 篩選改斷言 **operation id**
+ * ——那比原本的 user_id 更精確：它直接釘住「哪幾列存活」，而不只是「存活的列屬於誰」。
  */
-#[Group('legacy-parity')]
 class OperationsIndexFilterTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
-
-        // 本類驗的是 legacy Blade 頁的行為。Blade 下架計畫環節 3「先封路、不刪碼」把那些
-        // 路由改成 302／410，但頁面本身還在、還部署著、還能被 kill switch 叫回來，
-        // 所以這份覆蓋在觀察期內仍有意義——局部關閉封路即可。環節 4 實體刪除時一併移除。
-        $this->useLegacyBladePages();
 
         config()->set('database.default', 'sqlite');
         config()->set('database.connections.sqlite', [
@@ -126,19 +137,57 @@ class OperationsIndexFilterTest extends TestCase {
         ], $overrides));
     }
 
-    /** 取出 viewData('lists') 中所有 user_id */
-    private function listUserIds($response): array {
-        return $response->viewData('lists')->pluck('user_id')->all();
+    /**
+     * 打 `/app/operations` 並取回 `lists` prop。
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function appLists(User $actor, string $query = ''): array {
+        $lists = null;
+
+        $this->actingAs($actor)
+            ->get('/app/operations' . $query)
+            ->assertOk()
+            ->assertInertia(function (Assert $page) use (&$lists) {
+                $lists = $page->component('Admin/Operations/Index')->toArray()['props']['lists'];
+            });
+
+        return $lists;
     }
 
-    /** 取出 viewData('lists') 中所有 op_type */
-    private function listOpTypes($response): array {
-        return $response->viewData('lists')->pluck('op_type')->map(fn ($v) => (int) $v)->all();
+    /** `lists` 裡所有 operation id（排序後，讓斷言與列表順序無關）。 */
+    private function idsOf(array $lists): array {
+        $ids = array_map('intval', array_column($lists, 'id'));
+        sort($ids);
+
+        return $ids;
     }
 
-    /** 取出 viewData('lists') 中所有 operation id */
-    private function listOperationIds($response): array {
-        return $response->viewData('lists')->pluck('id')->map(fn ($v) => (int) $v)->all();
+    /** 打 `/app/operations` 並取回 `filters` prop。 */
+    private function appFilters(User $actor, string $query = ''): array {
+        $filters = null;
+
+        $this->actingAs($actor)
+            ->get('/app/operations' . $query)
+            ->assertOk()
+            ->assertInertia(function (Assert $page) use (&$filters) {
+                $filters = $page->toArray()['props']['filters'];
+            });
+
+        return $filters;
+    }
+
+    /** 把一組 id 排序成與 idsOf() 可比的形狀。 */
+    private function sortedIds(array $ids): array {
+        $ids = array_map('intval', $ids);
+        sort($ids);
+
+        return $ids;
+    }
+
+    /** `lists` 裡所有 op_type。 */
+    private function opTypesOf(array $lists): array {
+        return array_map('intval', array_column($lists, 'op_type'));
     }
 
     // ── editor 篩選 ──
@@ -148,14 +197,13 @@ class OperationsIndexFilterTest extends TestCase {
         $alice = $this->makeUser('Alice', 'alice@example.com');
         $bob = $this->makeUser('Bob', 'bob@example.com');
 
-        $this->makeOperation($alice, Operation::TYPE_CREATE);
-        $this->makeOperation($bob, Operation::TYPE_CREATE);
+        $aliceOp = $this->makeOperation($alice, Operation::TYPE_CREATE);
+        $bobOp = $this->makeOperation($bob, Operation::TYPE_CREATE);
 
-        $response = $this->actingAs($alice)->get('/operations?editor=' . $bob->id);
-
-        $response->assertStatus(200);
-        $userIds = $this->listUserIds($response);
-        $this->assertSame([$bob->id], $userIds);
+        // 數字輸入走 user_id 精確比對（`ctype_digit` 分支）。
+        $ids = $this->idsOf($this->appLists($alice, '?editor=' . $bob->id));
+        $this->assertSame([(int) $bobOp->id], $ids, 'editor=<id> 應只留該使用者的操作');
+        $this->assertNotContains((int) $aliceOp->id, $ids);
     }
 
     #[Test]
@@ -163,14 +211,13 @@ class OperationsIndexFilterTest extends TestCase {
         $alice = $this->makeUser('Alice Wang', 'alice@example.com');
         $bob = $this->makeUser('Bob Chen', 'bob@example.com');
 
-        $this->makeOperation($alice, Operation::TYPE_CREATE);
-        $this->makeOperation($bob, Operation::TYPE_CREATE);
+        $aliceOp = $this->makeOperation($alice, Operation::TYPE_CREATE);
+        $bobOp = $this->makeOperation($bob, Operation::TYPE_CREATE);
 
-        $response = $this->actingAs($alice)->get('/operations?editor=Wang');
-
-        $response->assertStatus(200);
-        $userIds = $this->listUserIds($response);
-        $this->assertSame([$alice->id], $userIds);
+        // 文字輸入走 `name like`（與上面的數字分支是 `ctype_digit` 二分，只測一邊會漏）。
+        $ids = $this->idsOf($this->appLists($alice, '?editor=Wang'));
+        $this->assertSame([(int) $aliceOp->id], $ids, 'editor=<文字> 應走姓名模糊比對');
+        $this->assertNotContains((int) $bobOp->id, $ids);
     }
 
     #[Test]
@@ -178,16 +225,32 @@ class OperationsIndexFilterTest extends TestCase {
         $alice = $this->makeUser('Alice', 'alice@example.com');
         $bob = $this->makeUser('Bob', 'bob@example.com');
 
-        $this->makeOperation($alice, Operation::TYPE_CREATE);
-        $this->makeOperation($bob, Operation::TYPE_UPDATE);
+        $aliceOp = $this->makeOperation($alice, Operation::TYPE_CREATE);
+        $bobOp = $this->makeOperation($bob, Operation::TYPE_UPDATE);
 
-        $response = $this->actingAs($alice)->get('/operations?editor=');
+        // 空字串 ≠ 「篩掉全部」。
+        //
+        // ⚠️ **這條斷言的極限要講清楚**：它記錄的是**契約**，抓不到 guard 退化。
+        // 若 `if ($editorFilter !== '')` 這道 guard 被拿掉，空字串會走
+        // `name like '%%'`——在任何有名字的使用者上結果都與「不加條件」相同，
+        // 所以測試照樣綠（codex 實測確認）。要真的抓到那個退化得靠「名字為 NULL 的
+        // 使用者」之類的脆弱 fixture，不值得。
+        $this->assertSame(
+            $this->sortedIds([$aliceOp->id, $bobOp->id]),
+            $this->idsOf($this->appLists($alice, '?editor=')),
+            'editor 為空字串時應顯示全部'
+        );
+        // 至少把參數回吐釘住（前端靠它保持輸入框內容）。
+        $this->assertSame('', $this->appFilters($alice, '?editor=')['editor'] ?? null);
 
-        $response->assertStatus(200);
-        $userIds = $this->listUserIds($response);
-        $this->assertCount(2, $userIds);
-        $this->assertContains($alice->id, $userIds);
-        $this->assertContains($bob->id, $userIds);
+        // 對照組：`?editor=0` ⇒ `ctype_digit('0')` 為真 ⇒ `where user_id = 0` ⇒ **必須是空集**。
+        // 這條**確實**證明數字分支還活著（把 `where` 拿掉就會紅），
+        // 補的是上面那條蓋不到的那一半。
+        $this->assertSame(
+            [],
+            $this->idsOf($this->appLists($alice, '?editor=0')),
+            'editor=0 應走數字分支並得到空集（沒有 user_id=0 的操作）'
+        );
     }
 
     // ── op_type 篩選 ──
@@ -201,10 +264,8 @@ class OperationsIndexFilterTest extends TestCase {
         $this->makeOperation($user, Operation::TYPE_DELETE);
 
         // 只篩選「新增」和「刪除」
-        $response = $this->actingAs($user)->get('/operations?op_type[]=1&op_type[]=4');
-
-        $response->assertStatus(200);
-        $opTypes = $this->listOpTypes($response);
+        $lists = $this->appLists($user, '?op_type[]=1&op_type[]=4');
+        $opTypes = $this->opTypesOf($lists);
         $this->assertCount(2, $opTypes);
         $this->assertContains(Operation::TYPE_CREATE, $opTypes);
         $this->assertContains(Operation::TYPE_DELETE, $opTypes);
@@ -219,10 +280,8 @@ class OperationsIndexFilterTest extends TestCase {
         $this->makeOperation($user, Operation::TYPE_UPDATE);
 
         // 傳入非法值 99，應被過濾掉，等同無篩選
-        $response = $this->actingAs($user)->get('/operations?op_type[]=99');
-
-        $response->assertStatus(200);
-        $opTypes = $this->listOpTypes($response);
+        $lists = $this->appLists($user, '?op_type[]=99');
+        $opTypes = $this->opTypesOf($lists);
         $this->assertCount(2, $opTypes);
     }
 
@@ -239,10 +298,8 @@ class OperationsIndexFilterTest extends TestCase {
         ]);
 
         // proposals 模式下傳入 op_type=1 應被忽略，提案仍然顯示
-        $response = $this->actingAs($user)->get('/operations?proposals_only=1&op_type[]=1');
-
-        $response->assertStatus(200);
-        $opTypes = $this->listOpTypes($response);
+        $lists = $this->appLists($user, '?proposals_only=1&op_type[]=1');
+        $opTypes = $this->opTypesOf($lists);
         $this->assertCount(1, $opTypes);
         $this->assertSame(Operation::TYPE_PROPOSAL_CREATE, $opTypes[0]);
     }
@@ -265,10 +322,8 @@ class OperationsIndexFilterTest extends TestCase {
             'resource' => 'ALTNAME_DATA',
         ]);
 
-        $response = $this->actingAs($user)->get('/operations?c_personid=1001&history_page=altnames');
-
-        $response->assertStatus(200);
-        $this->assertSame([$matching->id], $this->listOperationIds($response));
+        $lists = $this->appLists($user, '?c_personid=1001&history_page=altnames');
+        $this->assertSame([(int) $matching->id], $this->idsOf($lists));
     }
 
     #[Test]
@@ -309,10 +364,8 @@ class OperationsIndexFilterTest extends TestCase {
             ], JSON_UNESCAPED_UNICODE),
         ]);
 
-        $response = $this->actingAs($user)->get('/operations?c_personid=1001&history_page=kinship');
-
-        $response->assertStatus(200);
-        $this->assertSame([$matching->id], $this->listOperationIds($response));
+        $lists = $this->appLists($user, '?c_personid=1001&history_page=kinship');
+        $this->assertSame([(int) $matching->id], $this->idsOf($lists));
     }
 
     #[Test]
@@ -330,10 +383,8 @@ class OperationsIndexFilterTest extends TestCase {
             'resource_id' => 'c_personid=3003&c_kin_id=4004&c_kin_code=300',
         ]);
 
-        $response = $this->actingAs($user)->get('/operations?c_personid=1001&history_page=kinship');
-
-        $response->assertStatus(200);
-        $this->assertSame([$matching->id], $this->listOperationIds($response));
+        $lists = $this->appLists($user, '?c_personid=1001&history_page=kinship');
+        $this->assertSame([(int) $matching->id], $this->idsOf($lists));
     }
 
     #[Test]
@@ -351,10 +402,8 @@ class OperationsIndexFilterTest extends TestCase {
             'resource_id' => 'c_personid=3003&c_assoc_code=301&c_assoc_id=4004&c_kin_code=0&c_kin_id=4004&c_assoc_kin_code=0&c_assoc_kin_id=4004&c_text_title=%E5%85%B6%E4%BB%96%E6%96%87%E7%8D%BB&c_assoc_first_year=1100',
         ]);
 
-        $response = $this->actingAs($user)->get('/operations?c_personid=1001&history_page=assoc');
-
-        $response->assertStatus(200);
-        $this->assertSame([$matching->id], $this->listOperationIds($response));
+        $lists = $this->appLists($user, '?c_personid=1001&history_page=assoc');
+        $this->assertSame([(int) $matching->id], $this->idsOf($lists));
     }
 
     #[Test]
@@ -372,10 +421,8 @@ class OperationsIndexFilterTest extends TestCase {
             ], JSON_UNESCAPED_UNICODE),
         ]);
 
-        $response = $this->actingAs($user)->get('/operations');
-
-        $response->assertStatus(200);
-        $opTypes = $this->listOpTypes($response);
+        $lists = $this->appLists($user, '');
+        $opTypes = $this->opTypesOf($lists);
         $this->assertCount(1, $opTypes);
         $this->assertSame(Operation::TYPE_CREATE, $opTypes[0]);
     }
@@ -415,16 +462,13 @@ class OperationsIndexFilterTest extends TestCase {
         ]);
 
         // 篩選 Alice 的 pending 提案
-        $response = $this->actingAs($alice)->get('/operations?proposals_only=1&status[]=pending&editor=Alice');
+        $lists = $this->appLists($alice, '?proposals_only=1&status[]=pending&editor=Alice');
 
-        $response->assertStatus(200);
-
-        $lists = $response->viewData('lists');
-        $this->assertCount(1, $lists);
-        $this->assertSame($alice->id, $lists[0]->user_id);
-
-        $data = json_decode($lists[0]->resource_data, true);
-        $this->assertSame('pending', $data['__review_status']);
+        // 3 筆提案（Alice pending／Bob pending／Alice approved）要收斂成 1 筆。
+        $this->assertCount(1, $lists, 'status 與 editor 應是交集而非聯集');
+        // React 列沒有 user_id，改用 user_name 與 review_status 兩個 prop 釘住「是哪一筆」。
+        $this->assertSame('Alice', $lists[0]['user_name'] ?? null);
+        $this->assertSame('pending', $lists[0]['review_status'] ?? null);
     }
 
     #[Test]
@@ -455,11 +499,20 @@ class OperationsIndexFilterTest extends TestCase {
             ], JSON_UNESCAPED_UNICODE),
         ]);
 
-        $response = $this->actingAs($user)->get('/operations?proposals_only=1');
+        $lists = $this->appLists($user, '?proposals_only=1');
 
-        $response->assertStatus(200);
-        $response->assertSeeText('提案說明');
-        $response->assertSeeText('這是提案說明');
-        $response->assertDontSeeText('修改說明');
+        // 提案列的備註標籤語義：是「提案說明」而不是「修改說明」。
+        // 原本用 assertSeeText 驗 Blade 文案；不變量其實在 primary_note_label
+        // 與 operation_notes[].label 兩個 prop（OperationsController:1023-1024）。
+        $this->assertCount(1, $lists);
+        $this->assertSame(__('operations.proposal_desc'), $lists[0]['primary_note_label'] ?? null);
+        $this->assertNotSame(__('operations.modification_desc'), $lists[0]['primary_note_label'] ?? null);
+
+        $noteLabels = array_column($lists[0]['operation_notes'] ?? [], 'label');
+        $this->assertContains(__('operations.proposal_desc'), $noteLabels);
+        $this->assertNotContains(__('operations.modification_desc'), $noteLabels);
+
+        // 備註內容本身要傳下去（否則標籤對了但使用者看不到說明）。
+        $this->assertContains('這是提案說明', array_column($lists[0]['operation_notes'] ?? [], 'content'));
     }
 }

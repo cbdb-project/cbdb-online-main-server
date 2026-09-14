@@ -8,7 +8,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
+use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -24,23 +24,25 @@ use Tests\TestCase;
  *     2026_07_10 migration 改名為 c_chn，舊 row_pk 拿去組 WHERE 直接 1054。
  */
 /**
- * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
- * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
+ * ── 2026-09-14（Blade 下架環節 4a-2）─────────────────────────────
+ *
+ * 本檔原本打 legacy `/operations` 並自建 Blade stub，現改打 `/app/operations` 並讀 Inertia prop。
+ * `buildOperationsListing()` 本來就新舊共用，所以每一條的不變量完全不動。
+ *
+ * 有兩條原本就順手 ping 過 `/app/operations`，但**只斷言 200**——那只擋 500、不擋「降級成
+ * 查不到現況」，所以不算等價覆蓋；轉換後它們的現況斷言（`current` / `matches_current`）
+ * 才真正落在 React 路徑上。
+ *
+ * ⚠️ `test_audit_diff_skips_row_pk_columns_dropped_by_migration` 的 `DB::listen` 機制斷言
+ * **必須原樣保留**：SQLite 會把無法解析的識別字當字串常量，查詢照跑只是查不到列，
+ * 所以只斷言輸出的話這條測試在修好前後都會過（等於沒測到）。
  */
-#[Group('legacy-parity')]
 class OperationsIndexResilienceTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
 
-        // 本類驗的是 legacy Blade 頁的行為。Blade 下架計畫環節 3「先封路、不刪碼」把那些
-        // 路由改成 302／410，但頁面本身還在、還部署著、還能被 kill switch 叫回來，
-        // 所以這份覆蓋在觀察期內仍有意義——局部關閉封路即可。環節 4 實體刪除時一併移除。
-        $this->useLegacyBladePages();
-
         config()->set('database.default', 'sqlite');
         config()->set('database.connections.sqlite.database', ':memory:');
-
-        $this->stubOperationsViews();
 
         Schema::create('users', function (Blueprint $table) {
             $table->increments('id');
@@ -90,59 +92,27 @@ class OperationsIndexResilienceTest extends TestCase {
         Schema::dropIfExists('operations');
         Schema::dropIfExists('users');
 
-        // 每個測試方法都會建兩個暫存目錄，不清掉會隨測試次數累積。
-        foreach ($this->tempDirs as $dir) {
-            $this->deleteDirectory($dir);
-        }
-        $this->tempDirs = [];
-
         parent::tearDown();
     }
 
-    /** @var string[] 本測試建立的暫存目錄，tearDown 時刪除。 */
-    private array $tempDirs = [];
+    /**
+     * 打 `/app/operations` 並取回 `lists` prop（取代原本的 `viewData('lists')`）。
+     *
+     * 欄位名有一處不同：`resource_diff` → `diff_source`（值是 `resource_diff ?? resource_original`）；
+     * `audit_logs` 不變。
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function appLists(string $query = '?proposals_only=1'): array {
+        $lists = null;
 
-    private function deleteDirectory(string $dir): void {
-        if (!is_dir($dir)) {
-            return;
-        }
+        $this->get('/app/operations' . $query)
+            ->assertOk()
+            ->assertInertia(function (Assert $page) use (&$lists) {
+                $lists = $page->component('Admin/Operations/Index')->toArray()['props']['lists'];
+            });
 
-        $items = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-        foreach ($items as $item) {
-            $item->isDir() ? @rmdir($item->getPathname()) : @unlink($item->getPathname());
-        }
-        @rmdir($dir);
-    }
-
-    /** 用最小 Blade stub 取代真實 operations 視圖，讓測試專注在 controller 的取資料邏輯。 */
-    protected function stubOperationsViews(): void {
-        $tempBase = sys_get_temp_dir() . '/laravel-test-views-' . uniqid();
-        mkdir($tempBase . '/layouts', 0777, true);
-        mkdir($tempBase . '/operations', 0777, true);
-        $this->tempDirs[] = $tempBase;
-
-        file_put_contents(
-            $tempBase . '/layouts/dashboard.blade.php',
-            "<!doctype html>\n<html lang=\"zh-Hant\"><head><meta charset=\"utf-8\"></head><body>@yield('content')</body></html>\n"
-        );
-        file_put_contents(
-            $tempBase . '/operations/index.blade.php',
-            "@extends('layouts.dashboard')\n\n@section('content')\n    <h1>最近編輯列表</h1>\n@endsection\n"
-        );
-
-        $compiledPath = sys_get_temp_dir() . '/laravel-views-' . uniqid();
-        mkdir($compiledPath, 0777, true);
-        $this->tempDirs[] = $compiledPath;
-
-        // 暫存目錄排在真實 views 之前：operations.index 用輕量 stub（真實視圖依賴 AdminLTE），
-        // 其餘（例如 Inertia 的 root view）仍要解析得到真實檔案，否則 /app/operations 會 500。
-        $paths = [$tempBase, resource_path('views')];
-        config()->set('view.paths', $paths);
-        config()->set('view.compiled', $compiledPath);
-        app('view')->setFinder(new \Illuminate\View\FileViewFinder(app('files'), $paths));
+        return $lists;
     }
 
     protected function actingAsAdmin(): User {
@@ -213,21 +183,14 @@ class OperationsIndexResilienceTest extends TestCase {
 
         $this->createPostedToOfficeOperation('61211_._2108722');
 
-        $response = $this->get('/operations?proposals_only=1');
-        $response->assertStatus(200);
-
-        $lists = $response->viewData('lists');
-        $diff = $lists[0]->getAttribute('resource_diff');
+        $lists = $this->appLists();
+        $diff = $lists[0]['diff_source'] ?? null;
         $this->assertNotNull($diff, "'_._' 格式應能查到現況列並產生差異比對");
 
         $sequenceRow = collect($diff['rows'])->firstWhere('field', 'c_sequence');
         $this->assertNotNull($sequenceRow);
         $this->assertSame('2', $sequenceRow['current'], "現況欄應來自 POSTED_TO_OFFICE_DATA 實際資料列");
         $this->assertTrue($sequenceRow['matches_current']);
-
-        // 出事的網址是 flag 已上線的 React 版；它與 Blade 版共用 buildOperationsListing()，
-        // 但既然回報的是這條路徑，就直接把它釘住。
-        $this->get('/app/operations?proposals_only=1')->assertStatus(200);
     }
 
     #[Test]
@@ -244,11 +207,8 @@ class OperationsIndexResilienceTest extends TestCase {
 
         $this->createPostedToOfficeOperation('61211-2108722');
 
-        $response = $this->get('/operations?proposals_only=1');
-        $response->assertStatus(200);
-
-        $lists = $response->viewData('lists');
-        $diff = $lists[0]->getAttribute('resource_diff');
+        $lists = $this->appLists();
+        $diff = $lists[0]['diff_source'] ?? null;
         $sequenceRow = collect($diff['rows'])->firstWhere('field', 'c_sequence');
         $this->assertSame('2', $sequenceRow['current'], "'-' 格式應繼續查得到現況列");
         $this->assertTrue($sequenceRow['matches_current']);
@@ -261,11 +221,8 @@ class OperationsIndexResilienceTest extends TestCase {
 
         $this->createPostedToOfficeOperation('61211');
 
-        $response = $this->get('/operations?proposals_only=1');
-        $response->assertStatus(200);
-
-        $lists = $response->viewData('lists');
-        $diff = $lists[0]->getAttribute('resource_diff');
+        $lists = $this->appLists();
+        $diff = $lists[0]['diff_source'] ?? null;
         $this->assertNotNull($diff, '提案的前後值仍應比對得出差異');
 
         $sequenceRow = collect($diff['rows'])->firstWhere('field', 'c_sequence');
@@ -327,8 +284,7 @@ class OperationsIndexResilienceTest extends TestCase {
             $executedSql[] = $event->sql;
         });
 
-        $response = $this->get('/operations?proposals_only=1');
-        $response->assertStatus(200);
+        $lists = $this->appLists();
 
         $this->assertNotEmpty($executedSql, 'DB::listen 應攔到查詢，否則下面的斷言不成立');
         foreach ($executedSql as $sql) {
@@ -339,8 +295,7 @@ class OperationsIndexResilienceTest extends TestCase {
             );
         }
 
-        $lists = $response->viewData('lists');
-        $auditLogs = $lists[0]->getAttribute('audit_logs');
+        $auditLogs = $lists[0]['audit_logs'] ?? [];
         $this->assertCount(1, $auditLogs);
 
         $pinyinRow = collect($auditLogs[0]['diff']['rows'])->firstWhere('field', 'c_pinyin');
@@ -392,11 +347,8 @@ class OperationsIndexResilienceTest extends TestCase {
             'new_data' => json_encode(['id' => 525, 'c_pinyin' => 'Qutan'], JSON_UNESCAPED_UNICODE),
         ]);
 
-        $response = $this->get('/operations?proposals_only=1');
-        $response->assertStatus(200);
-
-        $lists = $response->viewData('lists');
-        $auditLogs = $lists[0]->getAttribute('audit_logs');
+        $lists = $this->appLists();
+        $auditLogs = $lists[0]['audit_logs'] ?? [];
         $pinyinRow = collect($auditLogs[0]['diff']['rows'])->firstWhere('field', 'c_pinyin');
         $this->assertSame('Qutan', $pinyinRow['current'], '欄名都在時應正常查到現況列');
         $this->assertTrue($pinyinRow['matches_current']);
@@ -426,11 +378,8 @@ class OperationsIndexResilienceTest extends TestCase {
             'updated_at' => Carbon::now(),
         ]);
 
-        $response = $this->get('/operations?proposals_only=1');
-        $response->assertStatus(200);
-
-        $lists = $response->viewData('lists');
-        $diff = $lists[0]->getAttribute('resource_diff');
+        $lists = $this->appLists();
+        $diff = $lists[0]['diff_source'] ?? null;
         $nameRow = collect($diff['rows'])->firstWhere('field', 'c_name_chn');
         $this->assertSame('(未取得)', $nameRow['current'], '人物尚未建立時現況欄應標為未取得');
     }
@@ -473,8 +422,7 @@ class OperationsIndexResilienceTest extends TestCase {
                 'updated_at' => Carbon::now(),
             ]);
 
-            $response = $this->get('/operations?proposals_only=1');
-            $response->assertStatus(200);
+            $this->appLists();
         } finally {
             Schema::dropIfExists('ASSOC_DATA');
         }
@@ -507,7 +455,7 @@ class OperationsIndexResilienceTest extends TestCase {
 
         $this->assertFalse(Schema::hasTable('ALTNAME_DATA'));
 
-        $this->get('/operations?proposals_only=1')->assertStatus(200);
+        $this->appLists();
     }
 
     #[Test]
@@ -545,7 +493,7 @@ class OperationsIndexResilienceTest extends TestCase {
                 'updated_at' => Carbon::now(),
             ]);
 
-            $this->get('/operations?proposals_only=1')->assertStatus(200);
+            $this->appLists();
         } finally {
             Schema::dropIfExists('POSTED_TO_ADDR_DATA');
         }
@@ -568,7 +516,7 @@ class OperationsIndexResilienceTest extends TestCase {
             'updated_at' => Carbon::now(),
         ]);
 
-        $this->get('/operations?proposals_only=1')->assertStatus(200);
+        $this->appLists();
     }
 
     #[Test]
@@ -594,8 +542,7 @@ class OperationsIndexResilienceTest extends TestCase {
             'updated_at' => Carbon::now(),
         ]);
 
-        $this->get('/app/operations?proposals_only=1')->assertStatus(200);
-        $this->get('/operations?proposals_only=1')->assertStatus(200);
+        $this->appLists();
     }
 
     #[Test]
@@ -625,7 +572,6 @@ class OperationsIndexResilienceTest extends TestCase {
         // ALTNAME_DATA 表刻意不建立，模擬 resource 對不到實體表的情形。
         $this->assertFalse(Schema::hasTable('ALTNAME_DATA'));
 
-        $response = $this->get('/operations?proposals_only=1');
-        $response->assertStatus(200);
+        $this->appLists();
     }
 }

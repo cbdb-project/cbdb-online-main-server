@@ -1661,7 +1661,8 @@ class CodesController extends Controller {
             'column_behaviour' => $this->codeColumnBehaviour($table, array_values($columns), 'proposal', $values),
             'urls' => [
                 'update' => route('app.codes.proposals.update', ['table_name' => $table, 'operation' => $operation['id']], false),
-                'return' => route('operations.index', ['proposals_only' => 1], false),
+                // 指 React 版：legacy /operations 現在是 302 shim（環節 3 封路），繞它會多一跳。
+                'return' => route('app.operations.index', ['proposals_only' => 1], false),
             ],
             'page_translations' => [
                 'codes' => is_array($t = trans('codes')) ? $t : [],

@@ -526,4 +526,59 @@ class CoordinatePairNormalizerTest extends TestCase {
 
         $this->assertSame(['X_COORD' => 'non_numeric', 'x_coord' => 'non_numeric'], $invalid);
     }
+
+    // ── 整列模式（create）──────────────────────────────────
+
+    #[Test]
+    public function testCompleteRowModeClearsAHalfPairWhereThePartnerIsAbsent(): void {
+        // create 手上的 $row 就是要 insert 的完整列，所以缺席的那一軸**必然**是 NULL
+        // ——「送了經度、沒送緯度」在那裡已經是一個半截座標，不是「等資料庫裡另一半」。
+        $result = Normalizer::normalizeRow(['x_coord' => 105.36354], 'ADDR_CODES', true);
+
+        $this->assertNull($result['data']['x_coord']);
+        $this->assertNull($result['data']['y_coord']);
+        $this->assertSame(Normalizer::REASON_PARTNER, $result['cleared']['x_coord']);
+    }
+
+    #[Test]
+    public function testPerFieldModeLeavesAHalfPairAloneBecauseItCannotSeeTheStoredRow(): void {
+        // 逐欄 update 的同一個輸入必須**不動**：這一層看不到資料庫，另一軸可能有值，
+        // 擅自清掉會刪除呼叫端根本沒提到的資料。
+        $row = ['x_coord' => 105.36354];
+        $result = Normalizer::normalizeRow($row, 'ADDR_CODES');
+
+        $this->assertSame($row, $result['data']);
+        $this->assertArrayNotHasKey('y_coord', $result['data']);
+        $this->assertSame([], $result['cleared']);
+    }
+
+    #[Test]
+    public function testCompleteRowModeStillKeepsAFullValidPair(): void {
+        $row = ['x_coord' => 113.11134338, 'y_coord' => 40.37184906];
+        $result = Normalizer::normalizeRow($row, 'ADDR_CODES', true);
+
+        $this->assertSame($row, $result['data']);
+        $this->assertSame([], $result['cleared']);
+    }
+
+    #[Test]
+    public function testCompleteRowModeDoesNothingWhenNeitherAxisIsPresent(): void {
+        // 整列模式也不可以無中生有：一個完全沒有座標欄的 create 不該被塞進兩個 null，
+        // 那會讓 insert 明確寫入 NULL 而不是讓資料庫用預設值——語義上一樣，但
+        // `cleared` 會冒出兩筆假通知。
+        $row = ['c_name_chn' => '安定衛'];
+        $result = Normalizer::normalizeRow($row, 'ADDR_CODES', true);
+
+        $this->assertSame($row, $result['data']);
+        $this->assertSame([], $result['cleared']);
+    }
+
+    #[Test]
+    public function testCompleteRowModeStillDefersToTheValidatorForGarbage(): void {
+        $row = ['x_coord' => 'east'];
+        $result = Normalizer::normalizeRow($row, 'ADDR_CODES', true);
+
+        $this->assertSame($row, $result['data']);
+        $this->assertSame([], $result['cleared']);
+    }
 }

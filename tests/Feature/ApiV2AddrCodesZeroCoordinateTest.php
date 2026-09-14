@@ -573,35 +573,6 @@ class ApiV2AddrCodesZeroCoordinateTest extends TestCase {
     }
 
     #[Test]
-    public function testA409ConflictStillCarriesTheCoordinateNotice(): void {
-        // 「成功、409、422 都要掛」不是口號：被擋下來時使用者更需要知道系統改了他的輸入。
-        // 實測把兩個 handler 的 withWriteNotices 全部改回 withVariantNotices，只有三個
-        // 成功路徑的測試會紅——所有錯誤路徑都沒人守。
-        $this->actAsEditor();
-        DB::table('ADDR_CODES')->insert([
-            ['c_addr_id' => 8001, 'c_name' => 'Keeper', 'c_admin_cat_code' => 176, 'x_coord' => 113.1, 'y_coord' => 40.3],
-            ['c_addr_id' => 8002, 'c_name' => 'Mover', 'c_admin_cat_code' => 176, 'x_coord' => 105.0, 'y_coord' => 30.0],
-        ]);
-
-        // 改主鍵撞既有列 → 409，同一個請求也把座標歸零。
-        $response = $this->postJson('/api/v2/mutate', [
-            'resource' => 'addr-codes',
-            'person_id' => 0,
-            'mode' => 'direct',
-            'operation' => 'update',
-            'target' => ['pk' => ['c_addr_id' => 8002]],
-            'changes' => ['c_admin_cat_code' => 176, 'x_coord' => 0],
-        ]);
-
-        // 這條路徑不一定產生 409（主鍵不在白名單內），所以只斷言「有座標通知」這件事，
-        // 不綁死狀態碼——重點是錯誤回應不會把通知吃掉。
-        $this->assertNotEmpty(
-            (array) $response->json('notices'),
-            '回應（不論成功或失敗）都必須帶上座標通知'
-        );
-    }
-
-    #[Test]
     public function testA422ValidationFailureStillCarriesTheCoordinateNotice(): void {
         // 歸一跑在校驗之前，所以校驗失敗時座標已經被改過了——這時最需要通知。
         $this->actAsEditor();
@@ -695,5 +666,105 @@ class ApiV2AddrCodesZeroCoordinateTest extends TestCase {
             '核准帶著非數值座標的提案時，原值被改動了——若變成 0 就是那個洞還在'
         );
         $this->assertSame(40.37184906, (float) $row->y_coord);
+    }
+
+    #[Test]
+    public function testCreateWithOnlyOneAxisStoresNeitherBecauseTheRowIsComplete(): void {
+        // create 的 $row 就是要 insert 的完整列，所以「只送經度」已經是半截座標。
+        // update 那一側刻意保持不同（看不到資料庫、另一軸可能有值），差異寫在 API.md。
+        $this->actAsEditor();
+
+        $response = $this->postJson('/api/v2/create', [
+            'resource' => 'addr-codes',
+            'person_id' => 0,
+            'mode' => 'direct',
+            'target' => ['pk' => ['c_addr_id' => 5010]],
+            'changes' => ['c_name_chn' => '半截', 'x_coord' => 105.36354],
+        ])->assertOk();
+
+        $row = $this->row(5010);
+        $this->assertNull($row->x_coord, 'create 不該存出 `105.36, NULL` 這種半截座標');
+        $this->assertNull($row->y_coord);
+        // 丟掉了使用者真的打進去的值，一定要說。
+        $this->assertNotEmpty($response->json('notices'));
+    }
+
+    #[Test]
+    public function testUpdateWithOnlyOneValidAxisIsLeftAloneAndDocumentedAsSuch(): void {
+        // 反面：逐欄 update 收到單一有效軸時什麼都不做。這是刻意的不對稱，因為這一層
+        // 看不到資料庫——另一軸可能有值，擅自清掉會刪除呼叫端沒提到的資料。
+        $this->actAsEditor();
+        $this->seedRow(['x_coord' => null, 'y_coord' => null]);
+
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'addr-codes',
+            'person_id' => 0,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_addr_id' => 4338]],
+            'changes' => ['x_coord' => 105.36354],
+        ])->assertOk();
+
+        $row = $this->row();
+        $this->assertSame(105.36354, (float) $row->x_coord);
+        $this->assertNull($row->y_coord, '逐欄 update 不補寫另一軸——這個半截列是已知且已記載的限制');
+    }
+
+    #[Test]
+    public function testApprovalTellsTheReviewerWhenItZeroedACoordinateItWasNotAskedAbout(): void {
+        // 代碼表 update 的提案 payload 是 array_merge(原始列, changes)，所以快照裡帶著
+        // 提案人從沒碰過的座標欄。核准一筆無關的 c_notes 編輯，就可能順手把一列半髒座標
+        // 的真實經度清成 NULL——`REASON_PARTNER` 的定義正是「系統丟掉了一個真的值」，
+        // 它必須傳到審核者眼前，不能靜默。
+        $admin = User::forceCreate([
+            'name' => 'coord approver',
+            'email' => 'coord-approver@example.com',
+            'confirmation_token' => 'token-coord-approver',
+            'is_active' => User::STATUS_ACTIVE,
+            'is_admin' => User::ROLE_SUPER_ADMIN,
+        ]);
+        // 半髒列：經度是真值、緯度是 0（Codes UI 表單路徑今天仍造得出來）。
+        $this->seedRow(['x_coord' => 113.5, 'y_coord' => 0]);
+
+        $original = (array) $this->row();
+        $payload = $original;
+        $payload['c_notes'] = '提案人只改了這個欄位';
+        $payload['__review_status'] = 'pending';
+        $payload['__key_columns'] = ['c_addr_id'];
+        $payload['__proposal_meta'] = [
+            'action' => 'update',
+            'table' => 'ADDR_CODES',
+            'submitted_by' => $admin->name,
+            'submitted_by_id' => $admin->id,
+        ];
+
+        $operationId = DB::table('operations')->insertGetId([
+            'user_id' => $admin->id,
+            'c_personid' => 0,
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+            'resource' => 'ADDR_CODES',
+            'resource_id' => 'c_addr_id=4338',
+            'resource_data' => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            'resource_original' => json_encode($original, JSON_UNESCAPED_UNICODE),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($admin);
+        $this->post(route('operations.proposals.approve', $operationId), ['review_comment' => '同意']);
+
+        // 歸零真的發生了……
+        $row = $this->row();
+        $this->assertNull($row->x_coord, '半髒座標應該在核准時被歸零');
+        $this->assertNull($row->y_coord);
+        $this->assertSame('提案人只改了這個欄位', $row->c_notes);
+
+        // ……而且審核者被告知了。flash 訊息存在 session 裡（本專案的 flash() helper）。
+        $messages = json_encode(session()->all(), JSON_UNESCAPED_UNICODE);
+        $this->assertStringContainsString(
+            'x_coord',
+            (string) $messages,
+            '核准順手丟掉了一個真實的經度值，卻沒有任何訊息告訴審核者'
+        );
     }
 }

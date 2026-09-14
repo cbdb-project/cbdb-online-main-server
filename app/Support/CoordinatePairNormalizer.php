@@ -79,22 +79,25 @@ final class CoordinatePairNormalizer {
      *
      * `ADDRESSES` 是 `cbdb:regenerate-addresses-table` 由 `ADDR_CODES` 以
      * `INSERT ... SELECT ac.x_coord, ac.y_coord` 重建的派生快取，那條 raw SQL 路徑沒有
-     * PHP 陣列、本類掛不上去，也不需要——源頭乾淨，派生物就乾淨。列在這裡的真正理由是
-     * **它另有一條活的互動式寫入端**：`ADDRESSES` 在 `config/codes.php` 的清單裡、又不在
-     * `CodesController::$readOnlyTables`。它沒有真正的主鍵（原始 schema 只有一個非唯一
-     * `KEY`），於是 `getKeyColumns()` 一路掉到「取前兩個物理欄」的 fallback，實測回
-     * `['c_addr_id', 'c_addr_cbd']`——所以只要表單把這兩欄填了，
-     * `POST /codes/ADDRESSES` 就會**真的 insert**，座標一併寫進去。
-     *（更新那一側實際上到不了：`RegenerateAddresses` 對每一列都寫
-     * `NULL AS c_addr_cbd`，`where c_addr_cbd = <值>` 永遠命不中，`performUpdate` 的
-     * 「找不到目標列」守衛會先擋下。）
+     * PHP 陣列、本類掛不上去，也不需要——源頭乾淨，派生物就乾淨。
+     *
+     * **今天這筆登記實際生效的地方只有一處**：`ADDRESSES` 的 create 提案核准重放
+     *（`OperationsProposalController::applyCreateProposal()`）。它另有一條活的互動式
+     * 寫入端——`ADDRESSES` 在 `config/codes.php` 的清單裡、不在
+     * `CodesController::$readOnlyTables`，而且它沒有真正的主鍵（原始 schema 只有一個
+     * 非唯一 `KEY`），於是 `getKeyColumns()` 掉到「取前兩個物理欄」的 fallback，實測回
+     * `['c_addr_id', 'c_addr_cbd']`，所以只要表單把這兩欄填了 `POST /codes/ADDRESSES`
+     * 就會真的 insert——但**那條路徑目前還沒掛上本類**（`CodesController` 從不呼叫它），
+     * 所以這筆登記對它還沒有任何保護作用。接上它是下一個階段的事。
+     *（更新那一側到不了：`RegenerateAddresses` 對每一列都寫 `NULL AS c_addr_cbd`，
+     * `where c_addr_cbd = <值>` 永遠命不中，「找不到目標列」守衛會先擋下。）
      *
      * 要留意這層保護是**短暫的**：下一次 `RegenerateAddresses` 會 truncate 整張表，手動
-     * 插進去的列本來就會消失。所以這是便宜、正確、fail-closed 的順手防護，不是承重結構。
+     * 插進去的列本來就會消失。所以這是便宜、fail-closed 的順手防護，不是承重結構。
      *
      * 這與 {@see VariantReplaceScope} 把 `ADDRESSES` 列為排除（「派生表：內容由源頭重建，
      * 改派生物只會與源頭不一致」）並不矛盾，兩者性質不同：異體字替換是**編輯性的內容改寫**
-     * （對派生表做沒有意義），座標歸零是**完整性守衛**（任何寫得進去的地方都該守）。house
+     *（對派生表做沒有意義），座標歸零是**完整性守衛**（任何寫得進去的地方都該守）。house
      * 本來就這樣分——`restoreUpdate()` 不做內容替換，卻仍然跑
      * `assertCharVariantMapWritable()` 與樹成環守衛。
      *
@@ -167,7 +170,7 @@ final class CoordinatePairNormalizer {
      *         `cleared` 的欄名用 `$data` 裡原本出現的拼法（同一欄有多種拼法時全部列出），
      *         沒出現過的補寫欄位用 `PAIRS` 登記的拼法。
      */
-    public static function normalizeRow(array $data, ?string $table): array {
+    public static function normalizeRow(array $data, ?string $table, bool $dataIsCompleteRow = false): array {
         $pairs = self::pairsFor($table);
         if ($pairs === []) {
             return ['data' => $data, 'cleared' => []];
@@ -205,6 +208,31 @@ final class CoordinatePairNormalizer {
                         continue 3;
                     }
                 }
+            }
+            // **必須排在上面那道「非數值就整對不動」的預掃之後。** 先跑整列模式的話,
+            // `POST /api/v2/create {x_coord: "east"}` 會被靜默清成 NULL 而不是讓
+            // validator 回 422——正是本類註解明文禁止的形狀（把該報錯的請求變成
+            // 「存成沒有座標」）。這個順序是自己的單元測試抓出來的。
+            // 整列模式（`create`）：缺席的那一軸**必然**落庫成 NULL，所以「送了經度、
+            // 沒送緯度」在這裡就已經是一個半截座標，而不是「等資料庫裡另一半」。
+            // 這是 update 與 create 的真實差異：逐欄 update 看不到資料庫、無從判斷，
+            // 但 create 手上的 $row 就是要 insert 的完整列。所以只有 create 能、也應該
+            // 在這裡就把半截對清掉——否則 `POST /api/v2/create {x_coord: 105.36}` 會存出
+            // `105.36, NULL`，正是本類宣告「對每一個消費端都同樣不可用」的那個形狀。
+            if ($dataIsCompleteRow && count($present) < count($pair)) {
+                foreach ($pair as $column) {
+                    $keys = $present[$column] ?? [$column];
+                    foreach ($keys as $key) {
+                        $submitted = array_key_exists($key, $data);
+                        $wasNull = $submitted && $data[$key] === null;
+                        $data[$key] = null;
+                        if (!$wasNull) {
+                            $cleared[(string) $key] = self::REASON_PARTNER;
+                        }
+                    }
+                }
+
+                continue;
             }
 
             // 逐欄判定：只要有任何一欄是空白或零，整對都要清空。

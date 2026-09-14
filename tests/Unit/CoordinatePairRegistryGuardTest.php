@@ -135,9 +135,12 @@ class CoordinatePairRegistryGuardTest extends TestCase {
         // 不查 information_schema（那會綁死 MySQL，而測試跑 SQLite），改掃 migration 原始碼
         // ——這條規則要擋的正是「新 migration 加了 x_coord 卻沒動 PAIRS」。
         //
-        // **三種寫法都要掃到。** 第一版只認 `CREATE TABLE \`X\` (` 這一種，於是有兩個盲點，
+        // **四種寫法都要掃到**（raw SQL 帶／不帶反引號、`Schema::create`、`Schema::table`）。
+        // 第一版只認 `CREATE TABLE \`X\` (` 這一種，於是有兩個盲點，
         // 而且都不是假設：
-        //  (a) 本庫有 17 處 `Schema::create()`，那是新 migration 的正常寫法，一個都不匹配
+        //  (a) 本庫有 17 處 `Schema::create()` 與多處 `Schema::table()`（後者是「給既有表
+        //      **加**座標欄」的寫法，至少和新建一張表一樣可能發生），那是新 migration 的
+        //      正常寫法，舊版一個都不匹配
         //      ——`2025_11_17_100000_drop_place_codes_table.php` 的 down() 裡就有
         //      `$table->double('x_coord')`，舊版守衛完全看不見；
         //  (b) 有 8 處 raw `CREATE TABLE` 不帶反引號（`CREATE TABLE CBDB__TRAD_SIMP_MAP (`、
@@ -157,10 +160,12 @@ class CoordinatePairRegistryGuardTest extends TestCase {
                 $found[$m[1]] = ($found[$m[1]] ?? '').$m[2];
             }
 
-            // (2) Schema::create('X', function (...) { ... })：抓表名後把該檔剩餘內容一起看。
+            // (2) Schema::create('X', ...) 與 Schema::table('X', ...)：抓表名後把該檔剩餘
+            //     內容一起看。`Schema::table()` 是「給既有表**加**座標欄」的寫法，至少和
+            //     新建一張表一樣可能發生，第一版漏掉它。
             //     刻意不精確切出 closure 主體——寧可**過度**歸因（把整個檔案的內容算給這張表）
             //     也不要漏掉：這支守衛寧可誤報一次讓人來看，也不要靜默放過一張新表。
-            preg_match_all("/Schema::create\(\s*['\"]([A-Za-z0-9_]+)['\"]/", $source, $schema, PREG_SET_ORDER);
+            preg_match_all("/Schema::(?:create|table)\(\s*['\"]([A-Za-z0-9_]+)['\"]/", $source, $schema, PREG_SET_ORDER);
             foreach ($schema as $m) {
                 $found[$m[1]] = ($found[$m[1]] ?? '').$source;
             }

@@ -161,6 +161,14 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
         // 注意這一步可能補寫呼叫端沒送的伙伴欄（經緯度必須成對），而白名單的收窄在上面
         // 幾行就做完了——補寫的欄位不會再過白名單。`CoordinatePairRegistryGuardTest`
         // 是為此存在的機械把關（登記的座標欄必須都在該表的 allowed_fields 裡）。
+        // **兩個累積器都必須在這裡重置，而不是各自在自己的掛鉤旁邊。**
+        // handler 是容器解析的單例，`batch_mutate` 會用同一個實例跑完整批（實測各 item 的
+        // spl_object_id 相同）。而下面有幾個 return 早於異體字掛鉤卻仍要掛通知（交易外的
+        // tree_cycle 422），若 `resetVariantReplaced()` 留在掛鉤旁邊，那些 return 讀到的是
+        // **上一個 item** 的 `variantReplaced`——回應會告訴使用者「你送的『淸』已正規化為
+        // 『清』」，而這一筆他根本沒送那個字。`OFFICE_TYPE_TREE` 同時有 `c_parent_id` 與
+        // 可替換的 `c_office_type_desc_chn`，所以這條路徑是真的走得到的。
+        $this->resetVariantReplaced();
         $this->resetCoordinateCleared();
         $updateData = $this->applyCoordinateNormalization($updateData);
         // 濾掉「沒送來、而且原值本來就是 NULL」的伙伴欄通知：那是真的什麼都沒發生。
@@ -191,9 +199,16 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
             if ((string) $updateData[$treeParentColumn] !== (string) $currentParent) {
                 $cycleError = $this->findTreeCycle($table, $keyColumn, $treeParentColumn, $pk[$keyColumn], $updateData[$treeParentColumn]);
                 if ($cycleError !== null) {
-                    // 交易外的這條與交易內的孿生分支（下方 QueryException 那組）必須一致地掛上通知：
-                    // 目前沒有任何表同時登記了 tree_parent_column 與座標對，所以這裡走不到，
-                    // 但那是 config 的巧合而不是結構保證。留一條沒掛通知的 return 給下一個人踩不划算。
+                    // 交易外的這條與交易內的孿生分支（下方 QueryException 那組）必須一致地掛上通知。
+                    // **這條是真的走得到的**：`OFFICE_TYPE_TREE` 同時有 `c_parent_id`（樹的上層欄）
+                    // 與可替換的 `c_office_type_desc_chn`，所以「改了字形又同時成環」是一個實際的
+                    // 請求。座標那一半確實走不到（沒有表同時登記 tree_parent_column 與座標對），
+                    // 但那是 config 的巧合、不是結構保證。
+                    //
+                    // 這裡曾經出過一個 bug 值得記著：本條 return 早於下方的異體字掛鉤，所以一旦
+                    // `resetVariantReplaced()` 留在那個掛鉤旁邊，它讀到的就是**上一個 batch item**
+                    // 的替換紀錄——回應會說「你送的『淸』已正規化」而這一筆根本沒送那個字。
+                    // 兩個累積器現在都在方法上方一起重置，就是為了這件事。
                     return $this->withWriteNotices($this->errorResponse($cycleError, 422, ['changes' => ['tree_cycle']]));
                 }
             }
@@ -212,7 +227,6 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
         // 8 個同類欄），送「淸華書局」會落庫「清華書局」。別因為「看起來全是拼音欄」
         // 就把這裡當成 no-op 而移除。
         // char_variant_map 自身在 EXCLUDED_TABLES（替換等於自我吞噬），不受影響。
-        $this->resetVariantReplaced();
         $updateData = $this->applyVariantReplacement($updateData);
 
         // 檢查是否有實際變更

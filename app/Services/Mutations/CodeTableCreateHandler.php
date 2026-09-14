@@ -238,8 +238,16 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
         // 欄位是 `double DEFAULT NULL`，insert 時補一個 NULL 是真正的 no-op，沒有任何
         // 既存值被丟掉，說「另一軸也清空了」只會是雜訊。使用者自己送的那一欄（零／空白）
         // 仍然會留下通知，因為 submitted 的欄永遠不被濾。
+        // **兩個累積器都必須在這裡重置，而不是各自在自己的掛鉤旁邊。**
+        // handler 是容器解析的單例，`batch_mutate` 會用同一個實例跑完整批（實測各 item 的
+        // spl_object_id 相同）。而下面有幾個 return 早於異體字掛鉤卻仍要掛通知（交易外的
+        // tree_cycle 422），若 `resetVariantReplaced()` 留在掛鉤旁邊，那些 return 讀到的是
+        // **上一個 item** 的 `variantReplaced`——回應會告訴使用者「你送的『淸』已正規化為
+        // 『清』」，而這一筆他根本沒送那個字。`OFFICE_TYPE_TREE` 同時有 `c_parent_id` 與
+        // 可替換的 `c_office_type_desc_chn`，所以這條路徑是真的走得到的。
+        $this->resetVariantReplaced();
         $this->resetCoordinateCleared();
-        $row = $this->applyCoordinateNormalization($row, $table);
+        $row = $this->applyCoordinateNormalization($row, $table, true);
         $this->dropNoOpCoordinateNotices([]);
 
         // 型別正規化 + 校驗：與 update 端共用同一份判定（CodeTableFieldValidator）。
@@ -273,9 +281,16 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
                 $row[$treeParentColumn] ?? null
             );
             if ($cycleError !== null) {
-                // 交易外的這條與交易內的孿生分支（下方 QueryException 那組）必須一致地掛上通知：
-                // 目前沒有任何表同時登記了 tree_parent_column 與座標對，所以這裡走不到，
-                // 但那是 config 的巧合而不是結構保證。留一條沒掛通知的 return 給下一個人踩不划算。
+                // 交易外的這條與交易內的孿生分支（下方 QueryException 那組）必須一致地掛上通知。
+                // **這條是真的走得到的**：`OFFICE_TYPE_TREE` 同時有 `c_parent_id`（樹的上層欄）
+                // 與可替換的 `c_office_type_desc_chn`，所以「改了字形又同時成環」是一個實際的請求。
+                // 座標那一半確實走不到（沒有表同時登記 tree_parent_column 與座標對），但那是 config
+                // 的巧合、不是結構保證。
+                //
+                // 這裡曾經出過一個 bug 值得記著：本條 return 早於下方的異體字掛鉤，所以一旦
+                // `resetVariantReplaced()` 留在那個掛鉤旁邊，它讀到的就是**上一個 batch item** 的
+                // 替換紀錄——回應會說「你送的『淸』已正規化」而這一筆根本沒送那個字。
+                // 兩個累積器現在都在方法上方一起重置，就是為了這件事。
                 return $this->withWriteNotices($this->errorResponse($cycleError, 422, ['changes' => ['tree_cycle']]));
             }
         }
@@ -298,7 +313,6 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
         // 所以替換不可能動到任何主鍵欄。
         // 第二個參數**必須顯式傳**：本類別沒有 tableName()，省略會 fallback 到不存在的
         // 方法而在 runtime 炸掉（不是靜態錯誤）。
-        $this->resetVariantReplaced();
         $row = $this->applyVariantReplacement($row, $table);
 
         $operationId = (string) Str::ulid();

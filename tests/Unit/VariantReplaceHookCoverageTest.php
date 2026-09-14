@@ -326,6 +326,10 @@ class VariantReplaceHookCoverageTest extends TestCase {
             'app/Services/Mutations/AbstractPersonSubresourceCreateHandler.php' => \App\Services\Mutations\AbstractPersonSubresourceCreateHandler::class,
             'app/Services/Mutations/AbstractPersonSubresourceMutationHandler.php' => \App\Services\Mutations\AbstractPersonSubresourceMutationHandler::class,
             'app/Services/Mutations/AbstractCodeTableMutationHandler.php' => \App\Services\Mutations\AbstractCodeTableMutationHandler::class,
+            // create 端原本完全不在這份清冊裡，所以「真的呼叫了掛鉤方法」從來沒被檢查過
+            // ——而 create／update 的掛鉤必須對稱（只在單邊做會造出「新增進得去、改回
+            // 同一個值卻 422」那種最難查的不對稱）。
+            'app/Services/Mutations/CodeTableCreateHandler.php' => \App\Services\Mutations\CodeTableCreateHandler::class,
         ];
 
         foreach ($bases as $file => $class) {
@@ -398,6 +402,7 @@ class VariantReplaceHookCoverageTest extends TestCase {
      */
     private const NOTICE_CALL_BY_FILE = [
         'app/Services/Mutations/AbstractCodeTableMutationHandler.php' => 'withWriteNotices',
+        'app/Services/Mutations/CodeTableCreateHandler.php' => 'withWriteNotices',
     ];
 
     /**

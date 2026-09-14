@@ -22,6 +22,16 @@ info:
     is the key that was actually written; do not reuse the submitted value. Other silent
     rewrites (pinyin `v` normalized to `ü`, bracket normalization, sentinel
     normalization) produce no `notices`.
+
+    Coordinate zeroing: `ADDR_CODES.x_coord`/`y_coord` are a pair, and a blank or exactly-zero
+    axis is stored as `NULL` - `0,0` is not a place, it is "no coordinate" written as a
+    legal-looking number. Because a one-axis coordinate is unusable, clearing one axis clears
+    the other too, **including an axis the caller did not send**: `{"x_coord": 0}` also nulls
+    `y_coord`, and `result.updated_fields` will therefore list a column that was not in
+    `changes`. On `create` (where the payload is the whole row) a pair with only one axis is
+    also cleared; on per-field `update` it is not, because that layer cannot see the stored
+    row. Every such rewrite is reported in `notices`. Values that are not numbers at all
+    (`"east"`, `"0e0"`, `"+40.5"`) are still rejected with 422 rather than silently nulled.
 servers:
   - url: /
 tags:
@@ -420,15 +430,19 @@ components:
       type: array
       description: |
         Human-readable notes about server-side rewrites that the client did not ask for.
-        Present only when a variant-character replacement happened; appears on success
-        responses and on 409/422 failures alike (a "primary key already exists" or
-        "no effective changes" message is confusing without it).
+        Present when a variant-character replacement happened, or when a coordinate pair was
+        zeroed (blank/zero longitude or latitude stored as NULL). One request can trigger both,
+        and both share this single field. Appears on success responses and on 409/422 failures
+        alike (a "primary key already exists" or "no effective changes" message is confusing
+        without it).
       items:
         type: string
       example:
         - 異體字：「淸」已正規化為「清」
+        - 經緯度：「x_coord」是 0，視為 NULL（0,0 不是有效座標）；「y_coord」一併視為 NULL（經緯度必須成對，另一軸為空或 0）
       x-note: |
-        One notice covers every column in the request; the message lists the
-        variant/reference pairs that were applied and does not attribute them to
-        individual columns.
+        The two notice kinds are attributed differently. A variant-replacement notice covers
+        every column in the request at once and lists the variant/reference pairs without
+        saying which column each came from. A coordinate notice is per-column and names the
+        column it is about.
 

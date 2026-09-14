@@ -27,4 +27,5 @@ return [
     'cleared_with_partner' => '":column" is treated as NULL as well (longitude and latitude go together, and the other axis was empty or 0)',
 
     'not_numeric' => 'The coordinate field(s) :columns must be numeric. Forms like "0e0" or "east" are silently coerced to 0 by the database, so they are rejected; leave the field empty to clear it.',
+    'half_pair_snapshot' => 'This restore snapshot carries only one axis of the coordinate pair (:columns must come together) and the target row already exists. Writing it back would either destroy the existing other axis or fabricate a pair that never existed in either state; neither is acceptable, so the restore was aborted. Use a database backup for this row instead.',
 ];

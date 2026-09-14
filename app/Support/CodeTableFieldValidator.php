@@ -120,6 +120,20 @@ final class CodeTableFieldValidator {
                 && !($allowFloat && (is_int($value) || is_float($value)))
             ) {
                 $errors[$field] = [$field . ' 必須為' . ($allowFloat ? '字串、數值或 null' : ($allowInt ? '字串、整數或 null' : '字串或 null'))];
+            } elseif (is_float($value) && !is_finite($value)) {
+                // INF／NAN。上面的型別檢查放行它們（`is_float` 為真），而 `looksNumeric`
+                // 那一支只看字串，所以在這條之前非有限浮點會一路寫進 double 欄。
+                // 而且它進得來：`json_decode('{"x_coord":1e999}')` 就是 `float(INF)`，
+                // 呼叫端完全不必刻意構造。
+                //
+                // 判定端早就拒絕它們（`CoordinateValidator::isNumeric()` 明文排除
+                // NAN／INF），這裡是把寫入端對齊過去。
+                //
+                // 實務上只有 `float_fields` 需要這一條：純 `integer_fields` 的欄位收到浮點
+                // 時，上面那支型別檢查已經以「必須為字串、整數或 null」擋下（`is_int(INF)`
+                // 為假、而 `$allowFloat` 也為假），所以 INF 進不了整數欄。條件仍寫成不分欄位
+                // 型別，這樣未來新增的數值類別不會又漏一次。
+                $errors[$field] = [$field . ' 必須為有限數值'];
             } elseif ($allowInt && !$allowFloat
                 && is_string($value) && $value !== ''
                 && self::looksNumeric($value, false)

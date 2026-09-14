@@ -10,6 +10,7 @@ use App\Services\AuditLogService;
 use App\Services\CharVariantMapService;
 use App\Services\NameSearchIndexService;
 use App\Support\CompositePrimaryKey;
+use App\Support\CoordinatePairNormalizer;
 use App\Support\SelfReferencingTreeGuard;
 use App\Support\UnknownPerson;
 use App\Support\VariantEquivalentLookup;
@@ -929,6 +930,48 @@ class OperationsProposalController extends Controller {
         return CharVariantMapService::replaceRow($data, $table)['data'];
     }
 
+    /**
+     * 核准落庫前把空白／零值的經緯度歸成 NULL。
+     *
+     * 位置與 `replaceVariantsForApproval()` 並列、掛在兩個 apply* 方法的最上方，理由同源
+     * 也同樣是**雙保險**：提交端（`AbstractCodeTableMutationHandler`／
+     * `CodeTableCreateHandler`）存進 payload 的已是歸一後的值，本步是對**歷史遺留 payload**
+     * 補網——`operations` 裡今天就躺著在這條機制上線之前送出的 `ADDR_CODES` 待審提案，
+     * 它們的 `resource_data` 可能帶著 `x_coord: 0`。少了這一步，核准其中一筆就會把
+     * 一列 `0,0` 重新造回來，而且沒有任何人會注意到。
+     *
+     * 與落地替換不同的一點：座標永遠不是主鍵成員，所以這裡沒有「查重用替換前的值」那種
+     * 錯位風險。掛在最上方是為了與旁邊那一條位置一致、讓範式可讀，不是因為順序有約束。
+     *
+     * 重複套用是幂等的（`NULL` 既非空白亦非零，第二次跑什麼都不做）。
+     *
+     * @param array<string,mixed> $data
+     * @return array<string,mixed>
+     */
+    protected function normalizeCoordinatesForApproval(string $table, array $data): array {
+        // **先擋掉「根本不是數」的座標值，再歸一。**
+        //
+        // `CoordinatePairNormalizer` 對 `"0e0"`／`"east"` 這類值刻意整對不動，前提是下游的
+        // `CodeTableFieldValidator` 會回 422。**那個前提在這條路徑上是假的**：核准重放直接
+        // insert／update，從不經過任何欄位驗證層。實測一筆帶 `x_coord: "0e0"` 的歷史提案
+        // 核准後，MariaDB 在非 strict sql_mode 下把它靜默轉成 `0`——正好重新造出這整套
+        // 機制要防的那一列。
+        //
+        // 這裡選擇**中止核准**而不是靜默清成 NULL：payload 裡有一個不是數的座標是壞資料，
+        // 該讓審核者看到並回去修提案，而不是由系統代為決定要丟掉它。丟出
+        // RuntimeException 是這兩個 apply* 方法既有的失敗慣例（上下都是這樣擋的），
+        // 呼叫端會轉成使用者看得到的錯誤訊息。
+        $invalid = CoordinatePairNormalizer::invalidColumns($data, $table);
+        if ($invalid !== []) {
+            throw new \RuntimeException(
+                '提案中的座標欄位不是數值（'.implode('、', array_keys($invalid))
+                .'），無法核准。請退回提案並修正後重新送出。'
+            );
+        }
+
+        return CoordinatePairNormalizer::normalizeRow($data, $table)['data'];
+    }
+
     protected function applyCreateProposal(string $table, array $data, array $keyColumns): array {
         // 異體字落地替換：**掛在方法最上方、buildKeyConditions() 之前**，不是「insert 之前」。
         // 下方 :753 的重複檢查也用 $data 組主鍵條件，若替換晚於它，就會出現「查重用替換前
@@ -937,6 +980,8 @@ class OperationsProposalController extends Controller {
         // 這是**雙保險**：提案建立端（S2／S3／S5）存進 payload 的已是替換後值，本步是對
         // 歷史遺留 payload（那些在落地替換上線前送出的提案）補網；依 D8 重複套用是幂等的。
         $data = $this->replaceVariantsForApproval($table, $data);
+        // 經緯度歸零（見 normalizeCoordinatesForApproval 的註解：對歷史遺留 payload 補網）。
+        $data = $this->normalizeCoordinatesForApproval($table, $data);
 
         $data = $this->assignAutoKeyIfNeeded($table, $keyColumns, $data);
         $data = $this->enforceAuditFieldsForCreate($table, $data);
@@ -994,6 +1039,11 @@ class OperationsProposalController extends Controller {
         // 異體字落地替換：同樣掛在最上方。$conditions 用 $original（既有列的實際值）定位，
         // 不受替換影響；而 buildUpdatePayload() 與改鍵碰撞偵測都讀 $data，必須看到替換後的值。
         $data = $this->replaceVariantsForApproval($table, $data);
+        // 經緯度歸零（見 normalizeCoordinatesForApproval 的註解：對歷史遺留 payload 補網）。
+        // 必須早於 buildUpdatePayload()：那一步是拿 $data 與 $original 做差集，若它看到的
+        // 還是 `0`，這筆核准就會把 `0` 寫進資料庫；看到 `null` 才會正確地寫 NULL，
+        // 而在原值已是 NULL 時正確地落在差集之外（不產生無意義的寫入）。
+        $data = $this->normalizeCoordinatesForApproval($table, $data);
 
         $data = $this->enforceAuditFieldsForUpdate($table, $data, $original);
         $conditions = $this->buildKeyConditions($keyColumns, $original);

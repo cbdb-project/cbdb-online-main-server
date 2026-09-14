@@ -338,7 +338,7 @@ class VariantReplaceHookCoverageTest extends TestCase {
 
             $missing = $this->missingInstanceCalls(
                 $file,
-                ['applyVariantReplacement', 'resetVariantReplaced', 'withVariantNotices']
+                ['applyVariantReplacement', 'resetVariantReplaced', self::NOTICE_CALL_BY_FILE[$file] ?? 'withVariantNotices']
             );
 
             $this->assertSame(
@@ -348,7 +348,57 @@ class VariantReplaceHookCoverageTest extends TestCase {
                     .'（註解與字串字面值都不算）——光有 use 而不呼叫，等於沒有掛鉤'
             );
         }
+
+        // 上面對 AbstractCodeTableMutationHandler 只要求它呼叫聚合入口
+        // `withWriteNotices()`，所以鏈條的第二段必須在這裡補上：那個聚合方法**真的**
+        // 轉呼 `withVariantNotices()`。少了這一段，把聚合 trait 改成只掛座標通知就會
+        // 讓 80+ 張代碼表靜默失去異體字通知，而兩個斷言都還是綠的。
+        $aggregate = 'app/Services/Mutations/Concerns/WritesNoticeAggregate.php';
+        $this->assertFileExists(base_path($aggregate));
+        // **兩支都要斷言。** 只釘異體字那一支的話，把聚合改成
+        // `return $this->withVariantNotices($response);` 就會讓所有代碼表寫入靜默失去
+        // 座標歸零通知，而這支 census 還是綠的——那正是本檔存在要防的那種無聲退化，
+        // 只是換成另一種通知。
+        $this->assertSame(
+            [],
+            $this->missingInstanceCalls($aggregate, ['withVariantNotices', 'withCoordinateNotices']),
+            $aggregate.' 必須真的轉呼 withVariantNotices() 與 withCoordinateNotices() 兩者：'
+                .'代碼表 handler 的通知全部經過它，漏掉任一支，那一種通知就在所有代碼表'
+                .'寫入路徑上靜默消失'
+        );
+
+        // 聚合入口只在被 use 時才生效。兩個代碼表 handler 都必須掛著它——少了 use，
+        // 上面那些 `withWriteNotices(` 呼叫會是 runtime fatal 而不是靜默退化，但那也只在
+        // 該路徑真被走到時才炸；釘在這裡讓它在 CI 就紅。
+        foreach ([
+            \App\Services\Mutations\AbstractCodeTableMutationHandler::class,
+            \App\Services\Mutations\CodeTableCreateHandler::class,
+        ] as $class) {
+            $this->assertContains(
+                \App\Services\Mutations\Concerns\WritesNoticeAggregate::class,
+                class_uses_recursive($class),
+                $class.' 必須掛著 WritesNoticeAggregate：它的 return 全部經由 withWriteNotices() 掛通知'
+            );
+        }
     }
+
+    /**
+     * 哪些檔案是經由聚合入口掛通知的，而不是直接呼叫 `withVariantNotices()`。
+     *
+     * `AbstractCodeTableMutationHandler` 有 9 個需要掛通知的 return，而通知來源自 2026-09
+     * 起有兩種（異體字替換、經緯度歸零，見 `CoordinatePairNormalizer`）。逐一補上第二種
+     * 必然會漏掉一半——而漏掉的那半正是 409／422 這些「被擋下來時使用者最需要知道系統改了
+     * 什麼」的路徑。所以那些 return 改為統一呼叫
+     * {@see \App\Services\Mutations\Concerns\WritesNoticeAggregate::withWriteNotices()}，
+     * 由它一處轉呼兩支。
+     *
+     * 這個清冊存在的意義是**不放鬆把關**：仍然逐檔要求「真的呼叫了掛通知的方法」，只是對
+     * 這一檔認的是聚合入口；聚合入口本身另有一條斷言要求它轉呼 `withVariantNotices()`。
+     * 直接把期望值改成寬鬆比對（例如「呼叫兩者之一都算」）會讓「兩支都沒掛」也綠。
+     */
+    private const NOTICE_CALL_BY_FILE = [
+        'app/Services/Mutations/AbstractCodeTableMutationHandler.php' => 'withWriteNotices',
+    ];
 
     /**
      * 繼承掛鉤基底、但自己另有寫入的 handler 必須明文登記。

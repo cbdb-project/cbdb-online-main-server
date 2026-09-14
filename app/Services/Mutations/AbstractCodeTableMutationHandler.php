@@ -28,6 +28,8 @@ use Illuminate\Support\Str;
 abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler {
     use \App\Services\Mutations\Concerns\AppliesVariantReplacement;
     use \App\Services\Mutations\Concerns\GuardsCharVariantMapWrites;
+    use \App\Services\Mutations\Concerns\NormalizesCoordinatePairs;
+    use \App\Services\Mutations\Concerns\WritesNoticeAggregate;
     use \App\Services\Mutations\Concerns\HandlesCodeTableWrites;
     protected OperationRepository $operationRepository;
     protected AuditLogService $auditLogService;
@@ -148,6 +150,23 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
             ]);
         }
 
+        // 經緯度「空白／零值 → NULL」。掛鉤點的三個約束見 NormalizesCoordinatePairs 的
+        // trait 註解，這裡只記結論：**必須早於下面的 normalize()、validateFields() 與
+        // 變更偵測**。早於 normalize() 是因為那一步會先把 `''` 轉成 null，使用者留空的
+        // 那一軸就不再可辨識、通知會消失；早於變更偵測是因為 `{x_coord: 0}` 打在一列
+        // 座標本來就是 NULL 的資料上，若偵測看到的還是 `0`，就會寫一次 NULL 覆蓋 NULL
+        // ——什麼都沒變，卻蓋掉 c_modified_* 並寫出 before／after 相同的
+        // operations／audit_log。
+        //
+        // 注意這一步可能補寫呼叫端沒送的伙伴欄（經緯度必須成對），而白名單的收窄在上面
+        // 幾行就做完了——補寫的欄位不會再過白名單。`CoordinatePairRegistryGuardTest`
+        // 是為此存在的機械把關（登記的座標欄必須都在該表的 allowed_fields 裡）。
+        $this->resetCoordinateCleared();
+        $updateData = $this->applyCoordinateNormalization($updateData);
+        // 濾掉「沒送來、而且原值本來就是 NULL」的伙伴欄通知：那是真的什麼都沒發生。
+        // 送來了的欄一律保留——那才是「填了經度、因為緯度留空而被整對丟棄」的情形。
+        $this->dropNoOpCoordinateNotices((array) $original);
+
         // 型別正規化（與 create 端同一套；只在單邊做會製造「新增進得去、改回同一個值
         // 卻 422」的不對稱）。必須在校驗與變更偵測之前：正規化後才是真正要落庫的值。
         $updateData = CodeTableFieldValidator::normalize($updateData, $this->fieldTypeSpec());
@@ -155,7 +174,9 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
         // 驗證欄位值
         $validationErrors = $this->validateFields($updateData);
         if (!empty($validationErrors)) {
-            return $this->errorResponse('參數校驗失敗', 422, $validationErrors);
+            // 帶上座標通知：正規化已經跑過了，使用者被 422 擋下來時更需要知道
+            // 「我送的座標被改成 NULL 了」。
+            return $this->withCoordinateNotices($this->errorResponse('參數校驗失敗', 422, $validationErrors));
         }
 
         // 自參照樹：改上層節點可能成環（A→B、B→A 各自都滿足外鍵，資料庫擋不住），
@@ -170,7 +191,10 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
             if ((string) $updateData[$treeParentColumn] !== (string) $currentParent) {
                 $cycleError = $this->findTreeCycle($table, $keyColumn, $treeParentColumn, $pk[$keyColumn], $updateData[$treeParentColumn]);
                 if ($cycleError !== null) {
-                    return $this->errorResponse($cycleError, 422, ['changes' => ['tree_cycle']]);
+                    // 交易外的這條與交易內的孿生分支（下方 QueryException 那組）必須一致地掛上通知：
+                    // 目前沒有任何表同時登記了 tree_parent_column 與座標對，所以這裡走不到，
+                    // 但那是 config 的巧合而不是結構保證。留一條沒掛通知的 return 給下一個人踩不划算。
+                    return $this->withWriteNotices($this->errorResponse($cycleError, 422, ['changes' => ['tree_cycle']]));
                 }
             }
         }
@@ -204,7 +228,7 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
         if (!$hasEffectiveChange) {
             // 使用者送的字被歸一成與現值相同時，422 也要帶 notices，
             // 否則「未偵測到任何修改內容」看起來毫無道理（對齊人物子資源 handler）。
-            return $this->withVariantNotices($this->errorResponse('未偵測到任何修改內容', 422, [
+            return $this->withWriteNotices($this->errorResponse('未偵測到任何修改內容', 422, [
                 'changes' => ['no_effective_changes'],
             ]));
         }
@@ -290,7 +314,7 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
             });
         } catch (TreeCycleException $e) {
             // 交易內的鎖定複查擋下的競態；與 handle() 裡那次同樣回 422 tree_cycle。
-            return $this->withVariantNotices($this->errorResponse($e->getMessage(), 422, ['changes' => ['tree_cycle']]));
+            return $this->withWriteNotices($this->errorResponse($e->getMessage(), 422, ['changes' => ['tree_cycle']]));
         } catch (\Illuminate\Database\QueryException $e) {
             // 這三個回應都在落地替換之後，所以都要帶 notices（AGENTS §1.3：成功、409、422
             // 都要掛）——被擋下來時使用者更需要知道自己輸入的字已被正規化。
@@ -301,28 +325,28 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
             // 是可直接重試的暫時性衝突，回 409 而不是 500。自參照樹的鎖定走訪會讓
             // 兩個方向相反的重掛以不同順序取鎖，資料庫因此可能挑一方回滾。
             if ($this->isLockContention($e)) {
-                return $this->withVariantNotices($this->errorResponse('與其他同時進行的修改發生鎖衝突，請重試', 409, ['changes' => ['lock_contention']]));
+                return $this->withWriteNotices($this->errorResponse('與其他同時進行的修改發生鎖衝突，請重試', 409, ['changes' => ['lock_contention']]));
             }
             if ($this->isForeignKeyViolation($e)) {
                 // 白名單開放的欄位裡有外鍵欄（ADDR_CODES.c_admin_cat_code → ADMIN_CAT_CODES、
                 // ADDR_BELONGS_DATA.c_source → TEXT_CODES）。指向不存在的代碼是呼叫端的輸入
                 // 問題，要回 422；不擋的話 MariaDB 1452 會一路冒到 controller 變成 500，
                 // SQLite 則會被誤判成 409「請重試」而誘導無效的重試迴圈。
-                return $this->withVariantNotices($this->errorResponse('關聯的記錄不存在（外鍵約束）', 422, ['changes' => ['foreign_key_violation']]));
+                return $this->withWriteNotices($this->errorResponse('關聯的記錄不存在（外鍵約束）', 422, ['changes' => ['foreign_key_violation']]));
             }
             // NOT NULL／CHECK：理論上已由 not_null_fields 在 422 擋下，這裡是登記漏了時的
             // 兜底——同樣是呼叫端輸入問題，不該以 500 或「請重試」的 409 呈現。
             if ($this->isNotNullOrCheckViolation($e)) {
-                return $this->withVariantNotices($this->errorResponse('欄位不可為空', 422, ['changes' => ['not_null_violation']]));
+                return $this->withWriteNotices($this->errorResponse('欄位不可為空', 422, ['changes' => ['not_null_violation']]));
             }
             // 值轉換／超出範圍（strict sql_mode 才會拋）：同樣是輸入問題，兜底轉 422。
             if ($this->isValueRangeOrConversionViolation($e)) {
-                return $this->withVariantNotices($this->errorResponse('欄位值超出允許範圍或型別不符', 422, ['changes' => ['invalid_value']]));
+                return $this->withWriteNotices($this->errorResponse('欄位值超出允許範圍或型別不符', 422, ['changes' => ['invalid_value']]));
             }
             // 部分表（如 char_variant_map 的 c_variant_char）在非主鍵欄位上另有唯一鍵；
             // 更新撞到該唯一鍵須回 409（可重試/可提示），不能讓資料庫層例外冒出成 500。
             if ($this->isUniqueConstraintViolation($e)) {
-                return $this->withVariantNotices($this->errorResponse('修改後的值與其他記錄的唯一鍵衝突', 409, ['changes' => ['conflict']]));
+                return $this->withWriteNotices($this->errorResponse('修改後的值與其他記錄的唯一鍵衝突', 409, ['changes' => ['conflict']]));
             }
 
             throw $e;
@@ -330,7 +354,7 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
 
         $this->resetVariantMapCacheIfNeeded($table);
 
-        return $this->withVariantNotices(response()->json([
+        return $this->withWriteNotices(response()->json([
             'ok' => true,
             'resource' => $this->resourceName(),
             'mode' => 'direct',
@@ -379,7 +403,7 @@ abstract class AbstractCodeTableMutationHandler extends AbstractMutationHandler 
 
         // 提案 payload 已是替換後的值（掛鉤在 mode 分派之前），所以提案回應也要帶 notices
         // ——否則提案人不知道自己送的字形在審核畫面上已被改過。
-        return $this->withVariantNotices(response()->json([
+        return $this->withWriteNotices(response()->json([
             'ok' => true,
             'resource' => $this->resourceName(),
             'mode' => 'proposal',

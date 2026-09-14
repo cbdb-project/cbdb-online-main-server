@@ -181,7 +181,7 @@
 | 14 | `package.json` + lockfile | 移除 `admin-lte`、`jquery`、`@ttskch/select2-bootstrap4-theme`、`datatables.net`、`datatables.net-bs4`、`@vitejs/plugin-vue`、`@vue/compiler-sfc`、`vue`，並視 grep 結果評估 `lodash`、`sass`。`npm install` 後提交 lockfile | 每個套件刪除前先 `grep -rn "<pkg>" resources/js` 確認 inertia 端零 import。⚠️ ① `app.js:22` `import select2 from 'select2'`，但 **`select2` 不在 `package.json`**（靠 `admin-lte` 的依賴樹解析）——刪完跑 `npm ls select2` 確認走乾淨；② **`@fortawesome/fontawesome-free` 不可刪**，`resources/css/inertia.css:23` 直接 `@import` 它 |
 | 15 | `tests/**` | 刪除純 legacy 的 Feature 測試；含新舊對照者移除 legacy 斷言；移除 **`TestCase::useLegacyPersonForms()`**（`tests/TestCase.php:35-43`，把 `basicinformation.*` flag 壓成 `old`）——注意它**不在 `setUp()` 裡，是各 legacy 測試自行呼叫的 opt-in helper**，移除時要一併處理所有呼叫端 | ✅ **環節 1.5 已完成分流**：14 個 `useLegacyPersonForms()` 呼叫端全部標上 `#[Group('legacy-parity')]`，`./vendor/bin/phpunit --group legacy-parity` 可一鍵列出全部 199 個測試（即環節 2 的刪除清單）；兩個 needs-v2-first 的缺口已補齊 v2 等價覆蓋。<br>⚠️ 直接依賴 flag 的還有 `LegacyBladeFormGateTest`、`FlagAwareUrlHelpersTest`、`NavigationSchemaTest`、`AuthPagesInertiaTest`、`CodesIndexInertiaTest`、`CodesPersonPickerTest`、`InertiaSharedPropsTest`、`OperationsIndexLinksTest`、`OperationsProposalResourceLinkTest`、`CompositePrimaryKeyTest`，全部要改。<br>⚠️ ② **`useLegacyPersonForms()` 有 14 個呼叫端**（環節 1.5 實測；已全部標 `#[Group('legacy-parity')]`）（`BasicInformation{Addresses,Altnames,Sources,Texts}ControllerTest`、`BasicInformationPagesLoadTest`、`BasicInformationProposalTest`、`BiogMainBasicInfoNameMergeTest`、`BiogMainProposalTest`、`EventStatusWriteActionsTest`、`FormUrlEncodingTest`、`NameSearchIndexAutoSyncTest`、`OfficeStoreRedirectTest`、`ProposalNormalizationTest`、`UnknownPersonKinshipAssocBlockTest` …），直接刪 helper ⇒ 14 檔 `Call to undefined method`。<br>⚠️ ③ **`tests/Unit/VariantReplaceHookCoverageTest.php` 必定會紅**，見下方專節 |
 | 16 | 文檔 | `AGENTS.md`（「舊版 Blade 仍實體保留／翻回 `old` 即回退」整段改寫）、`README.md`（**逐行**：`:64` 的「AdminLTE 3 + Blade 仍實體保留作回退相容期／Phase 7 未執行」、`:65-66` 的入口清單含 `app.js`／`jquery-global.js`、`:114`、`:117`——`:64` 與 `:114` 是**對外承諾**「flag 改回 old 即可回退」，與 AGENTS.md 同等級，不改就是文件說謊）、`CHANGELOG.md`、`docs/ADMINLTE.md`（改為「已下架」歷史文件）、`docs/ADMINLTE4_UPGRADE_FEASIBILITY.md`（標註已被取代）、`docs/REACT_INERTIA_MIGRATION_PLAN.md`（§五雙殼／§五之二回退保證／附錄 C 禁止清單全部失效）、`docs/REACT_MIGRATION_BACKLOG.md`（P6-C1/C2、P7-1..3 → `retired`）、`docs/VIEWS.md`、`docs/migration-specs/*.md`（22 份 fidelity spec 加「歷史存檔」抬頭） | ⚠️ **`docs/CODES_SORT_FILTER_AUTH_GATE.md` 必須改寫**——該文記載「把 `codes` flag 切回 `old` 會重新暴露無門檻的深分頁排序查詢」；Blade 版刪除後此風險**消失**，結論需更新，否則會誤導未來的安全評估 |
-| 17 | `API.md` / `docs/openapi/openapi.yaml` | **本計畫預設不動任何 API 路由／欄位／授權／錯誤碼**，故無需更新。**若某個環節實際動到了對外端點語義（例如把 legacy 端點改成導向／410），必須在同一 commit 同步 `API.md`**（AGENTS.md 文檔維護原則） | 環節 3 的導向／410 屬對外行為改變 → **需在 `API.md` 註記**受影響的 legacy URL |
+| 17 | `API.md` / `docs/openapi/openapi.yaml` | **本計畫預設不動任何 API 路由／欄位／授權／錯誤碼**，故無需更新。**若某個環節實際動到了對外端點語義（例如把 legacy 端點改成導向／410），必須在同一 commit 同步 `API.md`**（AGENTS.md 文檔維護原則） | ✅ **實查結果：環節 3 無需更新 `API.md`**。`API.md` 收錄的是 v1／v2 的 API 端點，唯一與本次相關的是 `GET /codes/{table_name}/export`（`API.md:1686`）——而那條**沒有被封路**（React 匯出鈕正在用），敘述仍然正確。legacy web 表單端點從不在 `API.md` 範圍內。環節 4 實體刪除時再複查一次 |
 
 | 18 | `app/Providers/AppServiceProvider.php` | 環節 5 移除 `View::composer('layouts.dashboard-v3', …)`（`:81`）與 `Paginator::useBootstrap()`（`:53`） | ⚠️ 該 composer 是 `shouldRetainQueryDetails()`（`:113-160`，QueryProfile 明細保留機制）的**唯一消費者**。刪 layout 後它不會 500、只是永遠不觸發 ⇒ 一整段帶安全註解的邏輯變成看不見的死碼。**必須明確決定：廢除，還是改接 React（`HandleInertiaRequests` 目前沒有分享它）** |
 | 19 | `composer.json` | **本計畫不移除任何 composer 套件** | ⚠️ 兩個看似 Blade 遺物的套件**不可刪**：`laravel/ui`（`Auth::routes()` macro 的唯一來源）、`laracasts/flash`（雖然 `@include('flash::message')` 只在兩個待刪 layout 裡，但 `HandleInertiaRequests.php:80,192` 把它橋接成 React toast，**仍在服役**） |
@@ -396,10 +396,11 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
 > 交付物：[docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md](./BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md)（逐條 route manifest）
 > ＋ `app/Http/Middleware/RetireLegacyBladePage`（逐條掛，35 條）
 > ＋ `config/legacy_page_retirement.php`（kill switch）
-> ＋ `tests/Feature/LegacyBladePageRetirementTest`（57 個測試）
+> ＋ `tests/Feature/LegacyBladePageRetirementTest`（59 個測試，含逐條身分斷言）
 >
-> **實測分類**：`php artisan route:list --json` 取出 A-1…A-17 的 **53 條** legacy 路由，逐條判定後
-> **35 條封路**（22 條 GET→302、13 條→410）、**19 條不動**（新舊共用方法，或 React 正在呼叫的
+> **實測分類**：`php artisan route:list --json` 取出該批 controller 上的 **65 條** legacy（非 `app/*`）路由，逐條判定後
+> **35 條封路**（22 條 GET→302、13 條→410）、**19 條不動**、**11 條不在本環節範圍**（v1 token API 與 Query Playground 共用後端）。不動的理由分三級：
+> 只有 1 條真的「動了就壞」、6 條是「封了不會壞但 `listRouteName()` 收斂還沒做」、12 條是 React 正在呼叫的
 > action endpoint——其中 `crowdsourcing/{id}/confirm|reject` 是 **GET 動詞的寫入端**，按 prefix
 > 套規則會直接命中）。測試逐條驗證「該封的封了、該留的一條都沒被誤掛」，並鎖住總數 35。
 >

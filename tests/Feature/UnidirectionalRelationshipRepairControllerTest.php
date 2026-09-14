@@ -8,6 +8,7 @@ use App\Support\VariantReplaceScope;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -17,11 +18,6 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase {
 
     protected function setUp(): void {
         parent::setUp();
-
-        // 本類驗的是 legacy Blade 頁的行為。Blade 下架計畫環節 3「先封路、不刪碼」把那些
-        // 路由改成 302／410，但頁面本身還在、還部署著、還能被 kill switch 叫回來，
-        // 所以這份覆蓋在觀察期內仍有意義——局部關閉封路即可。環節 4 實體刪除時一併移除。
-        $this->useLegacyBladePages();
 
         // 使用 in-memory SQLite 数据库
         config()->set('database.default', 'sqlite');
@@ -253,16 +249,24 @@ class UnidirectionalRelationshipRepairControllerTest extends TestCase {
         $response->assertRedirect(route('login'));
     }
 
+    #[Group('legacy-parity')]
     #[Test]
     public function regular_user_cannot_access_repair_page() {
+        // 本測試打的是 legacy Blade 頁（環節 3 已封路，但頁面還在、還能被 kill switch
+        // 叫回來），故局部關閉封路。環節 4 實體刪除時連同本呼叫一併移除。
+        $this->useLegacyBladePages();
         $response = $this->actingAs($this->regularUser)
             ->get(route('admin.unidirectional-relationship-repair'));
 
         $response->assertStatus(403);
     }
 
+    #[Group('legacy-parity')]
     #[Test]
     public function admin_can_access_repair_page() {
+        // 本測試打的是 legacy Blade 頁（環節 3 已封路，但頁面還在、還能被 kill switch
+        // 叫回來），故局部關閉封路。環節 4 實體刪除時連同本呼叫一併移除。
+        $this->useLegacyBladePages();
         $response = $this->actingAs($this->adminUser)
             ->get(route('admin.unidirectional-relationship-repair'));
 

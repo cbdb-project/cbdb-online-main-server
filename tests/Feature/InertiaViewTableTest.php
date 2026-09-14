@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -14,11 +15,6 @@ class InertiaViewTableTest extends TestCase {
 
     protected function setUp(): void {
         parent::setUp();
-
-        // 本類驗的是 legacy Blade 頁的行為。Blade 下架計畫環節 3「先封路、不刪碼」把那些
-        // 路由改成 302／410，但頁面本身還在、還部署著、還能被 kill switch 叫回來，
-        // 所以這份覆蓋在觀察期內仍有意義——局部關閉封路即可。環節 4 實體刪除時一併移除。
-        $this->useLegacyBladePages();
 
         $this->createTestTables();
         $this->user = User::factory()->create([
@@ -318,17 +314,53 @@ class InertiaViewTableTest extends TestCase {
     // Old /view routes still work
     // -------------------------------------------------------
 
+    #[Group('legacy-parity')]
     #[Test]
     public function test_legacy_view_index_still_works(): void {
+        // 本測試打的是 legacy Blade 頁（環節 3 已封路，但頁面還在、還能被 kill switch
+        // 叫回來），故局部關閉封路。環節 4 實體刪除時連同本呼叫一併移除。
+        $this->useLegacyBladePages();
         $response = $this->actingAs($this->user)->get(route('view.index'));
         $response->assertOk();
         $response->assertViewIs('view.list');
     }
 
+    #[Group('legacy-parity')]
     #[Test]
     public function test_legacy_view_show_still_works(): void {
+        // 本測試打的是 legacy Blade 頁（環節 3 已封路，但頁面還在、還能被 kill switch
+        // 叫回來），故局部關閉封路。環節 4 實體刪除時連同本呼叫一併移除。
+        $this->useLegacyBladePages();
         $response = $this->actingAs($this->user)->get(route('view.show', 'test-items'));
         $response->assertOk();
         $response->assertViewIs('view.index');
+    }
+
+    /**
+     * kill switch 的實證：關掉封路之後 legacy Blade 頁**真的會渲染**。
+     *
+     * LegacyBladePageRetirementTest 那邊只能證明「middleware 讓開了」（它的精簡 schema
+     * 渲染不了大部分頁面）。這裡有完整的 view_tables fixtures，可以斷言到視圖名——
+     * 這才是 config/legacy_page_retirement.php 與 route manifest 所宣稱的「立刻復活」。
+     *
+     * 這條測試守的是環節 3 的核心賣點：**不需重新部署、不需 git revert 就能回退**。
+     * 環節 4 實體刪除 legacy 頁之後，這個能力與本測試一併消失。
+     */
+    #[Group('legacy-parity')]
+    #[Test]
+    public function test_kill_switch_restores_the_legacy_view_page(): void {
+        // 預設（封路生效）：導向 React 版
+        $this->actingAs($this->user)
+            ->get(route('view.index'))
+            ->assertStatus(302)
+            ->assertRedirect('/app/view');
+
+        $this->useLegacyBladePages();
+
+        // 關掉之後：原 legacy Blade 頁完整渲染
+        $this->actingAs($this->user)
+            ->get(route('view.index'))
+            ->assertOk()
+            ->assertViewIs('view.list');
     }
 }

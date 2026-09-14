@@ -232,24 +232,72 @@ class LegacyBladePageRetirementTest extends TestCase {
         );
     }
 
-    /** manifest 說 35 條，這裡鎖住總數，避免日後零散加掛而沒更新文件。 */
+    /**
+     * 封路的**身分**必須與 manifest 逐條吻合——不只是數量。
+     *
+     * 只鎖數量擋得住「零散加掛」，卻擋不住「換掛」：把某條該封的拿掉、同時誤封另一條，
+     * 數字還是 35、測試照綠。所以這裡寫死完整清單，diff 會直接指出該改 manifest 哪一行。
+     */
     #[Test]
     public function exactly_the_manifested_routes_are_gated(): void {
+        $expected = [
+            'DELETE codes/{table_name}/{id}',
+            'DELETE manage/{manage}',
+            'GET admin/ai-fill-logs',
+            'GET admin/audit-logs',
+            'GET admin/batch-load-book-titles',
+            'GET admin/batch-load-offices',
+            'GET admin/batch-load-social-institutes',
+            'GET admin/cbdb-table-maintenance',
+            'GET admin/explainsql',
+            'GET admin/unidirectional-relationship-repair',
+            'GET codes',
+            'GET codes/{table_name}',
+            'GET codes/{table_name}/create',
+            'GET codes/{table_name}/{id}/edit',
+            'GET crowdsourcing',
+            'GET dashboard',
+            'GET manage',
+            'GET manage/create',
+            'GET manage/{manage}',
+            'GET manage/{manage}/edit',
+            'GET merge-preview',
+            'GET operations',
+            'GET profile',
+            'GET query-playground/nl-query-logs',
+            'GET view',
+            'GET view/{key}',
+            'PATCH profile',
+            'POST admin/explainsql',
+            'POST codes/{table_name}',
+            'POST codes/{table_name}/proposal',
+            'POST manage',
+            'POST merge-preview',
+            'POST|PATCH codes/{table_name}/{id}/proposal',
+            'PUT|PATCH codes/{table_name}/{id}',
+            'PUT|PATCH manage/{manage}',
+        ];
+
         $gated = [];
         foreach (Route::getRoutes() as $route) {
             foreach ($route->gatherMiddleware() as $m) {
                 if (is_string($m) && str_starts_with($m, 'legacy.page')) {
-                    $gated[] = implode('|', array_diff($route->methods(), ['HEAD'])).' '.$route->uri();
+                    $methods = implode('|', array_values(array_diff($route->methods(), ['HEAD'])));
+                    $gated[] = $methods.' '.$route->uri();
+
+                    break;
                 }
             }
         }
 
-        $this->assertCount(
-            35,
+        sort($gated);
+        sort($expected);
+
+        $this->assertSame(
+            $expected,
             $gated,
-            "封路路由數與 manifest 不符（實際 ".count($gated)." 條）。"
-            ."加減路由時請同步更新 docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md：\n"
-            .implode("\n", $gated)
+            '封路清單與 docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md 不符；'
+            .'加減或改動封路路由時請同步更新該文件與本清單。'
         );
     }
     // ── kill switch ──────────────────────────────────────────
@@ -266,14 +314,22 @@ class LegacyBladePageRetirementTest extends TestCase {
         $user = $this->superAdmin();
 
         // 預設：封路生效
-        $this->actingAs($user)->get('/dashboard')->assertStatus(302);
+        $this->actingAs($user)->get('/admin/explainsql')->assertStatus(302);
 
         config(['legacy_page_retirement.enabled' => false]);
 
-        // 關掉之後請求應抵達原 legacy controller（不是 302、也不是 410）
-        $status = $this->actingAs($user)->get('/dashboard')->status();
-        $this->assertNotSame(302, $status, 'kill switch 關閉後不該再導向');
-        $this->assertNotSame(410, $status, 'kill switch 關閉後不該回 410');
+        // 關掉之後請求應抵達原 legacy controller。
+        //
+        // 這個測試只證明「middleware 讓開了」——它用 /dashboard，而該頁在本檔的精簡 schema
+        // 下渲染會因缺表而 5xx，所以**必須連 5xx 一起排除**，否則 500 也會讓
+        // assertNotSame(302)/assertNotSame(410) 通過，變成假綠。
+        //
+        // 「legacy 頁真的復活並渲染成功」的實證在
+        // InertiaViewTableTest::test_kill_switch_restores_the_legacy_view_page——那邊有完整
+        // 的 view_tables fixtures，能斷言 assertOk() + assertViewIs()。
+        // 用 /admin/explainsql：它不查業務表，在本檔的精簡 schema 下也能真的渲染，
+        // 所以可以斷言 assertOk()——比「不是 302 也不是 410」有意義得多。
+        $this->actingAs($user)->get('/admin/explainsql')->assertOk();
     }
 
     /** 寫入端的 410 同樣受 kill switch 控制。 */
@@ -285,6 +341,8 @@ class LegacyBladePageRetirementTest extends TestCase {
 
         config(['legacy_page_retirement.enabled' => false]);
 
-        $this->assertNotSame(410, $this->actingAs($user)->patch('/profile', [])->status());
+        $status = $this->actingAs($user)->patch('/profile', [])->status();
+        $this->assertNotSame(410, $status);
+        $this->assertLessThan(500, $status, '同理：5xx 會讓上面那個斷言變成假綠');
     }
 }

@@ -133,7 +133,7 @@ class UserProfileController extends Controller {
             return back()->withErrors(['current_password' => '當前密碼不正確'])->withInput();
         }
 
-        return redirect()->route('profile.edit')->with('success', '個人資料已成功更新');
+        return redirect()->route('app.profile.edit')->with('success', '個人資料已成功更新');
     }
 
     /**

@@ -5,7 +5,23 @@
 ## 專案現況
 - 技術棧：Laravel 12、PHP 8.2+、MariaDB 10.11（prod 實測 10.11.14；相容性下限仍按 10.3 撰寫）、SQLite（測試）、Vite、Vue 3、Inertia/React。
 - 全站主要互動頁面已遷移至 **React/Inertia 並翻 flag 上線**（`config/migration_flags.php` 頁面 flag 多為 `new`）：人物列表/檢視/詳情中樞、13 個 React 編輯器（basic-info + 12 個複合主鍵子資源）、Codes CRUD、operations/manage/crowdsourcing、admin 工具、認證頁、Query Playground（`/app/query-playground`）等。
-- **舊版 Blade 視圖與 AdminLTE 3 + Bootstrap 4 仍實體保留**：flag-gated 頁面（basicinformation.*、view、codes、operations、manage、crowdsourcing、admin.*、auth.*、welcome 等）把對應 flag 改回 `old` 即可即時回退、不需改碼。**人物編輯相關 legacy 路由在 flag=new 時已被 `LegacyBladeFormGate` 實質下架**：表單 GET 302 導向 `/app` 對應頁、寫入端點（含無欄位白名單的 `proposalStore`）回 410；flag 改回 `old` 才放行。少數頁面例外：**Query Playground 無主頁 flag，`/query-playground` 硬導向 `/app/query-playground`（React）、不走 flag 回退；外部資料庫引用瀏覽器亦同，`/external-db-link` 硬導向 `/app/external-db-link`、Blade 版已刪除**。AdminLTE 實體下架（Phase 7）尚未執行。**新功能一律只做在 React/Inertia 路徑（`resources/js/inertia/**`），不要再改舊 Blade。**
+- **舊版 Blade 視圖與 AdminLTE 3 + Bootstrap 4 仍實體保留，但已全面封路**（見 [docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)）：
+  - **人物編輯全套（`basicinformation.*`）已於環節 2 實體刪除**——視圖、12 組子資源路由與 controller、
+    `LegacyBladeFormGate`、以及那 15 個 `MIGRATION_FLAG_BASICINFO_*` flag 全部不存在了。
+    舊 URI 只剩 302 導向（顯示頁）／410（寫入端）。**把 flag 塞回 config 不會復活它們**（有護欄測試鎖住）。
+    唯三例外：`saveas`、`Duplicate_Collateral_Info`（React 編輯器正在呼叫）與 `destroy`。
+  - **其餘頁面（`codes`／`view`／`operations`／`manage`／`crowdsourcing`／`admin.*`／`merge-preview`／
+    `profile`／`dashboard`／`nl-query-logs`）已於環節 3 封路但未刪碼**：Blade 視圖與 controller 都還在，
+    只是請求不再抵達 controller（顯示頁 302、legacy 寫入端 410）。逐條清單見
+    [docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md](./docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md)。
+  - 🔴 **回退鍵已經不是 migration flag**：這批頁面翻 `MIGRATION_FLAG_*=old` **沒有任何效果**
+    （封路 middleware 不讀 flag）。要回退請設 **`LEGACY_PAGE_RETIREMENT=false`** 並
+    `php artisan config:clear && php artisan config:cache`——不需重新部署、不需 git revert。
+    migration flag 現在只影響**連結指向**（側邊欄、payload 裡的 URL），不影響舊頁能否開啟。
+  - 少數頁面本就無 flag：Query Playground 主頁 `/query-playground` 硬導向 `/app/query-playground`；
+    外部資料庫引用瀏覽器 `/external-db-link` 硬導向 `/app/external-db-link`（Blade 版已刪）。
+  - AdminLTE 實體下架（環節 5）尚未執行。
+  - **新功能一律只做在 React/Inertia 路徑（`resources/js/inertia/**`），不要再改舊 Blade。**
 - 前端資源由 Vite 載入；React/Inertia 元件在 `resources/js/inertia/`。
 - 使用者介面支援繁體中文／英文切換（預設 zh-TW），文件與 commit message 一律使用繁體中文。
 

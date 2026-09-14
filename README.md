@@ -61,7 +61,7 @@
 
 ### 前端構建現況
 - 主要互動頁面已遷移至 **React/Inertia 並翻 flag 上線**（人物列表/檢視/詳情中樞、13 個編輯器、Codes、營運管理工具、認證頁、Query Playground 等），React 元件在 `resources/js/inertia/**`，feature flag 見 `config/migration_flags.php`（多為 `new`）。
-- **AdminLTE 3** (Bootstrap 4) + Blade 仍實體保留作回退相容期：flag-gated 頁面把對應 flag 改回 `old` 即可回退（可逆）；Query Playground 例外（無主頁 flag、硬導向 React，不走 flag 回退）。尚未實體下架（Phase 7 未執行）。新功能一律只做在 React/Inertia 路徑。
+- **AdminLTE 3** (Bootstrap 4) + Blade 仍實體保留，但**已全面封路**：舊 URL 一律 302 導向 `/app` 對應頁、legacy 寫入端回 410。🔴 **回退鍵不再是 migration flag**——請設 `LEGACY_PAGE_RETIREMENT=false` 並 `php artisan config:clear && php artisan config:cache`（不需重新部署）。人物編輯全套（`basicinformation.*`）已**實體刪除**、無法回退。逐條清單見 [docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md](docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md)。AdminLTE 實體下架未執行。新功能一律只做在 React/Inertia 路徑。
 - 構建系統為 **Vite**；主要入口：`resources/js/app.js`（AdminLTE/jQuery UI 組件）、`resources/js/datatables.js`、`resources/js/inertia/**`（React/Inertia）。
 - `resources/js/jquery-global.js` 將 jQuery 暴露到全局（供保留中的 Blade 頁使用）。
 - 所有頁面均使用 `@vite` 載入前端資源，**請勿引入外部 CDN 的 jQuery/Bootstrap**，以免版本衝突。
@@ -111,7 +111,7 @@ php artisan cbdb:rebuild-person-change-index   # 部署後須跑一次：回填�
 
 ### 前端
 - 主要 React/Inertia 線上路徑：`/app/basicinformation`（人物列表 / 詳情中樞 / 13 個編輯器）、`/app/query-playground`、`/app/codes`、`/app/operations` 等。
-- 舊版 Blade 路由多數保留作回退（flag-gated 頁面改 flag 回 `old`）；Query Playground 例外（硬導向 React，無 flag 回退）。皆不再新增功能；新功能一律做在 React/Inertia。
+- 舊版 Blade 路由已全面封路（顯示頁 302、寫入端 410），視圖與 controller 仍保留；回退用 `LEGACY_PAGE_RETIREMENT=false`（**不是** migration flag）。人物編輯全套已實體刪除。Query Playground 與外部資料庫引用瀏覽器本就硬導向 React、無 flag。皆不再新增功能；新功能一律做在 React/Inertia。
 - 前端入口：
   - `resources/js/inertia/**`（React/Inertia，主要互動頁）
   - `resources/js/app.js`、`resources/js/datatables.js`（保留中的 AdminLTE/Blade 頁）

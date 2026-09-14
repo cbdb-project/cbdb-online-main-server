@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -14,6 +15,11 @@ use Tests\TestCase;
  * 使用 in-memory SQLite 数据库，灌入最小化测试数据
  * 只验证 HTTP 状态码，不检查具体内容
  */
+/**
+ * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
+ * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
+ */
+#[Group('legacy-parity')]
 class ManagePagesLoadTest extends TestCase {
     protected $adminUser;
     protected $regularUser;
@@ -282,7 +288,7 @@ class ManagePagesLoadTest extends TestCase {
                 'is_admin' => 0,
             ]);
 
-        $response->assertRedirect(route('manage.index'));
+        $response->assertRedirect(route('app.manage.index'));
     }
 
     /**

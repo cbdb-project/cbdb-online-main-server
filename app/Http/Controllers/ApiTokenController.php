@@ -126,7 +126,7 @@ class ApiTokenController extends Controller {
         }
 
         // Otherwise, redirect back with the token in session flash
-        return redirect()->route('profile.edit')
+        return redirect()->route('app.profile.edit')
             ->with('token', $token->plainTextToken)
             ->with('success', 'API Token 創建成功，請妥善保存');
     }

@@ -4,6 +4,22 @@
 
 ## 2026-09
 
+### Blade 下架：legacy 頁面全面封路，人物編輯全套實體刪除
+
+計畫與逐條清單：[docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)、[docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md](./docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md)
+
+- **對使用者的影響**：所有舊 URL（`/codes`、`/operations`、`/manage`、`/view`、`/profile`、`/dashboard`、`/admin/*`、`/basicinformation*`…）現在一律導向 `/app` 對應頁；舊表單的寫入端點回 410。**書籤仍然可用**（302 導向並保留 query string）。
+- **人物編輯全套已實體刪除**（-22,000 行）：`resources/views/biogmains/**`、12 組子資源路由與 controller、`LegacyBladeFormGate`、15 個 `MIGRATION_FLAG_BASICINFO_*` flag。舊 URI 只剩導向；`saveas`／`Duplicate_Collateral_Info`／`destroy` 三條例外仍在服役。
+- **其餘頁面只封路、未刪碼**：Blade 視圖與 controller 都還在，可用 kill switch 叫回。
+- 🔴 **回退鍵變了**：這批頁面翻 `MIGRATION_FLAG_*=old` **不再有效果**。要回退請設 **`LEGACY_PAGE_RETIREMENT=false`** 並 `php artisan config:clear && php artisan config:cache`——不需重新部署、不需 git revert。
+- **部署者請順手清除各機器 `.env` 的 15 個失效變數**：`MIGRATION_FLAG_BASICINFO_{INDEX,SHOW,EDITOR,ALTNAME,ADDRESSES,TEXTS,SOURCES,OFFICES,ASSOC,KINSHIP,EVENTS,ENTRIES,STATUSES,POSSESSION,SOCIALINST}`，以及早已失效的 `MIGRATION_FLAG_WIKI_MAINTENANCE`。留著無執行期影響，但會誤導維護者。
+- **順帶修掉的既存問題**：
+  - v2 的 kinship／association handler **從來沒有**「未詳人物（personid 0）不得建立關係」守衛（legacy controller 有、同族的 Possession／Posting 也有）——等於走 React 編輯器本來就擋不住。已補在 6 個掛點，並刻意修掉 legacy 的 `-999` 繞過漏洞。
+  - 眾包用戶開「新增人物」頁會無限導向（`ERR_TOO_MANY_REDIRECTS`），且既有測試把該迴圈寫死成期望值。改為 501 並附說明。
+  - 多處 `redirect()->route('<legacy>')` 會多繞一跳 302，讓 `laracasts/flash` 的成功／失敗提示被 session 老化掉而**靜默消失**。全部改指 `/app`。
+- **仍待處理（環節 4 之後）**：AdminLTE 實體下架、`biogmains` 翻譯群組的孤兒 key、提案核准路徑的未詳人物守衛、`Duplicate_Collateral_Info` 會複製歷史髒列。
+
+
 ### v2 API 補上官職類型層級樹（OFFICE_TYPE_TREE）的寫入，順帶讓代碼表寫入支援文本主鍵
 
 - **回報**：「完全沒有寫入口徑」。這張表原本只能走 `/codes` UI 或眾包端，v2 API 完全碰不到。

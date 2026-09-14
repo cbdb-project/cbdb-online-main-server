@@ -7,6 +7,7 @@ use App\Services\CharVariantMapService;
 use App\Support\VariantReplaceScope;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -23,6 +24,11 @@ use Tests\TestCase;
  * `SOCIAL_INSTITUTION_TYPES.c_inst_type_code` 等）。用數字主鍵去斷言「它沒被改寫」
  * 證明不了任何事，所以這裡不做那條測試；排除本身由 `VariantReplaceScopeTest` 斷言。
  */
+/**
+ * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
+ * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
+ */
+#[Group('legacy-parity')]
 class CodesVariantReplacementTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();

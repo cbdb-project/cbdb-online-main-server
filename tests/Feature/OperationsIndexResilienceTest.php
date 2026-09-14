@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -22,6 +23,11 @@ use Tests\TestCase;
  *  2. audit_log.row_pk 是寫入當下的欄名快照，pinyin.lastname_chn 於
  *     2026_07_10 migration 改名為 c_chn，舊 row_pk 拿去組 WHERE 直接 1054。
  */
+/**
+ * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
+ * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
+ */
+#[Group('legacy-parity')]
 class OperationsIndexResilienceTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();

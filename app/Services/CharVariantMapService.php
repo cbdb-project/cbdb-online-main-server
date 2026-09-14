@@ -321,7 +321,15 @@ class CharVariantMapService {
         }
 
         $data = $response->getData(true);
-        $data['notices'] = $notices;
+        // **併入而非覆寫**：`notices` 現在不只有異體字一種來源（見
+        // `App\Services\Mutations\Concerns\NormalizesCoordinatePairs`：經緯度歸零也寫這裡），
+        // 而同一個請求可能同時觸發兩者（改了中文名、又把座標留空）。
+        //
+        // 原本這裡是 assign，於是「先掛座標、再掛異體字」的組合順序會**靜默吃掉**座標通知；
+        // 換句話說正確性取決於呼叫端的嵌套順序，而那是個沒有任何測試守得住的隱性契約
+        // （實測：把 `WritesNoticeAggregate` 的順序反過來，整個測試套件照樣全綠）。
+        // 兩邊都改成 merge，順序就不再承重。
+        $data['notices'] = array_merge($data['notices'] ?? [], $notices);
 
         return response()->json($data, $response->getStatusCode());
     }

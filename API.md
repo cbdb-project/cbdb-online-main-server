@@ -153,7 +153,7 @@ Token 有效期：建立時可指定 `expires_in`（1～3650 天），未指定�
 }
 ```
 
-寫入在伺服器做過**異體字替換**時，會多一個頂層 `notices` 陣列說明替換內容。涵蓋範圍：人物主檔與所有人物子資源、代碼表 create／update、官職與社會機構聚合。**失敗回應也可能帶 `notices`**——最典型的是 409（替換後撞既有主鍵）與 422（替換後與現值相同、「未偵測到任何修改內容」）：那些訊息若不附上替換說明會顯得毫無道理。注意其他靜默改寫（**Unicode NFC 正規化**、拼音 `v→ü`、括號正規化、哨兵值正規化）**不會**產生 `notices`，只能從回應的 `result.pk` / `result.row` 看出來。
+寫入在伺服器做過**異體字替換**或**經緯度歸零**（見 13.1）時，會多一個頂層 `notices` 陣列說明改寫內容。涵蓋範圍：人物主檔與所有人物子資源、代碼表 create／update、官職與社會機構聚合。**失敗回應也可能帶 `notices`**——最典型的是 409（替換後撞既有主鍵）與 422（替換後與現值相同、「未偵測到任何修改內容」）：那些訊息若不附上替換說明會顯得毫無道理。注意其他靜默改寫（**Unicode NFC 正規化**、拼音 `v→ü`、括號正規化、哨兵值正規化）**不會**產生 `notices`，只能從回應的 `result.pk` / `result.row` 看出來。
 
 由控制器／handler 判定的失敗（多數 4xx 與 5xx）：
 
@@ -749,7 +749,7 @@ Authorization: Bearer <token>
 | result.status | 字串 | 只在 proposal 出現，值為 `proposal_created` |
 | result.operation_id | 數字 | `operations` 表 id；proposal 模式即提案編號 |
 | result.row | 物件 | 只在 direct 出現，為寫入後從資料庫回讀的完整列 |
-| notices | 陣列 | 只在伺服器做過**異體字替換**時出現，**成功與失敗（409／422）回應都可能有**（Unicode NFC、拼音 `v→ü`、括號正規化等改寫是靜默的，不會有 `notices`） |
+| notices | 陣列 | 只在伺服器做過**異體字替換**或**經緯度歸零**（空白／零值寫成 `NULL`，見 13.1）時出現，**成功與失敗（409／422）回應都可能有**（Unicode NFC、拼音 `v→ü`、括號正規化等改寫是靜默的，不會有 `notices`） |
 
 **回應欄位的例外（請以「可能不存在」的方式讀取）**：
 
@@ -1418,6 +1418,9 @@ Authorization: Bearer <token>
   - **可送數值（整數或小數）**：`ADDR_CODES.x_coord`／`y_coord`（訊息 `<欄名> 必須為字串、數值或 null`）。
   - 數值欄**送字串時必須真的是數字**（整數欄 `-?\d+`、浮點欄另允許小數點），否則 422 `<欄名> 必須為整數`／`必須為數值`。不擋的話 MariaDB 在本專案的非 strict sql_mode 下會把 `"not-a-year"` **靜默存成 0**，而 0 在年份／代碼欄都是合法值、事後看不出是壞資料。
   - 可為 null 的數值欄送空字串 `""` 等於**清空（寫入 null）**，不是寫 0。
+  - **經緯度是一對，空白或零一律落庫為 `NULL`**（`ADDR_CODES.x_coord`／`y_coord`；`create` 與 `update` 兩端一致）。`0`、`"0"`、`"0.0"`、`"0.00000"`、`-0`、空字串、只有空白的字串都算——它們轉成 double 之後全都精確等於 0，而 `0,0` 不是座標、是「沒有座標」被寫成了一個看起來合法的數字（伺服器的 `CoordinateValidator` 讀取端早就判它無效）。**一對之中只要有任一軸符合，另一軸也會被寫成 `NULL`，即使你沒有送它**：只送 `{"x_coord": 0}` 也會把 `y_coord` 一併清空，因為只有一軸的座標對每個消費端都不可用。所以送 `{"x_coord": 105.36, "y_coord": ""}` **不會**存下那個經度——`105.36` 會被丟棄，回應的 `notices` 會說明這件事，請以 `result.row` 為準。
+  - 這一步發生在「有沒有變更」的判斷**之前**：對一列座標本來就是 `NULL` 的資料送 `{"x_coord": 0}`，會得到 422 `changes: no_effective_changes`（而不是寫一次 `NULL` 覆蓋 `NULL`、白白蓋掉 `c_modified_*`）。這不是 bug。
+  - **不是所有非法座標都會被清成 `NULL`**：非空白、非數值的值（`"east"`、`"0e0"`、`"+40.5"`）仍然回 422 `<欄名> 必須為數值`，整對都不動。**但前後帶空白的數字不算在內**：所有輸入都會先經過全域的字串修剪，`" 40.5 "` 抵達時已是 `"40.5"`，所以它是個合法數值——若同一對的另一軸是零或空白，這個 `40.5` 會跟著被清成 `NULL`（回 200，`notices` 會說明）。把它們靜默清成 `NULL` 會讓一個該報錯的請求變成「存成沒有座標」。溢位成無限大的數字（JSON 的 `1e999`）回 422 `<欄名> 必須為有限數值`。
   - 整數欄另有**值域檢查**（依該欄實際型別，如 smallint 是 -32768～32767），超出回 422 `<欄名> 必須在 <min> 與 <max> 之間`。同理由：非 strict sql_mode 下 MariaDB 會把 40000 靜默截斷成 32767，回 200 但年份是錯的。
   - 超出 PHP 整數精度的數字字串回 422 `<欄名> 整數值超出可表示範圍`（`(int)` 會飽和成最大值，讓值域檢查誤判為「剛好在範圍內」）。`bigint` 欄不做值域檢查，只做這條溢位檢查。
   - **不受 255 上限**：`ADDR_CODES.c_notes`、`ADMIN_CAT_CODES.c_notes`（實際型別是 longtext）。13.2 的 create 另有 `TEXT_CODES.c_notes`——該欄只能新增時寫，不在本節的 update 白名單內。
@@ -1430,6 +1433,7 @@ Authorization: Bearer <token>
 - 外鍵欄指向不存在的列 → 422 `changes: ["foreign_key_violation"]`（`ADDR_CODES.c_admin_cat_code` → `ADMIN_CAT_CODES`、`ADDR_BELONGS_DATA.c_source` → `TEXT_CODES`）。NOT NULL 欄仍被寫成空 → 422 `changes: ["not_null_violation"]`（正常情況下會先被上面的欄位級規則擋在 `<欄名> 不可為空`）。
 - 其餘錯誤與人物子資源一致：白名單外欄位 422 `disallowed_fields`、`changes` 整包為空 422 `changes: empty`、有送但值相同 422 `changes: no_effective_changes`、找不到列 404。
 - 回應 `result` 含 `pk`／`updated_fields`／`operation_id`／`row`；proposal 的 payload 另含 `__key_columns` 與 `__proposal_meta`。
+- **`updated_fields` 可能包含你沒有送的欄位**：目前唯一的來源是上面的經緯度成對規則——送 `{"x_coord": 0}` 會得到 `updated_fields: ["x_coord", "y_coord"]`，因為 `y_coord` 也被一併寫成了 `NULL`。請不要假設 `updated_fields` 是你送出的 `changes` 鍵集合的子集。
 - 更新成功時系統會蓋 `c_modified_by`／`c_modified_date`（表有這兩欄時；署名經 `AuditActor`）；`c_created_*` 只在新增時蓋、之後永遠沿用。
 - **代碼表 `update` 寫入 `operations` 時，`c_personid` 一律被記成 `0`**（不論你送什麼 `person_id`）。13.2 的 `create` 則是原樣記錄你送的 `person_id`——兩者不一致，追蹤時請注意。
 

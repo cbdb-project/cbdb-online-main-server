@@ -30,6 +30,8 @@ use Illuminate\Support\Str;
 class CodeTableCreateHandler extends AbstractMutationHandler {
     use \App\Services\Mutations\Concerns\AppliesVariantReplacement;
     use \App\Services\Mutations\Concerns\GuardsCharVariantMapWrites;
+    use \App\Services\Mutations\Concerns\NormalizesCoordinatePairs;
+    use \App\Services\Mutations\Concerns\WritesNoticeAggregate;
     use \App\Services\Mutations\Concerns\HandlesCodeTableWrites;
     protected array $definitions;
     protected OperationRepository $operationRepository;
@@ -219,6 +221,27 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
 
         $row = array_intersect_key($changes, array_flip($allowed));
 
+        // 經緯度「空白／零值 → NULL」。掛鉤點與 update 端對稱（見
+        // AbstractCodeTableMutationHandler 同一處的註解與 NormalizesCoordinatePairs 的
+        // trait 註解）：**必須早於下面的 normalize() 與 validate()**，否則使用者留空的那
+        // 一軸會先被轉成 null、不再可辨識，通知就消失了。
+        //
+        // create／update 兩端的掛鉤點必須對稱，這是硬約束而不是潔癖：只在單邊做會造出
+        // 「新增進得去、之後改回同一個值卻 422」這種最難查的不對稱（理由詳見
+        // CodeTableFieldValidator 的類註）。
+        //
+        // 表名**必須顯式傳**：本類別的表由請求決定、沒有 tableName()，省略會 fallback
+        // 到不存在的方法而在 runtime 炸掉（不是靜態錯誤）。
+        //
+        // 一樣要呼叫 dropNoOpCoordinateNotices()，傳空陣列：新增沒有原始列，所以「沒送來、
+        // 而且原值是 NULL」對每一個補寫的伙伴欄都成立，那些通知會被濾掉。這是對的——
+        // 欄位是 `double DEFAULT NULL`，insert 時補一個 NULL 是真正的 no-op，沒有任何
+        // 既存值被丟掉，說「另一軸也清空了」只會是雜訊。使用者自己送的那一欄（零／空白）
+        // 仍然會留下通知，因為 submitted 的欄永遠不被濾。
+        $this->resetCoordinateCleared();
+        $row = $this->applyCoordinateNormalization($row, $table);
+        $this->dropNoOpCoordinateNotices([]);
+
         // 型別正規化 + 校驗：與 update 端共用同一份判定（CodeTableFieldValidator）。
         // 未登記型別的欄位一律要求 string|null 且 ≤ 255；不擋的話型別不合會變成資料庫層 500。
         // 第三個參數（文字欄接受 JSON 數字）**只有 create 端開啟**——這條路徑在加上校驗
@@ -227,7 +250,9 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
         $row = CodeTableFieldValidator::normalize($row, $def, true);
         $validationErrors = CodeTableFieldValidator::validate($row, $def + ['integer_ranges' => $this->integerRanges($table)]);
         if (!empty($validationErrors)) {
-            return $this->errorResponse('參數校驗失敗', 422, $validationErrors);
+            // 帶上座標通知：正規化已經跑過了，被 422 擋下來時使用者更需要知道
+            // 「我送的座標被改成 NULL 了」。
+            return $this->withCoordinateNotices($this->errorResponse('參數校驗失敗', 422, $validationErrors));
         }
 
         // 自參照樹：擋掉「自己當自己的上層」。父節點必須存在由資料庫的自參照外鍵保證
@@ -248,7 +273,10 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
                 $row[$treeParentColumn] ?? null
             );
             if ($cycleError !== null) {
-                return $this->errorResponse($cycleError, 422, ['changes' => ['tree_cycle']]);
+                // 交易外的這條與交易內的孿生分支（下方 QueryException 那組）必須一致地掛上通知：
+                // 目前沒有任何表同時登記了 tree_parent_column 與座標對，所以這裡走不到，
+                // 但那是 config 的巧合而不是結構保證。留一條沒掛通知的 return 給下一個人踩不划算。
+                return $this->withWriteNotices($this->errorResponse($cycleError, 422, ['changes' => ['tree_cycle']]));
             }
         }
 
@@ -347,7 +375,7 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
             });
         } catch (TreeCycleException $e) {
             // 交易內的鎖定複查擋下的競態；與上面那次同樣回 422 tree_cycle。
-            return $this->withVariantNotices($this->errorResponse($e->getMessage(), 422, ['changes' => ['tree_cycle']]));
+            return $this->withWriteNotices($this->errorResponse($e->getMessage(), 422, ['changes' => ['tree_cycle']]));
         } catch (\Illuminate\Database\QueryException $e) {
             // 這幾個回應都在落地替換之後，所以**必須**帶 notices（AGENTS §1.3：成功、409、
             // 422 都要掛）——被擋下來時使用者更需要知道自己輸入的字被正規化了，否則交易
@@ -362,22 +390,22 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
             // 是可直接重試的暫時性衝突，回 409 而不是 500。自參照樹的鎖定走訪會讓
             // 兩個方向相反的重掛以不同順序取鎖，資料庫因此可能挑一方回滾。
             if ($this->isLockContention($e)) {
-                return $this->withVariantNotices($this->errorResponse('與其他同時進行的修改發生鎖衝突，請重試', 409, ['changes' => ['lock_contention']]));
+                return $this->withWriteNotices($this->errorResponse('與其他同時進行的修改發生鎖衝突，請重試', 409, ['changes' => ['lock_contention']]));
             }
             if ($this->isForeignKeyViolation($e)) {
-                return $this->withVariantNotices($this->errorResponse('關聯的記錄不存在（外鍵約束）', 422, ['changes' => ['foreign_key_violation']]));
+                return $this->withWriteNotices($this->errorResponse('關聯的記錄不存在（外鍵約束）', 422, ['changes' => ['foreign_key_violation']]));
             }
             // NOT NULL／CHECK：理論上已由 not_null_fields 在 422 擋下，這裡是登記漏了時的兜底。
             if ($this->isNotNullOrCheckViolation($e)) {
-                return $this->withVariantNotices($this->errorResponse('欄位不可為空', 422, ['changes' => ['not_null_violation']]));
+                return $this->withWriteNotices($this->errorResponse('欄位不可為空', 422, ['changes' => ['not_null_violation']]));
             }
             // 值轉換／超出範圍（strict sql_mode 才會拋）：同樣是輸入問題，兜底轉 422。
             if ($this->isValueRangeOrConversionViolation($e)) {
-                return $this->withVariantNotices($this->errorResponse('欄位值超出允許範圍或型別不符', 422, ['changes' => ['invalid_value']]));
+                return $this->withWriteNotices($this->errorResponse('欄位值超出允許範圍或型別不符', 422, ['changes' => ['invalid_value']]));
             }
             // 顯式撞號 TOCTOU、或 auto-assign 並發搶到同 id → 唯一鍵衝突轉 409（呼叫端可重試）。
             if ($this->isUniqueConstraintViolation($e)) {
-                return $this->withVariantNotices($this->errorResponse('目標主鍵已存在（並發衝突，請重試）', 409, ['target.pk' => ['conflict']]));
+                return $this->withWriteNotices($this->errorResponse('目標主鍵已存在（並發衝突，請重試）', 409, ['target.pk' => ['conflict']]));
             }
 
             throw $e;
@@ -393,7 +421,7 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
                 : (int) ($insertedArray[$col] ?? 0);
         }
 
-        return $this->withVariantNotices(response()->json([
+        return $this->withWriteNotices(response()->json([
             'ok' => true,
             'resource' => $def['resource'],
             'mode' => 'direct',

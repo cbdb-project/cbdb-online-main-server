@@ -70,8 +70,12 @@ class LoginRedirectTest extends TestCase {
         // 確保未登錄
         auth()->logout();
 
-        // 訪問需要認證的頁面
-        $response = $this->get('/dashboard');
+        // 訪問需要認證的頁面。
+        // `/dashboard` 自 Blade 下架環節 4a-3 起是純 redirect closure（Blade 頁已刪、不掛 auth），
+        // 所以改打 `/app/dashboard`——那才是實際受 `auth` 保護的路由。
+        // 順帶說明使用者實際體驗的變化：打舊 URL 現在是 302 → `/app/dashboard` → 302 → `/login`
+        // （多一跳），而 Laravel 記下的 intended URL 變成 `/app/dashboard`，登入後直接落在 React 頁。
+        $response = $this->get('/app/dashboard');
 
         // 應該重定向到登錄頁面
         $response->assertRedirect('/login');

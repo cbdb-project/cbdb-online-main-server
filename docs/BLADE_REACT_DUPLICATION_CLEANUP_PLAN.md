@@ -475,8 +475,43 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
     實際 URL 帶完整 9 欄 PK。
     唯一保留的 legacy 耦合是 `test_legacy_codes_edit_page_resolves_the_right_composite_row`
     （要開 legacy codes 編輯頁確認 id 解析，該頁屬 4b），已單獨掛 `#[Group('legacy-parity')]`。
-  - **4a-3 待做**：實體刪除 9 個視圖 + 7 個元件 + 9 條路由 + 9 個 Blade controller 方法，
-    並移除 `InertiaViewTableTest` 的 3 條 kill-switch 實證測試（那個能力屆時才真的消失）。
+  - **4a-3 ✅ 已完成（2026-09-14）**：實體刪除 **16 個 Blade 檔**（9 個視圖 + D-6 的 4 個元件
+    + 環節 2 遺留的 3 個孤兒元件）與 **9 個 Blade controller 方法**，共 **-3894 行**。
+    - **9 條路由改成 redirect closure**，不再掛 `legacy.page`。理由：那個 middleware 有兩條
+      fail-open 路徑（導向目標不存在時放行、kill switch 關閉時放行），視圖被刪之後那兩條
+      會變成 500 而不是「看到舊頁」。改成 closure 就沒有可掉下去的 controller。
+      **route name 全部保留**（書籤／外部連結繼續可用並保留 query string，`route('x')`
+      呼叫端與 `NavigationSchemaTest` 的舊 nav 斷言都不必改）。
+    - 🔴 **這 9 條自此沒有任何 kill switch 級回退**：`LEGACY_PAGE_RETIREMENT=false` 對它們
+      已無作用，要回到 Blade 只能 git revert 並重新部署。新增
+      `LegacyBladePageRetirementTest::legacy_readonly_pages_redirect_without_the_kill_switch()`
+      把這一點寫死——**光看 302 的狀態碼分辨不出來**，若日後有人照舊 runbook 操作，
+      那條測試是唯一寫死「不能」的地方。封路身分清單 35 → **25**（35 − 10）。
+    - `dashboard`／`view` 兩條的 `auth` middleware 一併移除（redirect 不需授權）。
+      副作用：未登入打舊 URL 變成 302 → `/app/dashboard` → 302 → `/login`（多一跳），
+      但 Laravel 記下的 intended URL 變成 `/app/dashboard`，登入後直接落在 React 頁。
+      `InactiveAccountAccessTest` 與 `LoginRedirectTest` 原本拿 `/dashboard` 當「受保護頁面」
+      的代表，已改指 `/app/dashboard`——它們從守 shim 變成守實際頁面。
+    - 🔴 **`RouteActionsExistTest` 抓到一條真的漏刪**：`POST merge-preview`
+      （legacy 表單用 POST 回同一頁顯示結果）也指向被刪的 `MergePreviewController@index`，
+      而它掛的是 `legacy.page:gone`——kill switch 一關就 500。已改成 closure 直接 410。
+      **這就是為什麼那條護欄測試值得存在。**
+    - 翻譯鍵不逐鍵清：4a 視圖用到的 7 個群組全部也被對應的 React controller 當
+      `page_translations` 傳下去（`common`／`nav`／`person`／`query`／`biogmains` 另由
+      `HandleInertiaRequests` 全站共享），**沒有群組變孤兒**，所以不會壞、也不違反 §6 的
+      zh-TW／en 同步。
+      📌 **但個別孤兒鍵已實數過：252 個**（`admin` 109、`operations` 61、`query` 41、
+      `common` 20、`biogmains` 18、`person` 3）。留給環節 5 之後整批處理（理由同 7-T1：
+      動態組鍵 grep 不到，逐鍵猜的收益為零）。
+    - 📌 **環節 5 的清理清單新增兩筆**（4a-3 之後才確定成為死碼）：
+      ① `resources/js/app.js:387-530` 整段 jQuery 邏輯以 `.person-id-display-component`
+      為錨，該元件已於本環節刪除；② `app/Support/Navigation.php` 各節點的
+      `['pages' => ['Crowdsourcing'|'審計日誌'|'AI 填充日誌'|'NL Query Logs']]` 對應的是
+      Blade 的 `page_title_key`，現在沒有任何 Blade 頁會送出這些值（`NavigationSchemaTest` 仍綠）。
+    - 📌 **4b 的一個注意點**：`resources/views/codes/proposal-edit.blade.php:54` 的
+      `route('operations.index', ['proposals_only' => 1])` 現在會把使用者從 Blade codes 流程
+      一鍵跳進 React `/app/operations`。kill switch 關閉時這是「半 Blade 半 React」的體驗；
+      若 4b 要保持「關掉就是純 Blade」需另行處理。
 **同時刪**環節 2 保留下來的 `biogmains/defense.blade.php`（若走 (a) 方案）與 D-6 中的 `components/{diff-table,posted-to-addr-diff,key-value-table,ai-fill-diff-table}`（它們的最後消費者就在這一批）
 - **4b 表單／寫入頁**：codes 全套、manage、profile、admin/explainsql、3 個 batch-load、cbdb-table-maintenance、unidirectional-repair（⚠️ 只刪薄殼，`perform*` 全留）。**每刪一條 route 前，用三個方向各掃一次** `app/`、`resources/js/`、`tests/`：① **route name**（`route('x')`）、② **URI prefix**（`url('crowdsourcing/…')`、字串拼接——`CrowdsourcingController.php:183-184` 就是這型，route name grep 抓不到）、③ **controller action**。並把結果列進該 commit 的刪除清單。另外 `grep -rn "RouteName\|routeName" app/Http/Controllers` 找 `listRouteName()` 這類**回傳路由名字串**的分支
 - **4c 認證與入口**：auth 4 頁、welcome（同時移除 4 個 Auth controller 與 `WelcomeController` 的 flag 分支）

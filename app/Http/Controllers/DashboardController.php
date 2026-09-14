@@ -7,12 +7,8 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class DashboardController extends Controller {
-    public function index() {
-        return view('dashboard.index', array_merge([
-            'page_title' => __('nav.dashboard'),
-            'page_title_key' => '系統總覽',
-        ], $this->buildStats()));
-    }
+    // index() 是 legacy Blade 版，已隨 Blade 下架環節 4a-3 連同視圖一併刪除。
+    // 共用的取資料 helper 全部保留給 appIndex() 使用。
 
     /**
      * Inertia + React 版（統計卡片）。

@@ -244,7 +244,7 @@ Token 有效期：建立時可指定 `expires_in`（1～3650 天），未指定�
 
 ### `GET /api/v2/operations`
 
-輸出操作記錄（對應 `/operations` 頁面），分頁輸出。**不需要登入。**
+輸出操作記錄（對應 `/app/operations` 頁面；舊 URL `/operations` 只剩 302 導向），分頁輸出。**不需要登入。**
 
 ### 輸入參數
 

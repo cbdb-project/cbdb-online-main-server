@@ -69,41 +69,8 @@ class AdminAuditLogController extends Controller {
         ];
     }
 
-    /**
-     * Audit Log 列表（舊 Blade 版，僅活躍管理員）
-     */
-    public function index(Request $request) {
-        $this->guard();
-
-        $historyContext = $this->resolveHistoryContext($request);
-        $query = DB::table('audit_log');
-        $this->applyRequestFilters($query, $request, $historyContext);
-
-        $options = $this->filterOptions();
-        $tableNames = $options['table_names'];
-        $actorTypes = $options['actor_types'];
-
-        $query->orderByDesc('occurred_at')->orderByDesc('id');
-
-        $logs = $query->paginate(20)->withQueryString();
-
-        return view('admin.audit_logs.index', [
-            'page_title' => __('admin.audit_logs'),
-            'page_title_key' => '審計日誌',
-            'page_url' => route('admin.audit-logs'),
-            'logs' => $logs,
-            'table_names' => $tableNames,
-            'actor_types' => $actorTypes,
-            'history_context' => $historyContext,
-            'filters' => [
-                'search' => $request->input('search'),
-                'table_name' => $request->input('table_name'),
-                'operation' => $request->input('operation'),
-                'actor_type' => $request->input('actor_type'),
-                'actor_id' => $request->input('actor_id'),
-            ],
-        ]);
-    }
+    // index() 是 legacy Blade 版，已隨 Blade 下架環節 4a-3 連同視圖一併刪除。
+    // 共用的取資料 helper 全部保留給 appIndex() 使用。
 
     /**
      * Audit Log 列表（Inertia + React 版）。授權/篩選與 Blade 版一致，另支援

@@ -25,21 +25,8 @@ class MergePreviewController extends Controller {
         $this->middleware('auth');
     }
 
-    public function index(Request $request) {
-        if (!Auth::user()->isAdmin()) {
-            flash('該用戶沒有權限，請聯絡管理員。', 'error');
-
-            return redirect('/home');
-        }
-
-        $data = $this->buildMergePreview($request);
-
-        return view('manage.merge-preview', array_merge($data, [
-            'page_title' => 'MergePreview',
-            'page_description' => '人物記錄合併預覽',
-            'page_url' => '/merge-preview',
-        ]));
-    }
+    // index() 是 legacy Blade 版，已隨 Blade 下架環節 4a-3 連同視圖一併刪除。
+    // 共用的取資料 helper 全部保留給 appIndex() 使用。
 
     public function appIndex(Request $request) {
         if (!Auth::user()->isAdmin()) {

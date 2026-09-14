@@ -19,7 +19,13 @@
 |     對它們只影響**連結／URL payload 的指向**（Navigation 側邊欄、code_table_edit_url()、
 |     CodesController 的 URL payload、HandleInertiaRequests::profileUrl()、audit-log URL 等），
 |     **不影響 legacy 頁面是否可開啟或其渲染**。仍由 flag 決定渲染的只剩 'auth' 與 'welcome'
-|     （分支在 controller 內部、路由未封路）。人物編輯 basicinformation.* 已實體刪除、無法回退。
+|     （分支在 controller 內部、路由未封路）。
+|   - 🔴 **已實體刪除、連 kill switch 都救不回的**：人物編輯 basicinformation.*（環節 2），
+|     以及環節 4a-3 的 9 條唯讀頁——operations／dashboard／view／view/{key}／merge-preview／
+|     crowdsourcing／nl-query-logs／admin.audit-logs／admin.ai-fill-logs。它們已改成 redirect
+|     closure、不掛封路 middleware，所以 LEGACY_PAGE_RETIREMENT=false 對它們**無作用**。
+|     kill switch 現在只涵蓋**表單／寫入頁**（codes 全套／manage／profile／admin.explainsql／
+|     3 個 batch-load／cbdb-table-maintenance／unidirectional-repair），即環節 4b 的範圍。
 |   - 「翻 flag 上線」只能由人執行（見計畫附錄 C 寫入禁止清單）；
 |     AI executor 不得自動切換。
 |   - 可用環境變數覆蓋（部署時），key 形如 MIGRATION_FLAG_<UPPER_SNAKE>。
@@ -80,8 +86,9 @@ return [
         ],
 
         // View Tables（React 版已翻 new 上線，2026-06-26）
-        // ⚠️ 已封路（routes/web.php 的 view／view/{key} 掛 legacy.page）：翻回 old 不會回到 Blade，
-        // 只會改變連結指向。回退鍵是 LEGACY_PAGE_RETIREMENT=false。
+        // 🔴 Blade 版已於環節 4a-3 **實體刪除**：view／view/{key} 現在是 redirect closure，
+        // 翻回 old 不會回到 Blade，而且 LEGACY_PAGE_RETIREMENT=false 對它**也無作用**
+        // （已不掛封路 middleware）。本 flag 現在只影響連結指向。
         'view' => env('MIGRATION_FLAG_VIEW', 'new'),
 
         // Phase 6 — 認證頁與入口（已翻 new 上線；flag 可逆回 old）

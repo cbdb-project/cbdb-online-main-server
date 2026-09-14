@@ -85,7 +85,7 @@ export default function PersonBanner({ data, onTabSelect }: { data: PersonBanner
             {data.can_view_audit_logs && historyPage ? (
                 <div style={historyRowStyle}>
                     <a
-                        href={`${data.audit_logs_base ?? '/admin/audit-logs'}?c_personid=${data.person_id}&history_page=${historyPage}`}
+                        href={`${data.audit_logs_base ?? '/app/admin/audit-logs'}?c_personid=${data.person_id}&history_page=${historyPage}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={historyLinkStyle}

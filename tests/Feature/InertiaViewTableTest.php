@@ -6,7 +6,6 @@ use App\Models\User;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -311,56 +310,21 @@ class InertiaViewTableTest extends TestCase {
     }
 
     // -------------------------------------------------------
-    // Old /view routes still work
+    // Old /view routes（環節 4a-3 已實體刪除 Blade 視圖）
     // -------------------------------------------------------
+    //
+    // 這裡原本有三條 legacy 測試，隨 Blade 下架環節 4a-3 移除：
+    //
+    //  - test_legacy_view_index_still_works ／ test_legacy_view_show_still_works
+    //    只斷言 `assertViewIs('view.list')`／`assertViewIs('view.index')`；那兩個視圖已刪除。
+    //  - test_kill_switch_restores_the_legacy_view_page 驗的是「關掉封路後 Blade 頁真的
+    //    渲染」——那個能力現在**確實不存在**了（視圖已刪，而且 `/view` 改成純 redirect
+    //    closure、不再掛 `legacy.page`，所以 kill switch 對它完全無作用）。
+    //    它前半段的「302 → /app/view」已由
+    //    LegacyBladePageRetirementTest::legacy_readonly_pages_redirect_without_the_kill_switch
+    //    接手（那條同時驗「kill switch 關閉也照樣 302」）。
+    //
+    // 🔴 **連帶效應**：`/view` 這批頁面自此**沒有任何 kill switch 級回退**，
+    //    要回到 Blade 只能 git revert 並重新部署。
 
-    #[Group('legacy-parity')]
-    #[Test]
-    public function test_legacy_view_index_still_works(): void {
-        // 本測試打的是 legacy Blade 頁（環節 3 已封路，但頁面還在、還能被 kill switch
-        // 叫回來），故局部關閉封路。環節 4 實體刪除時連同本呼叫一併移除。
-        $this->useLegacyBladePages();
-        $response = $this->actingAs($this->user)->get(route('view.index'));
-        $response->assertOk();
-        $response->assertViewIs('view.list');
-    }
-
-    #[Group('legacy-parity')]
-    #[Test]
-    public function test_legacy_view_show_still_works(): void {
-        // 本測試打的是 legacy Blade 頁（環節 3 已封路，但頁面還在、還能被 kill switch
-        // 叫回來），故局部關閉封路。環節 4 實體刪除時連同本呼叫一併移除。
-        $this->useLegacyBladePages();
-        $response = $this->actingAs($this->user)->get(route('view.show', 'test-items'));
-        $response->assertOk();
-        $response->assertViewIs('view.index');
-    }
-
-    /**
-     * kill switch 的實證：關掉封路之後 legacy Blade 頁**真的會渲染**。
-     *
-     * LegacyBladePageRetirementTest 那邊只能證明「middleware 讓開了」（它的精簡 schema
-     * 渲染不了大部分頁面）。這裡有完整的 view_tables fixtures，可以斷言到視圖名——
-     * 這才是 config/legacy_page_retirement.php 與 route manifest 所宣稱的「立刻復活」。
-     *
-     * 這條測試守的是環節 3 的核心賣點：**不需重新部署、不需 git revert 就能回退**。
-     * 環節 4 實體刪除 legacy 頁之後，這個能力與本測試一併消失。
-     */
-    #[Group('legacy-parity')]
-    #[Test]
-    public function test_kill_switch_restores_the_legacy_view_page(): void {
-        // 預設（封路生效）：導向 React 版
-        $this->actingAs($this->user)
-            ->get(route('view.index'))
-            ->assertStatus(302)
-            ->assertRedirect('/app/view');
-
-        $this->useLegacyBladePages();
-
-        // 關掉之後：原 legacy Blade 頁完整渲染
-        $this->actingAs($this->user)
-            ->get(route('view.index'))
-            ->assertOk()
-            ->assertViewIs('view.list');
-    }
 }

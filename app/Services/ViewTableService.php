@@ -180,14 +180,9 @@ class ViewTableService {
         ];
     }
 
-    /**
-     * 將 SQL 中的 ? 佔位符替換為實際的 binding 值。
-     *
-     * @see renderSql() 的別名，供 Controller 呼叫使用。
-     */
-    public function formatSql(string $sql, array $bindings): string {
-        return $this->renderSql($sql, $bindings);
-    }
+    // formatSql() 是 renderSql() 的別名，唯一呼叫端是 ViewTableController::show()
+    // （legacy Blade 版）。該方法已隨 Blade 下架環節 4a-3 刪除，所以這個別名一併移除
+    // ——它是「專門為薄殼開的門」，屬於本次刪除範圍而不是要保留的共用 helper。
 
     /**
      * 將 SQL 中的 ? 佔位符替換為實際的 binding 值。

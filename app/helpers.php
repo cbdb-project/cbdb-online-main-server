@@ -143,9 +143,10 @@ if (!function_exists('person_create_url')) {
 }
 
 // 聯合主鍵保留字弱點防禦函式。
-// 原僅定義於 resources/views/biogmains/defense.blade.php（@include 時載入），
-// 移至此處統一自動載入，供控制器（如 OperationsController::serializeOperationRow）共用；
-// defense.blade.php 仍以 function_exists 守衛，重複載入時自動略過，行為一致。
+// 歷史上定義在 resources/views/biogmains/defense.blade.php（@include 時載入），
+// 後來移至此處統一自動載入，供控制器（如 OperationsController::serializeOperationRow）共用。
+// 那個 Blade 檔已隨 Blade 下架環節 2 刪除，所以本處是唯一定義（原本的 function_exists
+// 守衛只是過渡期用來避免重複載入，現在沒有第二個載入點了）。
 if (!function_exists('unionPKDef')) {
     function unionPKDef($key) {
         $key = str_replace("/", "(slash)", $key);

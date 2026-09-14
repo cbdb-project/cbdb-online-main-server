@@ -68,37 +68,39 @@ class LegacyBladePageRetirementTest extends TestCase {
     // ── 顯示頁 → 302 導向 /app ─────────────────────────────────
 
     /**
+     * 仍由 `legacy.page` middleware 封路的顯示頁（視圖還在，kill switch 可叫回）。
+     *
+     * ⚠️ **已實體刪除的 9 條唯讀頁不在這裡**——它們改成 redirect closure，見
+     * `deletedReadonlyPageProvider()`。兩者對 302 行為而言等價（都是 302 + 同一目標），
+     * 所以下面那條 302 測試同時吃兩個 provider；但**回退能力完全不同**，
+     * 所以身分清單（`exactly_the_manifested_routes_are_gated()`）只含這一批。
+     *
+     * 把兩批分開放是刻意的：混在同一個 provider 裡只能靠註解區分，
+     * 下一個人很容易把 9 條當成 gated 而去改 manifest。
+     *
      * @return array<string, array{0: string, 1: string}>
      */
     public static function gatedDisplayPageProvider(): array {
         return [
-            'dashboard' => ['/dashboard', '/app/dashboard'],
             'profile' => ['/profile', '/app/profile'],
             'codes index' => ['/codes', '/app/codes'],
             'codes show' => ['/codes/ADDR_CODES', '/app/codes/ADDR_CODES'],
             'codes create' => ['/codes/ADDR_CODES/create', '/app/codes/ADDR_CODES/create'],
             'codes edit' => ['/codes/ADDR_CODES/1/edit', '/app/codes/ADDR_CODES/1/edit'],
-            'operations' => ['/operations', '/app/operations'],
             'manage index' => ['/manage', '/app/manage'],
             'manage edit' => ['/manage/1/edit', '/app/manage/1/edit'],
-            'merge-preview' => ['/merge-preview', '/app/merge-preview'],
-            'crowdsourcing' => ['/crowdsourcing', '/app/crowdsourcing'],
-            'view index' => ['/view', '/app/view'],
-            'view show' => ['/view/kinship', '/app/view/kinship'],
-            'audit-logs' => ['/admin/audit-logs', '/app/admin/audit-logs'],
-            'ai-fill-logs' => ['/admin/ai-fill-logs', '/app/admin/ai-fill-logs'],
             'explainsql' => ['/admin/explainsql', '/app/admin/explainsql'],
             'batch books' => ['/admin/batch-load-book-titles', '/app/admin/batch-load-book-titles'],
             'batch offices' => ['/admin/batch-load-offices', '/app/admin/batch-load-offices'],
             'batch social' => ['/admin/batch-load-social-institutes', '/app/admin/batch-load-social-institutes'],
             'table maintenance' => ['/admin/cbdb-table-maintenance', '/app/admin/cbdb-table-maintenance'],
             'unidirectional repair' => ['/admin/unidirectional-relationship-repair', '/app/admin/unidirectional-relationship-repair'],
-            'nl query logs' => ['/query-playground/nl-query-logs', '/app/query-playground/nl-query-logs'],
         ];
     }
 
     #[Test]
     #[DataProvider('gatedDisplayPageProvider')]
+    #[DataProvider('deletedReadonlyPageProvider')]
     public function legacy_display_pages_redirect_to_the_react_equivalent(string $from, string $to): void {
         $this->actingAs($this->superAdmin())
             ->get($from)
@@ -249,8 +251,6 @@ class LegacyBladePageRetirementTest extends TestCase {
         $expected = [
             'DELETE codes/{table_name}/{id}',
             'DELETE manage/{manage}',
-            'GET admin/ai-fill-logs',
-            'GET admin/audit-logs',
             'GET admin/batch-load-book-titles',
             'GET admin/batch-load-offices',
             'GET admin/batch-load-social-institutes',
@@ -261,24 +261,16 @@ class LegacyBladePageRetirementTest extends TestCase {
             'GET codes/{table_name}',
             'GET codes/{table_name}/create',
             'GET codes/{table_name}/{id}/edit',
-            'GET crowdsourcing',
-            'GET dashboard',
             'GET manage',
             'GET manage/create',
             'GET manage/{manage}',
             'GET manage/{manage}/edit',
-            'GET merge-preview',
-            'GET operations',
             'GET profile',
-            'GET query-playground/nl-query-logs',
-            'GET view',
-            'GET view/{key}',
             'PATCH profile',
             'POST admin/explainsql',
             'POST codes/{table_name}',
             'POST codes/{table_name}/proposal',
             'POST manage',
-            'POST merge-preview',
             'POST|PATCH codes/{table_name}/{id}/proposal',
             'PUT|PATCH codes/{table_name}/{id}',
             'PUT|PATCH manage/{manage}',
@@ -330,9 +322,11 @@ class LegacyBladePageRetirementTest extends TestCase {
         // 下渲染會因缺表而 5xx，所以**必須連 5xx 一起排除**，否則 500 也會讓
         // assertNotSame(302)/assertNotSame(410) 通過，變成假綠。
         //
-        // 「legacy 頁真的復活並渲染成功」的實證在
-        // InertiaViewTableTest::test_kill_switch_restores_the_legacy_view_page——那邊有完整
-        // 的 view_tables fixtures，能斷言 assertOk() + assertViewIs()。
+        // 「legacy 頁真的復活並渲染成 **Blade**」的實證在同檔的
+        // migration_flags_no_longer_reopen_gated_legacy_pages()——它末尾對 /admin/explainsql
+        // 斷言 assertViewIs('admin.explain_sql')。
+        //（原本指向 InertiaViewTableTest::test_kill_switch_restores_the_legacy_view_page，
+        //  該測試已隨環節 4a-3 刪除——/view 的 Blade 頁不存在了，那個能力也不存在了。）
         // 用 /admin/explainsql：它不查業務表，在本檔的精簡 schema 下也能真的渲染，
         // 所以可以斷言 assertOk()——比「不是 302 也不是 410」有意義得多。
         $this->actingAs($user)->get('/admin/explainsql')->assertOk();
@@ -393,16 +387,20 @@ class LegacyBladePageRetirementTest extends TestCase {
         // 反面對照：沒被覆寫的未知 key 才會拿到 default，證明上面兩條不是 fallback。
         $this->assertSame('new', migration_flag('a-key-that-does-not-exist'));
 
-        // 顯示頁：仍然 302。涵蓋三種 middleware 組合——純 legacy.page（codes／operations／manage）、
-        // 與 `auth` 併掛（dashboard／view/{key}，順序敏感）。
-        foreach (['/codes', '/codes/DYNASTIES', '/admin/explainsql', '/operations', '/manage',
-            '/dashboard', '/view/dynasties'] as $uri) {
+        // 顯示頁：仍然 302。涵蓋兩種 middleware 組合——純 legacy.page（codes／manage／explainsql）
+        // 與「`auth` 併掛」（`/profile`，順序敏感：auth 若排在封路之後，未登入請求會先被導到 /login）。
+        //
+        // ⚠️ 原本這裡還列了 /operations、/dashboard、/view/dynasties，但它們自環節 4a-3 起
+        // 是 redirect closure——**不管 flag 怎麼翻都會 302**，放在這個測試裡是空轉斷言，
+        // 而且會讓「auth 併掛」那個組合變成完全沒被覆蓋（唯一還是 auth + legacy.page 的
+        // 顯示頁就是 /profile）。它們的行為由 legacy_readonly_pages_redirect_without_the_kill_switch() 守。
+        foreach (['/codes', '/codes/DYNASTIES', '/admin/explainsql', '/manage', '/profile'] as $uri) {
             $this->actingAs($user)
                 ->get($uri)
                 ->assertStatus(302, "翻 flag 不應讓 {$uri} 回到 Blade 版（封路 middleware 不讀 flag）");
         }
 
-        // 寫入端（`legacy.page:gone`）同樣不讀 flag：35 條封路裡有 16 條是這型，
+        // 寫入端（`legacy.page:gone`）同樣不讀 flag：25 條封路裡有 12 條是這型，
         // 只驗導向型會漏掉一半。
         foreach ([['patch', '/profile'], ['post', '/codes/DYNASTIES']] as [$method, $uri]) {
             $this->actingAs($user)
@@ -418,5 +416,50 @@ class LegacyBladePageRetirementTest extends TestCase {
             ->get('/admin/explainsql')
             ->assertOk()
             ->assertViewIs('admin.explain_sql');
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string}>
+     */
+    public static function deletedReadonlyPageProvider(): array {
+        return [
+            'dashboard' => ['/dashboard', '/app/dashboard'],
+            'operations' => ['/operations', '/app/operations'],
+            'view index' => ['/view', '/app/view'],
+            'view show' => ['/view/kinship', '/app/view/kinship'],
+            'merge-preview' => ['/merge-preview', '/app/merge-preview'],
+            'crowdsourcing' => ['/crowdsourcing', '/app/crowdsourcing'],
+            'nl query logs' => ['/query-playground/nl-query-logs', '/app/query-playground/nl-query-logs'],
+            'audit-logs' => ['/admin/audit-logs', '/app/admin/audit-logs'],
+            'ai-fill-logs' => ['/admin/ai-fill-logs', '/app/admin/ai-fill-logs'],
+        ];
+    }
+
+    /**
+     * 🔴 環節 4a-3 的核心行為變化：這 9 條唯讀頁的 Blade 視圖與 controller 方法**已實體刪除**，
+     * 所以它們改成純 redirect closure、**不再受 kill switch 控制**。
+     *
+     * 為什麼值得一條專屬測試：其餘 25 條封路的賣點是「`LEGACY_PAGE_RETIREMENT=false` 就能
+     * 即時叫回 Blade 頁」。這 9 條沒有那個能力了——而**光看 302 的狀態碼分辨不出來**。
+     * 若日後有人誤以為 kill switch 能救回它們（例如照著舊 runbook 操作），
+     * 這條測試是唯一寫死「不能」的地方。
+     *
+     * 它同時接手了被刪掉的 `InertiaViewTableTest::test_kill_switch_restores_the_legacy_view_page`
+     * ——那條原本證明「關掉封路後 Blade 頁真的渲染」，而該能力現在確實不存在。
+     */
+    #[Test]
+    #[DataProvider('deletedReadonlyPageProvider')]
+    public function legacy_readonly_pages_redirect_without_the_kill_switch(string $from, string $to): void {
+        $user = $this->superAdmin();
+
+        // 預設（封路開啟）：302
+        $this->actingAs($user)->get($from)->assertStatus(302)->assertRedirect($to);
+
+        // 關掉 kill switch：**照樣** 302——頁面已經不存在，叫不回來。
+        config(['legacy_page_retirement.enabled' => false]);
+        $this->actingAs($user)
+            ->get($from)
+            ->assertStatus(302, "{$from} 的 Blade 頁已實體刪除，kill switch 不該（也無法）把它叫回來")
+            ->assertRedirect($to);
     }
 }

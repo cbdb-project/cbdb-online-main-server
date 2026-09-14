@@ -6,23 +6,18 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
+use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
- * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
+ * ── 2026-09-15（Blade 下架環節 4b-3）─────────────────────────────
+ * 本檔全部改打 React 端（`/app/profile`）。`appUpdate()` 與 legacy `update()` 是兩個薄殼、
+ * 共用同一份驗證與寫入，所以 16 條 PATCH 只是換 URI、斷言一字未改；顯示頁改斷言 props。
  */
-#[Group('legacy-parity')]
 class UserProfileTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
-
-        // 本類驗的是 legacy Blade 頁的行為。Blade 下架計畫環節 3「先封路、不刪碼」把那些
-        // 路由改成 302／410，但頁面本身還在、還部署著、還能被 kill switch 叫回來，
-        // 所以這份覆蓋在觀察期內仍有意義——局部關閉封路即可。環節 4 實體刪除時一併移除。
-        $this->useLegacyBladePages();
 
         config()->set('database.default', 'sqlite');
         config()->set('database.connections.sqlite', [
@@ -55,7 +50,7 @@ class UserProfileTest extends TestCase {
 
     #[Test]
     public function testGuestCannotAccessProfile() {
-        $response = $this->get('/profile');
+        $response = $this->get('/app/profile');
         $response->assertRedirect('/login');
     }
 
@@ -70,13 +65,21 @@ class UserProfileTest extends TestCase {
             'is_active' => 1,
         ]);
 
-        $response = $this->actingAs($user)->get('/profile');
-
-        $response->assertStatus(200);
-        $response->assertSee('個人資料設定');
-        $response->assertSee('Test User');
-        $response->assertSee('test@example.com');
-        $response->assertSee('Test Institute');
+        // 原本 assertSee 頁面標題（Blade 直出中文）＋三個欄位值。React 版標題走翻譯鍵；
+        // 三個值在 `profile` prop 裡。
+        // 🔴 `assertSee($user->email)` 很弱：登入者自己的 email 出現在 navbar 也會綠。
+        // 這裡指名是 `profile` 這個 prop 的欄位。順帶釘住 `update_url`——少了它，
+        // 整頁不可儲存，而原本的斷言完全看不出來。
+        $this->actingAs($user)
+            ->get('/app/profile')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Profile/Edit')
+                ->where('profile.name', 'Test User')
+                ->where('profile.email', 'test@example.com')
+                ->where('profile.institution', 'Test Institute')
+                ->where('update_url', route('app.profile.update', [], false))
+                ->has('avatars'));
     }
 
     #[Test]
@@ -90,7 +93,7 @@ class UserProfileTest extends TestCase {
             'is_active' => 1,
         ]);
 
-        $response = $this->actingAs($user)->patch('/profile', [
+        $response = $this->actingAs($user)->patch('/app/profile', [
             'name' => 'New Name',
             'email' => 'new@example.com',
             'institution' => 'New Institute',
@@ -117,7 +120,7 @@ class UserProfileTest extends TestCase {
             'is_active' => 1,
         ]);
 
-        $response = $this->actingAs($user)->patch('/profile', [
+        $response = $this->actingAs($user)->patch('/app/profile', [
             'name' => 'Test User',
             'email' => 'test@example.com',
             'institution' => 'Test Institute',
@@ -145,7 +148,7 @@ class UserProfileTest extends TestCase {
             'is_active' => 1,
         ]);
 
-        $response = $this->actingAs($user)->patch('/profile', [
+        $response = $this->actingAs($user)->patch('/app/profile', [
             'name' => 'Test User',
             'email' => 'test@example.com',
             'institution' => 'Test Institute',
@@ -168,7 +171,7 @@ class UserProfileTest extends TestCase {
             'is_active' => 1,
         ]);
 
-        $response = $this->actingAs($user)->patch('/profile', [
+        $response = $this->actingAs($user)->patch('/app/profile', [
             'name' => 'Test User',
             'email' => 'test@example.com',
             'institution' => 'Test Institute',
@@ -195,7 +198,7 @@ class UserProfileTest extends TestCase {
             'is_active' => 1,
         ]);
 
-        $response = $this->actingAs($user)->patch('/profile', [
+        $response = $this->actingAs($user)->patch('/app/profile', [
             'name' => 'Test User',
             'email' => 'test@example.com',
             'institution' => 'Test Institute',
@@ -231,7 +234,7 @@ class UserProfileTest extends TestCase {
             'is_active' => 1,
         ]);
 
-        $response = $this->actingAs($user)->patch('/profile', [
+        $response = $this->actingAs($user)->patch('/app/profile', [
             'name' => 'Test User',
             'email' => 'existing@example.com',
             'institution' => 'Test Institute',
@@ -257,7 +260,7 @@ class UserProfileTest extends TestCase {
 
         $originalPasswordHash = $user->password;
 
-        $response = $this->actingAs($user)->patch('/profile', [
+        $response = $this->actingAs($user)->patch('/app/profile', [
             'name' => 'Updated Name',
             'email' => 'test@example.com',
             'institution' => 'Updated Institute',
@@ -284,7 +287,7 @@ class UserProfileTest extends TestCase {
             'is_active' => 1,
         ]);
 
-        $response = $this->actingAs($user)->patch('/profile', [
+        $response = $this->actingAs($user)->patch('/app/profile', [
             'name' => '',
             'email' => 'test@example.com',
             'institution' => 'Test Institute',
@@ -305,7 +308,7 @@ class UserProfileTest extends TestCase {
             'is_active' => 1,
         ]);
 
-        $response = $this->actingAs($user)->patch('/profile', [
+        $response = $this->actingAs($user)->patch('/app/profile', [
             'name' => 'Test User',
             'email' => '',
             'institution' => 'Test Institute',
@@ -326,7 +329,7 @@ class UserProfileTest extends TestCase {
             'is_active' => 1,
         ]);
 
-        $response = $this->actingAs($user)->patch('/profile', [
+        $response = $this->actingAs($user)->patch('/app/profile', [
             'name' => 'Test User',
             'email' => 'test@example.com',
             'institution' => '',
@@ -352,7 +355,7 @@ class UserProfileTest extends TestCase {
             'is_active' => 1,
         ]);
 
-        $response = $this->actingAs($user)->patch('/profile', [
+        $response = $this->actingAs($user)->patch('/app/profile', [
             'name' => 'Test User',
             'email' => 'test@example.com',
             'institution' => 'Test Institute',
@@ -378,7 +381,7 @@ class UserProfileTest extends TestCase {
             'is_active' => 1,
         ]);
 
-        $response = $this->actingAs($user)->patch('/profile', [
+        $response = $this->actingAs($user)->patch('/app/profile', [
             'name' => 'Test User',
             'email' => 'test@example.com',
             'institution' => 'Test Institute',
@@ -400,7 +403,7 @@ class UserProfileTest extends TestCase {
             'is_active' => 1,
         ]);
 
-        $response = $this->actingAs($user)->patch('/profile', [
+        $response = $this->actingAs($user)->patch('/app/profile', [
             'name' => 'Test User',
             'email' => 'test@example.com',
             'institution' => 'Test Institute',
@@ -426,7 +429,7 @@ class UserProfileTest extends TestCase {
         ]);
 
         // 測試 avatar19.png（超出範圍）
-        $response = $this->actingAs($user)->patch('/profile', [
+        $response = $this->actingAs($user)->patch('/app/profile', [
             'name' => 'Test User',
             'email' => 'test@example.com',
             'institution' => 'Test Institute',
@@ -452,7 +455,7 @@ class UserProfileTest extends TestCase {
         ]);
 
         // 測試 CBDB 默認頭像（avatar0.png）
-        $response = $this->actingAs($user)->patch('/profile', [
+        $response = $this->actingAs($user)->patch('/app/profile', [
             'name' => 'Test User',
             'email' => 'test@example.com',
             'institution' => 'Test Institute',
@@ -469,7 +472,7 @@ class UserProfileTest extends TestCase {
         for ($i = 1; $i <= 18; $i++) {
             $avatarName = "avatar{$i}.png";
 
-            $response = $this->actingAs($user)->patch('/profile', [
+            $response = $this->actingAs($user)->patch('/app/profile', [
                 'name' => 'Test User',
                 'email' => 'test@example.com',
                 'institution' => 'Test Institute',

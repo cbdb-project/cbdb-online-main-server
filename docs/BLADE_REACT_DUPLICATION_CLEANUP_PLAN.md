@@ -732,9 +732,87 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
     `testColumnFiltersAndSortAreAppliedSafely` 漏了 `sort_by` 斷言——只驗列序不夠，
     因為 `sort_by` 被整個丟掉時主鍵 tie-breaker 會產生**一模一樣**的順序。
 
-  - **4b-3 待做**：manage／profile／admin 側（`ManagePagesLoadTest` 12、`UserProfileTest` 17、
-    `InactiveAccountAccessTest` 20、`AdminExplainSqlTest` 6、3 個 batch-load 共 68、
-    `UnidirectionalRelationshipRepairControllerTest` 2）。
+  - **4b-3 ✅ 已完成（2026-09-15）——manage／profile／admin 側移植完畢，`legacy-parity` 歸零**：
+    `AdminBatchLoadBookTitlesTest` 52、`InactiveAccountAccessTest` 20、`UserProfileTest` 17、
+    `ManagePagesLoadTest` 12、`AdminBatchLoadSocialInstitutesTest` 10、`AdminExplainSqlTest` 6、
+    `AdminBatchLoadOfficesTest` 6、`UnidirectionalRelationshipRepairControllerTest` 2
+    ⇒ **legacy-parity 125 → 0**。全庫再無任何 `#[Group('legacy-parity')]` 測試、
+    再無任何 `useLegacyBladePages()` 呼叫點。
+
+    **三個 batch-load 檔（68 條）幾乎全是 route name 換前綴**：store／undo／update-pinyin 的
+    legacy 與 app 路由**指向同一個 controller 方法**，所以 80 次 `route('admin.batch-load-*')`
+    → `route('app.admin.batch-load-*')` 之後斷言一字未改。要改的只有**結果頁**——
+    原本 Blade 渲染、用 `assertSee` 掃 HTML，React 版放進 `results`／`batch_errors`／`batch_id` props。
+    ⚠️ **結果頁不可用 `assertSee`**：Inertia 把 props JSON 化時把非 ASCII escape 成 `\uXXXX`，
+    中文一個都掃不到（`AdminBatchLoadOfficesTest` 的既有註解早就踩過一次，這次三個檔都寫上了）。
+
+    **移植後普遍比原本強**（同 4b-2c 的模式）：
+    - `assertSee('200501')` → `type_id` 這一欄就是 200501（原本那串數字出現在頁面任何地方都綠）。
+    - `assertSee('是')`／`assertSee('否')` → `name_created` 這個布林（原本弱到荒謬：
+      頁面上任何地方出現那個字都會綠）。
+    - `assertSee('書院 / 10')`／`assertSee('清 / 20')` → 那是 Blade 把兩欄拼成一格顯示，
+      props 裡是兩欄，分別斷言。
+    - `assertSee('class="pinyin-cell"')` 這類**版型 class** → 改斷言「就地編輯要靠的東西」：
+      結果列的 `c_textid` 與現行拼音、以及 `urls.update_pinyin`（**少了那個 URL 整個功能不可達，
+      而原本的三條 class 斷言完全看不出來**）。
+    - `assertSee($user->email)`（profile／manage 編輯頁）→ `profile.email`／`user.email` prop。
+      原本很弱：登入者自己的 email 出現在 navbar 也會綠。
+    - `AdminExplainSqlTest` 的 `assertSee('MySQL EXPLAIN')` → 斷言 `results` 真的非空
+      （原本只要標題印出來就綠，連 EXPLAIN 根本沒跑成功都看不出來）。
+      ⚠️ 筆數**刻意不寫死**：EXPLAIN 的輸出列數依 driver 而異（SQLite 9 列、MariaDB 1 列）。
+
+    📌 **順帶把兩條「註解寫了但沒斷言」的不變量釘住**：
+    `ManagePagesLoadTest` 的 fixture 註解寫「被刪除的用戶不应该在列表中显示」，但沒有任何斷言
+    ⇒ 補上「5 個 fixture 使用者、列表只回 4 個、且不含那個已刪除的 email」。
+
+    🔴 **`InactiveAccountAccessTest` 拿 `/profile` 當「受保護頁面」的代表，已改打 `/app/profile`**。
+    ⚠️ **我第一版寫錯了理由，review 實測推翻**：我寫「legacy `/profile` 掛 `legacy.page` ⇒ 請求
+    先被封路 302 導走、根本到不了 `auth.active`」——**不成立**。`/profile` 的 `auth` 是
+    **路由群組** middleware，合併後排在 `legacy.page` **之前**，所以
+    `Authenticate::authenticate()` 的 `abort_if(!isActive(), 403)` 先命中；那兩條「未啟用被擋」
+    的測試在改動前後都是**真的**在驗 `auth.active`。
+    （`RetireLegacyBladePage` 註解講的「controller middleware 排在 route middleware 之後」
+    指的是 controller 建構式裡的 `$this->middleware('auth')`，不適用於群組 auth。**兩者不要混淆。**）
+    **真正會壞的是正向那條**：`active_session_still_passes` 打 legacy `/profile` 會拿到封路的
+    302 而不是 200。加上那條路由本來就要在 4b-4 刪，所以整檔改打 `/app/profile`。
+
+    📌 **`TestCase::useLegacyBladePages()` 自此零呼叫點**，成為死碼，留給 4b-4 連同 Blade 頁一起刪。
+
+    🔴 **4b-4 的硬前置（review 查出，現在就寫進來免得屆時誤刪）**：
+    React 的單向關係修復頁用的兩個 POST 端點**沒有 `app.` 雙胞胎**——它直接呼叫
+    `admin.unidirectional-relationship-repair.kinship` 與 `.assoc`
+    （`routes/web.php` 兩條都**沒掛** `legacy.page`，見 `Admin/UnidirectionalRelationshipRepair/Index.tsx`）。
+    刪 `admin/unidirectional-relationship-repair` 那條 GET 時**不可連坐刪掉這兩條 POST**。
+
+    ⚠️ **review 另外抓到三類我自己的疏漏，都已修**：
+    - **全域替換把散文也改了**：三個 batch-load 檔的檔頭原本寫「所以本檔的
+      `assertRedirect(route('admin.batch-load-…'))` 都改成 `app.admin.batch-load-…`」，
+      被 `route('admin.batch-load-` → `route('app.admin.batch-load-` 的全域替換打成
+      「A 都改成 A」，整句失去意義（4b-1 的收斂理由讀不懂了）。**動測試檔的散文要與程式碼分開處理。**
+    - **註解承諾了 body 沒做的事**：`test_blank_source_is_rejected` 的註解寫「要指名是來源欄的錯」，
+      底下卻只有 `assertNotEmpty`。補上指名之後才看清楚**這條測試的名字與它實際走到的分支不一樣**
+      （輸入尾端 tab ⇒ 命中的是「未找到三欄資料」而非「來源 TEXT_ID 為空」）。
+      那是移植前就有的落差，本環節只把實際行為釘住並寫明。
+    - **漏搬一條**：`UnidirectionalRelationshipRepairControllerTest::guest_cannot_access_repair_page`
+      還打在 legacy 路由上（同檔另外兩條都搬了）。
+
+    🟡 **兩條「我以為釘住了、其實沒有」**（review 用 mutation 證明）：
+    - `ManagePagesLoadTest` 那條「已刪除用戶不得出現在列表」——fixture 的那個人**三個軟刪除謂詞
+      全中**，所以只要 `buildUserListing()` 的三個 `where` 還活著任何一個它就被擋掉
+      ⇒ 只偵測得到「三個一起掉」。已新增
+      `test_manage_index_soft_delete_filter_covers_every_predicate()`：逐謂詞各建一個使用者
+      （每人只踩一個 `-`）。實測三個謂詞**分別**拿掉都只有這條紅。
+    - **剪貼簿格式契約真的弄丟了**：`test_results_page_renders_copy_button_with_payload` 原本釘的
+      `"801\t某某書"` 是「textid TAB 書名、逐列換行」的格式契約（使用者貼進 Excel 靠它）。
+      移植後只斷言了「原料」（`c_textid`／`title` 有傳下去），有人把欄序對調、TAB 換成逗號都不會紅，
+      而那段拼接是 `Index.tsx` 裡的 inline arrow、全庫沒有對應 vitest。
+      ⇒ 抽成 `Pages/Admin/BatchLoadBookTitles/copyPayload.ts` 並補 `copyPayload.test.ts`（6 條），
+      與 4b-2c-2 的 `showNavigation.ts` 同一個處置。
+      **教訓：把「伺服器端只剩一半」寫進註解不等於另一半有人守——要嘛補前端測試，要嘛明寫不測。**
+
+    📌 三個 batch-load 的 `formProps()`／`resultsProp()` 輔助方法補上 `->component(...)`：
+    少了它，結果頁被換成別的 Inertia 元件時那批測試會照樣讀 props 而不報錯。
+
   - **4b-4 待做**：實體刪除。
 **每刪一條 route 前，用三個方向各掃一次** `app/`、`resources/js/`、`tests/`：① **route name**（`route('x')`）、② **URI prefix**（`url('crowdsourcing/…')`、字串拼接——`CrowdsourcingController.php:183-184` 就是這型，route name grep 抓不到）、③ **controller action**。並把結果列進該 commit 的刪除清單。另外 `grep -rn "RouteName\|routeName" app/Http/Controllers` 找 `listRouteName()` 這類**回傳路由名字串**的分支
 - **4c 認證與入口**：auth 4 頁、welcome（同時移除 4 個 Auth controller 與 `WelcomeController` 的 flag 分支）

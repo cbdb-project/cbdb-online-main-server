@@ -7,23 +7,22 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use PHPUnit\Framework\Attributes\Group;
+use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
- * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
+ * ── 2026-09-15（Blade 下架環節 4b-3）─────────────────────────────
+ * 本檔全部改打 React 端（`/app/admin/explainsql`）。
+ *
+ * ⚠️ **POST 這一側不是單純換 URI**：legacy 的 `explain()` 與 React 的 `appExplain()` 是
+ * **兩個方法**（共用 `runExplain()`），legacy 回 Blade 視圖、React 回同一個 Inertia 元件
+ * 並把結果放進 `results`／`columns`／`error` props。所以 `assertSee('MySQL EXPLAIN')`
+ * 這類掃畫面文案的斷言換成斷言 props——那些文案在 React 版是前端的翻譯鍵。
  */
-#[Group('legacy-parity')]
 class AdminExplainSqlTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
-
-        // 本類驗的是 legacy Blade 頁的行為。Blade 下架計畫環節 3「先封路、不刪碼」把那些
-        // 路由改成 302／410，但頁面本身還在、還部署著、還能被 kill switch 叫回來，
-        // 所以這份覆蓋在觀察期內仍有意義——局部關閉封路即可。環節 4 實體刪除時一併移除。
-        $this->useLegacyBladePages();
 
         config()->set('database.default', 'sqlite');
         config()->set('database.connections.sqlite.database', ':memory:');
@@ -79,8 +78,8 @@ class AdminExplainSqlTest extends TestCase {
 
     #[Test]
     public function test_guest_is_redirected_to_login(): void {
-        $response = $this->get('/admin/explainsql');
-        $response->assertStatus(302);
+        $response = $this->get('/app/admin/explainsql');
+        $response->assertRedirect(route('login'));
     }
 
     #[Test]
@@ -88,7 +87,7 @@ class AdminExplainSqlTest extends TestCase {
         $user = $this->makeUser(['is_admin' => 0]);
 
         $this->actingAs($user);
-        $response = $this->get('/admin/explainsql');
+        $response = $this->get('/app/admin/explainsql');
         $response->assertStatus(403);
     }
 
@@ -97,8 +96,16 @@ class AdminExplainSqlTest extends TestCase {
         $user = $this->makeUser();
         $this->actingAs($user);
 
-        $response = $this->get('/admin/explainsql');
-        $response->assertStatus(200)->assertSee('SQL 語句');
+        // 原本 assertSee('SQL 語句')——Blade 的欄位標籤。React 版走翻譯鍵；
+        // 伺服器端能負責的是「回的是那個 Inertia 頁、初始狀態乾淨、而且送出端點有傳下去」。
+        $this->get('/app/admin/explainsql')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Admin/ExplainSql/Index')
+                ->where('sql', '')
+                ->where('results', null)
+                ->where('error', null)
+                ->where('explain_url', route('app.admin.explainsql.explain', [], false)));
     }
 
     #[Test]
@@ -108,14 +115,25 @@ class AdminExplainSqlTest extends TestCase {
 
         DB::statement('CREATE TABLE sample (id INTEGER)');
 
-        $response = $this->withSession(['locale' => 'zh-TW'])
-            ->post('/admin/explainsql', [
-                'sql' => 'SELECT * FROM sample',
-            ]);
+        // 原本 assertSee 兩串畫面文案（區塊標題與筆數說明），它們在 React 版是翻譯鍵。
+        // 這裡改成斷言**實際的 EXPLAIN 結果**有回來——比原本強：`assertSee('MySQL EXPLAIN')`
+        // 只要標題印出來就綠，連結果是空的、或根本沒跑成功都看不出來。
+        $props = [];
 
-        $response->assertStatus(200)
-            ->assertSee('MySQL EXPLAIN')
-            ->assertSee('本次查詢共');
+        $this->withSession(['locale' => 'zh-TW'])
+            ->post('/app/admin/explainsql', ['sql' => 'SELECT * FROM sample'])
+            ->assertOk()
+            ->assertInertia(function (Assert $page) use (&$props) {
+                $page->component('Admin/ExplainSql/Index');
+                $props = $page->toArray()['props'];
+            });
+
+        $this->assertSame('SELECT * FROM sample', $props['sql']);
+        $this->assertNull($props['error']);
+        // 筆數不寫死：EXPLAIN 的輸出列數依 driver／版本而異（SQLite 這裡是 9 列，
+        // MariaDB 是 1 列）。要守的是「真的跑出結果、而且欄位表也一起回來」。
+        $this->assertNotEmpty($props['results'], 'EXPLAIN 應該回傳結果列');
+        $this->assertNotEmpty($props['columns'], '少了 columns，前端畫不出表頭');
     }
 
     #[Test]
@@ -126,12 +144,12 @@ class AdminExplainSqlTest extends TestCase {
         DB::statement('CREATE TABLE sample (id INTEGER)');
         DB::statement('CREATE TABLE users2 (id INTEGER)');
 
-        $response = $this->post('/admin/explainsql', [
-            'sql' => 'SELECT * FROM users2',
-        ]);
-
-        $response->assertStatus(200)
-            ->assertSeeText("Table 'users2' is not in allowlist");
+        // 白名單拒絕：訊息本身是後端產生的（非翻譯鍵），所以照原樣比對，只是改讀 prop。
+        $this->post('/app/admin/explainsql', ['sql' => 'SELECT * FROM users2'])
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('error', "Table 'users2' is not in allowlist")
+                ->where('results', null));
     }
 
     #[Test]
@@ -139,11 +157,10 @@ class AdminExplainSqlTest extends TestCase {
         $user = $this->makeUser();
         $this->actingAs($user);
 
-        $response = $this->post('/admin/explainsql', [
-            'sql' => 'DELETE FROM sample',
-        ]);
-
-        $response->assertStatus(200)
-            ->assertSee('Only SELECT / WITH queries are allowed.');
+        $this->post('/app/admin/explainsql', ['sql' => 'DELETE FROM sample'])
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('error', 'Only SELECT / WITH queries are allowed.')
+                ->where('results', null));
     }
 }

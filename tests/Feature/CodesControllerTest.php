@@ -471,90 +471,22 @@ class CodesControllerTest extends TestCase {
         $response->assertViewHas('useCursorPagination', true);
     }
 
-    #[Test]
-    public function testUiHiddenExcludedFromCodesListAssociativeConfig() {
-        // 生產 config/codes.php 的 tables 是關聯陣列（表名 => 說明），走 codes() 第一分支。
-        // 同時用全小寫 'pinyin' vs 大寫 'PINYIN' 鎖住 §9.1 C5 大小寫不敏感比對。
-        config(['codes.tables' => ['pinyin' => '拼音表', 'TEST_CODES' => '測試表']]);
-        config(['codes.ui_hidden' => ['PINYIN']]);
-
-        $names = array_column((new CodesRepository())->codes(), 'name');
-
-        // 從 /codes 首頁清單隱藏（大小寫不敏感）
-        $this->assertNotContains('pinyin', $names);
-        // 其他表不受影響
-        $this->assertContains('TEST_CODES', $names);
-        // 共用白名單（codes.tables）維持完整，不受 ui_hidden 影響
-        $this->assertArrayHasKey('pinyin', config('codes.tables'));
-    }
-
-    #[Test]
-    public function testUiHiddenAlsoFiltersLegacyIndexedConfig() {
-        // 向後相容：索引陣列（舊格式）走 codes() 第二分支，過濾同樣生效。
-        config(['codes.ui_hidden' => ['CBDB__NAME_FTS']]);
-
-        $names = array_column((new CodesRepository())->codes(), 'name');
-
-        $this->assertNotContains('CBDB__NAME_FTS', $names);
-        $this->assertContains('TEST_CODES', $names);
-        $this->assertContains('CBDB__NAME_FTS', config('codes.tables'));
-    }
-
-    #[Test]
-    public function testCodesDescriptionFollowsLocaleWithConfigFallback() {
-        // 說明欄改為隨語系解析 codes.table_desc.<表名>；缺翻譯時退回 config 原文。
-        // 真實情況：en/zh-TW 兩檔皆備齊全部 81 個 key，故 zh-TW 不會落到 en fallback。
-        config(['codes.tables' => [
-            'TEST_CODES' => '測試代碼表',   // 兩語系皆有翻譯 → 隨語系
-            'ZZZ_FAKE' => '假表原文說明', // 兩語系皆無翻譯 → 退回 config
-        ]]);
-        config(['codes.ui_hidden' => []]);
-        app('translator')->addLines(['codes.table_desc.TEST_CODES' => 'Test Codes Table'], 'en');
-        app('translator')->addLines(['codes.table_desc.TEST_CODES' => '測試代碼表（譯）'], 'zh-TW');
-
-        // en：有翻譯 → 英文；無翻譯 → 退回 config 原文
-        app()->setLocale('en');
-        $rows = collect((new CodesRepository())->codes());
-        $this->assertSame('Test Codes Table', $rows->firstWhere('name', 'TEST_CODES')['description']);
-        $this->assertSame('假表原文說明', $rows->firstWhere('name', 'ZZZ_FAKE')['description']);
-
-        // zh-TW：有翻譯 → 中文譯文；無翻譯 → 退回 config 原文
-        app()->setLocale('zh-TW');
-        $rows = collect((new CodesRepository())->codes());
-        $this->assertSame('測試代碼表（譯）', $rows->firstWhere('name', 'TEST_CODES')['description']);
-        $this->assertSame('假表原文說明', $rows->firstWhere('name', 'ZZZ_FAKE')['description']);
-    }
-
-    #[Test]
-    public function testCodesTableDescKeysStayInParityWithConfig() {
-        // 鎖定不變量：config/codes.php tables 的每個表名，en 與 zh-TW 的 table_desc 都必須有對應 key。
-        // 否則（因 app.fallback_locale=en）zh-TW 缺 key 會落回英文，或 en 缺 key 使英文欄退回中文原文。
-        $config = require base_path('config/codes.php');
-        $en = require base_path('resources/lang/en/codes.php');
-        $zh = require base_path('resources/lang/zh-TW/codes.php');
-
-        $configKeys = array_keys($config['tables']);
-        $enKeys = array_keys($en['table_desc']);
-        $zhKeys = array_keys($zh['table_desc']);
-        sort($configKeys);
-        sort($enKeys);
-        sort($zhKeys);
-
-        $this->assertSame($configKeys, $enKeys, 'en/codes.php table_desc 的 key 必須與 config/codes.php tables 完全一致');
-        $this->assertSame($configKeys, $zhKeys, 'zh-TW/codes.php table_desc 的 key 必須與 config/codes.php tables 完全一致');
-    }
-
-    #[Test]
-    public function testUiHiddenTableAbsentFromCodesIndexRoute() {
-        // 路由層級：GET /codes 首頁不應列出被隱藏的表。
-        config(['codes.ui_hidden' => ['CBDB__NAME_FTS']]);
-
-        $response = $this->get('/codes');
-
-        $response->assertStatus(200);
-        $response->assertDontSee('CBDB__NAME_FTS');
-        $response->assertSee('TEST_CODES');
-    }
+    // 這裡原本有 5 條測試。其中 4 條**完全不打 HTTP**（ui_hidden 過濾 ×2、說明欄 locale fallback、
+    // config↔lang table_desc key parity）。它們與 Blade 無關，只是住在這個 legacy 檔、
+    // 被 setUp 的 useLegacyBladePages() 連坐。已於環節 4b-2a 搬到
+    // **tests/Unit/CodesTableListingTest.php**——否則環節 4b 刪掉本檔時會靜默毀掉它們
+    // （與環節 4a 的 OperationsIndexLinksTest 同型陷阱）。
+    //
+    // 前 4 條搬家時有兩處刻意的改動：① 說明欄那條與 tests/Unit/CodesTableDescriptionTest.php
+    // 近乎逐字重複，已收斂成只驗「codes() 確實接到那個共用 helper」並改名為
+    // codes_list_routes_description_through_the_shared_helper；② 索引陣列那條原本依賴本檔
+    // setUp 設的 codes.tables，搬家後自己設（仍是索引陣列、仍走 codes() 第二分支）。
+    //
+    // 第 5 條 testUiHiddenTableAbsentFromCodesIndexRoute 也一起刪了，但走的是另一條路：
+    // 它驗的是 ui_hidden 的**路由層**效果（首頁真的看不到隱藏表），而那是全 repo **唯一**的
+    // 路由層斷言（其他 codes 測試一律把 ui_hidden 設成 [] 來排除干擾）。所以先把不變量移植到
+    // CodesIndexInertiaTest::ui_hidden_tables_are_absent_from_the_index_route()（打 /app/codes、
+    // 斷言 tables prop 不含隱藏表），**再**刪這一條——移植後它就成了重複覆蓋。
 
     #[Test]
     public function testUiHiddenTableStillReachableViaDirectUrl() {
@@ -1481,81 +1413,15 @@ class CodesControllerTest extends TestCase {
 
     // ── Phase 3：JOIN 表 resolveColumnForQuery 單元測試 ────────────────
 
-    #[Test]
-    public function testResolveColumnForQueryJoinAlias() {
-        $joinConfig = [
-            'base_table' => 'APPOINTMENT_CODE_TYPE_REL',
-            'base_alias' => 'rel',
-            'select' => [
-                'rel.c_appt_code',
-                'code.c_appt_desc_chn as appt_name',
-                'rel.c_appt_type_code',
-                'type.c_appt_type_desc_chn as appt_type_name',
-            ],
-        ];
-
-        $controller = $this->app->make(\App\Http\Controllers\CodesController::class);
-        $method = new \ReflectionMethod(\App\Http\Controllers\CodesController::class, 'resolveColumnForQuery');
-        $method->setAccessible(true);
-
-        // JOIN alias 應解析為 selectList 中的原始表達式
-        $this->assertEquals('code.c_appt_desc_chn', $method->invoke($controller, 'appt_name', $joinConfig));
-        $this->assertEquals('type.c_appt_type_desc_chn', $method->invoke($controller, 'appt_type_name', $joinConfig));
-    }
-
-    #[Test]
-    public function testResolveColumnForQueryBaseTableColumn() {
-        $joinConfig = [
-            'base_table' => 'APPOINTMENT_CODE_TYPE_REL',
-            'base_alias' => 'rel',
-            'select' => [
-                'rel.c_appt_code',
-                'code.c_appt_desc_chn as appt_name',
-                'rel.c_appt_type_code',
-                'type.c_appt_type_desc_chn as appt_type_name',
-            ],
-        ];
-
-        $controller = $this->app->make(\App\Http\Controllers\CodesController::class);
-        $method = new \ReflectionMethod(\App\Http\Controllers\CodesController::class, 'resolveColumnForQuery');
-        $method->setAccessible(true);
-
-        // base table 真實欄位（FakeSchemaBuilder 回傳 c_appt_code, c_appt_type_code）
-        $this->assertEquals('rel.c_appt_code', $method->invoke($controller, 'c_appt_code', $joinConfig));
-        $this->assertEquals('rel.c_appt_type_code', $method->invoke($controller, 'c_appt_type_code', $joinConfig));
-    }
-
-    #[Test]
-    public function testResolveColumnForQueryNonJoinTable() {
-        $controller = $this->app->make(\App\Http\Controllers\CodesController::class);
-        $method = new \ReflectionMethod(\App\Http\Controllers\CodesController::class, 'resolveColumnForQuery');
-        $method->setAccessible(true);
-
-        // 非 JOIN 表：直接回傳欄位名
-        $this->assertEquals('c_name', $method->invoke($controller, 'c_name', null));
-        $this->assertEquals('description', $method->invoke($controller, 'description', null));
-    }
-
-    #[Test]
-    public function testResolveColumnForQueryUnresolvableReturnsNull() {
-        $joinConfig = [
-            'base_table' => 'APPOINTMENT_CODE_TYPE_REL',
-            'base_alias' => 'rel',
-            'select' => [
-                'rel.c_appt_code',
-                'code.c_appt_desc_chn as appt_name',
-            ],
-        ];
-
-        $controller = $this->app->make(\App\Http\Controllers\CodesController::class);
-        $method = new \ReflectionMethod(\App\Http\Controllers\CodesController::class, 'resolveColumnForQuery');
-        $method->setAccessible(true);
-
-        // 不在 selectList 也不在 base table schema → null
-        $this->assertNull($method->invoke($controller, 'unknown_column', $joinConfig));
-        // 已有 dot prefix → null（防禦性）
-        $this->assertNull($method->invoke($controller, 'malicious.injection', $joinConfig));
-    }
+    // 這裡原本有 4 條用 ReflectionMethod 直呼 resolveColumnForQuery() 的**防注入**單元測試。
+    // 同樣不打 HTTP、與 Blade 無關，已於環節 4b-2a 搬到
+    // **tests/Unit/CodesResolveColumnForQueryTest.php**。
+    //
+    // 搬家時兩處刻意的改動：① 「base table 欄位」那條原本依賴本檔底部的 FakeSchemaBuilder，
+    // 改成真的建一張 APPOINTMENT_CODE_TYPE_REL（那組假 DB 只服務本檔、不隨檔搬家，
+    // 而且真表比假 DB 更貼近真實）；② dot-prefix 那條斷言由 'malicious.injection' 改寫成
+    // 'other.c_appt_code'——dot 後半改用**真實欄名**，才證明是「先看到 dot 就拒」，
+    // 而不是靠「欄名不存在」順帶擋掉。
 
     // ── Phase 3：JOIN 表整合測試 ───────────────────────────────────────
 

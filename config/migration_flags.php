@@ -15,7 +15,9 @@
 |   - 🔴 **「改回 'old' 即時回退」只對「未被封路」的頁面成立**（2026-09 起）：
 |     Blade 下架計畫環節 3 之後，多數 legacy 頁面由 `legacy.page` middleware 封路
 |     （顯示頁 302／寫入端 410），**該 middleware 不讀本檔任何 flag**。那批頁面的回退鍵是
-|     LEGACY_PAGE_RETIREMENT=false（見 config/legacy_page_retirement.php）；本檔的 flag
+|     LEGACY_PAGE_RETIREMENT=false（見 config/legacy_page_retirement.php）——
+|     🔴 **但那個開關自 2026-09-15（環節 4b-4b）起也沒有作用了**：所有 legacy 頁面
+|     都已改成 closure，沒有任何路由掛封路 middleware。要回到 Blade 只能 git revert。本檔的 flag
 |     對它們只影響**連結／URL payload 的指向**（Navigation 側邊欄、code_table_edit_url()、
 |     CodesController 的 URL payload、HandleInertiaRequests::profileUrl()、audit-log URL 等），
 |     **不影響 legacy 頁面是否可開啟或其渲染**。仍由 flag 決定渲染的只剩 'auth' 與 'welcome'
@@ -24,8 +26,8 @@
 |     以及環節 4a-3 的 9 條唯讀頁——operations／dashboard／view／view/{key}／merge-preview／
 |     crowdsourcing／nl-query-logs／admin.audit-logs／admin.ai-fill-logs。它們已改成 redirect
 |     closure、不掛封路 middleware，所以 LEGACY_PAGE_RETIREMENT=false 對它們**無作用**。
-|     kill switch 現在只涵蓋**表單／寫入頁**（codes 全套／manage／profile／admin.explainsql／
-|     3 個 batch-load／cbdb-table-maintenance／unidirectional-repair），即環節 4b 的範圍。
+|     🔴 **2026-09-15（環節 4b-4a／4b-4b）起，codes 全套與其餘表單／寫入頁也都實體刪除了**
+|     ——kill switch 的涵蓋範圍自此是**空集合**，沒有任何路由掛封路 middleware。
 |   - 「翻 flag 上線」只能由人執行（見計畫附錄 C 寫入禁止清單）；
 |     AI executor 不得自動切換。
 |   - 可用環境變數覆蓋（部署時），key 形如 MIGRATION_FLAG_<UPPER_SNAKE>。

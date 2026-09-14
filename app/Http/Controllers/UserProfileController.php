@@ -19,19 +19,10 @@ class UserProfileController extends Controller {
     public function __construct(private SecurityAuditLogger $securityAudit) {
         $this->middleware('auth');
     }
-
-    /**
-     * Show the user profile edit form.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function edit() {
-        return view('profile.edit', [
-            'user' => Auth::user(),
-            'page_title' => __('common.profile_settings'),
-            'page_description' => __('common.profile_settings_desc'),
-        ]);
-    }
+    // ── 2026-09-15（Blade 下架環節 4b-4b）─────────────────────────────
+    //
+    // 這裡原本有 legacy 的 edit()／update()。視圖已實體刪除，舊 URI 只剩 302／410。
+    // 🔴 **`rules()`／`applyProfileUpdate()` 等共用實作與 `appEdit()`／`appUpdate()` 都留著。**
 
     /**
      * Update the user's profile information.
@@ -123,17 +114,6 @@ class UserProfileController extends Controller {
         }
 
         return true;
-    }
-
-    public function update(Request $request) {
-        $user = Auth::user();
-        $validatedData = $request->validate($this->rules($request, $user));
-
-        if (!$this->applyProfileUpdate($request, $validatedData)) {
-            return back()->withErrors(['current_password' => '當前密碼不正確'])->withInput();
-        }
-
-        return redirect()->route('app.profile.edit')->with('success', '個人資料已成功更新');
     }
 
     /**

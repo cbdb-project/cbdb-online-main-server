@@ -19,20 +19,8 @@ class AdminBatchLoadSocialInstitutesController extends Controller {
     public function __construct(SocialInstituteImportService $socialInstituteImportService) {
         $this->socialInstituteImportService = $socialInstituteImportService;
     }
-
-    public function showForm() {
-        $this->ensureAdmin();
-
-        return view('admin.batch_load_social_institutes', [
-            'page_title' => __('admin.batch_load_social_institutes'),
-            'page_title_key' => '批次匯入社會機構',
-            'page_description' => __('admin.batch_load_social_institutes_desc'),
-            'page_url' => route('admin.batch-load-social-institutes'),
-            'input' => old('entries', ''),
-            'results' => session('batch_results', []),
-            'batchErrors' => session('batch_errors', []),
-        ]);
-    }
+    // ── 2026-09-15（Blade 下架環節 4b-4b）─────────────────────────────
+    // legacy showForm() 已刪。🔴 `store()` 是 legacy 與 app 共用的同一個方法，必須留著。
 
     /**
      * Inertia + React 版：批次匯入社會機構表單頁。

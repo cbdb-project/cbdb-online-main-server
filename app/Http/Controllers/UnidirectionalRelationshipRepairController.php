@@ -40,15 +40,9 @@ class UnidirectionalRelationshipRepairController extends Controller {
             return $next($request);
         });
     }
-
-    public function index(Request $request) {
-        return view('admin.unidirectional-relationship-repair', [
-            'page_title' => __('admin.unidirectional_repair'),
-            'page_title_key' => '單向關係修復',
-            'page_description' => __('admin.unidirectional_repair_desc'),
-            'page_url' => route('admin.unidirectional-relationship-repair'),
-        ]);
-    }
+    // ── 2026-09-15（Blade 下架環節 4b-4b）─────────────────────────────
+    // legacy index() 已刪。🔴 **`repairKinship()` 與 `repairAssoc()` 必須留著**——
+    // 它們**沒有 `app.` 雙胞胎**，React 修復頁直接呼叫那兩條 POST。
 
     public function appIndex(Request $request) {
         return \Inertia\Inertia::render('Admin/UnidirectionalRelationshipRepair/Index', [

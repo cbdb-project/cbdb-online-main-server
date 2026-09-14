@@ -241,8 +241,14 @@ Route::get('basicinformation/{id}/Duplicate_Collateral_Info', 'BasicInformationC
 // payload 裡的 URL。這裡的目標是與被移除的 middleware **一字不差的 parity**
 // （`RetireLegacyBladePage:80-81` 就是這兩行）。取捨與理由釘在
 // `LegacyBladePageRetirementTest::codes_redirects_preserve_the_query_string_and_encode_the_id()`。
-if (!function_exists('cbdb_legacy_codes_redirect')) {
-    function cbdb_legacy_codes_redirect(string $target, \Illuminate\Http\Request $request) {
+if (!function_exists('cbdb_legacy_page_redirect')) {
+    /**
+     * legacy 顯示頁 → `/app` 對應頁的 302（環節 4a／4b-4 共用）。
+     *
+     * 名稱在環節 4b-4b 從 `cbdb_legacy_codes_redirect` 改過來：它從來就不限 codes，
+     * 4b-4b 起 manage／profile／admin 全部共用同一份。
+     */
+    function cbdb_legacy_page_redirect(string $target, \Illuminate\Http\Request $request) {
         $url = route($target, $request->route()->parameters(), false);
         $qs = $request->getQueryString();
 
@@ -250,7 +256,7 @@ if (!function_exists('cbdb_legacy_codes_redirect')) {
     }
 }
 
-Route::get('codes', fn (\Illuminate\Http\Request $request) => cbdb_legacy_codes_redirect('app.codes.index', $request))
+Route::get('codes', fn (\Illuminate\Http\Request $request) => cbdb_legacy_page_redirect('app.codes.index', $request))
     ->name('codes.index');
 // Inertia + React 版（代碼表總覽）
 Route::get('app/codes', 'CodesController@appIndex')
@@ -259,7 +265,7 @@ Route::get('app/codes', 'CodesController@appIndex')
 // 全量導出：route 泛用，但範圍由 config('codes.export_columns') 白名單收斂（本輪僅 OFFICE_CODES）。
 // 直連 live 生產庫，故加 throttle 防爬蟲爆量。設計見 docs/OFFICE_CODES_EXPORT_SYNC.md。
 Route::get('codes/{table_name}/export', 'CodesController@export')->name('codes.export')->middleware('throttle:6,1');
-Route::get('codes/{table_name}', fn (\Illuminate\Http\Request $request) => cbdb_legacy_codes_redirect('app.codes.show', $request))
+Route::get('codes/{table_name}', fn (\Illuminate\Http\Request $request) => cbdb_legacy_page_redirect('app.codes.show', $request))
     ->name('codes.show');
 // TEXT_INSTANCE_DATA 的「Load Data」用：依 c_textid 精確取回書名（JSON，不掛 inertia）。
 // 額外路徑段，置於下方 {table_name} 泛用路由之前，避免被攔截。
@@ -323,7 +329,7 @@ Route::get('app/text/create', 'TextEntityController@appCreate')
     ->middleware('inertia')->name('app.text.create');
 Route::get('app/text/{id}/edit', 'TextEntityController@appEdit')
     ->middleware('inertia')->name('app.text.edit')->whereNumber('id');
-Route::get('codes/{table_name}/create', fn (\Illuminate\Http\Request $request) => cbdb_legacy_codes_redirect('app.codes.create', $request))
+Route::get('codes/{table_name}/create', fn (\Illuminate\Http\Request $request) => cbdb_legacy_page_redirect('app.codes.create', $request))
     ->name('codes.create');
 Route::post('codes/{table_name}/proposal', fn () => abort(410, 'Legacy codes proposal endpoint has been removed; use /app/codes/{table_name}/proposal.'))
     ->name('codes.propose.store');
@@ -337,7 +343,7 @@ Route::post('codes/{table_name}/proposal', fn () => abort(410, 'Legacy codes pro
 // ⚠️ **`proposalUpdateExisting()` 與 `proposalCancel()` 不是薄殼**：`app.codes.proposals.*`
 // 兩條路由指向的是**同一個方法**，所以那兩個 controller 方法**必須留著**，
 // 這裡刪的只是 legacy 這兩條路由的接線（見環節 4b-2b 的記錄）。
-Route::get('codes/{table_name}/proposals/{operation}/edit', fn (\Illuminate\Http\Request $request) => cbdb_legacy_codes_redirect('app.codes.proposals.edit', $request))
+Route::get('codes/{table_name}/proposals/{operation}/edit', fn (\Illuminate\Http\Request $request) => cbdb_legacy_page_redirect('app.codes.proposals.edit', $request))
     ->name('codes.proposals.edit');
 Route::patch('codes/{table_name}/proposals/{operation}', fn () => abort(410, 'Legacy codes proposal update endpoint has been removed; use /app/codes/{table_name}/proposals/{operation}.'))
     ->name('codes.proposals.update');
@@ -345,7 +351,7 @@ Route::delete('codes/{table_name}/proposals/{operation}', fn () => abort(410, 'L
     ->name('codes.proposals.cancel');
 Route::match(['post', 'patch'], 'codes/{table_name}/{id}/proposal', fn () => abort(410, 'Legacy codes update-proposal endpoint has been removed; use /app/codes/{table_name}/{id}/proposal.'))
     ->name('codes.propose.update')->where('id', '.*');
-Route::get('codes/{table_name}/{id}/edit', fn (\Illuminate\Http\Request $request) => cbdb_legacy_codes_redirect('app.codes.edit', $request))
+Route::get('codes/{table_name}/{id}/edit', fn (\Illuminate\Http\Request $request) => cbdb_legacy_page_redirect('app.codes.edit', $request))
     ->name('codes.edit')->where('id', '.*');
 Route::match(['put', 'patch'], 'codes/{table_name}/{id}', fn () => abort(410, 'Legacy codes update endpoint has been removed; use /app/codes/{table_name}/{id}.'))
     ->name('codes.update')->where('id', '.*');
@@ -363,20 +369,41 @@ Route::delete('operations/{operation}/cancel', 'OperationsProposalController@can
 // （見 docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md）——index/edit 導向 React，
 // store/update/destroy 是 legacy 寫入端回 410，create/show 的 controller 方法本來就是空的。
 // 路由名與 URI 全部原樣保留，Blade 視圖與 controller 也都沒刪（環節 3「先封路、不刪碼」）。
-Route::get('manage', 'ManagementController@index')
-    ->middleware('legacy.page:app.manage.index')->name('manage.index');
-Route::get('manage/create', 'ManagementController@create')
-    ->middleware('legacy.page:gone')->name('manage.create');
-Route::post('manage', 'ManagementController@store')
-    ->middleware('legacy.page:gone')->name('manage.store');
-Route::get('manage/{manage}/edit', 'ManagementController@edit')
-    ->middleware('legacy.page:app.manage.edit')->name('manage.edit');
-Route::get('manage/{manage}', 'ManagementController@show')
-    ->middleware('legacy.page:gone')->name('manage.show');
-Route::match(['put', 'patch'], 'manage/{manage}', 'ManagementController@update')
-    ->middleware('legacy.page:gone')->name('manage.update');
-Route::delete('manage/{manage}', 'ManagementController@destroy')
-    ->middleware('legacy.page:gone')->name('manage.destroy');
+// ── Blade 下架環節 4b-4b：manage／profile／admin 的 Blade 已實體刪除 ──────────
+// 處置與理由同 4a-3／4b-4a（見本檔上方）：`legacy.page` 有兩條 fail-open 路徑，
+// 視圖不存在會讓它們變成 500，所以改成純 closure。
+//
+// **route name 一律保留**，但兩個呼叫端的風險程度不同（review 指正，第一版寫得太一概）：
+//  - `ManagementController::appIndex()` 的 `edit_template` 是**沒有守衛**的
+//    `route('manage.edit', …)`——不過只有 `migration_flag('manage') === 'old'` 時才走到。
+//  - `HandleInertiaRequests::profileUrl()` 的 `route('profile.edit')` **被
+//    `Route::has()` 包著**，刪掉只會回 null，不會拋例外。
+// 兩者都屬環節 4d 的 flag 收斂範圍。⚠️ **目前沒有任何測試守著「route name 必須存在」**
+//（實測把 `->name('manage.edit')` 改名，Manage／Navigation／封路三組共 100 條測試全綠）。
+// 🔴 **這 7 條必須自己掛 `auth`**（codex 查出，實測確認）：原本的 `auth` 來自
+// `ManagementController` 的**建構式** middleware，方法刪掉之後就跟著消失了。
+// 實測 HEAD vs 工作區的訪客行為：7 條原本**全部 302 → /login**，拿掉之後變成
+// 302 → /app/manage（顯示頁）或 **410**（寫入端）。
+// ⚠️ 我與 review agent 都曾以為「middleware 順序讓封路先跑、訪客本來就拿 302/410」——
+// **量測推翻了這個推論**。`profile` 那兩條不受影響（它們在 `Route::middleware('auth')->group` 裡）。
+// 📌 環節 4a-3 對 `/dashboard` 做的是**相反**的選擇（刻意拿掉 auth，讓登入後的 intended URL
+// 落在 React 頁），那是有文件與測試的決定；這裡沒有理由改變行為，所以維持與刪除前一致。
+Route::middleware('auth')->group(function () {
+    Route::get('manage', fn (\Illuminate\Http\Request $request) => cbdb_legacy_page_redirect('app.manage.index', $request))
+        ->name('manage.index');
+    Route::get('manage/create', fn () => abort(410, 'Legacy manage create page has been removed; use /app/manage.'))
+        ->name('manage.create');
+    Route::post('manage', fn () => abort(410, 'Legacy manage store endpoint has been removed; use /app/manage.'))
+        ->name('manage.store');
+    Route::get('manage/{manage}/edit', fn (\Illuminate\Http\Request $request) => cbdb_legacy_page_redirect('app.manage.edit', $request))
+        ->name('manage.edit');
+    Route::get('manage/{manage}', fn () => abort(410, 'Legacy manage show page has been removed; use /app/manage/{manage}/edit.'))
+        ->name('manage.show');
+    Route::match(['put', 'patch'], 'manage/{manage}', fn () => abort(410, 'Legacy manage update endpoint has been removed; use /app/manage/{manage}.'))
+        ->name('manage.update');
+    Route::delete('manage/{manage}', fn () => abort(410, 'Legacy manage destroy endpoint has been removed; use /app/manage/{manage}.'))
+        ->name('manage.destroy');
+});
 // Inertia + React 版（使用者管理列表 + 編輯）
 Route::get('app/manage', 'ManagementController@appIndex')
     ->middleware(['auth', 'inertia'])
@@ -406,10 +433,10 @@ Route::get('app/merge-preview', 'MergePreviewController@appIndex')->name('app.me
 Route::post('operations/{operation}/restore', 'OperationsController@restore')->name('operations.restore');
 
 Route::middleware('auth')->group(function () {
-    Route::get('profile', 'UserProfileController@edit')
-        ->middleware('legacy.page:app.profile.edit')->name('profile.edit');
-    Route::patch('profile', 'UserProfileController@update')
-        ->middleware('legacy.page:gone')->name('profile.update');
+    Route::get('profile', fn (\Illuminate\Http\Request $request) => cbdb_legacy_page_redirect('app.profile.edit', $request))
+        ->name('profile.edit');
+    Route::patch('profile', fn () => abort(410, 'Legacy profile update endpoint has been removed; use /app/profile.'))
+        ->name('profile.update');
     // Inertia + React 版
     Route::get('app/profile', 'UserProfileController@appEdit')
         ->middleware('inertia')
@@ -480,9 +507,9 @@ Route::middleware('auth')->group(function () {
     Route::get('maps/tang', 'HistoricalMapsController@legacyRedirect');
     Route::get('maps/tang/{path?}', 'HistoricalMapsController@legacyRedirect')->where('path', '.*');
 
-    Route::get('admin/explainsql', 'AdminExplainSqlController@show')
-        ->middleware('legacy.page:app.admin.explainsql')->name('admin.explainsql');
-    Route::post('admin/explainsql', 'AdminExplainSqlController@explain')->middleware('legacy.page:gone');
+    Route::get('admin/explainsql', fn (\Illuminate\Http\Request $request) => cbdb_legacy_page_redirect('app.admin.explainsql', $request))
+        ->name('admin.explainsql');
+    Route::post('admin/explainsql', fn () => abort(410, 'Legacy explainsql endpoint has been removed; use /app/admin/explainsql.'));
     // Inertia + React 版（表單頁；GET 顯示、POST 跑 EXPLAIN 後重新 render）
     Route::get('app/admin/explainsql', 'AdminExplainSqlController@appShow')
         ->middleware('inertia')
@@ -490,14 +517,14 @@ Route::middleware('auth')->group(function () {
     Route::post('app/admin/explainsql', 'AdminExplainSqlController@appExplain')
         ->middleware('inertia')
         ->name('app.admin.explainsql.explain');
-    Route::get('admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@showForm')
-        ->middleware('legacy.page:app.admin.batch-load-book-titles')->name('admin.batch-load-book-titles');
-    Route::post('admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@store')
-        ->middleware('legacy.page:gone')->name('admin.batch-load-book-titles.store');
-    Route::post('admin/batch-load-book-titles/undo', 'AdminBatchLoadBookTitlesController@undo')
-        ->middleware('legacy.page:gone')->name('admin.batch-load-book-titles.undo');
-    Route::post('admin/batch-load-book-titles/update-pinyin', 'AdminBatchLoadBookTitlesController@updatePinyin')
-        ->middleware('legacy.page:gone')->name('admin.batch-load-book-titles.update-pinyin');
+    Route::get('admin/batch-load-book-titles', fn (\Illuminate\Http\Request $request) => cbdb_legacy_page_redirect('app.admin.batch-load-book-titles', $request))
+        ->name('admin.batch-load-book-titles');
+    Route::post('admin/batch-load-book-titles', fn () => abort(410, 'Legacy batch-load endpoint has been removed; use /app/admin/batch-load-book-titles.'))
+        ->name('admin.batch-load-book-titles.store');
+    Route::post('admin/batch-load-book-titles/undo', fn () => abort(410, 'Legacy batch-load endpoint has been removed; use /app/admin/batch-load-book-titles/undo.'))
+        ->name('admin.batch-load-book-titles.undo');
+    Route::post('admin/batch-load-book-titles/update-pinyin', fn () => abort(410, 'Legacy batch-load endpoint has been removed; use /app/admin/batch-load-book-titles/update-pinyin.'))
+        ->name('admin.batch-load-book-titles.update-pinyin');
     // Inertia + React 版（store/undo 重用既有方法，依請求路徑決定重導）
     Route::get('app/admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@appShowForm')
         ->middleware('inertia')->name('app.admin.batch-load-book-titles');
@@ -511,19 +538,19 @@ Route::middleware('auth')->group(function () {
     // 罕見字檢測（回傳 JSON）：只查 pinyin 表，列出表未收的漢字與行號，匯入前先行檢查。
     Route::post('app/admin/batch-load-book-titles/check-rare-chars', 'AdminBatchLoadBookTitlesController@checkRareChars')
         ->name('app.admin.batch-load-book-titles.check-rare-chars');
-    Route::get('admin/batch-load-social-institutes', 'AdminBatchLoadSocialInstitutesController@showForm')
-        ->middleware('legacy.page:app.admin.batch-load-social-institutes')->name('admin.batch-load-social-institutes');
-    Route::post('admin/batch-load-social-institutes', 'AdminBatchLoadSocialInstitutesController@store')
-        ->middleware('legacy.page:gone')->name('admin.batch-load-social-institutes.store');
+    Route::get('admin/batch-load-social-institutes', fn (\Illuminate\Http\Request $request) => cbdb_legacy_page_redirect('app.admin.batch-load-social-institutes', $request))
+        ->name('admin.batch-load-social-institutes');
+    Route::post('admin/batch-load-social-institutes', fn () => abort(410, 'Legacy batch-load endpoint has been removed; use /app/admin/batch-load-social-institutes.'))
+        ->name('admin.batch-load-social-institutes.store');
     // Inertia + React 版（store 重用，依請求路徑重導）
     Route::get('app/admin/batch-load-social-institutes', 'AdminBatchLoadSocialInstitutesController@appShowForm')
         ->middleware('inertia')->name('app.admin.batch-load-social-institutes');
     Route::post('app/admin/batch-load-social-institutes', 'AdminBatchLoadSocialInstitutesController@store')
         ->middleware('inertia')->name('app.admin.batch-load-social-institutes.store');
-    Route::get('admin/batch-load-offices', 'AdminBatchLoadOfficesController@showForm')
-        ->middleware('legacy.page:app.admin.batch-load-offices')->name('admin.batch-load-offices');
-    Route::post('admin/batch-load-offices', 'AdminBatchLoadOfficesController@store')
-        ->middleware('legacy.page:gone')->name('admin.batch-load-offices.store');
+    Route::get('admin/batch-load-offices', fn (\Illuminate\Http\Request $request) => cbdb_legacy_page_redirect('app.admin.batch-load-offices', $request))
+        ->name('admin.batch-load-offices');
+    Route::post('admin/batch-load-offices', fn () => abort(410, 'Legacy batch-load endpoint has been removed; use /app/admin/batch-load-offices.'))
+        ->name('admin.batch-load-offices.store');
     // Inertia + React 版（store 重用，依請求路徑重導）
     Route::get('app/admin/batch-load-offices', 'AdminBatchLoadOfficesController@appShowForm')
         ->middleware('inertia')->name('app.admin.batch-load-offices');
@@ -532,15 +559,20 @@ Route::middleware('auth')->group(function () {
     // 外部資料庫引用瀏覽器：已開放活躍帳號，路徑不再帶 admin 前綴（controller 沿用 WikiMaintenanceController 名稱）。
     Route::get('external-db-link', 'WikiMaintenanceController@index')->name('external-db-link');
     Route::get('app/external-db-link', 'WikiMaintenanceController@appIndex')->name('app.external-db-link')->middleware('inertia');
-    Route::get('admin/cbdb-table-maintenance', 'CbdbTableMaintenanceController@index')
-        ->middleware('legacy.page:app.admin.cbdb-table-maintenance')->name('admin.cbdb-table-maintenance');
+    // ⚠️ **只刪這條 GET**：底下的 `rebuild` 與 `progress` **沒有 `app.` 雙胞胎**——
+    // React 版 `appIndex()` 直接把這兩個 route name 組進 `urls` prop（見該 controller），
+    // 刪它們等於讓 React 的重建功能整個不可達。
+    Route::get('admin/cbdb-table-maintenance', fn (\Illuminate\Http\Request $request) => cbdb_legacy_page_redirect('app.admin.cbdb-table-maintenance', $request))
+        ->name('admin.cbdb-table-maintenance');
     Route::get('app/admin/cbdb-table-maintenance', 'CbdbTableMaintenanceController@appIndex')->name('app.admin.cbdb-table-maintenance')->middleware('inertia');
     Route::post('admin/cbdb-table-maintenance/rebuild', 'CbdbTableMaintenanceController@rebuild')->name('admin.cbdb-table-maintenance.rebuild');
     Route::get('admin/cbdb-table-maintenance/progress/{taskId}', 'CbdbTableMaintenanceController@getNameFtsProgress')
         ->where('taskId', '[a-zA-Z0-9_]+')
         ->name('admin.cbdb-table-maintenance.progress');
-    Route::get('admin/unidirectional-relationship-repair', 'UnidirectionalRelationshipRepairController@index')
-        ->middleware('legacy.page:app.admin.unidirectional-relationship-repair')->name('admin.unidirectional-relationship-repair');
+    // ⚠️ 同上：`…/kinship` 與 `…/assoc` 兩條 POST **沒有 `app.` 雙胞胎**，React 修復頁直接
+    // 呼叫它們（`appIndex()` 的 `urls.kinship`／`urls.assoc`）——**不可連坐刪除**。
+    Route::get('admin/unidirectional-relationship-repair', fn (\Illuminate\Http\Request $request) => cbdb_legacy_page_redirect('app.admin.unidirectional-relationship-repair', $request))
+        ->name('admin.unidirectional-relationship-repair');
     Route::get('app/admin/unidirectional-relationship-repair', 'UnidirectionalRelationshipRepairController@appIndex')->name('app.admin.unidirectional-relationship-repair')->middleware('inertia');
     Route::post('admin/unidirectional-relationship-repair/kinship', 'UnidirectionalRelationshipRepairController@repairKinship')->name('admin.unidirectional-relationship-repair.kinship');
     // Query Playground

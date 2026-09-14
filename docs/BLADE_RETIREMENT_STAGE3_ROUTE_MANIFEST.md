@@ -27,15 +27,21 @@ php artisan route:list --json
 | 4b-1 | 3 條 `codes.proposals.*` 與 5 條 batch-load 寫入端收斂後補封 | 「不動」19 → 11 |
 | **4b-4a** | **`codes` 全套（12 條）Blade 實體刪除**，改 closure | **那 12 條不再掛 `legacy.page`、沒有 kill switch 回退** |
 
-⇒ **目前仍掛 `legacy.page` 的只剩 21 條**（`manage` 7、`profile` 2、`admin.explainsql` 2、
-3 個 batch-load 共 8、`admin.cbdb-table-maintenance` 1、`admin.unidirectional-relationship-repair` 1）。
-權威清單是 `LegacyBladePageRetirementTest::exactly_the_manifested_routes_are_gated()` 的 `$expected`
-——**那份會紅，本文件不會**，所以兩者衝突時以測試為準。
+| **4b-4b** | **其餘 21 條（manage／profile／admin）Blade 實體刪除**，改 closure | **`legacy.page` 歸零** |
 
-⚠️ **4b-4b（其餘頁面的實體刪除）的硬前置**：
-- `admin/unidirectional-relationship-repair/{kinship,assoc}` 這兩條 POST **沒有 `app.` 雙胞胎**，
-  React 修復頁直接呼叫它們 ⇒ 刪那條 GET 時**不可連坐**。
-- `admin/cbdb-table-maintenance/{rebuild,progress}` 同理。
+⇒ 🔴 **目前仍掛 `legacy.page` 的路由是 0 條**（實測 `Route::getRoutes()`）。
+**本文件自此是純歷史文件**——它記錄的是環節 3 當時的判斷過程與逐條理由，那些理由仍有參考價值
+（特別是「不動」那 11 條的判準），但「處置」欄已全部被後續環節取代。
+現況的權威來源是 `LegacyBladePageRetirementTest::no_route_is_gated_by_the_retirement_middleware_any_more()`
+——**那份會紅，本文件不會**。
+
+🔴 **`RetireLegacyBladePage` 與 `config/legacy_page_retirement.php` 自此是死碼**，
+`LEGACY_PAGE_RETIREMENT=false` **沒有任何效果**。舊 runbook 裡「翻 kill switch 即可回退」
+那一步已作廢。
+
+⚠️ **4b-4b 刻意保留、不可連坐刪除的**（它們**沒有 `app.` 雙胞胎**，React 頁面直接呼叫）：
+- `admin/unidirectional-relationship-repair/{kinship,assoc}`
+- `admin/cbdb-table-maintenance/{rebuild,progress}`
 
 ## 分類與處置
 
@@ -230,7 +236,23 @@ legacy 寫入端，且 React 有各自的對應端點（`app/*` 或 `/api/v2/*`�
 
 ---
 
-## kill switch：環節 3「可逆」的實際兌現方式
+## kill switch（🔴 已失效，保留作為歷史）
+
+> 🔴🔴 **2026-09-15（環節 4b-4b）起，下面這整套操作步驟已經沒有作用對象。**
+>
+> 所有 legacy Blade 頁面都已**實體刪除**，`legacy.page` middleware **一條路由都沒掛**。
+> 把 `LEGACY_PAGE_RETIREMENT` 設成 `false` **不會叫回任何 Blade 頁**——照著做只會什麼都沒發生。
+> 要回到 Blade 只能 **git revert 並重新部署**。
+>
+> 護欄：`LegacyBladePageRetirementTest::no_route_is_gated_by_the_retirement_middleware_any_more()`
+> 與 `neither_the_kill_switch_nor_migration_flags_bring_legacy_pages_back()`。
+>
+> **本節保留的唯一理由**是：舊的部署 runbook 可能還抄著這幾行，讀到這裡的人需要知道它為什麼
+> 不再有效。以下內容一律視為歷史。
+
+<details>
+<summary>環節 3 當時的回退步驟（已失效）</summary>
+
 
 封路由 `config/legacy_page_retirement.php` 的 `enabled` 總開關控制（env：`LEGACY_PAGE_RETIREMENT`，預設 `true`）。
 
@@ -257,6 +279,8 @@ legacy 頁**立刻復活**——不需重新部署、不需 `git revert`。
 封路本身的行為由 `LegacyBladePageRetirementTest` 驗證，該檔**不** opt-out。
 
 > 📌 環節 4 實體刪除 legacy 頁時，這個開關、`useLegacyBladePages()` 以及 22 個 opt-out 都要一併移除——屆時沒有可以復活的對象，留著只會讓人誤以為還能回退。同時那 22 個測試類要做環節 1.5 那樣的逐測試分流。
+
+</details>
 
 ## 實作方式
 

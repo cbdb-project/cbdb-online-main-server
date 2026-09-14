@@ -36,25 +36,11 @@ class AdminBatchLoadBookTitlesController extends Controller {
         $this->operationRepository = $operationRepository;
         $this->toolsRepository = $toolsRepository;
     }
-
-    /**
-     * Render the batch upload form.
-     */
-    public function showForm() {
-        $this->ensureAdmin();
-
-        return view('admin.batch_load_book_titles', [
-            'page_title' => __('admin.batch_load_books'),
-            'page_title_key' => '批次匯入書稿資料',
-            'page_description' => __('admin.batch_load_books_desc'),
-            'page_url' => route('admin.batch-load-book-titles'),
-            'input' => old('entries', ''),
-            'results' => session('batch_results', []),
-            'batchErrors' => session('batch_errors', []),
-            'batchId' => session('batch_id'),
-            'toast' => session('toast'),
-        ]);
-    }
+    // ── 2026-09-15（Blade 下架環節 4b-4b）─────────────────────────────
+    //
+    // 這裡原本有 legacy 的 showForm()（render `admin.batch_load_book_titles`）。
+    // 🔴 **`store()`／`undo()`／`updatePinyin()` 必須留著**：legacy 與 app 兩條 POST 路由
+    // 指向的是**同一個方法**（legacy 那條現在是 410 closure，app 那條仍在服役）。
 
     /**
      * Inertia + React 版：批次匯入書稿表單頁。讀取與 Blade 相同的 session 結果。

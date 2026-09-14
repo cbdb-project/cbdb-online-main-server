@@ -49,33 +49,11 @@ class AdminExplainSqlController extends Controller {
 
         return ['sql' => $sql, 'results' => $results, 'columns' => $columns, 'error' => $error];
     }
-
-    public function show() {
-        $this->ensureAdmin();
-
-        return view('admin.explain_sql', [
-            'page_title' => 'SQL 執行計畫',
-            'page_description' => 'EXPLAIN 查詢計畫',
-            'page_url' => route('admin.explainsql'),
-            'sql' => '',
-            'results' => null,
-            'columns' => [],
-            'error' => null,
-        ]);
-    }
-
-    public function explain(Request $request) {
-        $this->ensureAdmin();
-
-        $data = $request->validate(['sql' => 'required|string']);
-        $outcome = $this->runExplain($data['sql']);
-
-        return view('admin.explain_sql', array_merge([
-            'page_title' => 'SQL 執行計畫',
-            'page_description' => 'EXPLAIN 查詢計畫',
-            'page_url' => route('admin.explainsql'),
-        ], $outcome));
-    }
+    // ── 2026-09-15（Blade 下架環節 4b-4b）─────────────────────────────
+    //
+    // 這裡原本有 legacy 的 show()／explain()（兩者都 render `admin.explain_sql`）。
+    // 🔴 **共用的 `runExplain()` 與 `appShow()`／`appExplain()` 都留著**——
+    // legacy 的 `explain()` 與 React 的 `appExplain()` 是**兩個方法**、共用 `runExplain()`。
 
     /**
      * Inertia + React 版（表單頁）。

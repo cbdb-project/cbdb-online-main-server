@@ -3,7 +3,7 @@
 > 狀態：**Phase 0–6 全部完成並已翻 flag 上線（2026-06-26）**　·　方向：**漸進式 strangler，逐頁取代，非一次性重寫**
 > 本文件只描述「做什麼、為何、依何順序」，不含實作程式碼。每個階段落地時請遵循專案的「小環節 → review → codex → 推進」節奏。
 
-> ✅ **2026-06-26 上線里程碑**：全站可遷移頁面 feature flag 已全翻 `new`（使用者人工逐頁驗收通過），React/Inertia 為線上預設。**剩餘人類待辦**：Phase 7（AdminLTE/Blade 實體下架）、P6-C1/C2 死碼清理。🔴 **2026-09 更新**：「舊視圖/路由仍保留供回退」已不準確——見 [Blade 下架計畫](./BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)。人物編輯全套已**實體刪除**；其餘多數 legacy 頁面雖然碼還在，但已**封路**，回退鍵是 `LEGACY_PAGE_RETIREMENT=false` 而非 flag。
+> ✅ **2026-06-26 上線里程碑**：全站可遷移頁面 feature flag 已全翻 `new`（使用者人工逐頁驗收通過），React/Inertia 為線上預設。**剩餘人類待辦**：Phase 7（AdminLTE/Blade 實體下架）、P6-C1/C2 死碼清理。🔴 **2026-09 更新**：「舊視圖/路由仍保留供回退」已不準確——見 [Blade 下架計畫](./BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)。人物編輯全套已**實體刪除**；其餘多數 legacy 頁面雖然碼還在，但已**封路**，回退鍵是 `LEGACY_PAGE_RETIREMENT=false` 而非 flag。🔴 **後續（2026-09-15，環節 4b-4a／4b-4b）：這句話已失效**——表單／寫入頁也全部實體刪除了，`legacy.page` 一條路由都沒掛，`LEGACY_PAGE_RETIREMENT=false` **沒有任何作用**。要回到 Blade 只能 git revert 並重新部署。
 
 > 📍 **狀態與接手指引（活頁，每次迭代更新）** —— 接手的 AI 從這裡開始：
 > - **目前進度**：**Phase 0（F1–F6）、Phase 1（P1-1…P1-6）、Phase 2（P2-1…P2-5）全部完成**；Phase 3 **P3-1 完成、P3-2 blocked**（需人決策）；**Phase 5 全部可遷移頁完成（P5-1…P5-11，P5-12 排除）**。全部 commit 於 `feat/phase0-f1-tailwind-tokens`，逐項過 review agent + codex gate（按：當時 flag 預設 old；**已於 2026-06-26 全翻 new 上線**，見頂部里程碑）。write-path（codes/manage 的 store/update/destroy/proposal，operations restore/proposal、crowdsourcing confirm/reject、wiki/table-maintenance rebuild/import、unidirectional repair）一律未改或採 perform*/listRouteName 單一來源抽取，舊 Blade byte-equivalent。全測試 1533 綠。
@@ -193,7 +193,7 @@
 
 新舊頁**完全隔離**，可長期並存（現成證明：`ViewTables` 的 Blade 版 `view.index`/`view.show` 與 React 版 `app.view.index`/`app.view.show` 此刻同時上線）。
 
-> 🔴 **2026-09-14 起，下面「切換 = 導覽指向」與「回退保證」兩條只適用於「還沒被封路」的頁面**（Blade 下架計畫環節 3）。已封路的那批翻 flag **沒有效果**——`legacy.page` middleware 不讀 flag。🔴 **而且要分兩層**：`operations`／`dashboard`／`view`／`merge-preview`／`crowdsourcing`／`nl-query-logs`／`admin.audit-logs`／`admin.ai-fill-logs` 已於**環節 4a-3 實體刪除**，連 `LEGACY_PAGE_RETIREMENT=false` 都救不回來（舊 URI 只剩 302 導向）；回退鍵仍有效的只剩**表單／寫入頁**（`codes` 全套／`manage`／`profile`／`admin.explainsql`／3 個 batch-load／`cbdb-table-maintenance`／`unidirectional-repair`），即環節 4b 的範圍。人物編輯全套（`basicinformation.*`）已**實體刪除**、完全無法回退。仍由 flag 決定渲染的只剩 `auth.*` 與 `welcome`。
+> 🔴 **2026-09-14 起，下面「切換 = 導覽指向」與「回退保證」兩條只適用於「還沒被封路」的頁面**（Blade 下架計畫環節 3）。已封路的那批翻 flag **沒有效果**——`legacy.page` middleware 不讀 flag。🔴 **而且要分兩層**：`operations`／`dashboard`／`view`／`merge-preview`／`crowdsourcing`／`nl-query-logs`／`admin.audit-logs`／`admin.ai-fill-logs` 已於**環節 4a-3 實體刪除**，連 `LEGACY_PAGE_RETIREMENT=false` 都救不回來（舊 URI 只剩 302 導向）；〔原文：回退鍵仍有效的只剩**表單／寫入頁**（`codes` 全套／`manage`／`profile`／`admin.explainsql`／3 個 batch-load／`cbdb-table-maintenance`／`unidirectional-repair`），即環節 4b 的範圍。〕🔴 **後續（2026-09-15，環節 4b-4a／4b-4b）：這句話已失效**——表單／寫入頁也全部實體刪除了，`legacy.page` 一條路由都沒掛，`LEGACY_PAGE_RETIREMENT=false` **沒有任何作用**。要回到 Blade 只能 git revert 並重新部署。人物編輯全套（`basicinformation.*`）已**實體刪除**、完全無法回退。仍由 flag 決定渲染的只剩 `auth.*` 與 `welcome`。
 
 - **路由慣例**：新 React 頁建在平行路由（既有慣例 `/app/*`，加 `->middleware('inertia')`），**不動舊路由**。新舊不同根模板（`inertia.blade.php` vs `dashboard-v3`）、不同 DOM，無掛載衝突。
 - **切換 = 導覽指向**：以**每頁 feature flag**（`config/migration_flags.php` 或 DB 設定）決定側邊欄/連結指向新或舊頁。flip 一個值即上線新頁，改回即回退，**不需改碼、不需重新部署**（若用 config 快取，回退僅需 `config:cache`）。
@@ -235,7 +235,7 @@
 - 後端：`assertInertia` 斷言元件/props；複合主鍵頁補 query-path mutation + NULL 段邊界測試。
 - 前端：建議引入 E2E（Playwright/Cypress）覆蓋關鍵流程（人物編輯、提案核可），目前專案無此設施，列為 Phase 0 待評估項。
 - 每階段：`npm run build` + `./vendor/bin/phpunit`（受影響）+ 對應頁面 smoke（沿用 `ADMINLTE.md` 既有 smoke 清單路徑）。
-- 回退：新舊路由並存期間，側邊欄指回 Blade 舊路由即可即時回退；Blade 視圖在該頁穩定前不刪除。🔴 **已於 2026-09 失效**（環節 3 封路）：那批頁面的回退鍵改為 `LEGACY_PAGE_RETIREMENT=false`，見本文件 §五之二的前言。
+- 回退：新舊路由並存期間，側邊欄指回 Blade 舊路由即可即時回退；Blade 視圖在該頁穩定前不刪除。🔴 **已於 2026-09 失效**（環節 3 封路）：那批頁面的回退鍵改為 `LEGACY_PAGE_RETIREMENT=false`，見本文件 §五之二的前言。🔴 **後續（2026-09-15，環節 4b-4a／4b-4b）：這句話已失效**——表單／寫入頁也全部實體刪除了，`legacy.page` 一條路由都沒掛，`LEGACY_PAGE_RETIREMENT=false` **沒有任何作用**。要回到 Blade 只能 git revert 並重新部署。
 
 ## 九、為何不一次性重寫
 105 視圖、~30 頁面組、複合主鍵高風險區、大量資料表格，且 Phase 4 的 12 個編輯表單為全新開發 —— 一次性重寫＝多人週凍結期 + 全站回歸風險。漸進式 strangler 讓每步可發布、可回退、可測試，且與專案「每個小環節 review + codex」節奏一致；專案已走在這條路上（5 個 Inertia 頁面 + 完整 PersonBrowser 唯讀元件庫）。
@@ -264,7 +264,7 @@
   3. **fidelity spec**：對照舊頁截圖與互動（篩選欄順序、Enter 送出、分頁、空/載入狀態），含 DataTables 既有互動的盤點與取捨。
   4. 測試：`assertInertia` 斷言 component/props + 授權（403/404）案例。
   5. 切換：feature flag 預設仍指舊頁；驗證無誤後 flip 指向新頁；保留舊頁可回退。
-     🔴 **此步驟自 2026-09 起已不適用**（全站頁面都已 flip 完畢，且 Blade 下架計畫環節 2／3 已把 legacy 頁面刪除或封路）。保留為歷史流程紀錄；「保留舊頁可回退」對已封路頁面不成立——回退鍵是 `LEGACY_PAGE_RETIREMENT=false`，見 §五之二前言。
+     🔴 **此步驟自 2026-09 起已不適用**（全站頁面都已 flip 完畢，且 Blade 下架計畫環節 2／3 已把 legacy 頁面刪除或封路）。保留為歷史流程紀錄；「保留舊頁可回退」對已封路頁面不成立——回退鍵是 `LEGACY_PAGE_RETIREMENT=false`，見 §五之二前言。🔴 **後續（2026-09-15，環節 4b-4a／4b-4b）：這句話已失效**——表單／寫入頁也全部實體刪除了，`legacy.page` 一條路由都沒掛，`LEGACY_PAGE_RETIREMENT=false` **沒有任何作用**。要回到 Blade 只能 git revert 並重新部署。
 
 ---
 

@@ -1,7 +1,15 @@
 {{--
     CHGIS 地圖前端資源與設定注入
-    由 addresses/offices 列表頁 @include。注入 window.chgisMapConfig（路由、範圍、i18n），
-    並透過 @vite 載入 chgis-map 入口（含 Leaflet 與 modal 樣式）。
+    注入 window.chgisMapConfig（路由、範圍、i18n），並透過 @vite 載入 chgis-map 入口
+    （含 Leaflet 與 modal 樣式）。
+
+    ⚠️ 這個 partial 被 resources/views/inertia.blade.php @include，也就是**每一個 React 頁
+    都會執行它**——刪除或改壞它會讓全站 Inertia 頁 500。它原本放在 biogmains/ 底下
+    （_chgis_map_assets.blade.php），Blade 下架計畫環節 2 刪除該目錄前先搬到這裡，避免被
+    當成 legacy 檔一併刪掉。
+
+    必須在 inertia.blade.php 的 @stack('scripts') **之前** @include（本檔用 @push('scripts')）。
+
     AGENTS.md：AJAX URL 使用相對路徑 route(name, [], false)，避免 HTTPS mixed content。
 --}}
 @php
@@ -19,13 +27,22 @@
     $chgisManager = app(\App\Services\ChgisMapManager::class);
     $chgisTileVersion = $chgisManager->isReady() ? (@filemtime($chgisManager->path()) ?: 0) : 0;
     $chgisTileTemplate .= '?v=' . $chgisTileVersion;
+
+    // 人物地圖點 URL 模板。原本這裡傳的是 basicinformation.index 的 URL 當「base」，前端再自行
+    // 接上 /{id}/map-points——那讓每一個 React 頁都相依於一條 **legacy 路由名**，該路由在環節 2
+    // 會被改成導向，名字一旦動到就是全站 500。改為直接產生 map-points 自己的 URL 模板。
+    $chgisPointsTemplate = str_replace(
+        '__ID__',
+        '{id}',
+        route('basicinformation.map-points', ['id' => '__ID__'], false)
+    );
 @endphp
 @push('scripts')
     <script>
         window.chgisMapConfig = {
             statusUrl: {!! Js::from(route('chgis-map.status', [], false)) !!},
             tileUrlTemplate: {!! Js::from($chgisTileTemplate) !!},
-            pointsUrlBase: {!! Js::from(route('basicinformation.index', [], false)) !!},
+            pointsUrlTemplate: {!! Js::from($chgisPointsTemplate) !!},
             minZoom: {{ (int) config('chgis_map.min_zoom', 3) }},
             maxZoom: {{ (int) config('chgis_map.max_zoom', 8) }},
             bounds: {!! Js::from(config('chgis_map.bounds')) !!},

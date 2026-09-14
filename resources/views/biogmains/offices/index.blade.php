@@ -98,5 +98,5 @@ use App\Support\CompositePrimaryKey;
         </div>
     </div>
     @include('biogmains.history-button')
-    @include('biogmains._chgis_map_assets')
+    @include('partials.chgis-map-assets')
 @endsection

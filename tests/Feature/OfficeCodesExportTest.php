@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
+use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -61,7 +61,7 @@ class OfficeCodesExportTest extends TestCase {
             ['c_office_id' => 3, 'c_dy' => 15, 'c_office_pinyin' => 'ti ju', 'c_office_chn' => self::EDGE_CHN, 'c_office_pinyin_alt' => null, 'c_office_chn_alt' => null, 'c_office_trans' => null, 'c_office_trans_alt' => null, 'c_source' => null, 'c_pages' => null, 'c_notes' => null],
         ]);
 
-        // ADDR_CODES：在 allowlist 但未配置匯出，用於「export 404」與「show 頁不顯示下載連結」反向案例。
+        // ADDR_CODES：在 allowlist 但未配置匯出，用於「export 404」與「`exportable` prop 為 false」兩個反向案例。
         // 需建真表，show 頁才渲染得出（否則查無表會 redirect 而非 200）。
         Schema::create('ADDR_CODES', function (Blueprint $table) {
             $table->integer('c_addr_id')->primary();
@@ -162,42 +162,58 @@ class OfficeCodesExportTest extends TestCase {
         $this->get('/codes/OFFICE_CODES/export')->assertStatus(500);
     }
 
-    #[Group('legacy-parity')]
+    /**
+     * ── 2026-09-14（Blade 下架環節 4b-2a）─────────────────────────
+     *
+     * 這三條原本打 legacy Blade show 頁、斷言「HTML 裡有沒有那個下載連結字串」。
+     * 真正的不變量是 `isExportable()`，而它在 React 版是 `exportable` prop——
+     * **該 prop 在全 repo 零斷言**，所以改成斷言它是淨增益（比 HTML 子字串精確）。
+     *
+     * 第三條混合了兩件事：「export 路由 404」那半打的是 `codes.export`，而**那條路由
+     * 沒掛 `legacy.page`、不在 4b 的刪除範圍**，而且「export_columns 設成空陣列」這個
+     * 情境沒有別的測試覆蓋（同檔的 `export_404_for_allowlisted_but_not_export_configured_table`
+     * 驗的是「缺鍵」，不是「空陣列」），所以那一行原樣保留。
+     */
     #[Test]
-    public function show_page_shows_download_link_for_exportable_table(): void {
-        // 本測試打的是 legacy Blade 頁（環節 3 已封路，但頁面還在、還能被 kill switch
-        // 叫回來），故局部關閉封路。環節 4 實體刪除時連同本呼叫一併移除。
-        $this->useLegacyBladePages();
-        $response = $this->get('/codes/OFFICE_CODES');
-
-        $response->assertOk();
-        $response->assertSee('/codes/OFFICE_CODES/export', false);
+    public function exportable_prop_is_true_for_an_exportable_table(): void {
+        $this->assertSame(true, $this->exportablePropOf('OFFICE_CODES'));
     }
 
-    #[Group('legacy-parity')]
     #[Test]
-    public function show_page_hides_download_link_for_non_exportable_table(): void {
-        // 本測試打的是 legacy Blade 頁（環節 3 已封路，但頁面還在、還能被 kill switch
-        // 叫回來），故局部關閉封路。環節 4 實體刪除時連同本呼叫一併移除。
-        $this->useLegacyBladePages();
-        // ADDR_CODES 在 allowlist 但不在 export_columns → exportable 為 false → 不應出現下載連結。
-        $response = $this->get('/codes/ADDR_CODES');
-
-        $response->assertOk();
-        $response->assertDontSee('/codes/ADDR_CODES/export', false);
+    public function exportable_prop_is_false_for_a_table_without_export_columns(): void {
+        // ADDR_CODES 在 allowlist 但不在 export_columns → exportable 為 false。
+        $this->assertSame(false, $this->exportablePropOf('ADDR_CODES'));
     }
 
-    #[Group('legacy-parity')]
     #[Test]
     public function empty_export_columns_config_is_treated_as_not_exportable(): void {
-        // 本測試打的是 legacy Blade 頁（環節 3 已封路，但頁面還在、還能被 kill switch
-        // 叫回來），故局部關閉封路。環節 4 實體刪除時連同本呼叫一併移除。
-        $this->useLegacyBladePages();
-        // 空陣列（保留設定鍵但不開放匯出）：export 須 404，且 show 頁不顯示下載連結（兩處共用 isExportable，不漂移）。
+        // 空陣列（保留設定鍵但不開放匯出）：export 須 404，且 show 頁的 exportable 為 false
+        // ——兩處共用 `isExportable()`，不可漂移。
         config(['codes.export_columns.OFFICE_CODES' => []]);
 
+        // `codes.export` 沒掛 legacy.page，不在 4b 範圍，所以這一行照原樣保留。
         $this->get('/codes/OFFICE_CODES/export')->assertNotFound();
-        $this->get('/codes/OFFICE_CODES')->assertOk()->assertDontSee('/codes/OFFICE_CODES/export', false);
+
+        $this->assertSame(false, $this->exportablePropOf('OFFICE_CODES'));
+    }
+
+    /**
+     * 打 `/app/codes/{table}` 並取回 `exportable` prop。
+     *
+     * ⚠️ `CodesController` 的 prop 組裝是 `$payload['exportable'] ?? false`，所以若某天
+     * `buildShowPayload()` 掉了這個鍵，兩條 `assertSame(false, …)` 仍會綠。真正守住
+     * 「鍵存在」的是 `exportable_prop_is_true_for_an_exportable_table`——三條分工如此。
+     */
+    private function exportablePropOf(string $table): ?bool {
+        $exportable = null;
+
+        $this->get('/app/codes/'.$table)
+            ->assertOk()
+            ->assertInertia(function (Assert $page) use (&$exportable) {
+                $exportable = $page->toArray()['props']['exportable'] ?? null;
+            });
+
+        return $exportable;
     }
 
     #[Test]

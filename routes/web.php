@@ -209,7 +209,49 @@ Route::get('app/basicinformation/{id}', 'BasicInformationController@appShow')
 Route::get('basicinformation/{id}/saveas', 'BasicInformationController@saveas');
 Route::get('basicinformation/{id}/Duplicate_Collateral_Info', 'BasicInformationController@Duplicate_Collateral_Info');
 
-Route::get('codes', 'CodesController@index')->middleware('legacy.page:app.codes.index')->name('codes.index');
+// ── Blade 下架環節 4b-4a：codes 全套 Blade 已實體刪除，舊 URI 只留 302／410 ──────
+//
+// 與環節 4a 同一個處置與同一個理由（見本檔上方那段）：`legacy.page` 有兩條 fail-open
+// 路徑，視圖不存在會讓它們變成 500 而不是「看到舊頁」，所以改成純 closure。
+//
+// 🔴 **codes 自此沒有任何 kill switch 級回退**：`LEGACY_PAGE_RETIREMENT=false` 對這批
+// 已無作用，要回到 Blade 只能 git revert 並重新部署。
+//
+// route name 一律保留：書籤／外部連結繼續可用，且 `code_table_edit_url()`／
+// `Navigation::codeItem()`／`CodesController::codesIdTemplate()` 那幾個
+// **flag-aware 的字串回退**（flag=old 時回傳 `/codes/...`）不會變成死連結——
+// 它們產出的 URL 仍會 302 到 React 版。那些回退本身的收斂屬環節 4d。
+// ── Blade 下架環節 4b-4a：codes 顯示頁的 302 導向 ────────────────────────
+//
+// 🔴 **一律走 `route($target, $request->route()->parameters(), false)`，不要手拼字串**
+// （第一版手拼，被 review 抓出兩個 bug）：
+//  1. **編碼**：手拼會讓 `Location` 吐出裸 UTF-8／裸空白，而代碼表**已支援文本主鍵**
+//     （`ADDR_CODES` 之外還有 `ALTNAME_DATA.c_alt_name_chn` 這類），所以 `$id = '慎'`
+//     不是假想。更糟的是 `a%2Fb` 會被解成真的路徑分隔。`route()` 會做 rawurlencode
+//     並只放行 `/ ? & # %`——那正是舊 `RetireLegacyBladePage` 的行為。
+//  2. **query string**：五條裡有一條漏拼（`proposals/{operation}/edit`），而舊 middleware
+//     對所有導向型一律保留 QS。書籤／從 operations 頁帶參數過來都會受影響。
+//
+// 這個小工具把兩件事收在一起，順帶消掉硬編碼的 `/app/codes` 字面值。
+//
+// ⚠️ **不要在交給 route() 之前自己先 rawurlencode**（codex 提過、實測後決定不改）：
+// `route()` 只放行 `/ ? & # %`，而 codes 的 `{id}` 是 `where('id', '.*')`，
+// `operations.resource_id` 對複合主鍵存的就是 `c_personid=1&c_x=2` 這種**帶 `=` 與 `&`** 的
+// 格式。先編碼會把那個形狀改寫成 `%3D`／`%26`——那是單方面改掉一個出現在 operations
+// payload 裡的 URL。這裡的目標是與被移除的 middleware **一字不差的 parity**
+// （`RetireLegacyBladePage:80-81` 就是這兩行）。取捨與理由釘在
+// `LegacyBladePageRetirementTest::codes_redirects_preserve_the_query_string_and_encode_the_id()`。
+if (!function_exists('cbdb_legacy_codes_redirect')) {
+    function cbdb_legacy_codes_redirect(string $target, \Illuminate\Http\Request $request) {
+        $url = route($target, $request->route()->parameters(), false);
+        $qs = $request->getQueryString();
+
+        return redirect()->to($url.($qs ? '?'.$qs : ''), 302);
+    }
+}
+
+Route::get('codes', fn (\Illuminate\Http\Request $request) => cbdb_legacy_codes_redirect('app.codes.index', $request))
+    ->name('codes.index');
 // Inertia + React 版（代碼表總覽）
 Route::get('app/codes', 'CodesController@appIndex')
     ->middleware('inertia')
@@ -217,7 +259,8 @@ Route::get('app/codes', 'CodesController@appIndex')
 // 全量導出：route 泛用，但範圍由 config('codes.export_columns') 白名單收斂（本輪僅 OFFICE_CODES）。
 // 直連 live 生產庫，故加 throttle 防爬蟲爆量。設計見 docs/OFFICE_CODES_EXPORT_SYNC.md。
 Route::get('codes/{table_name}/export', 'CodesController@export')->name('codes.export')->middleware('throttle:6,1');
-Route::get('codes/{table_name}', 'CodesController@show')->middleware('legacy.page:app.codes.show')->name('codes.show');
+Route::get('codes/{table_name}', fn (\Illuminate\Http\Request $request) => cbdb_legacy_codes_redirect('app.codes.show', $request))
+    ->name('codes.show');
 // TEXT_INSTANCE_DATA 的「Load Data」用：依 c_textid 精確取回書名（JSON，不掛 inertia）。
 // 額外路徑段，置於下方 {table_name} 泛用路由之前，避免被攔截。
 // 直連 live 生產庫、且與 codes 讀取面一樣無登入門檻，故加 throttle（同 codes.export 的理由）。
@@ -280,8 +323,10 @@ Route::get('app/text/create', 'TextEntityController@appCreate')
     ->middleware('inertia')->name('app.text.create');
 Route::get('app/text/{id}/edit', 'TextEntityController@appEdit')
     ->middleware('inertia')->name('app.text.edit')->whereNumber('id');
-Route::get('codes/{table_name}/create', 'CodesController@create')->middleware('legacy.page:app.codes.create')->name('codes.create');
-Route::post('codes/{table_name}/proposal', 'CodesController@proposalStore')->middleware('legacy.page:gone')->name('codes.propose.store');
+Route::get('codes/{table_name}/create', fn (\Illuminate\Http\Request $request) => cbdb_legacy_codes_redirect('app.codes.create', $request))
+    ->name('codes.create');
+Route::post('codes/{table_name}/proposal', fn () => abort(410, 'Legacy codes proposal endpoint has been removed; use /app/codes/{table_name}/proposal.'))
+    ->name('codes.propose.store');
 // ✅ **環節 4b-1 已收斂**：這三條原本不掛封路 middleware，因為 React /app/operations 的
 // 「修改提案」與「撤回」連結**都**指向它們（`OperationsController::serializeOperationRow()`
 // 的 `urls.edit_proposal` 與 `urls.cancel_proposal` 兩個三元式的 else 分支），
@@ -289,17 +334,25 @@ Route::post('codes/{table_name}/proposal', 'CodesController@proposalStore')->mid
 // 4b-1 把兩行都改指 `app.codes.proposals.*`（React 版早就存在、授權同等），
 // 所以這三條現在封得起來：GET→302、PATCH／DELETE→410。
 // 回歸測試：`OperationsIndexLinksTest::test_code_table_proposal_urls_point_at_the_react_endpoints_and_are_reachable()`。
-Route::get('codes/{table_name}/proposals/{operation}/edit', 'CodesController@proposalEdit')
-    ->middleware('legacy.page:app.codes.proposals.edit')->name('codes.proposals.edit');
-Route::patch('codes/{table_name}/proposals/{operation}', 'CodesController@proposalUpdateExisting')
-    ->middleware('legacy.page:gone')->name('codes.proposals.update');
-Route::delete('codes/{table_name}/proposals/{operation}', 'CodesController@proposalCancel')
-    ->middleware('legacy.page:gone')->name('codes.proposals.cancel');
-Route::match(['post', 'patch'], 'codes/{table_name}/{id}/proposal', 'CodesController@proposalUpdate')->middleware('legacy.page:gone')->name('codes.propose.update')->where('id', '.*');
-Route::get('codes/{table_name}/{id}/edit', 'CodesController@edit')->middleware('legacy.page:app.codes.edit')->name('codes.edit')->where('id', '.*');
-Route::match(['put', 'patch'], 'codes/{table_name}/{id}', 'CodesController@update')->middleware('legacy.page:gone')->name('codes.update')->where('id', '.*');
-Route::post('codes/{table_name}', 'CodesController@store')->middleware('legacy.page:gone')->name('codes.store');
-Route::delete('codes/{table_name}/{id}', 'CodesController@destroy')->middleware('legacy.page:gone')->name('codes.destroy')->where('id', '.*');
+// ⚠️ **`proposalUpdateExisting()` 與 `proposalCancel()` 不是薄殼**：`app.codes.proposals.*`
+// 兩條路由指向的是**同一個方法**，所以那兩個 controller 方法**必須留著**，
+// 這裡刪的只是 legacy 這兩條路由的接線（見環節 4b-2b 的記錄）。
+Route::get('codes/{table_name}/proposals/{operation}/edit', fn (\Illuminate\Http\Request $request) => cbdb_legacy_codes_redirect('app.codes.proposals.edit', $request))
+    ->name('codes.proposals.edit');
+Route::patch('codes/{table_name}/proposals/{operation}', fn () => abort(410, 'Legacy codes proposal update endpoint has been removed; use /app/codes/{table_name}/proposals/{operation}.'))
+    ->name('codes.proposals.update');
+Route::delete('codes/{table_name}/proposals/{operation}', fn () => abort(410, 'Legacy codes proposal cancel endpoint has been removed; use /app/codes/{table_name}/proposals/{operation}.'))
+    ->name('codes.proposals.cancel');
+Route::match(['post', 'patch'], 'codes/{table_name}/{id}/proposal', fn () => abort(410, 'Legacy codes update-proposal endpoint has been removed; use /app/codes/{table_name}/{id}/proposal.'))
+    ->name('codes.propose.update')->where('id', '.*');
+Route::get('codes/{table_name}/{id}/edit', fn (\Illuminate\Http\Request $request) => cbdb_legacy_codes_redirect('app.codes.edit', $request))
+    ->name('codes.edit')->where('id', '.*');
+Route::match(['put', 'patch'], 'codes/{table_name}/{id}', fn () => abort(410, 'Legacy codes update endpoint has been removed; use /app/codes/{table_name}/{id}.'))
+    ->name('codes.update')->where('id', '.*');
+Route::post('codes/{table_name}', fn () => abort(410, 'Legacy codes store endpoint has been removed; use /app/codes/{table_name}.'))
+    ->name('codes.store');
+Route::delete('codes/{table_name}/{id}', fn () => abort(410, 'Legacy codes destroy endpoint has been removed; use /app/codes/{table_name}/{id}.'))
+    ->name('codes.destroy')->where('id', '.*');
 
 Route::post('operations/{operation}/approve', 'OperationsProposalController@approve')->name('operations.proposals.approve');
 Route::post('operations/{operation}/reject', 'OperationsProposalController@reject')->name('operations.proposals.reject');

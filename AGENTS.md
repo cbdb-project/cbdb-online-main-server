@@ -15,10 +15,17 @@
     controller 方法都不存在了，舊 URI 只剩 **redirect closure**（302 並保留 query string）。
     🔴 **它們沒有 kill switch 級回退**——`LEGACY_PAGE_RETIREMENT=false` 對它們無作用
     （已不掛封路 middleware），要回到 Blade 只能 git revert 並重新部署。
-  - **表單／寫入頁（`codes` 全套／`manage`／`profile`／`admin.explainsql`／3 個 batch-load／
+  - **`codes` 全套已於環節 4b-4a 實體刪除**：5 個 Blade 視圖與 `CodesController` 的 10 個 legacy
+    方法（`index`／`show`／`create`／`edit`／`proposalEdit`／`store`／`update`／`destroy`／
+    `proposalStore`／`proposalUpdate`）都不存在了，舊 URI 只剩 **302 導向／410**。
+    🔴 **codes 自此沒有 kill switch 級回退**——`LEGACY_PAGE_RETIREMENT=false` 對它無作用。
+    ⚠️ **刻意留著的三組**：`export()`（`codes.export` 沒掛過封路，React 正在用）、
+    `proposalUpdateExisting()`／`proposalCancel()`（**不是薄殼**，`app.codes.proposals.*`
+    指向的是同一個方法）、以及所有 `perform*()`（Blade 與 React 共用的寫入實作）。
+  - **其餘表單／寫入頁（`manage`／`profile`／`admin.explainsql`／3 個 batch-load／
     `admin.cbdb-table-maintenance`／`admin.unidirectional-relationship-repair`）仍是「封路但未刪碼」**：
     Blade 視圖與 controller 都還在，只是請求不再抵達 controller（顯示頁 302、legacy 寫入端 410），
-    kill switch 可以把它們叫回來。這批屬環節 4b，尚未執行。逐條清單見
+    kill switch 可以把它們叫回來。這批屬環節 4b-4b，尚未執行。逐條清單見
     [docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md](./docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md)。
   - 🔴 **回退鍵已經不是 migration flag**：這批頁面翻 `MIGRATION_FLAG_*=old` **沒有任何效果**
     （封路 middleware 不讀 flag）。要回退請設 **`LEGACY_PAGE_RETIREMENT=false`** 並
@@ -264,8 +271,9 @@ php artisan cbdb:fetch-chgis-map        # 下載 CHGIS 底圖（缺檔才下載�
 - `POSTED_TO_ADDR_DATA` 的 `resource_id` 會沿用 `POSTED_TO_OFFICE_DATA` 格式，地址明細存於 `resource_data['rows']`。
 - 與時間欄位有關的修改，請注意 `DB_TIMEZONE` 必須與 `APP_TIMEZONE` 對齊；資料庫時區使用數字偏移，例如 `+08:00`。
 - 若測試需自行建表，請補齊必要主鍵、nullable、timestamps；很多回歸都來自測試表結構過度簡化。
-- `app/codes/{table_name}`（`CodesController@appShow`）帶 `sort_by`／`filters[...]` 時需登入且 `Auth::user()->isActive()`（見 `guardSortFilterRequiresAuth()`）；**Blade 版 `codes/{table_name}`（`show()`）未同步處理**。
-  🔴 **唯一能重新暴露它的是 `LEGACY_PAGE_RETIREMENT=false`**（全站 kill switch）：該 Blade 路由掛 `legacy.page:app.codes.show`、一律 302 導向 React 版，而封路 middleware 不讀 flag，所以翻 `MIGRATION_FLAG_CODES=old` **沒有任何效果**（最容易犯的錯，故明列）。**動用 kill switch 回退時必須把「無門檻深分頁排序查詢重新暴露」算進代價。**
+- `app/codes/{table_name}`（`CodesController@appShow`）帶 `sort_by`／`filters[...]` 時需登入且 `Auth::user()->isActive()`（見 `guardSortFilterRequiresAuth()`）。
+  ✅ **這條門檻自環節 4b-4a 起沒有旁路了**：Blade 版 `codes/{table_name}`（`show()`，未同步處理這道門檻）**已實體刪除**，舊 URI 只剩 redirect closure ⇒ **`LEGACY_PAGE_RETIREMENT=false` 也叫不回那個無門檻的查詢**。在那之前，kill switch 是唯一能重新暴露它的開關。
+  （翻 `MIGRATION_FLAG_CODES=old` 一直都沒有效果——封路 middleware 不讀 flag。）
   詳見 [docs/CODES_SORT_FILTER_AUTH_GATE.md](./docs/CODES_SORT_FILTER_AUTH_GATE.md)。
 
 ## 文檔維護原則

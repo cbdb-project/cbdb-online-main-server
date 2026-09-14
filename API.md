@@ -1256,7 +1256,7 @@ Authorization: Bearer <token>
 
 ### `DELETE /operations/{operation}/cancel`（站內撤回，資源無關）
 
-提案人撤回自己的提案。與 resubmit 同樣**不對外部 Bearer 客戶端開放**（web session＋CSRF），記錄於此是為了說明語義：codes／人物提案的站內撤回走 `codes/{table_name}/proposals/{operation}`（以表名為路徑段），13.4 聚合提案的 `resource` 是聚合名、該路徑對它必 404，故站內對聚合提案改走此端點。規則相同：登入且帳號啟用、提案人本人、提案仍為 `pending`／`rejected`；成功後 `__review_status` 轉 `cancelled`，`__proposal_meta` 記 `cancelled_at`／`cancelled_by`／`cancelled_by_id`／`cancel_reason`（請求的 `reason`，可省略）。
+提案人撤回自己的提案。與 resubmit 同樣**不對外部 Bearer 客戶端開放**（web session＋CSRF），記錄於此是為了說明語義：codes／人物提案的站內撤回走 **`app/codes/{table_name}/proposals/{operation}`**（以表名為路徑段；legacy 的 `codes/{table_name}/proposals/{operation}` 已於 Blade 下架環節 4b-4a 焊死成 **410**，且不再受 kill switch 控制），13.4 聚合提案的 `resource` 是聚合名、該路徑對它必 404，故站內對聚合提案改走此端點。規則相同：登入且帳號啟用、提案人本人、提案仍為 `pending`／`rejected`；成功後 `__review_status` 轉 `cancelled`，`__proposal_meta` 記 `cancelled_at`／`cancelled_by`／`cancelled_by_id`／`cancel_reason`（請求的 `reason`，可省略）。
 
 另外，**審核端點（`/operations/{operation}/approve`／`reject`）只接受 `__review_status` 為 `pending` 的提案**，已核准／退回／撤回者回 409——已核准的提案再核准一次會把同一份變更再套用一遍。
 

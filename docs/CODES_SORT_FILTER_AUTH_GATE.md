@@ -15,10 +15,10 @@
 - `codes/{table_name}`（Blade，`CodesController@show`）與 `app/codes/{table_name}`（React/Inertia，`CodesController@appShow`）**目前皆未掛 `auth` middleware**，任何人（含匿名爬蟲）都能直接帶 `sort_by`、`filters[...]` 打深分頁。
 - 兩條路由共用同一個 `buildShowPayload()`，該方法就是排序/filter/分頁邏輯的唯一入口。
 - 對照組：`view/{key}`（`ViewTableController`，另一個查詢瀏覽功能）**已經**掛 `->middleware('auth')`，證明「瀏覽類功能要求登入」在本 repo 是既有慣例，非新發明。
-- **API 表面確認**（回答 owner 的疑問）：當時 `routes/api.php` 的 `select` 前綴群組（`auth.optional` middleware）裡有一條 `Route::get('codes', 'ApiController@codes')`，路徑為 `/api/select/codes`，解析到 `App\Http\Controllers\ApiController`（非 `Api\ApiController`——這條路由沒有走 `Api\` 子命名空間）。**該類別根本沒有 `codes()` 方法**，所以那條路由打不通（method not found，實際是 500）；**#1250 已將它整條移除，現在是 404**。`CodesRepository::codes()`（回傳表名+說明清單）實際只被 `CodesController::index()`/`appIndex()` 呼叫，跟 `routes/api.php` 那條無關。無論如何，`routes/api.php` 裡沒有任何 `table_name` 相關路由，代表**不存在**任何暴露 per-table sort/filter/分頁資料的 API 路徑。既有的 Sanctum token（`routes/ai.php`、`api.php`）服務的是別的功能，跟這裡無關。
+- **API 表面確認**（回答 owner 的疑問）：當時 `routes/api.php` 的 `select` 前綴群組（`auth.optional` middleware）裡有一條 `Route::get('codes', 'ApiController@codes')`，路徑為 `/api/select/codes`，解析到 `App\Http\Controllers\ApiController`（非 `Api\ApiController`——這條路由沒有走 `Api\` 子命名空間）。**該類別根本沒有 `codes()` 方法**，所以那條路由打不通（method not found，實際是 500）；**#1250 已將它整條移除，現在是 404**。`CodesRepository::codes()`（回傳表名+說明清單）實際只被 `CodesController::appIndex()` 呼叫（環節 4b-4a 之前還有已刪除的 Blade `index()`），跟 `routes/api.php` 那條無關。無論如何，`routes/api.php` 裡沒有任何 `table_name` 相關路由，代表**不存在**任何暴露 per-table sort/filter/分頁資料的 API 路徑。既有的 Sanctum token（`routes/ai.php`、`api.php`）服務的是別的功能，跟這裡無關。
   - **結論不變：不需要 token 機制**——`sort_by`/`filters` 這個能力只存在於 web 路由（`app.codes.show`），完全走 session，只做 session 登入門檻即可覆蓋全部觸發面。
 - **owner 明確決定本輪不處理 Blade 版**，只收斂 React/Inertia 版（`appShow()`）。已知取捨記錄在第 7 節「風險與回退」。
-- 🔴 **2026-09-14 更新（Blade 下架環節 3）**：Blade 版 `show()` 已被封路，**不再是 flag 回退路徑**——見第 7 節。
+- ✅ **2026-09-15 更新（Blade 下架環節 4b-4a）**：Blade 版 `show()` **已實體刪除**，這道門檻自此沒有旁路——見第 7 節。
 - `codes/{table_name}/export` 走全欄白名單匯出、已有 `throttle:6,1`、不吃 `sort_by`/`filters`，不在本輪範圍。
 
 ## 3. 範圍界定
@@ -105,12 +105,16 @@
 
 ## 7. 風險與回退
 
-- **已知取捨（owner 已確認接受）**：Blade 版 `codes/{table_name}`（`show()`）本輪不處理，它至今仍是無門檻的。
-- 🔴 **2026-09-14 更新：重新暴露的條件已經改變**（Blade 下架計畫環節 3）。
-  `routes/web.php` 的 `codes/{table_name}` 現在掛 `legacy.page:app.codes.show`：一律 302 導向 React 版，而**封路 middleware 不讀 migration flag**。
-  - 翻 `MIGRATION_FLAG_CODES=old` ⇒ **沒有任何效果**，暴露不了未受保護的 `show()`。對**已封路的那批頁面**而言，migration flag 現在只影響連結指向，不影響舊頁能否開啟（`auth.*`／`welcome` 未封路，其 flag 仍決定渲染 Blade 或 React）。
-  - 設 **`LEGACY_PAGE_RETIREMENT=false`**（全站 kill switch，`config/legacy_page_retirement.php`）⇒ **會**讓流量回到未受保護的 Blade 版 `show()`，這個風險組合重新出現。
-  **所以：動用那個 kill switch 回退時，必須把「無門檻深分頁排序查詢重新暴露」算進代價**；若需要長期回退，要先補做 Blade 版的門檻。逐條封路清單見 [BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md](./BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md)。
+- ✅ **2026-09-15 更新：這個取捨已經消失**（Blade 下架計畫環節 4b-4a）。
+  Blade 版 `codes/{table_name}`（`show()`，本輪未同步門檻、至今無門檻的那一個）
+  **連同視圖與 controller 方法一起實體刪除了**；舊 URI 只剩 redirect closure。
+  ⇒ **`LEGACY_PAGE_RETIREMENT=false` 也叫不回那個無門檻的深分頁排序查詢**，
+  本節原本的「動用 kill switch 要把風險算進代價」已無適用對象。
+  護欄測試：`LegacyBladePageRetirementTest::legacy_codes_endpoints_stay_retired_without_the_kill_switch()`。
+- 📌 **歷史（環節 3～4b-4a 之間）**：那段期間 `codes/{table_name}` 掛 `legacy.page:app.codes.show`
+  ——翻 `MIGRATION_FLAG_CODES=old` **沒有任何效果**（封路 middleware 不讀 flag），
+  但設 `LEGACY_PAGE_RETIREMENT=false` **會**讓流量回到未受保護的 Blade `show()`。
+  保留這段是因為舊 runbook 可能還這樣寫；**現在那個組合已不存在**。
 - ~~風險：intended-URL 導回機制若跟現有 `login` 流程互動有例外~~ **（M2 已驗證，非風險）**：`redirect()->guest(route('login'))` 對帶 `X-Inertia: true` 的請求，實測仍是單純 302（非 409/`X-Inertia-Location`）。原因：`AuthInertiaRedirectTest.php` 裡的 409 是 `LoginController::sendLoginResponse()` **主動**判斷「登入成功後的目的地是 Blade（dashboard）」才手動呼叫 `Inertia::location()`；那是逐個呼叫點自行決定，不是 Inertia middleware 對所有 redirect 的通用行為。`route('login')` 本身走 `auth.login = 'new'`，`showLoginForm` 有掛 `inertia` middleware，是 Inertia 渲染的頁面，所以我們的導向目的地是 Inertia-aware 的，plain redirect 對 Inertia XHR client 而言可以正常走完（同源導向，`X-Inertia`/`X-Inertia-Version` header 會在瀏覽器層級跟著轉送）。已用 `tests/Feature/CodesSortFilterAuthGateTest.php::testGuestWithSortByAndInertiaHeaderStillGetsPlainRedirectToLogin` 鎖住。**踩雷記錄**：驗證時發現 Inertia 的 `Middleware::handle()` 對 GET 請求會比對 `X-Inertia-Version` 頭與伺服器端版本雜湊（見 `vendor/inertiajs/inertia-laravel/src/Middleware.php:133,169`），版本不符會觸發完全不相關的 409/`onVersionChange()`（導回原網址、跟登入門檻無關），測試時務必固定 `app.asset_url` 讓版本可預期，否則會被這個雜訊誤導。
 - 回退：門檻邏輯集中在 `CodesController::appShow()` 呼叫的一個方法內，若上線後發現誤擋合法使用者，移除該方法呼叫即可秒回退，不影響其他既有邏輯。
 - 本輪變更不改資料庫結構、不改既有 API 契約（`api.php` 的 `codes` 端點不受影響）。

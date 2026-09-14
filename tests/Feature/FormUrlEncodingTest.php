@@ -8,9 +8,23 @@ use App\Support\CompositePrimaryKey;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
+/**
+ * @legacy-parity 本類耦合 legacy Blade 人物表單路由（setUp 呼叫 useLegacyPersonForms()
+ * 把 basicinformation.* flag 撥回 'old' 以越過 LegacyBladeFormGate），將隨
+ * docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md 環節 2 連同 legacy 路由一併刪除。
+ *
+ * 環節 1.5 分流結論：**legacy-only** — 可隨環節 2 直接刪除。
+ * 測的是 legacy path-param 的 URL 編碼（斜線／問號／減號）——v2 以 JSON 物件傳 PK，此問題類別不存在。唯一的領域不變量 -999→0 已由 ApiV2Create*／ApiV2Mutate* 覆蓋。
+ *
+ * ⚠️ 本檔有 **6 個測試不依賴 flag**（flag=new 下實測仍綠），環節 2 刪檔前**必須先搬走**，
+ * 否則會連帶失去覆蓋：`testAssocCompositePKDecodingWithMinusInTextTitle`、`testAssocCompositePKDecodingWithMultipleMinusInTextTitle`、`testAssocCompositePKDecodingWithSlashAndMinusInTextTitle`、`testAssocFullCompositePKRoundTrip`、`testMinusEncodingDoesNotConflictWithSeparator`、`testUnionPKDefSymmetryForTextTitle`。
+ *
+ * 新測試請一律寫在 v2 mutation API 路徑上，不要再擴充本檔。
+ */
 /**
  * 測試表單 URL 編碼問題修復
  *
@@ -26,6 +40,7 @@ use Tests\TestCase;
  * - PR #740: assoc 表單 (c_text_title 欄位)
  * - 本次修復: altname ($alt 變數), sources (c_pages 欄位)
  */
+#[Group('legacy-parity')]
 class FormUrlEncodingTest extends TestCase {
     protected $user;
     protected $testPersonId = 12345;

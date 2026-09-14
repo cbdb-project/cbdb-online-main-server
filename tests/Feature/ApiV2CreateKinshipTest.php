@@ -627,4 +627,66 @@ class ApiV2CreateKinshipTest extends TestCase {
         $this->assertSame($opsAfterFirst, DB::table('operations')->count(), '重送被拒不得新增 operations 列');
         $this->assertSame($auditAfterFirst, DB::table('audit_log')->count(), '重送被拒不得新增 audit_log 列');
     }
+
+    // ── 「未詳」人物（personid 0）守衛 ───────────────────────
+
+    /**
+     * 這一組是 UnknownPersonKinshipAssocBlockTest 的 v2 等價覆蓋（Blade 下架計畫環節 1.5）。
+     *
+     * 背景：legacy controller 從一開始就擋「對未詳人物建關係／把未詳人物當成關係對象」，
+     * 但 v2 的 kinship／association handler **原本沒有這道守衛**（同族的 Possession／Posting
+     * 反而有），是分流時才發現的實質缺口。守衛已補在
+     * App\Services\Mutations\Concerns\BlocksUnknownPersonRelations。
+     */
+
+    #[Test]
+    public function testCreateBlocksUnknownOwnerPerson(): void {
+        $this->actingAs($this->makeUser(email: 'kin-unknown-owner@example.com'));
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'person_id' => 0,
+            'target' => ['pk' => ['c_personid' => 0, 'c_kin_id' => 300, 'c_kin_code' => 80]],
+        ]))->assertStatus(422)
+            ->assertJsonFragment(['person_id' => ['unknown_person_not_allowed']]);
+
+        $this->assertSame(0, DB::table('KIN_DATA')->count(), '被擋下時不得留下任何列（含鏡像）');
+    }
+
+    #[Test]
+    public function testCreateBlocksUnknownKinTarget(): void {
+        $this->actingAs($this->makeUser(email: 'kin-unknown-target@example.com'));
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'target' => ['pk' => ['c_personid' => 1000, 'c_kin_id' => 0, 'c_kin_code' => 80]],
+        ]))->assertStatus(422)
+            ->assertJsonFragment(['c_kin_id' => ['unknown_person_not_allowed']]);
+
+        $this->assertSame(0, DB::table('KIN_DATA')->count());
+    }
+
+    /** -999 是「未詳」的另一種表達，正規化成 0 之前就要擋，否則送 -999 即可繞過。 */
+    #[Test]
+    public function testCreateBlocksUnknownKinTargetSentinel(): void {
+        $this->actingAs($this->makeUser(email: 'kin-unknown-sentinel@example.com'));
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'target' => ['pk' => ['c_personid' => 1000, 'c_kin_id' => -999, 'c_kin_code' => 80]],
+        ]))->assertStatus(422)
+            ->assertJsonFragment(['c_kin_id' => ['unknown_person_not_allowed']]);
+    }
+
+    /** proposal 模式同樣要擋——否則未詳關係只是延後到核准時才落庫。 */
+    #[Test]
+    public function testProposalCreateBlocksUnknownOwnerPerson(): void {
+        $this->actingAs($this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'kin-unknown-proposal@example.com'));
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'mode' => 'proposal',
+            'person_id' => 0,
+            'target' => ['pk' => ['c_personid' => 0, 'c_kin_id' => 300, 'c_kin_code' => 80]],
+            'meta' => ['comment' => '應被擋'],
+        ]))->assertStatus(422);
+
+        $this->assertSame(0, DB::table('operations')->count(), '被擋下時不得建立提案');
+    }
 }

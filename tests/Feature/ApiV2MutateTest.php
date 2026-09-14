@@ -724,6 +724,133 @@ class ApiV2MutateTest extends TestCase {
         $this->assertDatabaseHas('BIOG_MAIN', ['c_personid' => 138841, 'c_name_chn' => '完顏阿骨打', 'c_death_age' => 61]);
     }
 
+    /**
+     * 姓名合併的**語序**：中文姓在前、拉丁文名在前。
+     *
+     * 這是 BiogMainBasicInfoNameMergeTest::testProperNameOrderIsGivenNameFirst 的 v2 等價覆蓋。
+     * 原測試走 legacy `PATCH /basicinformation/{id}`，會隨 Blade 下架計畫環節 2 一併刪除；
+     * 但「c_name_proper／c_name_rm 是**名+姓**，與中文相反」是不會自我證明的領域規則
+     * （BiogMainMutationHandler:246-247 與 BiogMainRepository:289-290 各有一份實作），
+     * 語序寫反了資料庫仍然寫得進去、其他測試也不會紅，所以必須有專門的斷言鎖住。
+     */
+    #[Test]
+    public function testDirectBiogMainUpdateMergesChineseSurnameFirstAndLatinGivenNameFirst() {
+        $this->actingAs($this->makeUser(email: 'biog-name-order@example.com'));
+        $this->seedBiogMain();
+
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'basicinformation',
+            'person_id' => 138841,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_personid' => 138841]],
+            'changes' => [
+                'c_surname_chn' => '張',
+                'c_mingzi_chn' => '三',
+                'c_surname' => 'Zhang',
+                'c_mingzi' => 'San',
+                'c_surname_proper' => 'Doe',
+                'c_mingzi_proper' => 'Jane',
+                'c_surname_rm' => 'Zhāng',
+                'c_mingzi_rm' => 'Sān',
+            ],
+        ])->assertOk();
+
+        $person = DB::table('BIOG_MAIN')->where('c_personid', 138841)->first();
+
+        // 中文：姓 + 名，無分隔
+        $this->assertSame('張三', $person->c_name_chn);
+        // 拉丁拼音：姓 + 空格 + 名
+        $this->assertSame('Zhang San', $person->c_name);
+        // 外文本名與羅馬字轉寫：**名 + 空格 + 姓**（與中文相反）
+        $this->assertSame('Jane Doe', $person->c_name_proper);
+        $this->assertSame('Sān Zhāng', $person->c_name_rm);
+    }
+
+    /**
+     * 合併時的空白處理：分欄只有空白時，合出來的姓名不得留下殘餘空格。
+     *
+     * 對應 BiogMainBasicInfoNameMergeTest::testNameMergeTrimsWhitespace 的 v2 等價。
+     *
+     * 這是一個**端到端不變量**，不是對單一實作的斷言：實測目前有兩道 trim 都會把它
+     * 擦乾淨——BiogMainRepository::updateById() 合併時的 trim()，以及其後
+     * BracketNormalizer::normalizePinyinField()（c_name_proper／c_name_rm 都在
+     * BIOG_MAIN_PINYIN_FIELDS 內）結尾的 trim()。**只拿掉前者本測試不會紅**，因為後者
+     * 仍會補上；拿掉後者或兩者才會紅。刻意保留成端到端形式：真正要保護的是「使用者看到
+     * 的姓名欄不得有前後空白」，而不是某一行程式碼。
+     *
+     * 實測細節：只含空白的輸入在抵達合併邏輯前**已是 NULL**（JSON 請求同樣經
+     * TrimStrings／ConvertEmptyStringsToNull），於是合併得到 `' '`，再被 trim 成 `''`。
+     * v2 落庫值為 `''`（非 NULL），故此處用 assertSame('') 精確比對——不寫
+     * `assertSame('', trim($v))`，因為那種寫法在值是 null 時也會通過，等於放掉
+     * 「欄位被整個清成 NULL」這個該被發現的差異。
+     */
+    #[Test]
+    public function testDirectBiogMainUpdateTrimsWhitespaceOnlyNameParts() {
+        $this->actingAs($this->makeUser(email: 'biog-name-trim@example.com'));
+        $this->seedBiogMain();
+
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'basicinformation',
+            'person_id' => 138841,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_personid' => 138841]],
+            'changes' => [
+                'c_surname_proper' => '  ',
+                'c_mingzi_proper' => '  ',
+                'c_surname_rm' => '',
+                'c_mingzi_rm' => '',
+            ],
+        ])->assertOk();
+
+        $person = DB::table('BIOG_MAIN')->where('c_personid', 138841)->first();
+
+        $this->assertSame('', $person->c_name_proper, 'c_name_proper 應為空字串，不得殘留空白、也不得變成 NULL');
+        $this->assertSame('', $person->c_name_rm, 'c_name_rm 應為空字串，不得殘留空白、也不得變成 NULL');
+    }
+
+    /**
+     * 提案路徑的姓名語序：**第二份實作**，必須單獨鎖。
+     *
+     * direct 走 BiogMainRepository::updateById()（:289-290），proposal 走
+     * BiogMainMutationHandler::prepareProposalPayload()（:246-247）——兩份各自把
+     * 「名+姓」寫死一次。上面那個 direct 測試改反 repository 會紅，但改反 handler
+     * **不會**紅，所以兩條路徑都要有自己的斷言，否則其中一份漂掉不會被發現。
+     */
+    #[Test]
+    public function testProposalBiogMainUpdateMergesLatinGivenNameFirst() {
+        $this->actingAs($this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'biog-name-order-proposal@example.com'));
+        $this->seedBiogMain();
+
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'basicinformation',
+            'person_id' => 138841,
+            'mode' => 'proposal',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_personid' => 138841]],
+            'changes' => [
+                'c_surname_chn' => '張',
+                'c_mingzi_chn' => '三',
+                'c_surname' => 'Zhang',
+                'c_mingzi' => 'San',
+                'c_surname_proper' => 'Doe',
+                'c_mingzi_proper' => 'Jane',
+                'c_surname_rm' => 'Zhāng',
+                'c_mingzi_rm' => 'Sān',
+            ],
+            'meta' => ['comment' => '改姓名'],
+        ])->assertOk();
+
+        $operation = DB::table('operations')->where('resource', 'BIOG_MAIN')->first();
+        $payload = json_decode($operation->resource_data, true);
+
+        $this->assertSame('張三', $payload['c_name_chn']);
+        $this->assertSame('Zhang San', $payload['c_name']);
+        $this->assertSame('Jane Doe', $payload['c_name_proper'], '提案 payload 的外文姓名應為名+姓');
+        $this->assertSame('Sān Zhāng', $payload['c_name_rm'], '提案 payload 的羅馬字姓名應為名+姓');
+    }
+
     /** 提案路徑同理（payload 不經 repository）。 */
     #[Test]
     public function testProposalBiogMainUpdateDoesNotClearNameChnWhenPartsAreNull() {

@@ -958,4 +958,96 @@ class ApiV2MutateKinshipTest extends TestCase {
         $response->assertOk()
             ->assertJson(['ok' => true, 'resource' => 'kinship']);
     }
+
+    // ── 「未詳」人物（personid 0）守衛 ───────────────────────
+
+    /**
+     * 這一組是 UnknownPersonKinshipAssocBlockTest 的 v2 等價覆蓋（Blade 下架計畫環節 1.5）。
+     *
+     * 背景：legacy controller 從一開始就擋「對未詳人物建關係／把未詳人物當成關係對象」，
+     * 但 v2 的 kinship／association handler **原本沒有這道守衛**（同族的 Possession／Posting
+     * 反而有），是分流時才發現的實質缺口。守衛已補在
+     * App\Services\Mutations\Concerns\BlocksUnknownPersonRelations。
+     */
+
+    #[Test]
+    public function testUpdateBlocksUnknownOwnerPerson(): void {
+        $this->actingAs($this->makeUser(email: 'kin-upd-unknown-owner@example.com'));
+        $this->seedKinship(['c_personid' => 0]);
+
+        $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'person_id' => 0,
+            'target' => ['pk' => ['c_personid' => 0, 'c_kin_id' => 2000, 'c_kin_code' => 72]],
+        ]))->assertStatus(422)
+            ->assertJsonFragment(['person_id' => ['unknown_person_not_allowed']]);
+    }
+
+    /** 改鍵把對象改成「未詳」也要擋——新值在 changes，只看 targetPk 會漏。 */
+    #[Test]
+    public function testUpdateBlocksRekeyingKinTargetToUnknown(): void {
+        $this->actingAs($this->makeUser(email: 'kin-upd-rekey-unknown@example.com'));
+        $this->seedKinship();
+
+        $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'changes' => ['c_kin_id' => 0],
+        ]))->assertStatus(422)
+            ->assertJsonFragment(['c_kin_id' => ['unknown_person_not_allowed']]);
+
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 72]);
+    }
+
+    /**
+     * pair-only 路徑也必須擋「未詳」——它**不經** handleAfterVariantReset，
+     * 守衛另外掛在 handlePairOnlyMirrorSync 內（codex review 指出的繞過）。
+     * 這條路徑會以 $original->c_kin_id 當反向列的 c_personid 建鏡像，對面是 0
+     * 就會生出一條屬於 personid 0 的關係列。
+     */
+    #[Test]
+    public function testPairOnlyMirrorSyncBlocksUnknownKinTarget(): void {
+        $this->actingAs($this->makeUser(email: 'kin-pair-only-unknown@example.com'));
+        $this->seedKinship(['c_kin_id' => 0, 'c_kin_code' => 72]);
+
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'kinship', 'person_id' => 1000, 'mode' => 'direct', 'operation' => 'update',
+            'target' => ['pk' => ['c_personid' => 1000, 'c_kin_id' => 0, 'c_kin_code' => 72]],
+            'changes' => ['c_kinship_pair' => 74],
+        ])->assertStatus(422)
+            ->assertJsonFragment(['c_kin_id' => ['unknown_person_not_allowed']]);
+
+        $this->assertSame(0, DB::table('KIN_DATA')->where('c_personid', 0)->count(), '不得生出屬於未詳人物的鏡像列');
+    }
+
+    #[Test]
+    public function testPairOnlyMirrorSyncBlocksUnknownOwnerPerson(): void {
+        $this->actingAs($this->makeUser(email: 'kin-pair-only-unknown-owner@example.com'));
+        $this->seedKinship(['c_personid' => 0, 'c_kin_id' => 2000, 'c_kin_code' => 72]);
+
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'kinship', 'person_id' => 0, 'mode' => 'direct', 'operation' => 'update',
+            'target' => ['pk' => ['c_personid' => 0, 'c_kin_id' => 2000, 'c_kin_code' => 72]],
+            'changes' => ['c_kinship_pair' => 74],
+        ])->assertStatus(422)
+            ->assertJsonFragment(['person_id' => ['unknown_person_not_allowed']]);
+    }
+
+    /**
+     * 反例（防過度攔截）：**歷史上已存在的 `c_kin_id = 0` 髒列，必須能被改鍵修好**。
+     *
+     * 守衛看的是「生效後的對象 id」（changes 優先、退回 targetPk）。修復動作是把 0 改成
+     * 有效人物 id，生效值非 0 ⇒ 放行。若守衛改成只看 targetPk，這條會紅——那等於把
+     * 髒資料鎖死、永遠修不了，比不擋還糟。
+     */
+    #[Test]
+    public function testUpdateAllowsRepairingHistoricalUnknownKinTarget(): void {
+        $this->actingAs($this->makeUser(email: 'kin-repair-historical-zero@example.com'));
+        $this->seedKinship(['c_kin_id' => 0, 'c_kin_code' => 72]);
+
+        $this->postJson('/api/v2/mutate', $this->kinshipPayload([
+            'target' => ['pk' => ['c_personid' => 1000, 'c_kin_id' => 0, 'c_kin_code' => 72]],
+            'changes' => ['c_kin_id' => 2000],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 72]);
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 0, 'c_kin_code' => 72]);
+    }
 }

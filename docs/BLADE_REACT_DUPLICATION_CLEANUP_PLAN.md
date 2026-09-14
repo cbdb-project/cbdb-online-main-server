@@ -179,7 +179,7 @@
 | 13b | **`resources/js/inertia/**` 的 legacy fallback 分支** | 與「刪 flag key／刪 legacy 路由」**同 commit** 移除：`components/PersonBrowser/shared/legacyEditUrl.ts`（`buildLegacyEditUrl/DeleteUrl/CreateUrl`）、`shared/Legacy{Edit,Create,Delete}Button.tsx`、14 個 `tabs/*Tab.tsx` 的 `xxxEditorIsNew` 參數與 false 分支、`TabContentLoader.tsx:88-100,235` 的 props 與 `BasicInfoView` 回退分支 | 🔴 React 的 `false` 分支**不是「什麼都不做」，是渲染指向 legacy 路由的按鈕**（`/basicinformation/{id}/{seg}/edit\|delete\|create`）。路由刪了、prop 又退成 `false` ⇒ 按鈕還在但全部 404 |
 | 13c | **React 端硬編碼的 legacy URL** | 每個環節開始前重跑：<br>`grep -rnE "['\"\`]/(basicinformation\|codes\|operations\|manage\|view\|dashboard\|profile\|crowdsourcing\|admin\|welcome)" resources/js/inertia \| grep -v '/app/'` | 已知命中：`PersonEditorShared/PersonBanner.tsx:88` 的 `?? '/admin/audit-logs'` fallback（環節 4a 後失效）；`TabContentLoader.tsx:260-261` 的 `saveas`／`Duplicate_Collateral_Info`（**必須保留**，見 D-5）；`AuthLayout.tsx:29`、`Pages/Profile/Edit.tsx:121` 的 `/home`（安全，`/home` 路由不刪） |
 | 14 | `package.json` + lockfile | 移除 `admin-lte`、`jquery`、`@ttskch/select2-bootstrap4-theme`、`datatables.net`、`datatables.net-bs4`、`@vitejs/plugin-vue`、`@vue/compiler-sfc`、`vue`，並視 grep 結果評估 `lodash`、`sass`。`npm install` 後提交 lockfile | 每個套件刪除前先 `grep -rn "<pkg>" resources/js` 確認 inertia 端零 import。⚠️ ① `app.js:22` `import select2 from 'select2'`，但 **`select2` 不在 `package.json`**（靠 `admin-lte` 的依賴樹解析）——刪完跑 `npm ls select2` 確認走乾淨；② **`@fortawesome/fontawesome-free` 不可刪**，`resources/css/inertia.css:23` 直接 `@import` 它 |
-| 15 | `tests/**` | 刪除純 legacy 的 Feature 測試；含新舊對照者移除 legacy 斷言；移除 **`TestCase::useLegacyPersonForms()`**（`tests/TestCase.php:35-43`，把 `basicinformation.*` flag 壓成 `old`）——注意它**不在 `setUp()` 裡，是各 legacy 測試自行呼叫的 opt-in helper**，移除時要一併處理所有呼叫端 | ⚠️ 21 個測試檔會打 legacy URL；直接依賴 flag 的有 `LegacyBladeFormGateTest`、`FlagAwareUrlHelpersTest`、`NavigationSchemaTest`、`AuthPagesInertiaTest`、`CodesIndexInertiaTest`、`CodesPersonPickerTest`、`InertiaSharedPropsTest`、`OperationsIndexLinksTest`、`OperationsProposalResourceLinkTest`、`CompositePrimaryKeyTest`，全部要改。<br>⚠️ ② **`useLegacyPersonForms()` 有 15 個呼叫端**（`BasicInformation{Addresses,Altnames,Sources,Texts}ControllerTest`、`BasicInformationPagesLoadTest`、`BasicInformationProposalTest`、`BiogMainBasicInfoNameMergeTest`、`BiogMainProposalTest`、`EventStatusWriteActionsTest`、`FormUrlEncodingTest`、`NameSearchIndexAutoSyncTest`、`OfficeStoreRedirectTest`、`ProposalNormalizationTest`、`UnknownPersonKinshipAssocBlockTest` …），直接刪 helper ⇒ 15 檔 `Call to undefined method`。<br>⚠️ ③ **`tests/Unit/VariantReplaceHookCoverageTest.php` 必定會紅**，見下方專節 |
+| 15 | `tests/**` | 刪除純 legacy 的 Feature 測試；含新舊對照者移除 legacy 斷言；移除 **`TestCase::useLegacyPersonForms()`**（`tests/TestCase.php:35-43`，把 `basicinformation.*` flag 壓成 `old`）——注意它**不在 `setUp()` 裡，是各 legacy 測試自行呼叫的 opt-in helper**，移除時要一併處理所有呼叫端 | ✅ **環節 1.5 已完成分流**：14 個 `useLegacyPersonForms()` 呼叫端全部標上 `#[Group('legacy-parity')]`，`./vendor/bin/phpunit --group legacy-parity` 可一鍵列出全部 199 個測試（即環節 2 的刪除清單）；兩個 needs-v2-first 的缺口已補齊 v2 等價覆蓋。<br>⚠️ 直接依賴 flag 的還有 `LegacyBladeFormGateTest`、`FlagAwareUrlHelpersTest`、`NavigationSchemaTest`、`AuthPagesInertiaTest`、`CodesIndexInertiaTest`、`CodesPersonPickerTest`、`InertiaSharedPropsTest`、`OperationsIndexLinksTest`、`OperationsProposalResourceLinkTest`、`CompositePrimaryKeyTest`，全部要改。<br>⚠️ ② **`useLegacyPersonForms()` 有 14 個呼叫端**（環節 1.5 實測；已全部標 `#[Group('legacy-parity')]`）（`BasicInformation{Addresses,Altnames,Sources,Texts}ControllerTest`、`BasicInformationPagesLoadTest`、`BasicInformationProposalTest`、`BiogMainBasicInfoNameMergeTest`、`BiogMainProposalTest`、`EventStatusWriteActionsTest`、`FormUrlEncodingTest`、`NameSearchIndexAutoSyncTest`、`OfficeStoreRedirectTest`、`ProposalNormalizationTest`、`UnknownPersonKinshipAssocBlockTest` …），直接刪 helper ⇒ 14 檔 `Call to undefined method`。<br>⚠️ ③ **`tests/Unit/VariantReplaceHookCoverageTest.php` 必定會紅**，見下方專節 |
 | 16 | 文檔 | `AGENTS.md`（「舊版 Blade 仍實體保留／翻回 `old` 即回退」整段改寫）、`README.md`（**逐行**：`:64` 的「AdminLTE 3 + Blade 仍實體保留作回退相容期／Phase 7 未執行」、`:65-66` 的入口清單含 `app.js`／`jquery-global.js`、`:114`、`:117`——`:64` 與 `:114` 是**對外承諾**「flag 改回 old 即可回退」，與 AGENTS.md 同等級，不改就是文件說謊）、`CHANGELOG.md`、`docs/ADMINLTE.md`（改為「已下架」歷史文件）、`docs/ADMINLTE4_UPGRADE_FEASIBILITY.md`（標註已被取代）、`docs/REACT_INERTIA_MIGRATION_PLAN.md`（§五雙殼／§五之二回退保證／附錄 C 禁止清單全部失效）、`docs/REACT_MIGRATION_BACKLOG.md`（P6-C1/C2、P7-1..3 → `retired`）、`docs/VIEWS.md`、`docs/migration-specs/*.md`（22 份 fidelity spec 加「歷史存檔」抬頭） | ⚠️ **`docs/CODES_SORT_FILTER_AUTH_GATE.md` 必須改寫**——該文記載「把 `codes` flag 切回 `old` 會重新暴露無門檻的深分頁排序查詢」；Blade 版刪除後此風險**消失**，結論需更新，否則會誤導未來的安全評估 |
 | 17 | `API.md` / `docs/openapi/openapi.yaml` | **本計畫預設不動任何 API 路由／欄位／授權／錯誤碼**，故無需更新。**若某個環節實際動到了對外端點語義（例如把 legacy 端點改成導向／410），必須在同一 commit 同步 `API.md`**（AGENTS.md 文檔維護原則） | 環節 3 的導向／410 屬對外行為改變 → **需在 `API.md` 註記**受影響的 legacy URL |
 
@@ -262,14 +262,97 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
 - `docs/REACT_MIGRATION_BACKLOG.md` 的 P6-C1／P6-C2 標為 `retired`。
 - **驗收**：全量 phpunit 綠；grep 證明零引用。
 
-### 環節 1.5 — 測試分流（**先做，否則環節 2 一定會卡住**）
-> 測試是本計畫**最大的單一工作量**，原本被壓縮成 §三的一欄，實際應獨立成環節。
+### 環節 1.5 — 測試分流 ✅ **已完成（2026-09-14）**
 
-- 對 `useLegacyPersonForms()` 的 **15 個呼叫端**逐檔標 `#[Group('legacy-parity')]`（目前全庫 `Group(` 零命中，**沒有任何機械化方式圈出 legacy 測試**，這一步就是在建立那個機制）。
-- 逐檔判定兩類：
-  - **純 legacy CRUD**（如 `BasicInformationPagesLoadTest`、`OfficeStoreRedirectTest`）→ 環節 2 直接刪。
-  - **測資料完整性行為**（`NameSearchIndexAutoSyncTest` 姓名索引同步、`FormUrlEncodingTest` 表單編碼、`ProposalNormalizationTest` 提案正規化、`BiogMainBasicInfoNameMergeTest` 異體字／姓名合併）→ 🔴 **先補一份走 v2 mutation 的等價測試，綠了才准刪 legacy 版**。這四項是 AGENTS.md §1.2／§1.3 明文要求的行為，直接刪＝該行為在 v2 路徑上是否等價**失去憑證**。
-- **驗收**：新補的 v2 等價測試全綠；`grep -rn "Group('legacy-parity')" tests/` 可列出完整清單。
+> 測試是本計畫**最大的單一工作量**，原本被壓縮成 §三的一欄，實際獨立成環節。
+
+**做法**：先把 `useLegacyPersonForms()` 暫時改成 no-op 跑一遍全部呼叫端，用**實測**而非閱讀來判定哪些測試真的依賴 legacy 路由。結果：14 個檔共 **199 個測試，其中 148 個在 flag=new 下會紅**（其餘 51 個不依賴 flag）。
+
+**已完成的動作**：
+
+1. 14 個檔全部標上 `#[Group('legacy-parity')]` 並在 class docblock 寫明分流結論。此前全庫 `Group(` **零命中**，現在 `./vendor/bin/phpunit --group legacy-parity` 可一鍵圈出全部 199 個測試。
+   🔴 **但 group 是「候選清單」，不是「刪除清單」**：199 個裡有 **51 個在 flag=new 下實測仍綠**，代表它們**不依賴 legacy 路由**，整檔刪除會連帶失去覆蓋。逐檔的保留清單見下表，且已寫進各檔 class docblock。
+2. 逐檔判定並補齊缺口（見下表）。
+
+| 測試檔 | 測試數（legacy 相依） | 分流 | 依據 |
+|---|---|---|---|
+| `BasicInformationAddressesControllerTest` | 4（4） | legacy-only | v2 覆蓋見 `ApiV2MutateAddressTest`／`ApiV2DeleteAddressTest` |
+| `BasicInformationAltnamesControllerTest` | 23（23） | legacy-only ✅ **補齊後成立** | 異體字替換與改鍵衝突確實已被 `ApiV2CreateAltnameTest`／`ApiV2MutateAltnameTest`／`ApiV2MutateVariantReplacementTest` 覆蓋；但**全形括號正規化原本零覆蓋**（v2 測資從未用過全形括號，`BracketNormalizerTest` 只測 service 不測接線），已補，見「補齊的 v2 等價覆蓋」#4 |
+| `BasicInformationPagesLoadTest` | 32（29） | legacy-only；**保留 3** | 純 Blade 渲染。保留：2 個 `/app/*` Inertia 案例 + `test_basicinformation_create_page_loads` |
+| `BasicInformationProposalTest` | 37（18） | legacy-only；**保留 19** | 提案「建立」走 legacy 表單；19 個 `testApprove*`／`testReject*` 不依賴 flag，**保留** |
+| `BasicInformationSourcesControllerTest` | 9（4） | legacy-only；**保留 5** | 稽核欄語義（§1.2）由**共用基底** `AbstractPersonSubresourceMutationHandler` 覆蓋，實際斷言在 `ApiV2MutateAddrIntegrityTest`／`ApiV2MutateTextEntityTest`（不在 `ApiV2MutateSourceTest`）。保留的 5 個不打路由，是直接呼叫 repository 的測試 |
+| `BasicInformationTextsControllerTest` | 5（5） | legacy-only | v2 覆蓋見 `ApiV2MutateTextTest`／`ApiV2DeleteTextTest` |
+| **`BiogMainBasicInfoNameMergeTest`** | 8（6） | **needs-v2-first ✅ 已補**；保留 2 | 見下方「補齊的 v2 等價覆蓋」#2。保留：`testGuestCannotUpdateNames`、`testInactiveUserCannotUpdateNames` |
+| `BiogMainProposalTest` | 13（7） | legacy-only；**保留 6** | 🔴 原判「核准端是共用碼已有覆蓋」**不成立**——`OperationsProposalControllerTest` 內 `BIOG_MAIN` **零命中**，BIOG_MAIN 的核准語義（拒絕清空名、軟刪除而非實刪、建立提案撞 id）**全庫只有本檔這 6 個 `testApproveBiogMain*` 在守**。所幸它們不依賴 flag，**保留即可**，不需另寫 |
+| `EventStatusWriteActionsTest` | 8（8） | legacy-only | 寫入與稽核欄語義由共用基底覆蓋（同上，斷言在 `ApiV2MutateAddrIntegrityTest`），`ApiV2MutateEventTest`／`ApiV2MutateStatusTest` 本身無稽核欄斷言 |
+| `FormUrlEncodingTest` | 21（15） | legacy-only；**保留 6** | 測的是 legacy path-param 的 URL 編碼（斜線／問號／減號）——**v2 以 JSON 物件傳 PK，此問題類別不存在**；唯一的領域不變量 `-999→0` 已有 v2 覆蓋。保留的 6 個是 `CompositePrimaryKey` 編解碼單元測試，與路由無關 |
+| **`NameSearchIndexAutoSyncTest`** | 13（5） | **needs-v2-first ✅ 已補**；保留 8 | 見下方「補齊的 v2 等價覆蓋」#1。保留：8 個 BIOG_MAIN Observer 案例 |
+| `OfficeStoreRedirectTest` | 3（3） | legacy-only | 純 legacy 表單 redirect 的 query 參數，v2 無對應概念 |
+| `ProposalNormalizationTest` | 5（5） | legacy-only | 合併機構 ID（`"123-4"`）是 legacy 表單欄位格式，v2 分欄傳送；`[n/a]` 哨兵與 `-999→0` 已由 `ApiV2MutateAssociationTest`／`CompositePrimaryKeyTest` 覆蓋；`__proposal_comment` 對應 v2 的 `meta.comment`，已有 `ApiV2MutateEntryTest` 覆蓋。<br>📌 待辦：`AssociationCreateHandler:280` 的 **create 側** `emptyToSentinel(c_text_title,'[n/a]')` 仍無 v2 斷言（現有的只覆蓋 update），成本很低，建議環節 2 前補上 |
+| **`UnknownPersonKinshipAssocBlockTest`** | 18（16） | **needs-v2-first ✅ 已補（含修 v2 缺口）**；保留 2 | 🔴 原判「v2 已覆蓋」**完全錯誤**——見下方「補齊的 v2 等價覆蓋」#3。保留：`kinship_store_allows_non_unknown_person`、`assoc_store_allows_non_unknown_person` |
+
+#### 補齊的 v2 等價覆蓋（**每一條都先證明過「會紅」**）
+
+1. **`tests/Feature/ApiV2AltnameNameIndexSyncTest.php`（新檔，5 個測試）**——`CBDB__NAME_FTS` 索引同步的 v2 等價：create／update／delete 各一，外加兩個異體字案例（索引必須以**落地替換後**的字形建立，不得殘留替換前的輸入）。v2 的 `AltnameCreateHandler`／`AltnameMutationHandler`／`AltnameDeleteHandler` 本來就有同步邏輯，但**完全沒有測試**。驗證方式：把三個 handler 的 `syncAltnameIndexAfter*()` 短路後，5 個測試全紅。
+
+2. **`ApiV2MutateTest` 新增 3 個測試**——姓名合併語序與 trim：
+   - `testDirectBiogMainUpdateMergesChineseSurnameFirstAndLatinGivenNameFirst`
+   - `testProposalBiogMainUpdateMergesLatinGivenNameFirst`
+   - `testDirectBiogMainUpdateTrimsWhitespaceOnlyNameParts`
+
+   另一個實測發現：`c_name_proper`／`c_name_rm` 的**空白清理有兩道**——
+   `BiogMainRepository::updateById()` 合併時的 `trim()`，以及其後
+   `BracketNormalizer::normalizePinyinField()` 結尾的 `trim()`（兩欄都在
+   `BIOG_MAIN_PINYIN_FIELDS` 內）。**任一道單獨拿掉都不會讓測試變紅**，兩道都拿掉才會。
+   該測試因此刻意寫成端到端不變量（「使用者看到的姓名欄不得有前後空白」），而不是綁死
+   某一行實作。
+
+   🔴 **另一個原本沒被記錄的事實：姓名合併有兩份各自獨立的實作**——direct 走 `BiogMainRepository::updateById()`（`:289-290`），proposal 走 `BiogMainMutationHandler::prepareProposalPayload()`（`:246-247`），兩邊各把「拉丁文名在前、中文姓在前」寫死一次。把**其中一份**的語序改反，另一份的測試**不會紅**。所以兩條路徑各有自己的斷言，缺一不可。驗證方式：分別反轉兩份實作，各自對應的測試確實變紅、另一個不動。
+
+3. 🔴 **修補 v2 的一個實質行為缺口**（見下方 #3）。這是分流最大的收穫：原本以為只是「搬測試」，實際上挖出 v2 從來沒有的守衛。
+
+#### 環節 2 的精確刪除規則
+
+`--group legacy-parity` 的 199 個是**候選**。實際動作分兩類：
+
+| 檔案 | 刪 | 保留（搬走） |
+|---|---|---|
+| `BasicInformationAddressesControllerTest` | 整檔（4） | — |
+| `BasicInformationAltnamesControllerTest` | 整檔（23） | — |
+| `BasicInformationTextsControllerTest` | 整檔（5） | — |
+| `EventStatusWriteActionsTest` | 整檔（8） | — |
+| `OfficeStoreRedirectTest` | 整檔（3） | — |
+| `ProposalNormalizationTest` | 整檔（5） | — |
+| `BasicInformationPagesLoadTest` | 29 | **3** |
+| `BasicInformationProposalTest` | 18 | **19**（`testApprove*`／`testReject*` 全套） |
+| `BasicInformationSourcesControllerTest` | 4 | **5**（直接呼叫 repository、不打路由） |
+| `BiogMainBasicInfoNameMergeTest` | 6 | **2**（授權檢查） |
+| `BiogMainProposalTest` | 7 | **6**（`testApproveBiogMain*`，全庫唯一的 BIOG_MAIN 核准覆蓋） |
+| `FormUrlEncodingTest` | 15 | **6**（`CompositePrimaryKey` 編解碼，與路由無關） |
+| `NameSearchIndexAutoSyncTest` | 5 | **8**（BIOG_MAIN Observer） |
+| `UnknownPersonKinshipAssocBlockTest` | 16 | **2**（正向案例） |
+| **合計** | **148** | **51** |
+
+逐測試清單已寫進各檔 class docblock，不需回頭查本文件。
+
+3. **`tests/Feature/ApiV2Create{Kinship,Association}Test` 與 `ApiV2Mutate{Kinship,Association}Test` 新增 11 個測試，並補上 v2 缺失的守衛。**
+
+   🔴 **這是分流最大的收穫，也是一個真實的線上行為缺口**：legacy controller 從一開始就擋「對『未詳』人物（personid 0）建關係」與「把『未詳』人物當成關係對象」（兩個 controller 各 4 道攔截），但 **v2 的 kinship／association handler 完全沒有這道守衛**——同族的 `PossessionCreateHandler:89`／`PostingCreateHandler:106` 反而有，可見是逐一掛上時漏了這兩個。也就是說**現況下走 React 編輯器本來就擋不住**，而 `UnknownPersonKinshipAssocBlockTest` 的 18 個測試全部只打 legacy 路由——一旦隨環節 2 刪除，這條不變量在全庫將沒有任何憑證。
+
+   處置：新增 `App\Services\Mutations\Concerns\BlocksUnknownPersonRelations` trait，掛到 kin／assoc 的 create 與 mutation 四個 handler，語義與 legacy 對齊（含訊息文字），改以 422 JSON 回應。測試涵蓋：擁有者為 0、對象為 0、對象為 -999 哨兵（正規化前就要擋，否則送 -999 即可繞過）、proposal 模式同樣要擋、改鍵把對象改成 0、pair-only 兩條路徑、以及一個**反例**（ASSOC_DATA 的 `c_kin_id`／`c_assoc_kin_id` 以 0 為合法哨兵，不得誤攔）。驗證方式：把 trait 的兩道判斷短路後絕大多數變紅、反例正確地維持綠；拿掉 pair-only 的守衛則 pair-only 回歸測試變紅。
+
+   涵蓋的掛點共 **6 處**：kin／assoc 的 create、mutation，以及兩條 pair-only 鏡像修復路徑。新增 14 個測試（含 3 個 pair-only 回歸與 1 個防過度攔截的反例）。
+
+   📌 **三筆殘留待辦，全部列入環節 7**（都是**既存狀態、非本次造成的回歸**，且牽涉需人決定的政策）：
+   1. **提案核准不經 handler**：KIN_DATA／ASSOC_DATA 的核准走 `OperationsProposalController::applyKinshipProposal()`／`applyAssocProposal()` → `BiogMainRepository::kinshipStoreById()` 等 legacy repository 方法，**legacy 與 v2 共用這條路徑、兩邊一樣沒擋**。影響僅限「守衛上線前已存在的 pending proposal」——新提案在提交時（direct 與 proposal 兩種 mode）都已被擋。要不要在核准分支補守衛，取決於「核准被擋時審核者該看到什麼」這個政策決定。
+   2. **`Duplicate_Collateral_Info()`** 直接複製 KIN_DATA／ASSOC_DATA 列，來源若有歷史 0 髒列會一併複製。該端點無 `legacy.form` 閘門、仍在服役（D-5a）。要跳過該列並告警、還是整批拒絕，同樣是政策決定。
+   3. **`PossessionMutationHandler`／`PostingMutationHandler` 的 update 路徑**同樣沒有這道守衛（legacy 有；它們的 create 有）。本次只對齊 kin／assoc，避免環節 1.5 無限擴張。
+
+4. **`ApiV2CreateAltnameTest` 與 `ApiV2MutateAltnameTest` 新增 4 個括號正規化測試**（create 正規化、create 撞鍵、update 正規化、update 撞鍵）。
+
+   `BracketNormalizer` 的**接線**（`AltnameCreateHandler:58`、`AltnameMutationHandler:59`）在 v2 一行測試都沒有——`tests/Unit/BracketNormalizerTest` 只測 service 本身，把 handler 那一行呼叫刪掉全庫仍然綠。新測試涵蓋兩套刻意不同的規則（中文欄只轉半形不加空格、拼音欄轉半形並補空格），以及「括號正規化後才撞鍵」必須被擋。兩個撞鍵測試精確斷言 **409 + `errors['target.pk'] = ['conflict']`**，不用寬鬆的「409 或 422」——後者會被無關的驗證錯誤矇混過去。驗證方式：拿掉兩處接線，正規化測試變紅。
+
+**驗收**：`./vendor/bin/phpunit --group legacy-parity` → OK (199 tests)；新增的 v2 測試全綠且**每一條都先證明過會紅**。
 
 ### 環節 2 — A-20 人物編輯 Blade 下架（風險：**中**，非「低」）
 > ⚠️ **原評估「風險低——已被閘門擋成不可達」是錯的**。閘門只擋 **HTTP 入口**，擋不住：
@@ -363,8 +446,18 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
 - `docs/migration-specs/**` 22 份加「歷史存檔」抬頭。
 
 ### 環節 7（獨立，不阻塞前六個環節）— D 類缺口評估
-- **D-5**：`saveas`／`Duplicate_Collateral_Info`／`basicinformation.destroy` 是否已有 React 等價功能？若無，開新任務先補 React 版。
+- **D-5a**：`saveas`／`Duplicate_Collateral_Info` 是 React 正在呼叫的 legacy 端點，評估搬進 v2 mutation／新 `/app` 端點。
+- **D-5b**：`basicinformation.destroy` 的 caller／外部契約盤點，確認無人使用後獨立 commit 下架。
 - **D-1**：`maps/index.blade.php` 是否 React 化（低優先）。
+
+**環節 1.5 移交的三筆「未詳人物守衛」殘留缺口**（都是既存狀態、非該環節造成的回歸，且都需要人做政策決定）：
+
+| # | 缺口 | 位置 | 需要決定什麼 |
+|---|---|---|---|
+| 7-U1 | **提案核准不經 mutation handler**，因此繞過守衛 | `OperationsProposalController::applyKinshipProposal()`／`applyAssocProposal()` → `BiogMainRepository::kinshipStoreById()` 等。**legacy 與 v2 共用這條路徑，兩邊一樣沒擋** | 影響僅限守衛上線前既有的 pending proposal（新提案在提交時已被擋）。要在核准分支補守衛嗎？補了之後審核者會看到「提案套用失敗」——該給什麼提示、還是改成自動退回？ |
+| 7-U2 | **`Duplicate_Collateral_Info()`** 複製 KIN_DATA／ASSOC_DATA 時會一併複製歷史 0 髒列 | `BasicInformationController::Duplicate_Collateral_Info()`；該端點無 `legacy.form` 閘門、仍在服役 | 跳過髒列並告警，還是整批拒絕複製？ |
+| 7-U3 | **`PossessionMutationHandler`／`PostingMutationHandler` 的 update 路徑**沒有未詳人物守衛（legacy 有；它們的 create 有） | 兩個 handler | 補齊以對齊 kin／assoc，還是維持現狀？ |
+
 - 結論寫回本文件 §二 D。
 
 ---

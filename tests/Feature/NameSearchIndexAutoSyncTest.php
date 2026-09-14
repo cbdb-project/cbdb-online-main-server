@@ -8,9 +8,23 @@ use App\Services\CharVariantMapService;
 use App\Support\CompositePrimaryKey;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
+/**
+ * @legacy-parity 本類耦合 legacy Blade 人物表單路由（setUp 呼叫 useLegacyPersonForms()
+ * 把 basicinformation.* flag 撥回 'old' 以越過 LegacyBladeFormGate），將隨
+ * docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md 環節 2 連同 legacy 路由一併刪除。
+ *
+ * 環節 1.5 分流結論：**needs-v2-first** — 含資料完整性行為，必須先有 v2 等價覆蓋才能刪。
+ * 已補齊：ApiV2AltnameNameIndexSyncTest（5 個 ALTNAME_DATA 案例的 v2 等價，含「索引須與異體字落地後的字形一致」）。本檔另 8 個 BIOG_MAIN 案例走 Observer、不依賴 flag，刪檔時須先搬走。
+ *
+ * ⚠️ 本檔有 **8 個測試不依賴 flag**（flag=new 下實測仍綠），環節 2 刪檔前**必須先搬走**，
+ * 否則會連帶失去覆蓋：`test_altname_with_spaced_parentheses_creates_space_free_index`、`test_creating_person_automatically_creates_index`、`test_deleting_person_removes_all_indexes`、`test_index_table_does_not_exist_gracefully_handles`、`test_person_with_parentheses_creates_correct_index`、`test_person_with_spaced_parentheses_creates_space_free_index`、`test_updating_person_name_reindexes`、`test_updating_person_non_name_fields_does_not_reindex`。
+ *
+ * 新測試請一律寫在 v2 mutation API 路徑上，不要再擴充本檔。
+ */
 /**
  * 姓名搜尋索引自動同步測試
  *
@@ -19,6 +33,7 @@ use Tests\TestCase;
  * - BiogMain：使用 Eloquent + Observer 自動觸發
  * - ALTNAME_DATA：使用 BasicInformationAltnamesController + NameSearchIndexService（因復合主鍵改用 Query Builder）
  */
+#[Group('legacy-parity')]
 class NameSearchIndexAutoSyncTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();

@@ -9,9 +9,23 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
+/**
+ * @legacy-parity 本類耦合 legacy Blade 人物表單路由（setUp 呼叫 useLegacyPersonForms()
+ * 把 basicinformation.* flag 撥回 'old' 以越過 LegacyBladeFormGate），將隨
+ * docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md 環節 2 連同 legacy 路由一併刪除。
+ *
+ * 環節 1.5 分流結論：**needs-v2-first** — 含資料完整性行為，必須先有 v2 等價覆蓋才能刪。
+ * 已補齊：ApiV2MutateTest 新增 direct 與 proposal 兩條路徑的姓名語序（中文姓在前／拉丁名在前）與 trim 斷言——兩條路徑各有一份實作，故各自鎖住。
+ *
+ * ⚠️ 本檔有 **2 個測試不依賴 flag**（flag=new 下實測仍綠），環節 2 刪檔前**必須先搬走**，
+ * 否則會連帶失去覆蓋：`testGuestCannotUpdateNames`、`testInactiveUserCannotUpdateNames`。
+ *
+ * 新測試請一律寫在 v2 mutation API 路徑上，不要再擴充本檔。
+ */
 /**
  * 測試 BiogMain 基本資料姓名欄位合併邏輯
  *
@@ -21,6 +35,7 @@ use Tests\TestCase;
  * - 外文全名 = 外文名 + ' ' + 外文姓（名+姓順序）
  * - 外文羅馬字轉寫姓名 = 外文羅馬字轉寫名 + ' ' + 外文羅馬字轉寫姓
  */
+#[Group('legacy-parity')]
 class BiogMainBasicInfoNameMergeTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();

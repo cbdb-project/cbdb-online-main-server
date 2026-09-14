@@ -589,4 +589,75 @@ class ApiV2CreateAltnameTest extends TestCase {
 
         $response->assertStatus(403);
     }
+
+    // ── 括號正規化（全形→半形；拼音欄另補空格）────────────────
+
+    /**
+     * v2 等價覆蓋（Blade 下架計畫環節 1.5）：對應
+     * BasicInformationAltnamesControllerTest::testStoreNormalizesFullwidthBrackets。
+     *
+     * 分流時發現 `BracketNormalizer` 的**接線**（AltnameCreateHandler:58 的
+     * `normalizeAltname()`）在 v2 一行測試都沒有——`tests/Unit/BracketNormalizerTest`
+     * 只測 service 本身，把那一行 handler 的呼叫刪掉全庫仍然綠。
+     *
+     * 規則有兩套、刻意不同：中文欄只做全形→半形**不加空格**；拼音欄除了轉半形，
+     * 還要確保左括號前／右括號後有空格。
+     */
+    #[Test]
+    public function testCreateNormalizesFullwidthBrackets(): void {
+        $this->actingAs($this->makeUser(email: 'create-bracket@example.com'));
+
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'target' => [
+                'pk' => [
+                    'c_personid' => 1000,
+                    'c_alt_name_chn' => '升卿（一作陞卿）',
+                    'c_alt_name_type_code' => 5,
+                ],
+            ],
+            'changes' => [
+                'c_alt_name' => 'Shengqing(Yizuoshengqing)',
+                'c_sequence' => 2,
+            ],
+        ]))->assertStatus(200);
+
+        $row = DB::table('ALTNAME_DATA')->where('c_personid', 1000)->where('c_sequence', 2)->first();
+        $this->assertNotNull($row);
+        $this->assertSame('升卿(一作陞卿)', $row->c_alt_name_chn, '中文欄：全形→半形，且不加空格');
+        $this->assertSame('Shengqing (Yizuoshengqing)', $row->c_alt_name, '拼音欄：全形→半形並補空格');
+    }
+
+    /**
+     * create 側：括號正規化後撞上既有列的鍵 → 必須擋。
+     * 對應 legacy 的 `testStoreBlocksBracketConflict`（codex review 指出 v2 原本只補了
+     * update 側的撞鍵，create 側漏了）。
+     */
+    #[Test]
+    public function testCreateBlocksKeyConflictCausedByBracketNormalization(): void {
+        $this->actingAs($this->makeUser(email: 'create-bracket-conflict@example.com'));
+        // 既有列的鍵已是半形形式
+        DB::table('ALTNAME_DATA')->insert([
+            'c_personid' => 1000,
+            'c_alt_name_chn' => '升卿(一作陞卿)',
+            'c_alt_name_type_code' => 5,
+            'c_source' => 0,
+            'c_sequence' => 1,
+        ]);
+        $before = DB::table('ALTNAME_DATA')->count();
+
+        // 送等價的全形寫法：正規化後會與上面那列同鍵
+        $this->postJson('/api/v2/create', $this->createPayload([
+            'target' => [
+                'pk' => [
+                    'c_personid' => 1000,
+                    'c_alt_name_chn' => '升卿（一作陞卿）',
+                    'c_alt_name_type_code' => 5,
+                ],
+            ],
+            'changes' => ['c_sequence' => 2],
+        ]))->assertStatus(409)
+            ->assertJson(['ok' => false]);
+
+        $this->assertSame($before, DB::table('ALTNAME_DATA')->count(), '被擋下時不得新增列');
+    }
 }

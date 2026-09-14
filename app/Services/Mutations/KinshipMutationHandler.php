@@ -6,6 +6,7 @@ use App\Models\Operation;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
+use App\Services\Mutations\Concerns\BlocksUnknownPersonRelations;
 use App\Services\Mutations\Concerns\ResolvesKinshipReversePair;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
@@ -13,6 +14,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
 class KinshipMutationHandler extends AbstractPersonSubresourceMutationHandler {
+    use BlocksUnknownPersonRelations;
     use ResolvesKinshipReversePair;
 
     /**
@@ -53,6 +55,30 @@ class KinshipMutationHandler extends AbstractPersonSubresourceMutationHandler {
     /** §8：合法反向碼集收斂於 RelationshipMirrorService（單一真相來源）。 */
     private function kinValidReverses($code): array {
         return app(\App\Services\RelationshipMirrorService::class)->validReverseKinSet($code);
+    }
+
+    /**
+     * 「未詳」人物（personid 0）守衛：與 legacy BasicInformationKinshipController 的 4 道 flash 攔截等價
+     * （唯一刻意的差異是 -999 也擋，見 trait 說明）。
+     * 見 Concerns\BlocksUnknownPersonRelations 的說明（含為何 v2 原本缺這一段）。
+     */
+    protected function handleAfterVariantReset(string $resource, string $mode, string $operation, int $personId, array $targetPk, array $changes, array $meta = []): JsonResponse {
+        // 授權必須先判：否則匿名／無權限者送 personid=0 會收到 422 而不是 401/403，
+        // 洩漏「這個 id 不合法」並偏離父類的錯誤優先序。父類稍後會再判一次——
+        // authorizeDirect()／authorizeProposal() 是純檢查、無副作用，重複呼叫安全。
+        $authorizationError = $mode === 'proposal' ? $this->authorizeProposal() : $this->authorizeDirect();
+        if ($authorizationError) {
+            return $authorizationError;
+        }
+
+        if ($blocked = $this->blockUnknownOwner($personId, '親屬', '修改')) {
+            return $blocked;
+        }
+        if ($blocked = $this->blockUnknownRelationTarget($changes, $targetPk, 'c_kin_id', '親屬')) {
+            return $blocked;
+        }
+
+        return parent::handleAfterVariantReset($resource, $mode, $operation, $personId, $targetPk, $changes, $meta);
     }
 
     public function __construct(
@@ -127,6 +153,15 @@ class KinshipMutationHandler extends AbstractPersonSubresourceMutationHandler {
     private function handlePairOnlyMirrorSync(int $personId, array $targetPk): JsonResponse {
         if ($authError = $this->authorizeDirect()) {
             return $authError;
+        }
+        // pair-only 不經 handleAfterVariantReset，守衛必須在這裡再掛一次：
+        // 這條路徑會以 $original->c_kin_id 當反向列的 c_personid 建鏡像，對面若是「未詳」
+        // 就會生出一條屬於 personid 0 的關係列。
+        if ($blocked = $this->blockUnknownOwner($personId, '親屬', '修改')) {
+            return $blocked;
+        }
+        if ($blocked = $this->blockUnknownRelationTarget([], $targetPk, 'c_kin_id', '親屬')) {
+            return $blocked;
         }
         $original = $this->findKinRow($targetPk);
         if (!$original) {

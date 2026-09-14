@@ -1229,4 +1229,78 @@ class ApiV2MutateAssociationTest extends TestCase {
         $response->assertOk()
             ->assertJson(['ok' => true, 'resource' => 'associations']);
     }
+
+    // ── 「未詳」人物（personid 0）守衛 ───────────────────────
+
+    /**
+     * 這一組是 UnknownPersonKinshipAssocBlockTest 的 v2 等價覆蓋（Blade 下架計畫環節 1.5）。
+     *
+     * 背景：legacy controller 從一開始就擋「對未詳人物建關係／把未詳人物當成關係對象」，
+     * 但 v2 的 kinship／association handler **原本沒有這道守衛**（同族的 Possession／Posting
+     * 反而有），是分流時才發現的實質缺口。守衛已補在
+     * App\Services\Mutations\Concerns\BlocksUnknownPersonRelations。
+     */
+
+    #[Test]
+    public function testUpdateBlocksUnknownOwnerPerson(): void {
+        $this->actingAs($this->makeUser(email: 'assoc-upd-unknown-owner@example.com'));
+        $this->seedAssociation(['c_personid' => 0]);
+
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'person_id' => 0,
+            'target' => ['pk' => ['c_personid' => 0]],
+        ]))->assertStatus(422)
+            ->assertJsonFragment(['person_id' => ['unknown_person_not_allowed']]);
+    }
+
+    /** 改鍵把關係對象改成「未詳」也要擋——新值在 changes，只看 targetPk 會漏。 */
+    #[Test]
+    public function testUpdateBlocksRekeyingAssocTargetToUnknown(): void {
+        $this->actingAs($this->makeUser(email: 'assoc-upd-rekey-unknown@example.com'));
+        $this->seedAssociation();
+
+        $this->postJson('/api/v2/mutate', $this->associationPayload([
+            'changes' => ['c_assoc_id' => 0],
+        ]))->assertStatus(422)
+            ->assertJsonFragment(['c_assoc_id' => ['unknown_person_not_allowed']]);
+
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 1000, 'c_assoc_id' => 2000]);
+    }
+
+    /**
+     * 反例（防過度攔截）：ASSOC_DATA 的 c_kin_id／c_assoc_kin_id 以 0 為**合法哨兵**
+     * （表示「非親屬關係」），守衛只看 c_assoc_id，不得把這些 0 誤判成「未詳人物」。
+     */
+    #[Test]
+    public function testUpdateAllowsZeroKinSentinelsInAssocPk(): void {
+        $this->actingAs($this->makeUser(email: 'assoc-upd-zero-kin-ok@example.com'));
+        $this->seedAssociation();
+
+        $this->postJson('/api/v2/mutate', $this->associationPayload())
+            ->assertOk()
+            ->assertJson(['ok' => true]);
+    }
+
+    /**
+     * pair-only 路徑也必須擋「未詳」——它**不經** handleAfterVariantReset，
+     * 守衛另外掛在 handlePairOnlyMirrorSync 內（codex review 指出的繞過）。
+     */
+    #[Test]
+    public function testPairOnlyMirrorSyncBlocksUnknownAssocTarget(): void {
+        $this->actingAs($this->makeUser(email: 'assoc-pair-only-unknown@example.com'));
+        $this->seedAssociation(['c_assoc_id' => 0]);
+
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'associations', 'person_id' => 1000, 'mode' => 'direct', 'operation' => 'update',
+            'target' => ['pk' => [
+                'c_personid' => 1000, 'c_assoc_code' => 1, 'c_assoc_id' => 0,
+                'c_kin_code' => 0, 'c_kin_id' => 0, 'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0,
+                'c_text_title' => '書名', 'c_assoc_first_year' => 1060,
+            ]],
+            'changes' => ['c_assocship_pair' => 2],
+        ])->assertStatus(422)
+            ->assertJsonFragment(['c_assoc_id' => ['unknown_person_not_allowed']]);
+
+        $this->assertSame(0, DB::table('ASSOC_DATA')->where('c_personid', 0)->count(), '不得生出屬於未詳人物的鏡像列');
+    }
 }

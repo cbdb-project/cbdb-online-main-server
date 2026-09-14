@@ -10,9 +10,24 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
+/**
+ * @legacy-parity 本類耦合 legacy Blade 人物表單路由（setUp 呼叫 useLegacyPersonForms()
+ * 把 basicinformation.* flag 撥回 'old' 以越過 LegacyBladeFormGate），將隨
+ * docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md 環節 2 連同 legacy 路由一併刪除。
+ *
+ * 環節 1.5 分流結論：**legacy-only** — 可隨環節 2 直接刪除。
+ * 稽核欄語義（§1.2）已由 ApiV2MutateSourceTest／ApiV2DeleteSourceTest 覆蓋。
+ *
+ * ⚠️ 本檔有 **5 個測試不依賴 flag**（flag=new 下實測仍綠），環節 2 刪檔前**必須先搬走**，
+ * 否則會連帶失去覆蓋：`testEditViewDisplaysCreationAndModificationInfo`、`testSourceDeleteRemovesRowAndStoresOriginal`、`testSourceStoreAndUpdateIgnoreProposalMetaFields`、`testSourceStoreWritesAuditFieldsAndOperations`、`testSourceUpdatePreservesCreationAndSetsModification`。
+ *
+ * 新測試請一律寫在 v2 mutation API 路徑上，不要再擴充本檔。
+ */
+#[Group('legacy-parity')]
 class BasicInformationSourcesControllerTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();

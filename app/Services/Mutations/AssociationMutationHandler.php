@@ -6,12 +6,14 @@ use App\Models\Operation;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
+use App\Services\Mutations\Concerns\BlocksUnknownPersonRelations;
 use App\Support\CompositePrimaryKey;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
 class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandler {
+    use BlocksUnknownPersonRelations;
     /**
      * 暫存表單送來的互逆配對碼（c_assocship_pair / c_kinship_pair / c_assoc_kinship_pair，皆非 ASSOC_DATA 欄）；
      * handle() 抽出、afterDirectUpdate()/proposalAuxiliaryPayload() 取用、finally 清除。
@@ -60,6 +62,30 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
 
     private function kinValidReverses($code): array {
         return app(\App\Services\RelationshipMirrorService::class)->validReverseKinSet($code);
+    }
+
+    /**
+     * 「未詳」人物（personid 0）守衛：與 legacy BasicInformationAssocController 的 4 道 flash 攔截等價
+     * （唯一刻意的差異是 -999 也擋，見 trait 說明）。
+     * 見 Concerns\BlocksUnknownPersonRelations 的說明（含為何 v2 原本缺這一段）。
+     */
+    protected function handleAfterVariantReset(string $resource, string $mode, string $operation, int $personId, array $targetPk, array $changes, array $meta = []): JsonResponse {
+        // 授權必須先判：否則匿名／無權限者送 personid=0 會收到 422 而不是 401/403，
+        // 洩漏「這個 id 不合法」並偏離父類的錯誤優先序。父類稍後會再判一次——
+        // authorizeDirect()／authorizeProposal() 是純檢查、無副作用，重複呼叫安全。
+        $authorizationError = $mode === 'proposal' ? $this->authorizeProposal() : $this->authorizeDirect();
+        if ($authorizationError) {
+            return $authorizationError;
+        }
+
+        if ($blocked = $this->blockUnknownOwner($personId, '社會關係', '修改')) {
+            return $blocked;
+        }
+        if ($blocked = $this->blockUnknownRelationTarget($changes, $targetPk, 'c_assoc_id', '社會關係對象')) {
+            return $blocked;
+        }
+
+        return parent::handleAfterVariantReset($resource, $mode, $operation, $personId, $targetPk, $changes, $meta);
     }
 
     public function __construct(
@@ -193,6 +219,15 @@ class AssociationMutationHandler extends AbstractPersonSubresourceMutationHandle
     private function handlePairOnlyMirrorSync(int $personId, array $targetPk, array $sentPairFields = ['c_assocship_pair']): JsonResponse {
         if ($authError = $this->authorizeDirect()) {
             return $authError;
+        }
+        // pair-only 不經 handleAfterVariantReset，守衛必須在這裡再掛一次：
+        // 這條路徑會以對面 id 當反向列的 c_personid 建鏡像，對面若是「未詳」
+        // 就會生出一條屬於 personid 0 的關係列。
+        if ($blocked = $this->blockUnknownOwner($personId, '社會關係', '修改')) {
+            return $blocked;
+        }
+        if ($blocked = $this->blockUnknownRelationTarget([], $targetPk, 'c_assoc_id', '社會關係對象')) {
+            return $blocked;
         }
         $original = $this->findAssocRow($targetPk);
         if (!$original) {

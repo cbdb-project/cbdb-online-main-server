@@ -6,15 +6,29 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
+/**
+ * @legacy-parity 本類耦合 legacy Blade 人物表單路由（setUp 呼叫 useLegacyPersonForms()
+ * 把 basicinformation.* flag 撥回 'old' 以越過 LegacyBladeFormGate），將隨
+ * docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md 環節 2 連同 legacy 路由一併刪除。
+ *
+ * 環節 1.5 分流結論：**legacy-only** — 可隨環節 2 直接刪除。
+ * 純 legacy 表單 redirect 的 query 參數，v2 無對應概念。
+ *
+ * 本檔 **全部測試都依賴 legacy 路由**（flag=new 下全紅），環節 2 可整檔刪除。
+ *
+ * 新測試請一律寫在 v2 mutation API 路徑上，不要再擴充本檔。
+ */
 /**
  * 測試官名新增後的重定向 URL 是否正確
  *
  * 重現問題：officeStoreById() 返回查詢參數格式的 resource_id（如 c_office_id=87473&c_posting_id=2104406），
  * 但 store() 仍用 explode('-', ...) 解析，導致重定向 URL 中 c_office_id 包含完整查詢字串、c_posting_id 為空。
  */
+#[Group('legacy-parity')]
 class OfficeStoreRedirectTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();

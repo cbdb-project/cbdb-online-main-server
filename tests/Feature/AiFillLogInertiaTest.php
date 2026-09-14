@@ -106,10 +106,15 @@ class AiFillLogInertiaTest extends TestCase {
                 ->has('id')
                 ->has('category')
                 ->has('source_text')
+                // has_submission 切「已提交／未提交」徽章（`Pages/Admin/AiFillLogs/Index.tsx` 直接用它），
+                // 而它正是「ai-fill-logs 全顯示 Not Submitted」那個回歸壞掉的那一格——在此之前零斷言。
+                // fixture 本來就是「第一筆有 user_submitted、第二筆 null」，加兩行即可。
+                ->where('has_submission', true)
                 ->where('person_url', route('app.basicinformation.show', ['id' => 1001, 'tab' => 'postings'], false))
                 ->has('comparison_rows')
                 ->has('ai_matched_pretty')
                 ->etc())
+            ->where('logs.data.1.has_submission', false)
             ->where('logs.data.1.person_url', route('app.basicinformation.show', ['id' => 1001, 'tab' => 'associations'], false)));
     }
 
@@ -182,5 +187,73 @@ class AiFillLogInertiaTest extends TestCase {
         ]);
 
         $this->actingAs($expert)->get(route('app.admin.ai-fill-logs'))->assertForbidden();
+    }
+    // ── 自 AiFillLogTest 移植（Blade 下架環節 4a-1）────────────────
+
+    /**
+     * 訪客要被重導到登入頁。
+     *
+     * 移植自 `AiFillLogTest::test_guest_cannot_access_ai_fill_logs`。React 側原本只有
+     * `non_super_admin_gets_403`（已登入但非 super admin），**沒有任何 guest 斷言**。
+     * 值得留著：`app/admin/ai-fill-logs` 的 `auth` 來自 `routes/web.php` 的**外層 group**，
+     * 路由自己只掛 `inertia`——哪天有人重排 group，這個保護會靜默消失。
+     */
+    #[Test]
+    public function guest_is_redirected_to_login(): void {
+        $this->get(route('app.admin.ai-fill-logs'))->assertRedirect(route('login'));
+    }
+
+    /**
+     * `?search=` 要真的縮小結果集，而不是只讓頁面回 200。
+     *
+     * 移植自 `AiFillLogTest::test_admin_page_filters`（原本斷言 `assertSee('唐朝開元年間知縣')`
+     * 與 `assertSee('暫無記錄')`，都是 Blade 文案）。React 側原本只有 `it_filters_by_category`，
+     * 而 category 是單欄 `where`；search 是**跨 leftJoin 的三欄 OR**
+     * （`ai_fill_logs.source_text`／`users.name`／`users.email`，見 `AiFillLogController:25-32`），
+     * 複雜得多卻沒人守。
+     *
+     * 順手補上 legacy 從未測過的另兩個 OR 分支——原測試只打了 `source_text`。
+     */
+    #[Test]
+    public function search_filter_matches_source_text_and_user_columns(): void {
+        $admin = $this->makeSuperAdmin();
+        $this->seedLog($admin->id, ['source_text' => '唐朝開元年間知縣']);
+
+        $other = User::forceCreate([
+            'name' => 'Zhang Yong',
+            'email' => 'zhangyong@example.com',
+            'password' => bcrypt('secret'),
+            'confirmation_token' => 'tok-other',
+            'is_active' => 1,
+            'is_admin' => User::ROLE_SUPER_ADMIN,
+        ]);
+        $this->seedLog($other->id, ['source_text' => '宋人某乙任某職']);
+
+        // ① source_text 命中：只留第一筆。
+        $this->assertSame(['唐朝開元年間知縣'], $this->searchSourceTexts($admin, '開元'));
+
+        // ② users.name 命中（跨 leftJoin）：只留第二筆。
+        $this->assertSame(['宋人某乙任某職'], $this->searchSourceTexts($admin, 'Zhang Yong'));
+
+        // ③ users.email 命中：同樣只留第二筆。
+        $this->assertSame(['宋人某乙任某職'], $this->searchSourceTexts($admin, 'zhangyong@example.com'));
+
+        // ④ 查無資料時是空集，不是「忽略篩選回全部」。
+        $this->assertSame([], $this->searchSourceTexts($admin, '不存在的文字'));
+    }
+
+    /** 打 `?search=` 並取回 `logs.data` 的 source_text 清單。 */
+    private function searchSourceTexts(User $admin, string $search): array {
+        $texts = [];
+
+        $this->actingAs($admin)
+            ->get(route('app.admin.ai-fill-logs', ['search' => $search]))
+            ->assertOk()
+            ->assertInertia(function (Assert $page) use (&$texts, $search) {
+                $props = $page->where('filters.search', $search)->toArray()['props'];
+                $texts = array_column($props['logs']['data'], 'source_text');
+            });
+
+        return $texts;
     }
 }

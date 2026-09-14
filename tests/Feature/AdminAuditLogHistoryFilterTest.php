@@ -5,29 +5,31 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
+use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
- * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
+ * 審計日誌的「人物頁歷史」過濾（`?c_personid=&history_page=`）。
+ *
+ * 這條過濾的實作（`resolveHistoryContext()` + `applyHistoryFilter()` +
+ * `appendAuditPersonIdLike()`，約 80 行的 LIKE 拼裝，含 `row_pk_text` 的 4 種邊界與 JSON 的
+ * 8 種空白／引號變形）是**唯一**支撐人物詳情頁「本頁歷史」的東西，而 `AdminAuditLogInertiaTest`
+ * 完全沒碰它。原本本檔打 legacy Blade 頁，2026-09-14（Blade 下架環節 4a-1）改測 React 版。
+ *
+ * 四列 fixture 的**形狀**就是這條測試的價值：
+ *  ① 同人同表（要被留下，`row_pk_text` 走 `c_personid=` **前綴形**）；
+ *  ② 同人不同表（要被濾掉）；
+ *  ③ 不同人同表（要被濾掉）；
+ *  ④ 同人同表但 `row_pk_text` 走 `&c_personid=` **中段形**（`appendAuditPersonIdLike()` 的
+ *    四個 pattern 裡最容易寫錯的一種）。
+ *
+ * ⚠️ 第 ④ 列是 review 揪出來補的：原本只有前綴形，所以把中段形的兩個 pattern 整個刪掉
+ * 測試照綠——docblock 聲稱覆蓋了中段形，實際沒有。簡化 fixture 等於廢掉這條測試。
  */
-#[Group('legacy-parity')]
 class AdminAuditLogHistoryFilterTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
-
-        // 本類驗的是 legacy Blade 頁的行為。Blade 下架計畫環節 3「先封路、不刪碼」把那些
-        // 路由改成 302／410，但頁面本身還在、還部署著、還能被 kill switch 叫回來，
-        // 所以這份覆蓋在觀察期內仍有意義——局部關閉封路即可。環節 4 實體刪除時一併移除。
-        $this->useLegacyBladePages();
-
-        $compiledViewPath = sys_get_temp_dir() . '/cbdb-test-views-admin-audit-log-history';
-        if (!is_dir($compiledViewPath)) {
-            mkdir($compiledViewPath, 0777, true);
-        }
-        config(['view.compiled' => $compiledViewPath]);
 
         config()->set('database.default', 'sqlite');
         config()->set('database.connections.sqlite', [
@@ -124,14 +126,53 @@ class AdminAuditLogHistoryFilterTest extends TestCase {
                 'old_data' => null,
                 'new_data' => json_encode(['c_alt_name_chn' => '別人別名'], JSON_UNESCAPED_UNICODE),
             ],
+            // ④ 同人同表，但 c_personid 出現在 row_pk_text 的**中段**（不是開頭）。
+            // 這一列專門守 appendAuditPersonIdLike() 的 '%&c_personid=N&%' pattern——
+            // 少了它，把中段形的兩個 pattern 刪掉測試照樣綠（review 實測確認）。
+            [
+                'occurred_at' => now(),
+                'created_at' => now(),
+                'table_name' => 'ALTNAME_DATA',
+                'operation' => 'UPDATE',
+                'actor_type' => 'user',
+                'actor_id' => (string) $admin->id,
+                'operation_id' => '01HISTORYALTNAME0000000004',
+                'row_pk' => json_encode([
+                    'c_alt_name_chn' => '中段形別名',
+                    'c_alt_name_type_code' => 2,
+                ], JSON_UNESCAPED_UNICODE),
+                'row_pk_text' => 'c_alt_name_type_code=2&c_personid=1001&c_alt_name_chn=%E4%B8%AD%E6%AE%B5%E5%BD%A2%E5%88%A5%E5%90%8D',
+                'old_data' => null,
+                'new_data' => json_encode(['c_alt_name_chn' => '中段形別名'], JSON_UNESCAPED_UNICODE),
+            ],
         ]);
 
-        $response = $this->actingAs($admin)->get('/admin/audit-logs?c_personid=1001&history_page=altnames');
+        $operationIds = null;
+        $historyContext = null;
 
-        $response->assertStatus(200);
-        $response->assertSeeText('正在顯示人物 1001 的「別名」審計日誌。');
-        $operationIds = $response->viewData('logs')->pluck('operation_id')->all();
+        $this->actingAs($admin)
+            ->get(route('app.admin.audit-logs', ['c_personid' => 1001, 'history_page' => 'altnames']))
+            ->assertOk()
+            ->assertInertia(function (Assert $page) use (&$operationIds, &$historyContext) {
+                $props = $page->component('Admin/AuditLogs/Index')->toArray()['props'];
+                $operationIds = array_column($props['logs']['data'], 'operation_id');
+                $historyContext = $props['history_context'];
+            });
 
-        $this->assertSame(['01HISTORYALTNAME0000000001'], $operationIds);
+        // 只留「該人 + 該 history 表群」的列：同人不同表（BIOG_TEXT_DATA）與
+        // 不同人同表（personid 2002）都必須被濾掉；前綴形與中段形兩列都必須被留下。
+        sort($operationIds);
+        $this->assertSame(
+            ['01HISTORYALTNAME0000000001', '01HISTORYALTNAME0000000004'],
+            $operationIds
+        );
+
+        // history_context 要如實回吐，React 頁面靠它顯示「正在顯示人物 N 的『別名』審計日誌」
+        // （`Pages/Admin/AuditLogs/Index.tsx` 直接用 history_context.label）。
+        // 原本 legacy 版的 assertSeeText 那句中文文案**同時**釘住了 label，所以 label 一定要驗——
+        // 少了它，label 錯了或空了都不會紅，頁面會顯示「正在顯示人物 1001 的『』審計日誌」。
+        $this->assertSame(1001, (int) ($historyContext['person_id'] ?? 0));
+        $this->assertSame('altnames', $historyContext['page'] ?? null);
+        $this->assertSame('別名', $historyContext['label'] ?? null);
     }
 }

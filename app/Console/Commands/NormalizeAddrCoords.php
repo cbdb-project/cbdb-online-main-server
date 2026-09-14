@@ -68,8 +68,8 @@ class NormalizeAddrCoords extends Command {
             // 刻意不點名「posting 自動填充」與「朝代同名消歧」——查過了：
             // `PostingAutofillService` 對 x_coord／y_coord **零引用**，它查 ADDRESSES 只取
             // 名稱與年份欄，其餘位址查詢打的是已清乾淨的 ADDR_CODES。會看到舊座標的是
-            // /codes/ADDRESSES 瀏覽頁、Query Playground 的原始 SQL，以及下游匯出。
-            $this->comment('      在那之前，/codes/ADDRESSES、Query Playground 與下游匯出仍會看到舊座標。');
+            // /app/codes/ADDRESSES 瀏覽頁、Query Playground 的原始 SQL，以及下游匯出。
+            $this->comment('      在那之前，/app/codes/ADDRESSES、Query Playground 與下游匯出仍會看到舊座標。');
         }
 
         return self::SUCCESS;

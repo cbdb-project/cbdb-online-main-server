@@ -1517,6 +1517,21 @@ class OperationsController extends Controller {
             throw new \RuntimeException(__('operations.restore_no_delete_data'));
         }
         $payload = $this->filterColumns($table, $target);
+        if ($this->hasColumn($table, 'created_at') && !isset($payload['created_at'])) {
+            $payload['created_at'] = Carbon::now();
+        }
+        if ($this->hasColumn($table, 'updated_at')) {
+            $payload['updated_at'] = Carbon::now();
+        }
+        // 同 restoreUpdate：重建被刪列也是一次寫入，c_modified_* 蓋還原人＋還原時刻；
+        // c_created_*（建檔事實）維持快照值。
+        if ($this->hasColumn($table, 'c_modified_by')) {
+            $payload['c_modified_by'] = \App\Support\AuditActor::currentName();
+        }
+        if ($this->hasColumn($table, 'c_modified_date')) {
+            $payload['c_modified_date'] = Carbon::now();
+        }
+        $conditions = $this->buildKeyConditions($operation, $target, $target);
         // 經緯度歸零：還原歷史快照時同樣要做。
         //
         // 這**刻意不同於** AGENTS.md §1.3 對異體字替換的處理（restore 不做內容替換），
@@ -1556,6 +1571,35 @@ class OperationsController extends Controller {
             // 第一版兩邊都用逐欄模式，於是只帶一軸的刪除快照會還原出 `105.36, NULL`
             //（審查端到端證明過）。實務可達性低（正常快照來自 `SELECT *`，兩欄都在），
             // 但那是資料形狀的巧合、不是結構保證。
+            // **半截對的快照，在目標列已存在時一律中止還原。**
+            //
+            // `restoreDelete` 走 `updateOrInsert()`——那同時是 update 也是 insert。兩位審查者
+            // 各用執行證據指出相反的危害，而兩個都對：對一個只帶 `x_coord` 的快照、
+            // 而目標列已存在且帶著真實的 `y_coord = 41.4`——
+            //   整列模式：寫出 `NULL, NULL`，**毀掉那個真實的 41.4**；
+            //   逐欄模式：寫出 `105.36, 41.4`，**憑空造出一對兩種狀態下都不存在過的座標**，
+            //             而且是靜默的。
+            // 捏造比「有通知的遺失」更糟，但兩者都不該發生。所以這裡不在 true／false 之間
+            // 二選一，而是認定「一對之中只有一軸出現在快照裡」本身就是**壞快照**，比照
+            // 上面那條「座標不是數值」一樣中止——不猜、不捏造、也不替使用者決定丟掉哪個值。
+            //
+            // 目標列**不存在**時（真正的 insert）沒有受害者：缺席的那一軸必然落庫成 NULL，
+            // 清成一對 NULL 是誠實的「沒有座標」，所以照樣走整列模式。
+            // 實務上這條中止走不到：刪除快照來自 `SELECT *`，兩欄一定都在。
+            $targetRowExists = !empty($conditions) && DB::table($table)->where($conditions)->exists();
+            if ($targetRowExists) {
+                foreach (CoordinatePairNormalizer::pairsFor($table) as $pair) {
+                    $present = array_filter(
+                        $pair,
+                        static fn (string $column): bool => array_key_exists($column, $payload)
+                    );
+                    if ($present !== [] && count($present) !== count($pair)) {
+                        throw new \RuntimeException(__('coordinate.half_pair_snapshot', [
+                            'columns' => implode('、', $pair),
+                        ]));
+                    }
+                }
+            }
             $coordinateResult = CoordinatePairNormalizer::normalizeRow($payload, $table, true);
             $payload = $coordinateResult['data'];
             $this->coordinateClearedOnRestore = array_merge(
@@ -1563,21 +1607,6 @@ class OperationsController extends Controller {
                 $coordinateResult['cleared']
             );
         }
-        if ($this->hasColumn($table, 'created_at') && !isset($payload['created_at'])) {
-            $payload['created_at'] = Carbon::now();
-        }
-        if ($this->hasColumn($table, 'updated_at')) {
-            $payload['updated_at'] = Carbon::now();
-        }
-        // 同 restoreUpdate：重建被刪列也是一次寫入，c_modified_* 蓋還原人＋還原時刻；
-        // c_created_*（建檔事實）維持快照值。
-        if ($this->hasColumn($table, 'c_modified_by')) {
-            $payload['c_modified_by'] = \App\Support\AuditActor::currentName();
-        }
-        if ($this->hasColumn($table, 'c_modified_date')) {
-            $payload['c_modified_date'] = Carbon::now();
-        }
-        $conditions = $this->buildKeyConditions($operation, $target, $target);
         // char_variant_map 是對照表本身：還原一筆被改／被刪的對照，可能重新引入環或
         // 多字元 key，繞過其餘 9 個寫入端的 guard（見 docs/CHAR_VARIANT_MAP_TEXT_COLUMN_ROLLOUT_PLAN.md S1）。
         // 注意這與「restore 不做內容替換」不衝突：那是不對還原內容做落地替換（保留歷史字形），

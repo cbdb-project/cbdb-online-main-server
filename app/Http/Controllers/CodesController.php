@@ -1725,16 +1725,31 @@ class CodesController extends Controller {
         $guardConditions = $isCreate
             ? []
             : $this->buildConditionsFromId($keyColumns, (string) ($operation['resource_id'] ?? ''));
-        // 座標通知需要「現況列」才能分辨真損失與假損失：`flashCoordinateNotices()` 會把
-        // 「沒送來、而且原值本來就是 NULL」的伙伴欄濾掉，但傳空陣列時那條規則會把**每一個**
-        // 沒送來的伙伴欄都濾掉——於是修改提案若只送 `x_coord=0`，使用者不會被告知一個真實的
-        // `y_coord` 將在核准時被清掉，而 §1.4 明說那種通知不可以靜默。
+        // 座標通知需要「寫入前的那一列」才能分辨真損失與假損失：
+        // `flashCoordinateNotices()` 會把「沒送來、而且原值本來就是 NULL」的伙伴欄濾掉，
+        // 但拿不到那一列時那條規則會把**每一個**沒送來的伙伴欄都濾掉——於是修改提案若只送
+        // `x_coord=0`，使用者不會被告知一個真實的 `y_coord` 將在核准時被清掉，而 §1.4 明說
+        // 那種通知不可以靜默。
+        //
+        // **來源用 operation 的 `resource_original` 快照，不重新解析 `resource_id` 去 SELECT。**
+        // 第一版走了解析那條路，結果漏掉 v2 建立的提案：`buildConditionsFromId()` 背後的
+        // 具名解析器只處理複合主鍵（`arity >= 2`），所以 v2 存的 `c_addr_id=4338` 會退回
+        // 「整段字串當值」而變成 `c_addr_id = 'c_addr_id=4338'`，查不到列 ⇒ `(array) null`
+        // ⇒ 通知被靜默吃掉（codex 實測）。快照沒有這個問題：它是解碼好的陣列，與
+        // `resource_id` 的兩種格式（Codes UI 的 `_._` 裸值 vs v2 的 query-string）都無關，
+        // 而且是權威來源、不必多一次查詢。
+        //
+        // 代價講清楚：快照是「提案建立時」的那一列，不是此刻的現況。核准實際寫入時比對的是
+        // 現況，所以理論上可能有落差；但編輯提案時本來就無法預知核准那一刻的狀態，而用快照
+        // 至少永遠是一個**真實存在過**的值，不會像查不到列那樣直接靜默。
         // create 提案沒有既有列（也沒有既存值可丟），維持空陣列。
         // 變數名刻意不叫 $existingRow——這個方法下面已經有一個同名變數，語義是
         // 「查重找到的衝突列」，完全不同的東西。
-        $liveRowForNotices = $isCreate || $guardConditions === []
+        // 只有登記了座標對的表才需要解碼快照——82 張代碼表裡有 80 張永遠不會產生座標通知
+        //（`flashCoordinateNotices()` 在 `$cleared === []` 時就早退），沒必要為它們解一次 JSON。
+        $liveRowForNotices = $isCreate || !CoordinatePairNormalizer::handles($table)
             ? []
-            : (array) ($this->fetchRowByKeys($table, $keyColumns, $guardConditions) ?: []);
+            : (array) (json_decode($operation['resource_original'] ?? '', true) ?: []);
         if ($guardError = $this->guardCharVariantMapWrite($table, $data, $guardConditions)) {
             flash($guardError, 'error');
 

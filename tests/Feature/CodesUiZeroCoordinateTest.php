@@ -683,4 +683,116 @@ class CodesUiZeroCoordinateTest extends TestCase {
             '現況列的 y_coord 是 40.3，會在核准時被一併清掉，必須告知使用者'
         );
     }
+
+    #[Test]
+    public function testRestoringAHalfPairSnapshotOverAnExistingRowIsRefused(): void {
+        // `restoreDelete` 走 `updateOrInsert()`——同時是 update 也是 insert。對一個只帶
+        // `x_coord` 的快照、而目標列已存在且帶著真實的 `y_coord`，兩種模式各有一種危害
+        // （兩位審查者各自以執行證據指出）：整列模式毀掉那個真實值；逐欄模式憑空造出一對
+        // 兩種狀態下都不存在過的座標，而且是靜默的。
+        //
+        // 所以這裡不在兩者之間選，而是認定「一對之中只有一軸出現在快照裡」本身就是壞快照，
+        // 比照「座標不是數值」一樣中止——不猜、不捏造、也不替使用者決定丟掉哪個值。
+        $admin = User::forceCreate([
+            'name' => 'restore half pair admin',
+            'email' => 'restore-half-pair@example.com',
+            'confirmation_token' => 'token-restore-half-pair',
+            'is_active' => User::STATUS_ACTIVE,
+            'is_admin' => User::ROLE_SUPER_ADMIN,
+        ]);
+
+        // 目標列**已存在**，帶著一個真實的緯度。
+        DB::table('ADDR_CODES')->insert([
+            'c_addr_id' => 9009,
+            'c_name' => 'AlreadyThere',
+            'c_admin_cat_code' => 176,
+            'x_coord' => null,
+            'y_coord' => 35.0,
+        ]);
+
+        // 快照只帶經度（完全沒有 y_coord 這個鍵）。
+        $snapshot = [
+            'c_addr_id' => 9009,
+            'c_name' => 'AlreadyThere',
+            'c_admin_cat_code' => 176,
+            'x_coord' => 105.36354,
+        ];
+
+        $operationId = DB::table('operations')->insertGetId([
+            'user_id' => $admin->id,
+            'c_personid' => 0,
+            'op_type' => Operation::TYPE_DELETE,
+            'resource' => 'ADDR_CODES',
+            'resource_id' => '9009',
+            'resource_data' => json_encode($snapshot, JSON_UNESCAPED_UNICODE),
+            'resource_original' => json_encode($snapshot, JSON_UNESCAPED_UNICODE),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($admin);
+        $this->post('/operations/'.$operationId.'/restore');
+
+        $row = $this->row(9009);
+        // 中止：那一列一個字都沒被動到。
+        $this->assertSame(
+            35.0,
+            (float) $row->y_coord,
+            '中止還原時既有的真實緯度必須毫髮無傷（毀掉它＝整列模式的危害）'
+        );
+        $this->assertNull(
+            $row->x_coord,
+            '也不可以把快照的經度寫進去——那會造出一對從未存在過的座標（逐欄模式的危害）'
+        );
+    }
+
+    #[Test]
+    public function testAV2FormatProposalIdStillWarnsAboutTheAxisItWillWipe(): void {
+        // v2 存的 resource_id 是 query-string（`c_addr_id=4338`），Codes UI 存的是 `_._`
+        // 串接的裸值。第一版靠解析 resource_id 去 SELECT 現況列，而背後的具名解析器只處理
+        // 複合主鍵（arity >= 2）——於是 v2 建立的單一主鍵提案會退回「整段字串當值」、查不到
+        // 列，通知被靜默吃掉（codex 實測）。現在改用 operation 的 resource_original 快照，
+        // 與兩種 resource_id 格式都無關。
+        $admin = User::forceCreate([
+            'name' => 'v2 prop editor',
+            'email' => 'codes-prop-v2@example.com',
+            'confirmation_token' => 'token-prop-v2',
+            'is_active' => User::STATUS_ACTIVE,
+            'is_admin' => User::ROLE_SUPER_ADMIN,
+        ]);
+        $this->seedRow(['x_coord' => 113.5, 'y_coord' => 40.3]);
+
+        $operationId = DB::table('operations')->insertGetId([
+            'user_id' => $admin->id,
+            'c_personid' => 0,
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+            'resource' => 'ADDR_CODES',
+            // **v2 格式**，不是 Codes UI 的裸 id
+            'resource_id' => 'c_addr_id=4338',
+            'resource_data' => json_encode([
+                'c_addr_id' => 4338,
+                'c_name_chn' => '安定衛',
+                'c_admin_cat_code' => 176,
+                '__review_status' => 'pending',
+                '__key_columns' => ['c_addr_id'],
+            ], JSON_UNESCAPED_UNICODE),
+            'resource_original' => json_encode((array) $this->row(), JSON_UNESCAPED_UNICODE),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($admin);
+        $this->patch('/app/codes/ADDR_CODES/proposals/'.$operationId, [
+            'c_addr_id' => '4338',
+            'c_name_chn' => '安定衛',
+            'c_admin_cat_code' => '176',
+            'x_coord' => '0',
+        ]);
+
+        $this->assertStringContainsString(
+            'y_coord',
+            (string) json_encode(session()->all(), JSON_UNESCAPED_UNICODE),
+            'v2 格式的 resource_id 也必須查得到寫入前那一列，否則真損失的通知會被靜默吃掉'
+        );
+    }
 }

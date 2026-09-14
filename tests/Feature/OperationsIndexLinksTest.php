@@ -12,18 +12,26 @@ use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
- * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
+ * ── 2026-09-14（Blade 下架環節 4a-2）─────────────────────────────
+ *
+ * 本檔 HEAD 有 28 條，其中 **17 條本次完全沒動**——它們透過 `firstResourceLink()`／`firstRow()`
+ * 打 `/app/operations` 並讀 Inertia props，本來就是 React 測試，只是住在這個 legacy 檔、
+ * 被 setUp 的 `useLegacyBladePages()` 連坐。整檔刪掉會毀掉它們，這是本次分流最大的陷阱。
+ *
+ * 動到的是 11 條：9 條原本打 legacy `/operations` 並用 `assertSee('href="..."')` 驗 HTML，
+ * 已全部改成打 `/app/operations` 並對 `resource_link`／`people[]`／`audit_logs[]`／`user_name`
+ * 做精確比對——比原本的 HTML 子字串斷言更強（`assertSee('/codes/...')` 會被
+ * `/app/codes/...` 同時命中，等於什麼都沒釘住）。
+ *
+ * 加上 1 條只加了一行、1 條被刪（同義反覆，見下方註解）。
+ *
+ * 唯一還需要 kill switch 的是 `test_legacy_codes_edit_page_resolves_the_right_composite_row`
+ * ——它從原本那條的後半段拆出來，要開 legacy codes 編輯頁確認 id 解析，而那個頁面屬
+ * **環節 4b**。它是本檔唯一仍掛 `#[Group('legacy-parity')]` 的測試。
  */
-#[Group('legacy-parity')]
 class OperationsIndexLinksTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
-
-        // 本類驗的是 legacy Blade 頁的行為。Blade 下架計畫環節 3「先封路、不刪碼」把那些
-        // 路由改成 302／410，但頁面本身還在、還部署著、還能被 kill switch 叫回來，
-        // 所以這份覆蓋在觀察期內仍有意義——局部關閉封路即可。環節 4 實體刪除時一併移除。
-        $this->useLegacyBladePages();
 
         config()->set('app.env', 'testing');
         $this->app['env'] = 'testing';
@@ -213,19 +221,17 @@ class OperationsIndexLinksTest extends TestCase {
             'crowdsourcing_status' => 0,
         ]);
 
-        // 访问 operations 页面
-        $response = $this->actingAs($user)->get('/operations');
-
-        $response->assertStatus(200);
-
-        // 验证页面包含正确的链接。codes flag=new → 連 React 版（含 /app 前綴）；
-        // 只斷言 '/codes/...' 會同時被 '/app/codes/...' 命中，等於什麼都沒釘住，故寫全並排除舊路徑。
-        $response->assertSee('href="/app/codes/TEXT_CODES/68942/edit"', false);
-        $response->assertDontSee('href="/codes/TEXT_CODES/68942/edit"', false);
-        $response->assertSee('查閱');
-        $response->assertDontSee('>68942</a>', false);
-        $response->assertSee('overflow-wrap: anywhere;', false);
-        $response->assertSee('(本修改不涉及人物)');
+        // codes flag=new → resource_link 指 React 版（含 /app 前綴）。
+        // 原本用 assertSee('href="/app/codes/..."') 驗 HTML；改成精確比對 prop 更強——
+        // assertSee('/codes/...') 本來會被 '/app/codes/...' 同時命中，等於什麼都沒釘住。
+        $row = $this->firstRow($user);
+        $this->assertSame('/app/codes/TEXT_CODES/68942/edit', $row['resource_link']);
+        // 這筆修改不涉及人物：people[] 是單一「佔位項」（id 為 null），
+        // 對應 Blade 原本的文案「(本修改不涉及人物)」。
+        $people = $row['people'] ?? [];
+        $this->assertCount(1, $people);
+        $this->assertNull($people[0]['id'], '不涉及人物的操作，people 佔位項的 id 應為 null');
+        $this->assertNull($people[0]['person_edit_url']);
     }
 
     /**
@@ -306,11 +312,12 @@ class OperationsIndexLinksTest extends TestCase {
             'c_nianhao_chn' => '測試年號',
         ]);
 
-        $response = $this->actingAs($user)->get('/operations');
-
-        $response->assertStatus(200);
-        $response->assertSee('href="/app/codes/NIAN_HAO/464/edit"', false);
-        $response->assertDontSee('/codes/NIAN_HAO/c_nianhao_id=464/edit', false);
+        // 單主鍵的 query-string resource_id（c_nianhao_id=464）要被正規化成 '464'
+        // 才能組進 codes path，否則連出來的是 /codes/NIAN_HAO/c_nianhao_id=464/edit。
+        $this->assertSame(
+            '/app/codes/NIAN_HAO/464/edit',
+            $this->firstResourceLink($user)
+        );
     }
 
     /**
@@ -430,7 +437,42 @@ class OperationsIndexLinksTest extends TestCase {
             $link
         );
 
-        // id 解析的保證與 flag 無關：Blade 版編輯頁同樣要開出 404794 那一列（不是 500001）。
+    }
+
+    /**
+     * 上一條的後半段：legacy Blade codes 編輯頁要真的開出 404794 那一列（不是 500001）。
+     *
+     * ⚠️ **本檔唯一還耦合 legacy 頁的測試**，所以單獨掛 `#[Group('legacy-parity')]`——
+     * 那個群組是專案文件化的「legacy 耦合測試一鍵清單」（計畫 §三第 15 欄）。
+     * 若只在註解寫「環節 4b 要一併移除」，沒有任何機械化手段找得出它，
+     * 屆時它會以「不在任何清單上的紅」出現，正是分流機制要避免的情況。
+     *
+     * legacy codes 編輯頁屬**環節 4b**（表單／寫入頁），本環節 4a 不刪它，故 per-test
+     * 局部關閉封路。4b 刪該頁時，**整條測試**移除即可——連結指向的斷言已在上一條，
+     * 這裡只驗「那個頁面對 id 的解析」。
+     */
+    #[Test]
+    #[Group('legacy-parity')]
+    public function test_legacy_codes_edit_page_resolves_the_right_composite_row(): void {
+        config(['migration_flags.pages.codes' => 'old']);
+
+        $user = User::forceCreate([
+            'name' => 'Hongsu Wang',
+            'email' => 'merged-person-legacy-edit@example.com',
+            'password' => bcrypt('password'),
+            'confirmation_token' => 'test-token',
+            'is_active' => 1,
+            'is_admin' => 1,
+        ]);
+
+        \DB::table('MERGED_PERSON_DATA')->insert([
+            ['c_personid' => 108625, 'c_merged_from_personid' => 500001],
+            ['c_personid' => 108625, 'c_merged_from_personid' => 404794],
+        ]);
+
+        $link = '/codes/MERGED_PERSON_DATA/c_personid=108625&c_merged_from_personid=404794/edit';
+
+        $this->useLegacyBladePages();
         $this->actingAs($user)->get($link)
             ->assertOk()
             ->assertSessionMissing('flash_notification')
@@ -438,44 +480,12 @@ class OperationsIndexLinksTest extends TestCase {
             ->assertDontSee('500001');
     }
 
-    #[Test]
-    public function test_person_specific_link_priority_logic() {
-        // 测试链接优先级逻辑：人物特定链接优先于代码表链接
-
-        $codeTableKeys = array_keys(config('codes.tables', []));
-        $codeTables = array_map('strtoupper', $codeTableKeys);
-
-        // 模拟一个涉及人物的 ALTNAME_DATA 操作
-        $resource = 'ALTNAME_DATA';
-        $resourceId = '115470-0-馬可·波羅-17';
-        $personId = 115470;
-        $opType = 3;
-
-        $isCodeResource = in_array(strtoupper($resource), $codeTables);
-        $this->assertTrue($isCodeResource, 'ALTNAME_DATA should be a code resource');
-
-        // 模拟视图逻辑
-        $hasPersonLink = $personId && $personId != 0;
-        $resourceSpecificLink = null;
-
-        if ($hasPersonLink) {
-            $resourceSpecificLink = "/basicinformation/{$personId}/altnames/{$resourceId}/edit";
-        }
-
-        $resourceLink = null;
-        // 优先使用人物相关的特定资源链接
-        if ($hasPersonLink && $resourceSpecificLink) {
-            $resourceLink = $resourceSpecificLink;
-        }
-        // 对于代码表资源，如果没有特定资源链接，则使用 codes 路由
-        elseif ($isCodeResource && $opType != 4) {
-            $resourceLink = route('codes.edit', ['table_name' => $resource, 'id' => $resourceId], false);
-        }
-
-        // 验证应该使用人物特定链接
-        $this->assertEquals('/basicinformation/115470/altnames/115470-0-馬可·波羅-17/edit', $resourceLink);
-        $this->assertStringNotContainsString('/codes/ALTNAME_DATA/', $resourceLink);
-    }
+    // 原本這裡有 test_person_specific_link_priority_logic：它自己用 if/else 組出
+    // $resourceLink 再斷言自己的組法（同義反覆），唯一碰到生產碼的是 config('codes.tables')
+    // 與一個永遠走不到的 route('codes.edit') 分支；而它斷言的 URL
+    // `/basicinformation/{id}/altnames/{pk}/edit` 是**環節 2 就已刪除的路由**。
+    // 連結優先序的真正覆蓋在同檔的 test_operations_index_renders_person_specific_resource_links_*
+    // 三條（驗 people[].resource_link 的實際值），故隨環節 4a-2 移除。
 
     #[Test]
     public function test_operations_index_does_not_generate_links_for_deleted_operations() {
@@ -501,16 +511,14 @@ class OperationsIndexLinksTest extends TestCase {
             'crowdsourcing_status' => 0,
         ]);
 
-        // 访问 operations 页面
-        $response = $this->actingAs($user)->get('/operations');
-
-        $response->assertStatus(200);
-
-        // 验证删除操作不生成編輯链接
-        $response->assertDontSee('/codes/TEXT_CODES/68942/edit', false);
-        $response->assertSee('無資源頁面');
-        // 但应该显示 resource_id
-        $response->assertSee('68942');
+        // 刪除操作（op_type=4）不得產編輯連結——資源已經不在了。
+        $row = $this->firstRow($user);
+        $this->assertNull($row['resource_link'], 'op_type=4 不該有 resource_link');
+        $this->assertFalse((bool) ($row['can_compare'] ?? false));
+        // 但資源識別本身仍要傳下去（使用者要知道刪掉的是哪一筆）。
+        // 列上沒有 resource_id prop；對外顯示的是 resource_description
+        // （`$formatResourceDescription($resourceName, $rawResourceId)`）。
+        $this->assertStringContainsString('68942', (string) ($row['resource_description'] ?? ''));
     }
 
     #[Test]
@@ -535,11 +543,12 @@ class OperationsIndexLinksTest extends TestCase {
             'crowdsourcing_status' => 0,
         ]);
 
-        $response = $this->get('/operations');
-
-        $response->assertStatus(200);
-        $response->assertSee('User ' . $user->id);
-        $response->assertDontSee('Hidden Editor');
+        // 訪客只看到 'User {id}'，看不到編輯者真名（隱私不變量，
+        // OperationsController 的 `Auth::check() ? name : 'User '.id`）。
+        // firstRow(null) 會先 Auth::logout()，確保這次真的是訪客請求。
+        $row = $this->firstRow(null);
+        $this->assertSame('User ' . $user->id, $row['user_name']);
+        $this->assertStringNotContainsString('Hidden Editor', json_encode($row, JSON_UNESCAPED_UNICODE));
     }
 
     #[Test]
@@ -603,12 +612,16 @@ class OperationsIndexLinksTest extends TestCase {
             ],
         ]);
 
-        $response = $this->actingAs($user)->get('/operations');
-
-        $response->assertStatus(200);
-        $response->assertSee('審計記錄（2 筆）');
-        $response->assertSee('POSTED_TO_OFFICE_DATA');
-        $response->assertSee('POSTED_TO_ADDR_DATA');
+        // 一筆 operation 連動兩表時，兩筆 audit 都要列出（原本驗 Blade 文案「審計記錄（2 筆）」；
+        // 筆數與表名才是不變量）。
+        $row = $this->firstRow($user);
+        $auditLogs = $row['audit_logs'] ?? [];
+        $this->assertCount(2, $auditLogs);
+        $this->assertSame(
+            ['POSTED_TO_ADDR_DATA', 'POSTED_TO_OFFICE_DATA'],
+            collect($auditLogs)->pluck('table_name')->sort()->values()->all()
+        );
+        $this->assertTrue((bool) ($row['has_audit_logs'] ?? false));
     }
 
     #[Test]
@@ -675,14 +688,14 @@ class OperationsIndexLinksTest extends TestCase {
             ],
         ]);
 
-        $response = $this->actingAs($user)->get('/operations');
-
-        $response->assertStatus(200);
-        $response->assertSee('/basicinformation/101/edit', false);
-        $response->assertSee('/basicinformation/202/edit', false);
-        $response->assertSee('rowspan="2"', false);
-        $response->assertSee('主操作');
-        $response->assertSee('連動');
+        // 一筆操作連動兩人時，兩人都要出現在 people[] 且各有人物編輯連結，並且恰有一個是主操作
+        // （原本的 rowspan="2"／「主操作」／「連動」是 Blade 排版文案，不是不變量）。
+        $people = $this->firstRow($user)['people'] ?? [];
+        $this->assertSame([101, 202], collect($people)->pluck('id')->map('intval')->sort()->values()->all());
+        foreach ($people as $person) {
+            $this->assertNotNull($person['person_edit_url'] ?? null, '每個受影響人物都要有編輯連結');
+        }
+        $this->assertCount(1, array_filter($people, fn ($p) => (bool) ($p['is_primary'] ?? false)));
     }
 
     #[Test]
@@ -747,15 +760,19 @@ class OperationsIndexLinksTest extends TestCase {
             ],
         ]);
 
-        $response = $this->actingAs($user)->get('/operations');
+        // 兩側鏡像列各自連到**自己那一邊**的 edit-v2（帶完整 PK query）。
+        // 原本驗 HTML（連 &amp; 實體都寫進斷言）；改成比對 people[].resource_link 的原始值——
+        // 更精確，也不會因為 HTML 轉義方式改變而假紅／假綠。
+        $people = $this->firstRow($user)['people'] ?? [];
+        $this->assertSame([
+            '/app/basicinformation/101/kinship/edit-v2?c_personid=101&c_kin_id=202&c_kin_code=1',
+            '/app/basicinformation/202/kinship/edit-v2?c_personid=202&c_kin_id=101&c_kin_code=3',
+        ], collect($people)->pluck('resource_link')->sort()->values()->all());
 
-        $response->assertStatus(200);
-        // flag-aware（測試環境 kinship editor flag=new）：operations 索引導向 React /app edit-v2（帶完整 PK query）。
-        $response->assertSee('/app/basicinformation/101/kinship/edit-v2?c_personid=101&amp;c_kin_id=202&amp;c_kin_code=1', false);
-        $response->assertSee('/app/basicinformation/202/kinship/edit-v2?c_personid=202&amp;c_kin_id=101&amp;c_kin_code=3', false);
-        $response->assertSee('c_personid：101<br', false);
-        $response->assertSee('c_personid：101');
-        $response->assertSee('c_kin_code：3');
+        // 資源描述要逐欄列出（使用者靠它分辨兩側是哪一列）。
+        $descriptions = implode(' ', collect($people)->pluck('resource_description')->all());
+        $this->assertStringContainsString('c_personid：101', $descriptions);
+        $this->assertStringContainsString('c_kin_code：3', $descriptions);
     }
 
     #[Test]
@@ -880,14 +897,22 @@ class OperationsIndexLinksTest extends TestCase {
             ],
         ]);
 
-        $response = $this->actingAs($user)->get('/operations');
+        // ASSOC 的 9 欄 PK 版本，同 kinship 的形狀。
+        $people = $this->firstRow($user)['people'] ?? [];
+        // ⚠️ 原本的 legacy 斷言 `assertSee('...&c_assoc_id=202', false)` 只是**前綴**比對，
+        // 實際 URL 帶完整 9 欄 PK。改成精確比對整串——順手揭露了原斷言過寬。
+        $this->assertSame([
+            '/app/basicinformation/101/assoc/edit-v2?c_personid=101&c_assoc_code=301&c_assoc_id=202'
+                .'&c_kin_code=0&c_kin_id=0&c_assoc_kin_code=0&c_assoc_kin_id=0'
+                .'&c_text_title=%E6%B8%AC%E8%A9%A6%E6%96%87%E7%8D%BB&c_assoc_first_year=1100',
+            '/app/basicinformation/202/assoc/edit-v2?c_personid=202&c_assoc_code=302&c_assoc_id=101'
+                .'&c_kin_code=0&c_kin_id=0&c_assoc_kin_code=0&c_assoc_kin_id=0'
+                .'&c_text_title=%E6%B8%AC%E8%A9%A6%E6%96%87%E7%8D%BB&c_assoc_first_year=1100',
+        ], collect($people)->pluck('resource_link')->sort()->values()->all());
 
-        $response->assertStatus(200);
-        // flag-aware（測試環境 assoc editor flag=new）：operations 索引導向 React /app edit-v2（帶完整 PK query）。
-        $response->assertSee('/app/basicinformation/101/assoc/edit-v2?c_personid=101&amp;c_assoc_code=301&amp;c_assoc_id=202', false);
-        $response->assertSee('/app/basicinformation/202/assoc/edit-v2?c_personid=202&amp;c_assoc_code=302&amp;c_assoc_id=101', false);
-        $response->assertSee('c_assoc_code：301');
-        $response->assertSee('c_assoc_code：302');
+        $descriptions = implode(' ', collect($people)->pluck('resource_description')->all());
+        $this->assertStringContainsString('c_assoc_code：301', $descriptions);
+        $this->assertStringContainsString('c_assoc_code：302', $descriptions);
     }
 
     #[Test]
@@ -947,13 +972,11 @@ class OperationsIndexLinksTest extends TestCase {
             ],
         ]);
 
-        $response = $this->actingAs($user)->get('/operations');
-
-        $response->assertStatus(200);
-        // 刪除操作不應產生任何編輯連結（含 flag-aware 的 /app edit-v2）。
-        $response->assertDontSee('/app/basicinformation/101/kinship/edit-v2?c_personid=101&amp;c_kin_id=202&amp;c_kin_code=1', false);
-        $response->assertDontSee('/app/basicinformation/202/kinship/edit-v2?c_personid=202&amp;c_kin_id=101&amp;c_kin_code=3', false);
-        $response->assertSee('無資源頁面');
+        // 刪除操作連 per-person 連結也不得產出（上一條的反面分支）。
+        $row = $this->firstRow($user);
+        $links = array_values(array_filter(collect($row['people'] ?? [])->pluck('resource_link')->all()));
+        $this->assertSame([], $links, '刪除操作不該有任何 per-person 資源連結');
+        $this->assertNull($row['resource_link'], '整列的 resource_link 也不該有');
     }
 
     // =====================================================================

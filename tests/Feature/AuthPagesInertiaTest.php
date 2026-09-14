@@ -79,6 +79,27 @@ class AuthPagesInertiaTest extends TestCase {
     #[Test]
     public function welcome_renders_inertia_when_flag_new(): void {
         $this->flagNew(['welcome']);
+
+        $this->get('/')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Welcome')
+                ->where('is_authenticated', false)
+                ->has('urls.login')
+                ->has('urls.name_api')
+                // 人物頁 base 已無 flag 可切（legacy 頁於 Blade 下架計畫環節 2 刪除），一律 /app。
+                ->where('urls.person_show', '/app/basicinformation')
+                ->where('urls.person_index', '/app/basicinformation'));
+    }
+
+    /**
+     * 護欄：即使有人把 `basicinformation.*` flag 塞回 config，入口頁的人物連結也不得
+     * 指回已刪除的 legacy 頁。原測試是「show／index 兩個 flag 可獨立切換」，那個能力
+     * 隨環節 2 一併消失。
+     */
+    #[Test]
+    public function welcome_person_bases_ignore_reintroduced_basicinformation_flags(): void {
+        $this->flagNew(['welcome']);
         config([
             'migration_flags.pages.basicinformation.show' => 'old',
             'migration_flags.pages.basicinformation.index' => 'old',
@@ -88,24 +109,8 @@ class AuthPagesInertiaTest extends TestCase {
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Welcome')
-                ->where('is_authenticated', false)
-                ->has('urls.login')
-                ->has('urls.name_api')
-                ->where('urls.person_show', '/basicinformation')
-                ->where('urls.person_index', '/basicinformation'));
-    }
-
-    #[Test]
-    public function welcome_exposes_person_show_and_index_bases_independently(): void {
-        $this->flagNew(['welcome', 'basicinformation.show']);
-        config(['migration_flags.pages.basicinformation.index' => 'old']);
-
-        $this->get('/')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('Welcome')
                 ->where('urls.person_show', '/app/basicinformation')
-                ->where('urls.person_index', '/basicinformation'));
+                ->where('urls.person_index', '/app/basicinformation'));
     }
 
     // ---- flag=old（預設）：維持 Blade，無 Inertia component ----

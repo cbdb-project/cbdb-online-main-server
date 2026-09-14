@@ -330,16 +330,17 @@ class CodesPersonPickerTest extends TestCase {
     }
 
     #[Test]
-    public function person_edit_url_template_follows_the_editor_migration_flag(): void {
-        // flag 翻回 old 時，碼表的人物連結必須跟著回到 legacy 編輯頁，
-        // 不能只有這裡還指著 React 版（這正是不在元件裡寫死路徑的原因）。
+    public function person_edit_url_template_always_points_at_the_react_editor(): void {
+        // 原測試驗的是「flag 翻回 old 時要跟著回到 legacy 編輯頁」；那個能力隨
+        // Blade 下架計畫環節 2 一併消失（legacy 人物編輯頁已刪除）。這裡改為護欄：
+        // 即使有人把 flag 塞回 config，模板也不得指回不存在的 legacy 頁。
         config(['migration_flags.pages.basicinformation.editor' => 'old']);
 
         $this->editAssoc()
             ->assertOk()
             ->assertInertia(function (Assert $page) {
                 $template = $page->toArray()['props']['column_behaviour']['c_personid']['picker']['edit_url_template'];
-                $this->assertSame('/basicinformation/__ID__/edit', $template);
+                $this->assertSame('/app/basicinformation/__ID__/edit', $template);
             });
     }
 

@@ -40,11 +40,17 @@ class InertiaSharedPropsTest extends TestCase {
         }
     }
 
-    public function test_shell_home_url_respects_basicinformation_index_flag(): void {
-        config(['migration_flags.pages.basicinformation.index' => 'old']);
-        $this->assertSame('/basicinformation', $this->shareFor(null)['shell']['home_url']);
+    /**
+     * 側邊欄「首頁」一律指 React 人物列表。
+     *
+     * 原測試驗的是 `basicinformation.index` flag 的切換；該 flag 隨 Blade 下架計畫環節 2
+     * 移除（legacy 人物頁已刪除）。這裡保留成護欄：即使有人把 flag 塞回 config，
+     * home_url 也不得指回 legacy。
+     */
+    public function test_shell_home_url_always_points_at_the_react_person_index(): void {
+        $this->assertSame('/app/basicinformation', $this->shareFor(null)['shell']['home_url']);
 
-        config(['migration_flags.pages.basicinformation.index' => 'new']);
+        config(['migration_flags.pages.basicinformation.index' => 'old']);
         $this->assertSame('/app/basicinformation', $this->shareFor(null)['shell']['home_url']);
     }
 

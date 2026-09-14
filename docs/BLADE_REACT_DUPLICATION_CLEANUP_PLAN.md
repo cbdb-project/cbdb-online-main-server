@@ -374,7 +374,14 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
 5b. 🔴 **同步改 `AiFillLogController.php:152-158`**：`prepareLog()` 的 `$personRoute` 仍指向 `basicinformation.{assoc,statuses,offices}.index`，改成 `/app` 對應頁（`app.basicinformation.show` + `tab`）。它有 `Route::has()` 保護 ⇒ 不會 500，但 `person_url` 會**靜默變 null、連結消失**（`Pages/Admin/AiFillLogs/Index.tsx:188`）——又一個測試抓不到的無聲退化。
 6. `config/migration_flags.php` 移除 `basicinformation.*` 全部 **15 個 key**（`index`／`show`／`editor` ＋ 12 個子資源；`config/migration_flags.php:45-63` 與 `tests/TestCase.php:36-41` 都列得出完整清單——**用清單比對，不要人工數**）。**同一 commit 內**一併收斂：`app/helpers.php` 的 6 個 helper、`CompositePrimaryKey.php:731-733`、**`Navigation.php:71-74` 的人物節點**（`self::url('basicinformation.index', …)`——若留到環節 4d 才改，側邊欄「人物編輯」會在環節 2 之後指向已被 **302** 導向的 legacy URL，每次點擊多一跳且 active-state 對不上）、以及 `PersonBrowserController` 的 12 個 props。
 7. 移除 `TestCase::useLegacyPersonForms()` 與環節 1.5 判定為「純 legacy」的測試檔；**同步下調 `VariantReplaceHookCoverageTest` 的清冊**（見 §三之三，兩處必紅）。
-8. 清理 `biogmains.*` 前綴的翻譯 key（逐 key grep，zh-TW/en 同步）。**只刪這個前綴**，`nav`／`person`／`common` 一律保留。
+8. ~~清理 `biogmains.*` 前綴的翻譯 key~~ → **改列為獨立項目 7-T1，本環節不做**。
+
+   實測結果：`resources/lang/zh-TW/biogmains.php` 共 **414 個 key**，以最寬鬆的比對（`biogmains.x` 字面 ＋ `t('x')`／`tb('x')`／`tBio('x')` 任一變數名）仍有 **301 個查無引用**。但這個數字**不能直接當刪除清單**：
+   - 「最寬鬆」意味著它把 `t('notes')` 這種**其他群組**的同名 key 也算成有引用，所以真正的孤兒數只會**更多**——方向是安全的；
+   - 但反過來，它**抓不到動態組出來的 key**（字串拼接、以變數當 key），那才是刪錯會出事的部分；
+   - React 仍大量使用這個群組（28 個元件綁 `tb`、6 個綁 `t`、2 個綁 `tBio`），它不是一個「整體死掉」的群組。
+
+   孤兒翻譯 key **沒有執行期影響**（不會 500、不會顯示 raw key），而刪錯會讓畫面出現 raw key。依本計畫 §三第 12 欄自訂的保守策略（「留下孤兒 key 的成本 ≪ 刪錯 key」），把它獨立成一個**只動翻譯檔**的 commit，配自己的 review，比夾在這個已經 -22,000 行的環節裡安全得多。
 - **驗收**：`PersonBrowserTest`、`ApiV2Mutate*Test`、`CompositePrimaryKeyTest`、`OperationsProposalResourceLinkTest`、`VariantReplaceHookCoverage` 全綠；🔴 **必須人工開頁**確認 `/app/basicinformation/{id}` 的 13 個 React 編輯器**都還在**（props 退化不會讓任何測試變紅）、`/app/person-browser` 各分頁正常、CHGIS 浮出地圖正常。
 
 ### 環節 3 — 先封路，不刪碼（風險：低，**完全可逆**）
@@ -456,6 +463,7 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
 |---|---|---|---|
 | 7-U1 | **提案核准不經 mutation handler**，因此繞過守衛 | `OperationsProposalController::applyKinshipProposal()`／`applyAssocProposal()` → `BiogMainRepository::kinshipStoreById()` 等。**legacy 與 v2 共用這條路徑，兩邊一樣沒擋** | 影響僅限守衛上線前既有的 pending proposal（新提案在提交時已被擋）。要在核准分支補守衛嗎？補了之後審核者會看到「提案套用失敗」——該給什麼提示、還是改成自動退回？ |
 | 7-U2 | **`Duplicate_Collateral_Info()`** 複製 KIN_DATA／ASSOC_DATA 時會一併複製歷史 0 髒列 | `BasicInformationController::Duplicate_Collateral_Info()`；該端點無 `legacy.form` 閘門、仍在服役 | 跳過髒列並告警，還是整批拒絕複製？ |
+| 7-T1 | **`biogmains` 翻譯群組的孤兒 key**（414 個中約 301 個查無引用） | `resources/lang/{zh-TW,en}/biogmains.php` | 逐 key 人工確認（含動態組鍵）後刪除，zh-TW／en 同步。獨立 commit、獨立 review；孤兒 key 無執行期影響，不急 |
 | 7-O1 | **`BiogMainRepository::altnameStoreById()`／`altnameUpdateById()`／`altnameDestroyById()` 成為孤兒** | 環節 2 刪掉 `BasicInformationAltnamesController` 後外部呼叫者歸零，但方法仍在（各含異體字掛鉤，`VariantReplaceHookCoverageTest` 的 `EXEMPT_DELEGATES` 把 `BiogMainRepository` 釘在 8 個掛鉤，看起來像「還有用」） | 刪除三個方法並把記數調成 6，還是保留？它們是大方法、含落地替換與索引同步，屬另一層（repository）的清理，不在環節 2 的「頁面／路由／controller」範圍內 |
 | 7-U3 | **`PossessionMutationHandler`／`PostingMutationHandler` 的 update 路徑**沒有未詳人物守衛（legacy 有；它們的 create 有） | 兩個 handler | 補齊以對齊 kin／assoc，還是維持現狀？ |
 

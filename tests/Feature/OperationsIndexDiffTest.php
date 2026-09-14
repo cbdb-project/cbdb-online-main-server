@@ -15,6 +15,11 @@ class OperationsIndexDiffTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
 
+        // 本類驗的是 legacy Blade 頁的行為。Blade 下架計畫環節 3「先封路、不刪碼」把那些
+        // 路由改成 302／410，但頁面本身還在、還部署著、還能被 kill switch 叫回來，
+        // 所以這份覆蓋在觀察期內仍有意義——局部關閉封路即可。環節 4 實體刪除時一併移除。
+        $this->useLegacyBladePages();
+
         config()->set('database.default', 'sqlite');
         config()->set('database.connections.sqlite.database', ':memory:');
 

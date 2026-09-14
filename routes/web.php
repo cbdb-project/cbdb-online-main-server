@@ -25,12 +25,13 @@ Auth::routes();
 // （$user->is_active = 2 早被註解），啟用信自 2021-08 起停發 → 沒有合法用途。
 // 日後若要恢復啟用信，應另建一次性、有期限的 email_verifications 表，不得重用
 // confirmation_token，且不得 Auth::login()。
-Route::get('operations', ['as' => 'operations.index', 'uses' => 'OperationsController@index']);
+Route::get('operations', ['as' => 'operations.index', 'uses' => 'OperationsController@index'])
+    ->middleware('legacy.page:app.operations.index');
 Route::get('app/operations', ['as' => 'app.operations.index', 'uses' => 'OperationsController@appIndex'])->middleware('inertia');
 Route::post('locale', 'LocaleController@switch')->name('locale.switch')->middleware('throttle:20,1');
 
 Route::get('home', 'HomeController@index')->name('home');
-Route::get('dashboard', 'DashboardController@index')->middleware('auth')->name('dashboard');
+Route::get('dashboard', 'DashboardController@index')->middleware(['auth', 'legacy.page:app.dashboard'])->name('dashboard');
 Route::get('app/dashboard', 'DashboardController@appIndex')
     ->middleware(['auth', 'inertia'])
     ->name('app.dashboard');
@@ -50,8 +51,8 @@ Route::middleware(['auth.optional'])->post('api/v2/proposals/{operation}/resubmi
 Route::middleware(['auth.optional'])->match(['get', 'post'], 'api/v2/get', 'Api\\MutationController@get')->name('api.v2.get.web');
 // #79：社會關係／親屬「對面互逆鏡像」現況偵測（缺邊/多條），供編輯器行內提示用。
 Route::middleware(['auth.optional'])->post('api/v2/relationship/opposite-edges', 'Api\\MutationController@oppositeEdges')->name('api.v2.relationship.opposite-edges.web');
-Route::get('view', 'ViewTableController@index')->middleware('auth')->name('view.index');
-Route::get('view/{key}', 'ViewTableController@show')->middleware('auth')->name('view.show');
+Route::get('view', 'ViewTableController@index')->middleware(['auth', 'legacy.page:app.view.index'])->name('view.index');
+Route::get('view/{key}', 'ViewTableController@show')->middleware(['auth', 'legacy.page:app.view.show'])->name('view.show');
 
 // CHGIS 地圖：底圖圖磚與下載狀態（與地址/官職列表頁同等公開）
 Route::get('chgis-map/tiles/{z}/{x}/{y}', 'ChgisMapController@tile')
@@ -187,7 +188,7 @@ Route::get('app/basicinformation/{id}', 'BasicInformationController@appShow')
 Route::get('basicinformation/{id}/saveas', 'BasicInformationController@saveas');
 Route::get('basicinformation/{id}/Duplicate_Collateral_Info', 'BasicInformationController@Duplicate_Collateral_Info');
 
-Route::get('codes', 'CodesController@index')->name('codes.index');
+Route::get('codes', 'CodesController@index')->middleware('legacy.page:app.codes.index')->name('codes.index');
 // Inertia + React 版（代碼表總覽）
 Route::get('app/codes', 'CodesController@appIndex')
     ->middleware('inertia')
@@ -195,7 +196,7 @@ Route::get('app/codes', 'CodesController@appIndex')
 // 全量導出：route 泛用，但範圍由 config('codes.export_columns') 白名單收斂（本輪僅 OFFICE_CODES）。
 // 直連 live 生產庫，故加 throttle 防爬蟲爆量。設計見 docs/OFFICE_CODES_EXPORT_SYNC.md。
 Route::get('codes/{table_name}/export', 'CodesController@export')->name('codes.export')->middleware('throttle:6,1');
-Route::get('codes/{table_name}', 'CodesController@show')->name('codes.show');
+Route::get('codes/{table_name}', 'CodesController@show')->middleware('legacy.page:app.codes.show')->name('codes.show');
 // TEXT_INSTANCE_DATA 的「Load Data」用：依 c_textid 精確取回書名（JSON，不掛 inertia）。
 // 額外路徑段，置於下方 {table_name} 泛用路由之前，避免被攔截。
 // 直連 live 生產庫、且與 codes 讀取面一樣無登入門檻，故加 throttle（同 codes.export 的理由）。
@@ -258,28 +259,42 @@ Route::get('app/text/create', 'TextEntityController@appCreate')
     ->middleware('inertia')->name('app.text.create');
 Route::get('app/text/{id}/edit', 'TextEntityController@appEdit')
     ->middleware('inertia')->name('app.text.edit')->whereNumber('id');
-Route::get('codes/{table_name}/create', 'CodesController@create')->name('codes.create');
-Route::post('codes/{table_name}/proposal', 'CodesController@proposalStore')->name('codes.propose.store');
+Route::get('codes/{table_name}/create', 'CodesController@create')->middleware('legacy.page:app.codes.create')->name('codes.create');
+Route::post('codes/{table_name}/proposal', 'CodesController@proposalStore')->middleware('legacy.page:gone')->name('codes.propose.store');
+// ⚠️ **不掛封路 middleware**：這條是 React /app/operations 的「修改提案」連結目標
+// （OperationsController 產 payload 時 route() 它，且無 Route::has() 保護，刪了整頁 500）。
 Route::get('codes/{table_name}/proposals/{operation}/edit', 'CodesController@proposalEdit')->name('codes.proposals.edit');
 Route::patch('codes/{table_name}/proposals/{operation}', 'CodesController@proposalUpdateExisting')->name('codes.proposals.update');
 Route::delete('codes/{table_name}/proposals/{operation}', 'CodesController@proposalCancel')->name('codes.proposals.cancel');
-Route::match(['post', 'patch'], 'codes/{table_name}/{id}/proposal', 'CodesController@proposalUpdate')->name('codes.propose.update')->where('id', '.*');
-Route::get('codes/{table_name}/{id}/edit', 'CodesController@edit')->name('codes.edit')->where('id', '.*');
-Route::match(['put', 'patch'], 'codes/{table_name}/{id}', 'CodesController@update')->name('codes.update')->where('id', '.*');
-Route::post('codes/{table_name}', 'CodesController@store')->name('codes.store');
-Route::delete('codes/{table_name}/{id}', 'CodesController@destroy')->name('codes.destroy')->where('id', '.*');
+Route::match(['post', 'patch'], 'codes/{table_name}/{id}/proposal', 'CodesController@proposalUpdate')->middleware('legacy.page:gone')->name('codes.propose.update')->where('id', '.*');
+Route::get('codes/{table_name}/{id}/edit', 'CodesController@edit')->middleware('legacy.page:app.codes.edit')->name('codes.edit')->where('id', '.*');
+Route::match(['put', 'patch'], 'codes/{table_name}/{id}', 'CodesController@update')->middleware('legacy.page:gone')->name('codes.update')->where('id', '.*');
+Route::post('codes/{table_name}', 'CodesController@store')->middleware('legacy.page:gone')->name('codes.store');
+Route::delete('codes/{table_name}/{id}', 'CodesController@destroy')->middleware('legacy.page:gone')->name('codes.destroy')->where('id', '.*');
 
 Route::post('operations/{operation}/approve', 'OperationsProposalController@approve')->name('operations.proposals.approve');
 Route::post('operations/{operation}/reject', 'OperationsProposalController@reject')->name('operations.proposals.reject');
 // 提案人撤回（與資源無關）：實體級提案的 resource 是聚合名，codes.proposals.cancel 的表名路徑段對它必 404。
 Route::delete('operations/{operation}/cancel', 'OperationsProposalController@cancel')->name('operations.proposals.cancel');
 
-Route::resource('manage', 'ManagementController', ['name' => [
-    'show' => 'manage.show',
-    'create' => 'manage.create',
-    'edit' => 'manage.edit',
-    'update' => 'manage.update',
-]]);
+// Legacy 使用者管理：原為 Route::resource，拆成顯式路由才能逐 action 掛不同處置
+// （見 docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md）——index/edit 導向 React，
+// store/update/destroy 是 legacy 寫入端回 410，create/show 的 controller 方法本來就是空的。
+// 路由名與 URI 全部原樣保留，Blade 視圖與 controller 也都沒刪（環節 3「先封路、不刪碼」）。
+Route::get('manage', 'ManagementController@index')
+    ->middleware('legacy.page:app.manage.index')->name('manage.index');
+Route::get('manage/create', 'ManagementController@create')
+    ->middleware('legacy.page:gone')->name('manage.create');
+Route::post('manage', 'ManagementController@store')
+    ->middleware('legacy.page:gone')->name('manage.store');
+Route::get('manage/{manage}/edit', 'ManagementController@edit')
+    ->middleware('legacy.page:app.manage.edit')->name('manage.edit');
+Route::get('manage/{manage}', 'ManagementController@show')
+    ->middleware('legacy.page:gone')->name('manage.show');
+Route::match(['put', 'patch'], 'manage/{manage}', 'ManagementController@update')
+    ->middleware('legacy.page:gone')->name('manage.update');
+Route::delete('manage/{manage}', 'ManagementController@destroy')
+    ->middleware('legacy.page:gone')->name('manage.destroy');
 // Inertia + React 版（使用者管理列表 + 編輯）
 Route::get('app/manage', 'ManagementController@appIndex')
     ->middleware(['auth', 'inertia'])
@@ -291,7 +306,11 @@ Route::match(['put', 'patch'], 'app/manage/{manage}', 'ManagementController@appU
     ->middleware(['auth', 'inertia'])
     ->name('app.manage.update');
 
-Route::match(['get', 'post'], 'merge-preview', 'MergePreviewController@index')->name('merge-preview.index');
+// GET 導向 React、POST（legacy 表單送出）回 410；原本是 match(['get','post']) 同一條。
+Route::get('merge-preview', 'MergePreviewController@index')
+    ->middleware('legacy.page:app.merge-preview.index')->name('merge-preview.index');
+Route::post('merge-preview', 'MergePreviewController@index')
+    ->middleware('legacy.page:gone')->name('merge-preview.store');
 Route::get('app/merge-preview', 'MergePreviewController@appIndex')->name('app.merge-preview.index')->middleware('inertia');
 
 // 原本這裡是 `Route::resource('operations', ...)`，但 OperationsController 只實作 index()
@@ -301,8 +320,10 @@ Route::get('app/merge-preview', 'MergePreviewController@appIndex')->name('app.me
 Route::post('operations/{operation}/restore', 'OperationsController@restore')->name('operations.restore');
 
 Route::middleware('auth')->group(function () {
-    Route::get('profile', 'UserProfileController@edit')->name('profile.edit');
-    Route::patch('profile', 'UserProfileController@update')->name('profile.update');
+    Route::get('profile', 'UserProfileController@edit')
+        ->middleware('legacy.page:app.profile.edit')->name('profile.edit');
+    Route::patch('profile', 'UserProfileController@update')
+        ->middleware('legacy.page:gone')->name('profile.update');
     // Inertia + React 版
     Route::get('app/profile', 'UserProfileController@appEdit')
         ->middleware('inertia')
@@ -328,7 +349,8 @@ Route::middleware('auth')->group(function () {
     // ── 暫不公開：僅管理員可訪問 ──────────────────────────────────────
     Route::middleware('superadmin')->group(function () {
         // 最近眾包錄入記錄
-        Route::get('crowdsourcing', ['as' => 'crowdsourcing.index', 'uses' => 'CrowdsourcingController@index']);
+        Route::get('crowdsourcing', ['as' => 'crowdsourcing.index', 'uses' => 'CrowdsourcingController@index'])
+            ->middleware('legacy.page:app.crowdsourcing.index');
         Route::get('app/crowdsourcing', ['as' => 'app.crowdsourcing.index', 'uses' => 'CrowdsourcingController@appIndex'])->middleware('inertia');
         // 同 operations（#1250）：CrowdsourcingController 只有 index()／appIndex()／
         // confirm()／reject() 與一個空的 store()，resource 生出的 create／show／edit／
@@ -371,8 +393,9 @@ Route::middleware('auth')->group(function () {
     Route::get('maps/tang', 'HistoricalMapsController@legacyRedirect');
     Route::get('maps/tang/{path?}', 'HistoricalMapsController@legacyRedirect')->where('path', '.*');
 
-    Route::get('admin/explainsql', 'AdminExplainSqlController@show')->name('admin.explainsql');
-    Route::post('admin/explainsql', 'AdminExplainSqlController@explain');
+    Route::get('admin/explainsql', 'AdminExplainSqlController@show')
+        ->middleware('legacy.page:app.admin.explainsql')->name('admin.explainsql');
+    Route::post('admin/explainsql', 'AdminExplainSqlController@explain')->middleware('legacy.page:gone');
     // Inertia + React 版（表單頁；GET 顯示、POST 跑 EXPLAIN 後重新 render）
     Route::get('app/admin/explainsql', 'AdminExplainSqlController@appShow')
         ->middleware('inertia')
@@ -380,7 +403,8 @@ Route::middleware('auth')->group(function () {
     Route::post('app/admin/explainsql', 'AdminExplainSqlController@appExplain')
         ->middleware('inertia')
         ->name('app.admin.explainsql.explain');
-    Route::get('admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@showForm')->name('admin.batch-load-book-titles');
+    Route::get('admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@showForm')
+        ->middleware('legacy.page:app.admin.batch-load-book-titles')->name('admin.batch-load-book-titles');
     Route::post('admin/batch-load-book-titles', 'AdminBatchLoadBookTitlesController@store')->name('admin.batch-load-book-titles.store');
     Route::post('admin/batch-load-book-titles/undo', 'AdminBatchLoadBookTitlesController@undo')->name('admin.batch-load-book-titles.undo');
     Route::post('admin/batch-load-book-titles/update-pinyin', 'AdminBatchLoadBookTitlesController@updatePinyin')->name('admin.batch-load-book-titles.update-pinyin');
@@ -397,14 +421,16 @@ Route::middleware('auth')->group(function () {
     // 罕見字檢測（回傳 JSON）：只查 pinyin 表，列出表未收的漢字與行號，匯入前先行檢查。
     Route::post('app/admin/batch-load-book-titles/check-rare-chars', 'AdminBatchLoadBookTitlesController@checkRareChars')
         ->name('app.admin.batch-load-book-titles.check-rare-chars');
-    Route::get('admin/batch-load-social-institutes', 'AdminBatchLoadSocialInstitutesController@showForm')->name('admin.batch-load-social-institutes');
+    Route::get('admin/batch-load-social-institutes', 'AdminBatchLoadSocialInstitutesController@showForm')
+        ->middleware('legacy.page:app.admin.batch-load-social-institutes')->name('admin.batch-load-social-institutes');
     Route::post('admin/batch-load-social-institutes', 'AdminBatchLoadSocialInstitutesController@store')->name('admin.batch-load-social-institutes.store');
     // Inertia + React 版（store 重用，依請求路徑重導）
     Route::get('app/admin/batch-load-social-institutes', 'AdminBatchLoadSocialInstitutesController@appShowForm')
         ->middleware('inertia')->name('app.admin.batch-load-social-institutes');
     Route::post('app/admin/batch-load-social-institutes', 'AdminBatchLoadSocialInstitutesController@store')
         ->middleware('inertia')->name('app.admin.batch-load-social-institutes.store');
-    Route::get('admin/batch-load-offices', 'AdminBatchLoadOfficesController@showForm')->name('admin.batch-load-offices');
+    Route::get('admin/batch-load-offices', 'AdminBatchLoadOfficesController@showForm')
+        ->middleware('legacy.page:app.admin.batch-load-offices')->name('admin.batch-load-offices');
     Route::post('admin/batch-load-offices', 'AdminBatchLoadOfficesController@store')->name('admin.batch-load-offices.store');
     // Inertia + React 版（store 重用，依請求路徑重導）
     Route::get('app/admin/batch-load-offices', 'AdminBatchLoadOfficesController@appShowForm')
@@ -414,13 +440,15 @@ Route::middleware('auth')->group(function () {
     // 外部資料庫引用瀏覽器：已開放活躍帳號，路徑不再帶 admin 前綴（controller 沿用 WikiMaintenanceController 名稱）。
     Route::get('external-db-link', 'WikiMaintenanceController@index')->name('external-db-link');
     Route::get('app/external-db-link', 'WikiMaintenanceController@appIndex')->name('app.external-db-link')->middleware('inertia');
-    Route::get('admin/cbdb-table-maintenance', 'CbdbTableMaintenanceController@index')->name('admin.cbdb-table-maintenance');
+    Route::get('admin/cbdb-table-maintenance', 'CbdbTableMaintenanceController@index')
+        ->middleware('legacy.page:app.admin.cbdb-table-maintenance')->name('admin.cbdb-table-maintenance');
     Route::get('app/admin/cbdb-table-maintenance', 'CbdbTableMaintenanceController@appIndex')->name('app.admin.cbdb-table-maintenance')->middleware('inertia');
     Route::post('admin/cbdb-table-maintenance/rebuild', 'CbdbTableMaintenanceController@rebuild')->name('admin.cbdb-table-maintenance.rebuild');
     Route::get('admin/cbdb-table-maintenance/progress/{taskId}', 'CbdbTableMaintenanceController@getNameFtsProgress')
         ->where('taskId', '[a-zA-Z0-9_]+')
         ->name('admin.cbdb-table-maintenance.progress');
-    Route::get('admin/unidirectional-relationship-repair', 'UnidirectionalRelationshipRepairController@index')->name('admin.unidirectional-relationship-repair');
+    Route::get('admin/unidirectional-relationship-repair', 'UnidirectionalRelationshipRepairController@index')
+        ->middleware('legacy.page:app.admin.unidirectional-relationship-repair')->name('admin.unidirectional-relationship-repair');
     Route::get('app/admin/unidirectional-relationship-repair', 'UnidirectionalRelationshipRepairController@appIndex')->name('app.admin.unidirectional-relationship-repair')->middleware('inertia');
     Route::post('admin/unidirectional-relationship-repair/kinship', 'UnidirectionalRelationshipRepairController@repairKinship')->name('admin.unidirectional-relationship-repair.kinship');
     // Query Playground
@@ -440,7 +468,8 @@ Route::middleware('auth')->group(function () {
     Route::post('query-playground/answer-from-nl-stream', 'QueryPlaygroundController@answerFromNLStream')
         ->middleware('throttle:qa-answer')
         ->name('query-playground.answer-from-nl-stream');
-    Route::get('query-playground/nl-query-logs', 'QueryPlaygroundController@nlQueryLogs')->name('query-playground.nl-query-logs');
+    Route::get('query-playground/nl-query-logs', 'QueryPlaygroundController@nlQueryLogs')
+        ->middleware('legacy.page:app.query-playground.nl-query-logs')->name('query-playground.nl-query-logs');
     Route::get('app/query-playground/nl-query-logs', 'QueryPlaygroundController@appNlQueryLogs')
         ->middleware('inertia')
         ->name('app.query-playground.nl-query-logs');
@@ -457,11 +486,13 @@ Route::middleware('auth')->group(function () {
     Route::post('api/ai/code-lookup/suggest', 'CodeLookupController@suggest')->name('ai.code-lookup.suggest');
 
     // AI 填充日誌（管理員工具）
-    Route::get('admin/ai-fill-logs', 'AiFillLogController@index')->name('admin.ai-fill-logs');
+    Route::get('admin/ai-fill-logs', 'AiFillLogController@index')
+        ->middleware('legacy.page:app.admin.ai-fill-logs')->name('admin.ai-fill-logs');
     Route::get('app/admin/ai-fill-logs', 'AiFillLogController@appIndex')
         ->middleware('inertia')
         ->name('app.admin.ai-fill-logs');
-    Route::get('admin/audit-logs', 'AdminAuditLogController@index')->name('admin.audit-logs');
+    Route::get('admin/audit-logs', 'AdminAuditLogController@index')
+        ->middleware('legacy.page:app.admin.audit-logs')->name('admin.audit-logs');
     // Inertia + React 版（與舊 Blade 版並存；側邊欄指向由 migration flag 控制）
     Route::get('app/admin/audit-logs', 'AdminAuditLogController@appIndex')
         ->middleware('inertia')

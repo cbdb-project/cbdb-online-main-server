@@ -26,4 +26,19 @@ abstract class TestCase extends BaseTestCase {
         // 「請確認主鍵欄位已填寫完整」這類與該測試無關的失敗）。
         CodesController::resetKeyColumnCache();
     }
+
+    /**
+     * 局部關閉 legacy Blade 頁面封路（Blade 下架計畫環節 3），供仍在驗 legacy 頁行為的測試使用。
+     *
+     * 環節 3 的語義是「先封路、不刪碼」——那些 Blade 視圖與 controller 都還在、還部署著、
+     * 還能被 config/legacy_page_retirement.php 的 kill switch 叫回來，所以它們的測試覆蓋在
+     * 觀察期內依然有意義，不該因為封路就一併失效。
+     *
+     * ⚠️ 環節 4 實體刪除那些頁面時，這個 helper 與所有呼叫端都要一併移除（比照已下架的
+     * useLegacyPersonForms()）。封路本身的行為由 LegacyBladePageRetirementTest 驗證，
+     * 該檔**不**呼叫本 helper。
+     */
+    protected function useLegacyBladePages(): void {
+        config(['legacy_page_retirement.enabled' => false]);
+    }
 }

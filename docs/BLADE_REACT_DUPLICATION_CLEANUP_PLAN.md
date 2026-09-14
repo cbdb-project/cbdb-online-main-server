@@ -391,7 +391,23 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
 2. 🔴 **子字串斷言造成假綠**。`assertStringContainsString('/basicinformation/12345/offices/edit', $url)` 會被 `/app/basicinformation/12345/offices/edit-v2` **照樣命中**（`/app` 是前綴、`-v2` 是後綴），於是同一個斷言同時接受 legacy 與 React 兩種形狀、失去鑑別力。已全部改成 `assertStringStartsWith('/app/…edit-v2')`。**環節 3／4 改任何 URL 斷言時一律用 StartsWith 或精確比對。**
 3. 🟡 **「塞回 flag 當護欄」要設 `'old'` 才有意義**。有幾個測試把 flag 設成 `'new'` 再斷言 React 行為——在 flag 已移除、行為本來就無條件的情況下那證明不了任何事。護欄的正確寫法是設 `'old'`。
 
-### 環節 3 — 先封路，不刪碼（風險：低，**完全可逆**）
+### 環節 3 — 先封路，不刪碼 ✅ **已完成（2026-09-14）**，風險：低，**完全可逆**
+
+> 交付物：[docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md](./BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md)（逐條 route manifest）
+> ＋ `app/Http/Middleware/RetireLegacyBladePage`（逐條掛，35 條）
+> ＋ `config/legacy_page_retirement.php`（kill switch）
+> ＋ `tests/Feature/LegacyBladePageRetirementTest`（57 個測試）
+>
+> **實測分類**：`php artisan route:list --json` 取出 A-1…A-17 的 **53 條** legacy 路由，逐條判定後
+> **35 條封路**（22 條 GET→302、13 條→410）、**19 條不動**（新舊共用方法，或 React 正在呼叫的
+> action endpoint——其中 `crowdsourcing/{id}/confirm|reject` 是 **GET 動詞的寫入端**，按 prefix
+> 套規則會直接命中）。測試逐條驗證「該封的封了、該留的一條都沒被誤掛」，並鎖住總數 35。
+>
+> 🔴 **執行中發現並修正的設計缺陷**：原本以為「保留 Blade 視圖與 controller 不動」就足以可逆。
+> 實作後全量測試 **186 個失敗、橫跨 22 個測試類**——因為**測試是打路由的**。那些測試不該刪
+> （頁面還在、還能叫回來），正解是讓它們局部關閉封路（`TestCase::useLegacyBladePages()`），
+> 並把封路做成 **config kill switch**：翻 `LEGACY_PAGE_RETIREMENT=false` 即可讓 legacy 頁復活，
+> **不需重新部署、不需 git revert**。這反而讓環節 3 的「可逆」比原計畫更名實相符。
 
 針對 A-1…A-17，**只**改路由行為、**保留** blade 檔與 controller 方法不動。
 

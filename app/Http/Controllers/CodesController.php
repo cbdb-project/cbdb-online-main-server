@@ -503,6 +503,14 @@ class CodesController extends Controller {
             'joined_columns' => array_values($payload['joinedColumns'] ?? []),
             'copyright_note' => $payload['copyrightNote'] ?? null,
             'filters' => (object) ($payload['filters'] ?? []),
+            // 🔴 **`applied_filters` 與 `filters` 不一樣，別合併**：`filters` 是使用者原樣輸入
+            // （供輸入框回填），`applied_filters` 只含**實際套用到查詢的欄位**——布林語法錯誤
+            // 的欄位被略過，不在裡面。前端換頁／排序時必須拿這個去組 URL，否則壞掉的條件會
+            // 黏在網址上、每次換頁都再報一次錯。Blade 版一直是這樣做的
+            // （`codes/show.blade.php` 的 `$linkFilters = $appliedFilters ?? $filters`），
+            // React 版原本沒有這個 prop、改用「非空」當判準 ⇒ 是遷移時掉的一個行為，
+            // 於 Blade 下架環節 4b-2c-2 補回。
+            'applied_filters' => (object) ($payload['appliedFilters'] ?? []),
             'sort_by' => $payload['sortBy'] ?? '',
             'sort_dir' => $payload['sortDir'] ?? 'asc',
             'boolean_enabled' => $payload['booleanEnabled'] ?? false,
@@ -3656,7 +3664,10 @@ class CodesController extends Controller {
             // 游标分頁路徑硬短路 filter/sort/布林，傳齊空值與兩分支對齊（避免 Blade undefined）。
             'booleanEnabled' => false,
             'booleanFilterAvailable' => false,
-            'appliedFilters' => [],
+            // 這條路徑上 $filters 在進來之前就已被硬短路成 []，所以現值等同硬寫 []；
+            // 用 $filters 而非字面 [] 是為了「哪天游標表開放 filter」時不會靜默丟掉它們
+            // ——前端的 navigate() 是拿 applied_filters 去組換頁 URL 的。
+            'appliedFilters' => $filters,
             'rawFilters' => $filters,
             'filterErrors' => [],
             'filterDescriptions' => [],

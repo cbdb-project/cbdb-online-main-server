@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import { router, usePage } from '@inertiajs/react';
-import type { FormDataConvertible } from '@inertiajs/core';
 import DashboardLayout from '../../Layouts/DashboardLayout';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -9,9 +8,10 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useTranslation } from '../../hooks/useTranslation';
 import type { SharedProps } from '../../types/page';
 import { cn } from '../../lib/utils';
+import { buildRowId, buildShowParams, type Params } from './showNavigation';
 
 type Row = Record<string, unknown>;
-type Params = Record<string, FormDataConvertible>;
+
 
 // 安全開關：停用碼表刪除的前端入口。多數碼表（DYNASTIES/GANZHI_CODES/TEXT_CODES/
 // OFFICE_CODES/SOCIAL_INSTITUTION_* 等）被人物資料以 ON DELETE CASCADE 外鍵引用，刪一列
@@ -45,6 +45,8 @@ interface CodesShowPageProps extends SharedProps {
     computed_columns: string[];
     copyright_note: string | null;
     filters: Record<string, string>;
+    /** 實際套用到查詢的欄位（布林語法錯誤的欄位不在裡面）。換頁／排序要用這個組 URL。 */
+    applied_filters?: Record<string, string>;
     sort_by: string;
     sort_dir: 'asc' | 'desc';
     boolean_enabled: boolean;
@@ -96,24 +98,47 @@ export default function CodesShow() {
     const reload = (params: Params) =>
         router.get(path, params, { preserveState: true, preserveScroll: true, replace: true });
 
-    /** 組合並導覽：保留 search/filters/sort/bool，merge 額外參數（page/after/before）。 */
-    const visit = (extra: Params = {}, useFilters = filters) => {
-        const params: Params = {};
-        if (search) params.search = search;
-        const applied = Object.fromEntries(Object.entries(useFilters).filter(([, v]) => v !== ''));
-        if (Object.keys(applied).length) params.filters = applied;
-        if (sort_by) {
-            params.sort_by = sort_by;
-            params.sort_dir = sort_dir;
-        }
-        if (boolean_enabled) params.filter_bool = 1;
-        Object.assign(params, extra);
-        reload(params);
+    /**
+     * 組合並導覽：保留 search/filters/sort/bool，merge 額外參數（page/after/before）。
+     *
+     * ── 2026-09-15（Blade 下架環節 4b-2c-2）─────────────────────────
+     * `useFilters`／`useSearch` **一律由呼叫端明示**，因為「要帶使用者正在編輯的值，
+     * 還是帶已送出／已套用的值」在每個互動上都不一樣，而且答案不是靠直覺猜的——
+     * 是照 `resources/views/codes/show.blade.php` 每個表單／連結實際送什麼定的：
+     *
+     * | 互動 | filters | search | Blade 依據 |
+     * |---|---|---|---|
+     * | 搜尋送出 `doSearch` | **applied** | 輸入框 | 搜尋表單的 hidden input 是 `$linkFilters` |
+     * | 套用篩選 `applyFilters` | 輸入框 | **props** | `#filter-form` 的 hidden `search` 是 `$search` |
+     * | 排序／換頁 `navigate` | **applied** | **props** | 連結用 `$linkFilters` ＋ `request('search')` |
+     * | 布林開關 `toggleBoolean` | 輸入框（原始） | **props** | `$toggleBase` 刻意用 `$filters`（§9.2 降級） |
+     *
+     * 「applied」與「輸入框」的差別只在**布林語法錯誤而被後端略過的欄位**：它非空，所以
+     * 舊寫法（`v !== ''`）會把它回灌進 URL ⇒ 壞掉的條件黏在網址上、每次換頁再報一次錯。
+     * 「props」與「輸入框」的 search 差別則是**打到一半還沒送出的字**：拿它去排序／換頁
+     * 會把沒送出的搜尋一併套用，而且還帶著另一個結果集的 `page=N`。
+     */
+    const visit = (extra: Params = {}, useFilters = filters, useSearch = search) => {
+        reload(buildShowParams({
+            filters: useFilters,
+            search: useSearch,
+            sortBy: sort_by,
+            sortDir: sort_dir,
+            booleanEnabled: boolean_enabled,
+            extra,
+        }));
     };
+
+    const appliedFilters = props.applied_filters ?? filters;
+
+    /** 排序／換頁：filters 與 search 都用伺服器已套用／已送出的值（見 visit 的表）。 */
+    const navigate = (extra: Params = {}) => visit(extra, appliedFilters, props.search ?? '');
 
     const doSearch = (e: React.FormEvent) => {
         e.preventDefault();
-        visit({ page: undefined });
+        // 送出的是搜尋框本身，所以 search 用輸入框的值；filters 用 applied（對齊 Blade 的
+        // 搜尋表單 hidden input `$linkFilters`）。
+        visit({ page: undefined }, appliedFilters, search);
     };
     const resetSearch = () => {
         setSearch('');
@@ -123,7 +148,9 @@ export default function CodesShow() {
     };
     const applyFilters = () => {
         if (!canSortOrFilter) return;
-        visit({ page: 1 });
+        // 送出的是 filter-row 輸入框，所以 filters 用輸入框的值；search 用已送出的值
+        // （對齊 Blade `#filter-form` 的 hidden `search` = `$search`）。
+        visit({ page: 1 }, filters, props.search ?? '');
     };
     const clearFilters = () => {
         setFilters({});
@@ -145,40 +172,27 @@ export default function CodesShow() {
                 nextDir = '';
             }
         }
-        visit({ sort_by: nextBy || undefined, sort_dir: nextDir || undefined, page: 1 });
+        navigate({ sort_by: nextBy || undefined, sort_dir: nextDir || undefined, page: 1 });
     };
 
     const sortIcon = (col: string) => (sort_by !== col ? '⇅' : sort_dir === 'asc' ? '▲' : '▼');
 
     const toggleBoolean = () => {
-        // 切換時保留使用者原始輸入（含尚待修正的欄位），對齊舊頁 §9.2。
-        const params: Params = {};
-        if (search) params.search = search;
-        const applied = Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== ''));
-        if (Object.keys(applied).length) params.filters = applied;
-        if (sort_by) {
-            params.sort_by = sort_by;
-            params.sort_dir = sort_dir;
-        }
-        if (!boolean_enabled) params.filter_bool = 1;
-        reload(params);
+        // 切換時保留使用者原始輸入（含尚待修正的欄位），對齊舊頁 §9.2——
+        // 這是刻意的降級路徑：使用者要能一鍵把寫壞的布林字串變回字面搜尋。
+        // search 則用已送出的值（與其他連結一致，見 visit 的表）。
+        // ⚠️ booleanEnabled 傳的是**切換後**的狀態，所以不能走 visit()。
+        reload(buildShowParams({
+            filters,
+            search: props.search ?? '',
+            sortBy: sort_by,
+            sortDir: sort_dir,
+            booleanEnabled: !boolean_enabled,
+        }));
     };
 
     /** 從一列依主鍵組合 id（對齊 Blade 的 implode('_._')）。 */
-    const rowId = (row: Row): string => {
-        let parts: string[] = [];
-        if (key_columns.length) {
-            parts = key_columns.map((c) => String(row[c] ?? '')).filter((v) => v !== '');
-        }
-        if (!parts.length) {
-            for (const v of Object.values(row)) {
-                const s = String(v ?? '');
-                if (s !== '') parts.push(s);
-                if (parts.length >= 2) break;
-            }
-        }
-        return parts.join('_._');
-    };
+    const rowId = (row: Row): string => buildRowId(row, key_columns);
 
     const cellValue = (row: Row, col: string): string => {
         let v = row[col];
@@ -417,20 +431,20 @@ export default function CodesShow() {
             <div className="mt-3">
                 {use_cursor && cursor ? (
                     <div className="flex items-center justify-end gap-2">
-                        <Button size="sm" variant="outline" disabled={!cursor.has_prev_pages} onClick={() => visit({ before: cursor.prev_cursor })}>
+                        <Button size="sm" variant="outline" disabled={!cursor.has_prev_pages} onClick={() => navigate({ before: cursor.prev_cursor })}>
                             <i className="fas fa-chevron-left" aria-hidden /> {tc('previous_page')}
                         </Button>
                         <span className="text-sm text-muted-foreground">
                             ID: {cursor.first_id != null ? nf.format(Number(cursor.first_id)) : '-'} – {cursor.last_id != null ? nf.format(Number(cursor.last_id)) : '-'}
                         </span>
-                        <Button size="sm" variant="outline" disabled={!cursor.has_more_pages} onClick={() => visit({ after: cursor.next_cursor })}>
+                        <Button size="sm" variant="outline" disabled={!cursor.has_more_pages} onClick={() => navigate({ after: cursor.next_cursor })}>
                             {tc('next_page')} <i className="fas fa-chevron-right" aria-hidden />
                         </Button>
                     </div>
                 ) : meta ? (
                     <Pagination
                         meta={meta}
-                        onPageChange={(page) => visit({ page })}
+                        onPageChange={(page) => navigate({ page })}
                         summaryTemplate="{from}–{to} / {total}"
                         labels={{ previous: tc('previous'), next: tc('next') }}
                     />

@@ -2,9 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
+use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -16,18 +17,18 @@ use Tests\TestCase;
  * coverage in ColumnFilterExpressionTest. See docs/CODES_BOOLEAN_FILTER_DESIGN.md §9.3.
  */
 /**
- * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
- * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
+ * ── 2026-09-15（Blade 下架環節 4b-2c-2）─────────────────────────
+ * 原本打 legacy Blade 頁（`/codes/*`）並在 setUp 裡 `useLegacyBladePages()`；已改打
+ * `/app/codes/*`。布林解析與 SQL 組裝是 `appShow()`／`show()` 共用的同一份實作，
+ * 所以斷言（比對命中的 id 集合）完全沒動——只有取結果的方式從 `viewData('data')->items()`
+ * 換成 Inertia 的 `rows` prop。
+ *
+ * ⚠️ React 端的篩選需要**登入且已啟用**（`guardSortFilterRequiresAuth()`，
+ * 見 docs/CODES_SORT_FILTER_AUTH_GATE.md），Blade 端沒有這道門檻 ⇒ `ids()` 裡先 actingAs。
  */
-#[Group('legacy-parity')]
 class CodesBooleanFilterIntegrationTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
-
-        // 本類驗的是 legacy Blade 頁的行為。Blade 下架計畫環節 3「先封路、不刪碼」把那些
-        // 路由改成 302／410，但頁面本身還在、還部署著、還能被 kill switch 叫回來，
-        // 所以這份覆蓋在觀察期內仍有意義——局部關閉封路即可。環節 4 實體刪除時一併移除。
-        $this->useLegacyBladePages();
 
         // Real default test connection is sqlite :memory: (phpunit.xml). Do NOT swap in a fake DB.
         config(['codes.tables' => ['cbf_places' => 'Test places']]);
@@ -66,10 +67,22 @@ class CodesBooleanFilterIntegrationTest extends TestCase {
      * @return list<int>
      */
     private function ids(string $expression): array {
-        $response = $this->get('/codes/cbf_places?filter_bool=1&filters[name]=' . urlencode($expression));
-        $response->assertStatus(200);
+        // 不落庫：本檔沒有建 users 表（也不需要），`actingAs` 用記憶體中的模型即可，
+        // 而且 `ids()` 每條測試會呼叫多次，落庫版會撞 email 唯一鍵。
+        $user = new User(['name' => 'reader', 'email' => 'reader@example.com']);
+        $user->id = 90;
+        $user->is_active = 1;
 
-        return collect($response->viewData('data')->items())
+        $rows = [];
+        $this->actingAs($user)
+            ->get('/app/codes/cbf_places?filter_bool=1&filters[name]=' . urlencode($expression))
+            ->assertOk()
+            ->assertInertia(function (Assert $page) use (&$rows) {
+                $rows = $page->toArray()['props']['rows'];
+            });
+
+        return collect($rows)
+            ->map(fn ($row) => (array) $row)
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->sort()

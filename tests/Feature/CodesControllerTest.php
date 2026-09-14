@@ -12,23 +12,23 @@ use Illuminate\Database\QueryException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use PHPUnit\Framework\Attributes\Group;
+use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * ⚠️ **本類目前是混的（Blade 下架環節 4b-2c-1 之後）**：52 條裡 **20 條寫入面已改打
- * `/app/codes/*`（React）**，**32 條讀取面仍打 legacy Blade**（它們斷言視圖變數與 HTML，
- * 要逐條對應 Inertia prop，留給環節 4b-2c-2）。
+ * CodesController 的 controller 級測試。
  *
- * 🔴 **所以類級的 `#[Group('legacy-parity')]` 現在是暫時的誤標**：那個 group 的既定用途是
- * 「舊版下線時一鍵清理」，而那 20 條測的已經是**活的 React 路徑**，被一鍵掃掉就是刪掉活覆蓋。
- * **這個狀態只允許存在到 4b-2c-2**——那一輪把剩下 32 條也移植完，屆時整個類級屬性與
- * `useLegacyBladePages()` 一起拿掉。在那之前不要對這個 group 做整批刪除。
+ * ── 2026-09-15（Blade 下架環節 4b-2c-2）─────────────────────────
+ * 本檔 52 條**全部改打 React 端**（`/app/codes/*`），類級的 `#[Group('legacy-parity')]`
+ * 與 setUp 的 `useLegacyBladePages()` 一併移除——4b-2c-1 留下的「混合狀態」到此結束。
  *
- * @legacy-parity 剩下 32 條讀取面驗的是 legacy Blade 頁，以 useLegacyBladePages() 局部關閉環節 3 的封路。
+ * 讀取面的視圖變數對照（供日後查閱）：
+ *   sortBy→sort_by、sortDir→sort_dir、booleanEnabled→boolean_enabled、
+ *   booleanFilterAvailable→boolean_filter_available、filterErrors→filter_errors、
+ *   filterDescriptions→filter_descriptions、useCursorPagination→use_cursor、
+ *   keyColumns→key_columns、appliedFilters→**applied_filters（本環節新增的 prop）**。
  */
-#[Group('legacy-parity')]
 class CodesControllerTest extends TestCase {
     protected $operationSpy;
     protected $originalDb;
@@ -36,12 +36,6 @@ class CodesControllerTest extends TestCase {
 
     protected function setUp(): void {
         parent::setUp();
-
-        // 只有**剩下 32 條讀取面**需要這個 opt-out（環節 3「先封路、不刪碼」把那些路由改成
-        // 302／410，頁面本身還在、還能被 kill switch 叫回來）。已於環節 4b-2c-1 改打
-        // `/app/codes/*` 的那 20 條寫入面**不需要**它——app 路由沒掛封路 middleware，
-        // 這行對它們是 no-op。環節 4b-2c-2 移植完剩下那批之後整行移除。
-        $this->useLegacyBladePages();
 
         config(['codes.tables' => ['TEST_CODES', 'TEXT_CODES', 'POSSESSION_DATA', 'CBDB__NAME_FTS', 'APPOINTMENT_CODE_TYPE_REL', 'OFFICE_CODE_TYPE_REL', 'APPOINTMENT_TYPES', 'ADDR_CODES']]);
         config(['codes.connection' => null]);
@@ -412,19 +406,16 @@ class CodesControllerTest extends TestCase {
         $user->is_active = 1;
         $this->actingAs($user);
 
-        $response = $this->get('/codes/TEXT_CODES/create');
+        // 原測試用 regex 掃 Blade 產生的 `name="…" class="form-control"` 取第一個輸入框，
+        // 再在它後面 150 字元內找 `value="42"`。React 版把同一件事表達成兩個 prop：
+        // `columns` 的**順序**就是欄位順序，`defaults` 就是預填值——比掃 HTML 精確，
+        // 也不會因為改了 class 名稱就假綠／假紅。
+        $props = $this->appProps('/app/codes/TEXT_CODES/create');
 
-        $response->assertStatus(200);
-        $content = $response->getContent();
-
-        preg_match_all('/name="([^"]+)" class="form-control"/', $content, $matches);
-        $this->assertNotEmpty($matches[1]);
-        $this->assertSame('c_textid', $matches[1][0]);
-
-        $firstInputMarkupStart = strpos($content, $matches[0][0]);
-        $this->assertNotFalse($firstInputMarkupStart);
-        $firstInputMarkup = substr($content, $firstInputMarkupStart, 150);
-        $this->assertNotFalse(strpos($firstInputMarkup, 'value="42"'));
+        $this->assertSame('c_textid', ($props['columns'] ?? [])[0] ?? null);
+        // 型別刻意用 assertEquals：`defaults` 走 JSON 序列化，數值在這條路徑上是字串 '42'。
+        // 這條測試的主題是「主鍵排第一且有預設值」，不是型別。
+        $this->assertEquals(42, ((array) $props['defaults'])['c_textid'] ?? null);
     }
 
     #[Test]
@@ -435,13 +426,11 @@ class CodesControllerTest extends TestCase {
             ['code_id' => 'A3', 'code_sub' => 'X3', 'description' => 'Gamma entry'],
         ]);
 
-        $response = $this->get('/codes/TEST_CODES?search=Beta');
+        $props = $this->appProps('/app/codes/TEST_CODES?search=Beta');
 
-        $response->assertStatus(200);
-        $response->assertSee('Beta entry');
-        $response->assertDontSee('Alpha entry');
-        $response->assertDontSee('Gamma entry');
-        $response->assertSee('value="Beta"', false);
+        $this->assertSame(['Beta entry'], $this->rowColumn($props, 'description'));
+        // 原本的 assertSee('value="Beta"') 驗的是搜尋框回填，對應 `search` prop。
+        $this->assertSame('Beta', $props['search']);
         $this->assertEmpty($this->operationSpy->calls);
     }
 
@@ -453,19 +442,18 @@ class CodesControllerTest extends TestCase {
             ['code_id' => 'A3', 'code_sub' => 'X3', 'description' => 'Gamma third'],
         ]);
 
-        $response = $this->get('/codes/TEST_CODES?filters[description]=Beta&filters[bad_column%20or%201=1]=ignored&sort_by=code_id&sort_dir=desc%20union');
+        $this->activeReader();
+        $props = $this->appProps('/app/codes/TEST_CODES?filters[description]=Beta&filters[bad_column%20or%201=1]=ignored&sort_by=code_id&sort_dir=desc%20union');
 
-        $response->assertStatus(200);
-        $response->assertSee('Beta second');
-        $response->assertSee('Beta first');
-        $response->assertDontSee('Gamma third');
-        $response->assertSee('name="filters[description]"', false);
-        $response->assertSee('value="Beta"', false);
-        $response->assertDontSee('bad_column or 1=1', false);
-
-        $content = $response->getContent();
-        $this->assertNotFalse($content);
-        $this->assertLessThan(strpos($content, 'Beta second'), strpos($content, 'Beta first'));
+        // 結果集與**順序**一次釘住：`sort_dir=desc union` 是非法值 ⇒ 落回 asc ⇒ A1 在 A2 前面。
+        // 原測試是拿兩個字串在 HTML 裡的位置相比，這裡直接比較整個欄值清單。
+        $this->assertSame(['Beta first', 'Beta second'], $this->rowColumn($props, 'description'));
+        // 好欄位留下、注入用的欄名整個消失（不是被跳脫，是根本沒進 filters）。
+        $this->assertSame(['description' => 'Beta'], (array) $props['filters']);
+        // sort_by 也要斷言：只驗列序不夠——sort_by 被整個丟掉時，主鍵 tie-breaker
+        // 會產生**一模一樣**的順序（review 指出）。
+        $this->assertSame('code_id', $props['sort_by']);
+        $this->assertSame('asc', $props['sort_dir']);
         $this->assertEmpty($this->operationSpy->calls);
     }
 
@@ -477,13 +465,13 @@ class CodesControllerTest extends TestCase {
             ['id' => 3, 'person_name' => 'Gamma'],
         ]);
 
-        $response = $this->get('/codes/CBDB__NAME_FTS');
+        $props = $this->appProps('/app/codes/CBDB__NAME_FTS');
 
-        $response->assertStatus(200);
-        $response->assertSee('Alpha');
-        $response->assertSee('Beta');
-        $response->assertSee('Gamma');
-        $response->assertViewHas('useCursorPagination', true);
+        $this->assertSame(['Alpha', 'Beta', 'Gamma'], $this->rowColumn($props, 'person_name'));
+        $this->assertTrue($props['use_cursor']);
+        // 游標分支必須真的把游標中繼資料傳下去，否則前端的上／下一頁按鈕永遠是停用的
+        // （原測試只驗「頁面沒爆」，這裡順帶把那個分支的輸出釘住）。
+        $this->assertIsArray($props['cursor']);
     }
 
     // 這裡原本有 5 條測試。其中 4 條**完全不打 HTTP**（ui_hidden 過濾 ×2、說明欄 locale fallback、
@@ -511,10 +499,9 @@ class CodesControllerTest extends TestCase {
             ['id' => 1, 'person_name' => 'Alpha'],
         ]);
 
-        $response = $this->get('/codes/CBDB__NAME_FTS');
+        $props = $this->appProps('/app/codes/CBDB__NAME_FTS');
 
-        $response->assertStatus(200);
-        $response->assertSee('Alpha');
+        $this->assertSame(['Alpha'], $this->rowColumn($props, 'person_name'));
     }
 
     #[Test]
@@ -523,10 +510,9 @@ class CodesControllerTest extends TestCase {
             ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
         ]);
 
-        $response = $this->get('/codes/TEST_CODES');
+        $props = $this->appProps('/app/codes/TEST_CODES');
 
-        $response->assertStatus(200);
-        $response->assertViewHas('booleanEnabled', false);
+        $this->assertFalse($props['boolean_enabled']);
     }
 
     #[Test]
@@ -535,10 +521,9 @@ class CodesControllerTest extends TestCase {
             ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
         ]);
 
-        $response = $this->get('/codes/TEST_CODES?filter_bool=1');
+        $props = $this->appProps('/app/codes/TEST_CODES?filter_bool=1');
 
-        $response->assertStatus(200);
-        $response->assertViewHas('booleanEnabled', true);
+        $this->assertTrue($props['boolean_enabled']);
     }
 
     #[Test]
@@ -548,14 +533,13 @@ class CodesControllerTest extends TestCase {
             ['code_id' => 'A2', 'code_sub' => 'X2', 'description' => 'Beta entry'],
         ]);
 
-        $response = $this->get('/codes/TEST_CODES?filter_bool=1&filters[description]=Beta');
+        $this->activeReader();
+        $props = $this->appProps('/app/codes/TEST_CODES?filter_bool=1&filters[description]=Beta');
 
-        $response->assertStatus(200);
-        $response->assertViewHas('booleanEnabled', true);
-        $response->assertSee('Beta entry');
-        $response->assertDontSee('Alpha entry');
-        $response->assertViewHas('appliedFilters', ['description' => 'Beta']);
-        $response->assertViewHas('filterErrors', []);
+        $this->assertTrue($props['boolean_enabled']);
+        $this->assertSame(['Beta entry'], $this->rowColumn($props, 'description'));
+        $this->assertSame(['description' => 'Beta'], (array) $props['applied_filters']);
+        $this->assertSame([], (array) $props['filter_errors']);
     }
 
     #[Test]
@@ -566,32 +550,33 @@ class CodesControllerTest extends TestCase {
         ]);
 
         // 好欄位 description=Beta 照常套用；壞欄位 code_sub='X1 AND' 解析失敗 → 記錯誤並略過。
-        $response = $this->get('/codes/TEST_CODES?filter_bool=1'
+        $this->activeReader();
+        $props = $this->appProps('/app/codes/TEST_CODES?filter_bool=1'
             . '&filters[description]=Beta'
             . '&filters[code_sub]=' . urlencode('X1 AND'));
 
-        $response->assertStatus(200);
         // 好欄位生效：只剩 Beta entry
-        $response->assertSee('Beta entry');
-        $response->assertDontSee('Alpha entry');
-        // 分流正確：appliedFilters 只含好欄位、filterErrors 只含壞欄位
-        $response->assertViewHas('appliedFilters', ['description' => 'Beta']);
-        $errors = $response->viewData('filterErrors');
-        $this->assertSame(['code_sub' => 'dangling_operator'], $errors);
+        $this->assertSame(['Beta entry'], $this->rowColumn($props, 'description'));
+        // 分流正確：applied_filters 只含好欄位、filter_errors 只含壞欄位
+        $this->assertSame(['description' => 'Beta'], (array) $props['applied_filters']);
+        $this->assertSame(['code_sub' => 'dangling_operator'], (array) $props['filter_errors']);
 
-        // 端到端護欄（決策 #19）：分頁連結帶好欄位、不帶被略過的壞欄位
-        $paginator = $response->viewData('data');
-        $url = $paginator->url(1);
-        $this->assertStringContainsString('description', $url);
-        $this->assertStringNotContainsString('code_sub', $url);
-        $this->assertStringContainsString('filter_bool', $url);
-
-        // blade 狀態攜帶（C6）：filter_bool 帶在 form/連結，互動不會洗掉布林模式
-        $response->assertSee('name="filter_bool" value="1"', false);
-        // blade 連結/隱藏狀態只帶好欄位（#19）：好欄位進 hidden 狀態，壞欄位不進
-        // （壞欄位仍會出現在 filter-row 文字輸入框做回填，故此處精準比對 hidden 狀態）
-        $response->assertSee('type="hidden" name="filters[description]"', false);
-        $response->assertDontSee('type="hidden" name="filters[code_sub]"', false);
+        // 端到端護欄（決策 #19）：換頁／排序的連結帶好欄位、不帶被略過的壞欄位。
+        //
+        // Blade 版是伺服器把連結整條組好，所以原測試斷言 `$paginator->url(1)` 的字串
+        // 與 hidden input 的 HTML。**React 版的連結是前端組的**，伺服器能負責的那一半就是
+        // 這個 prop——`Show.tsx` 的 `navigate()` 拿 `applied_filters` 去組 URL
+        // （見該檔註解與 Blade 下架環節 4b-2c-2）。所以這裡斷言的是同一個不變量的伺服器端。
+        $this->assertArrayHasKey('description', (array) $props['applied_filters']);
+        $this->assertArrayNotHasKey('code_sub', (array) $props['applied_filters']);
+        // 狀態攜帶（C6）：布林模式本身要留著，互動不會把它洗掉。
+        $this->assertTrue($props['boolean_enabled']);
+        // 壞欄位仍要回填到輸入框（使用者才改得動），所以它必須留在 `filters` 裡——
+        // 這正是 `filters` 與 `applied_filters` 不可合併的理由。
+        $this->assertSame(
+            ['description' => 'Beta', 'code_sub' => 'X1 AND'],
+            (array) $props['filters']
+        );
     }
 
     #[Test]
@@ -602,15 +587,12 @@ class CodesControllerTest extends TestCase {
         ]);
 
         // 'Beta AND' 懸空運算子 → 解析失敗 → 該欄記錯誤並略過（不轉字面、不套用），故兩列都顯示
-        $response = $this->get('/codes/TEST_CODES?filter_bool=1&filters[description]=' . urlencode('Beta AND'));
+        $this->activeReader();
+        $props = $this->appProps('/app/codes/TEST_CODES?filter_bool=1&filters[description]=' . urlencode('Beta AND'));
 
-        $response->assertStatus(200);
-        $response->assertSee('Alpha entry');
-        $response->assertSee('Beta entry');
-        $response->assertViewHas('appliedFilters', []);
-        $errors = $response->viewData('filterErrors');
-        $this->assertArrayHasKey('description', $errors);
-        $this->assertSame('dangling_operator', $errors['description']);
+        $this->assertSame(['Alpha entry', 'Beta entry'], $this->rowColumn($props, 'description'));
+        $this->assertSame([], (array) $props['applied_filters']);
+        $this->assertSame(['description' => 'dangling_operator'], (array) $props['filter_errors']);
     }
 
     #[Test]
@@ -620,10 +602,9 @@ class CodesControllerTest extends TestCase {
             ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
         ]);
 
-        $response = $this->get('/codes/TEST_CODES?filter_bool=1');
+        $props = $this->appProps('/app/codes/TEST_CODES?filter_bool=1');
 
-        $response->assertStatus(200);
-        $response->assertViewHas('booleanEnabled', false);
+        $this->assertFalse($props['boolean_enabled']);
     }
 
     #[Test]
@@ -633,12 +614,13 @@ class CodesControllerTest extends TestCase {
             ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
         ]);
 
-        $response = $this->get('/codes/TEST_CODES');
+        $props = $this->appProps('/app/codes/TEST_CODES');
 
-        $response->assertStatus(200);
-        // kill-switch 關閉時整個停用：連開關都不顯示（§2.2）
-        $response->assertViewHas('booleanFilterAvailable', false);
-        $response->assertDontSee(__('codes.advanced_filter'), false);
+        // kill-switch 關閉時整個停用：連開關都不顯示（§2.2）。
+        // Blade 版靠 assertDontSee 掃字串；React 版整塊開關包在
+        // `{boolean_filter_available && !use_cursor && (…)}` 裡（Show.tsx），所以伺服器端
+        // 能負責的就是這個 prop 為 false。
+        $this->assertFalse($props['boolean_filter_available']);
     }
 
     #[Test]
@@ -649,12 +631,16 @@ class CodesControllerTest extends TestCase {
 
         // 布林模式 + 壞欄位 code_sub（解析失敗）。「關閉進階篩選」連結必須保留原始輸入，
         // 讓使用者一鍵把錯誤布林字串降級為字面搜尋，而非讓輸入憑空消失（§9.2）。
-        $response = $this->get('/codes/TEST_CODES?filter_bool=1&filters[code_sub]=' . urlencode('X1 AND'));
+        $this->activeReader();
+        $props = $this->appProps('/app/codes/TEST_CODES?filter_bool=1&filters[code_sub]=' . urlencode('X1 AND'));
 
-        $response->assertStatus(200);
-        // toggle 連結是 href（方括號 URL-encoded 為 %5B/%5D）；filter-row input 用未編碼方括號，
-        // 故此斷言精準命中「連結帶有壞欄位原始值」，證明降級路徑保留它（pagination/sort 連結則排除，見上一測試）。
-        $response->assertSee('filters%5Bcode_sub%5D', false);
+        // Blade 版把「關閉進階篩選」連結整條組好，所以原測試斷言 href 裡有 `filters%5Bcode_sub%5D`。
+        // React 版那個連結是前端組的（`Show.tsx::toggleBoolean()` 刻意用**原始輸入**而非
+        // applied），伺服器端的對應物就是：壞欄位**留在 `filters`**、但**不在 `applied_filters`**。
+        // 這一組對照正是降級路徑與換頁路徑的差別。
+        $this->assertSame(['code_sub' => 'X1 AND'], (array) $props['filters']);
+        $this->assertSame([], (array) $props['applied_filters']);
+        $this->assertSame(['code_sub' => 'dangling_operator'], (array) $props['filter_errors']);
     }
 
     #[Test]
@@ -665,16 +651,15 @@ class CodesControllerTest extends TestCase {
         ]);
 
         // 即使帶 filters/sort/filter_bool，游標大表也應硬短路：忽略它們、永遠走游標路徑
-        $response = $this->get('/codes/CBDB__NAME_FTS?filter_bool=1&filters[person_name]=' . urlencode('Alpha OR Beta') . '&sort_by=person_name&sort_dir=desc');
+        $this->activeReader();
+        $props = $this->appProps('/app/codes/CBDB__NAME_FTS?filter_bool=1&filters[person_name]=' . urlencode('Alpha OR Beta') . '&sort_by=person_name&sort_dir=desc');
 
-        $response->assertStatus(200);
-        $response->assertViewHas('useCursorPagination', true);
-        $response->assertViewHas('filters', []);
-        $response->assertViewHas('sortBy', '');
-        $response->assertViewHas('booleanEnabled', false);
+        $this->assertTrue($props['use_cursor']);
+        $this->assertSame([], (array) $props['filters']);
+        $this->assertSame('', $props['sort_by']);
+        $this->assertFalse($props['boolean_enabled']);
         // filter 被忽略，兩列都還在
-        $response->assertSee('Alpha');
-        $response->assertSee('Beta');
+        $this->assertSame(['Alpha', 'Beta'], $this->rowColumn($props, 'person_name'));
     }
 
     #[Test]
@@ -683,12 +668,17 @@ class CodesControllerTest extends TestCase {
             ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
         ]);
 
-        $response = $this->get('/codes/TEST_CODES');
+        $props = $this->appProps('/app/codes/TEST_CODES');
 
-        $response->assertStatus(200);
-        // 關閉狀態：顯示「進階篩選」開啟連結（帶 filter_bool=1）
-        $response->assertSee(__('codes.advanced_filter'), false);
-        $response->assertSee('filter_bool=1', false);
+        // 關閉狀態：開關要可用（React 依 boolean_filter_available 決定整塊顯不顯示），
+        // 且目前處於「關閉」那一支（顯示「進階篩選」開啟鈕而非「停用」鈕）。
+        $this->assertTrue($props['boolean_filter_available']);
+        $this->assertFalse($props['boolean_enabled']);
+        // 原測試另外斷言連結字串帶 `filter_bool=1`。React 的開關是 onClick 組參數
+        // （Show.tsx::toggleBoolean），**那一段沒有伺服器端的對應物**——它是純前端邏輯。
+        // 不在這裡硬湊一個不相干的 prop 斷言充數（第一版我補了 `use_cursor`，
+        // 與 toggle 無關，被 review 指為填充物）。前端那段的覆蓋見
+        // resources/js/inertia/Pages/Codes/showNavigation.test.ts。
     }
 
     #[Test]
@@ -698,13 +688,12 @@ class CodesControllerTest extends TestCase {
             ['code_id' => 'A2', 'code_sub' => 'X2', 'description' => 'Beta entry'],
         ]);
 
-        $response = $this->get('/codes/TEST_CODES?filter_bool=1&filters[description]=Beta');
+        $this->activeReader();
+        $props = $this->appProps('/app/codes/TEST_CODES?filter_bool=1&filters[description]=Beta');
 
-        $response->assertStatus(200);
-        // 後端權威回填的人話描述（zh-TW）
-        $response->assertViewHas('filterDescriptions', ['description' => '含「Beta」']);
-        $response->assertSee('含「Beta」', false);
-        $response->assertSee(__('codes.filter_applied_label'), false);
+        // 後端權威回填的人話描述（zh-TW）。React 由 `filter_descriptions` 這個 prop 渲染
+        // （Show.tsx 的 `filter_applied_label` 區塊），所以伺服器端的契約就是這個 prop 的內容。
+        $this->assertSame(['description' => '含「Beta」'], (array) $props['filter_descriptions']);
     }
 
     #[Test]
@@ -713,13 +702,20 @@ class CodesControllerTest extends TestCase {
             ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
         ]);
 
-        $response = $this->get('/codes/TEST_CODES?filter_bool=1&filters[description]=' . urlencode('Beta AND'));
+        $this->activeReader();
+        $props = $this->appProps('/app/codes/TEST_CODES?filter_bool=1&filters[description]=' . urlencode('Beta AND'));
 
-        $response->assertStatus(200);
-        // 逐欄錯誤標記 + 本地化錯誤訊息 + 彙總警示
-        $response->assertSee('is-invalid', false);
-        $response->assertSee(__('codes.filter_err_dangling_operator'), false);
-        $response->assertSee(__('codes.filter_errors_heading', ['count' => 1]), false);
+        // 原測試斷言的三件事（逐欄 is-invalid 標記、本地化訊息、彙總警示）在 React 版
+        // **全部由 `filter_errors` 這一個 prop 驅動**（Show.tsx：`col in filter_errors` 決定
+        // 欄位標紅、`filter_err_${code}` 取訊息、`filter_errors_heading` 用它的數量）。
+        // 所以伺服器端要守的是「錯誤碼有傳下去、而且是可翻譯的那個碼」。
+        $this->assertSame(['description' => 'dangling_operator'], (array) $props['filter_errors']);
+        // 錯誤碼必須對得上翻譯鍵，否則前端只會顯示 filter_err_unknown（§6）。
+        $this->assertNotSame(
+            'codes.filter_err_dangling_operator',
+            (string) __('codes.filter_err_dangling_operator'),
+            '翻譯鍵不存在：前端會退回 filter_err_unknown'
+        );
     }
 
     #[Test]
@@ -728,13 +724,12 @@ class CodesControllerTest extends TestCase {
             ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha entry'],
         ]);
 
-        $response = $this->get('/codes/TEST_CODES');
+        $props = $this->appProps('/app/codes/TEST_CODES');
 
-        $response->assertStatus(200);
-        // Avoid matching sidebar labels containing「修改」/「刪除」，so assert on the action button classes instead.
-        $response->assertDontSee('btn btn-sm btn-info');
-        $response->assertDontSee('btn btn-sm btn-danger');
-        $response->assertDontSee('新增');
+        // 原測試靠「頁面上沒有那幾個 Bootstrap 按鈕 class」間接驗；React 版把同一件事
+        // 收斂成一個伺服器端的 prop：`can_edit`。Show.tsx 的新增／修改／刪除全部包在
+        // `can_edit &&` 裡。斷言 prop 比斷言 class 名稱穩定（改版型不會假紅）。
+        $this->assertFalse($props['can_edit']);
         $this->assertEmpty($this->operationSpy->calls);
     }
 
@@ -761,22 +756,22 @@ class CodesControllerTest extends TestCase {
         $user->is_active = 1;
         $this->actingAs($user);
 
-        $response = $this->get('/codes/TEXT_CODES');
+        $props = $this->appProps('/app/codes/TEXT_CODES');
 
-        $response->assertStatus(200);
-        $response->assertViewHas('keyColumns', ['c_textid']);
-        $response->assertSee('/codes/TEXT_CODES/T001/edit');
-        $response->assertDontSee('href="/codes/TEXT_CODES/T001_._', false);
-        $response->assertSee('c_textid', false);
-        $response->assertSee('badge badge-info ml-1', false);
-        $response->assertSee('PK', false);
-        $response->assertSee('c_title_chn', false);
-        $response->assertSee('c_title', false);
-        $response->assertSee('c_created_by', false);
-        $response->assertSee('c_created_date', false);
-        $response->assertSee('c_modified_by', false);
-        $response->assertSee('c_modified_date', false);
-        $response->assertSee('Sample Title CHN');
+        // 主鍵覆寫生效：只有 c_textid 是鍵欄（沒被推成複合鍵）。
+        $this->assertSame(['c_textid'], $props['key_columns']);
+        // 原測試斷言表頭上每一欄的字串都出現過、以及 PK 徽章的 Bootstrap class。
+        // React 版表頭由 `thead` prop 決定、PK 徽章由 `key_columns` 決定 ⇒ 斷言 thead
+        // 的**完整內容**（連順序）比逐一 assertSee 強：少一欄、多一欄、順序變了都會紅。
+        $this->assertSame(
+            ['c_textid', 'c_title', 'c_title_chn', 'c_bibl_cat_code', 'c_created_by', 'c_created_date', 'c_modified_by', 'c_modified_date'],
+            $props['thead']
+        );
+        $this->assertSame(['Sample Title CHN'], $this->rowColumn($props, 'c_title_chn'));
+        // 原測試的 assertDontSee('href="/codes/TEXT_CODES/T001_._') 是在驗「單欄主鍵不可
+        // 被組成 `T001_._…`」。React 的編輯連結由前端拿 `key_columns` 組（rowId()），
+        // 伺服器端的對應物就是上面那條 key_columns 斷言；編輯 URL 模板本身另驗。
+        $this->assertSame('/app/codes/TEXT_CODES/__ID__/edit', $props['urls']['edit_template']);
         $this->assertEmpty($this->operationSpy->calls);
     }
 
@@ -799,12 +794,11 @@ class CodesControllerTest extends TestCase {
         $user->is_active = 1;
         $this->actingAs($user);
 
-        $response = $this->get('/codes/APPOINTMENT_TYPES');
+        $props = $this->appProps('/app/codes/APPOINTMENT_TYPES');
 
-        $response->assertStatus(200);
-        $response->assertViewHas('keyColumns', ['c_appt_type_code']);
-        $response->assertSee('/codes/APPOINTMENT_TYPES/T001/edit');
-        $response->assertDontSee('href="/codes/APPOINTMENT_TYPES/T001_._', false);
+        $this->assertSame(['c_appt_type_code'], $props['key_columns']);
+        $this->assertSame(['T001'], $this->rowColumn($props, 'c_appt_type_code'));
+        $this->assertSame('/app/codes/APPOINTMENT_TYPES/__ID__/edit', $props['urls']['edit_template']);
 
     }
 
@@ -1144,40 +1138,38 @@ class CodesControllerTest extends TestCase {
         $user->is_active = 1;
         $this->actingAs($user);
 
-        $response = $this->get('/codes/TEXT_CODES/T001/edit');
+        // 原測試在 HTML 裡用 strpos 找 `name="c_created_by"`，再在它**之後**找 value 與
+        // readonly——那是位置式比對，任何版型調整都可能讓它假綠。React 版把同一組語義
+        // 放進兩個 prop：`values`（顯示的原始值）與 `column_behaviour`（唯讀與替換預覽）。
+        $props = $this->appProps('/app/codes/TEXT_CODES/T001/edit');
 
-        $response->assertStatus(200);
-        $content = $response->getContent();
+        $values = (array) $props['values'];
+        $behaviour = (array) $props['column_behaviour'];
 
-        // c_created_by 应显示原始值并且 readonly
-        $createdByPos = strpos($content, 'name="c_created_by"');
-        $this->assertNotFalse($createdByPos);
-        $this->assertNotFalse(strpos($content, 'value="origin"', $createdByPos));
-        $this->assertNotFalse(strpos($content, 'readonly', $createdByPos));
+        // 四個稽核欄都顯示**原始值**（不是當前使用者／當前時間）且唯讀。
+        $expectedValues = [
+            'c_created_by' => 'origin',
+            'c_created_date' => '2020-01-01 00:00:00',
+            'c_modified_by' => 'previous',
+            'c_modified_date' => '2020-01-02 00:00:00',
+        ];
+        foreach ($expectedValues as $column => $expected) {
+            $this->assertSame($expected, $values[$column] ?? null, $column.' 應顯示原始值');
+            $this->assertTrue(((array) ($behaviour[$column] ?? []))['readonly'] ?? false, $column.' 應唯讀');
+        }
 
-        // c_created_date 应显示原始值并且 readonly
-        $createdDatePos = strpos($content, 'name="c_created_date"');
-        $this->assertNotFalse($createdDatePos);
-        $this->assertNotFalse(strpos($content, 'value="2020-01-01 00:00:00"', $createdDatePos));
-        $this->assertNotFalse(strpos($content, 'readonly', $createdDatePos));
-
-        // c_modified_by 应显示原始值（"previous"）而非当前用戶，并且 readonly
-        $modifiedByPos = strpos($content, 'name="c_modified_by"');
-        $this->assertNotFalse($modifiedByPos);
-        $this->assertNotFalse(strpos($content, 'value="previous"', $modifiedByPos));
-        $this->assertNotFalse(strpos($content, 'readonly', $modifiedByPos));
-
-        // c_modified_date 应显示原始值（"2020-01-02 00:00:00"）而非当前日期，并且 readonly
-        $modifiedDatePos = strpos($content, 'name="c_modified_date"');
-        $this->assertNotFalse($modifiedDatePos);
-        $this->assertNotFalse(strpos($content, 'value="2020-01-02 00:00:00"', $modifiedDatePos));
-        $this->assertNotFalse(strpos($content, 'readonly', $modifiedDatePos));
-
-        // 应该有提示文字说明提交后会被替换的值
-        $response->assertSee('欄位內容提交後會被替換為：text-admin', false);
-        // Use config timezone (consistent with write operations)
+        // 只有 c_modified_* 有「提交後會被替換為 X」預覽（c_created_* 不會被改寫，所以沒有）。
         $expectedTimestamp = Carbon::now()->timezone(config('app.timezone'))->format('Y-m-d H:i:s');
-        $response->assertSee('欄位內容提交後會被替換為：'.$expectedTimestamp, false);
+        $this->assertSame(
+            '欄位內容提交後會被替換為：text-admin',
+            ((array) ($behaviour['c_modified_by']['hint'] ?? []))['text'] ?? null
+        );
+        $this->assertSame(
+            '欄位內容提交後會被替換為：'.$expectedTimestamp,
+            ((array) ($behaviour['c_modified_date']['hint'] ?? []))['text'] ?? null
+        );
+        $this->assertArrayNotHasKey('hint', (array) ($behaviour['c_created_by'] ?? []));
+        $this->assertArrayNotHasKey('hint', (array) ($behaviour['c_created_date'] ?? []));
 
         Carbon::setTestNow();
     }
@@ -1275,6 +1267,63 @@ class CodesControllerTest extends TestCase {
     // Phase 2: filter / sort tests
     // ──────────────────────────────────────────────────────────────
 
+    // -- Blade 下架環節 4b-2c-2 的移植輔助 --------------------------------
+    //
+    // 讀取面從 Blade 視圖變數／HTML 改成斷言 Inertia props。對照：
+    //   sortBy→sort_by、sortDir→sort_dir、booleanEnabled→boolean_enabled、
+    //   booleanFilterAvailable→boolean_filter_available、filterErrors→filter_errors、
+    //   filterDescriptions→filter_descriptions、useCursorPagination→use_cursor、
+    //   keyColumns→key_columns、appliedFilters→applied_filters（本環節新增的 prop）。
+    //
+    // 本環節的排序／篩選需要登入且已啟用帳號（guardSortFilterRequiresAuth()，
+    // 見 docs/CODES_SORT_FILTER_AUTH_GATE.md），Blade 端沒有這道門檻。所以帶 sort_by／
+    // filters 的測試一律先 actingAs($this->activeReader())。門檻本身的**擋下**路徑由
+    // CodesShowInertiaTest::guest_sort_or_filter_on_kinship_codes_computed_column_requires_login()
+    // 覆蓋，這裡走的是放行路徑。
+
+    /** 打 React 版 /app/codes/... 並取回 Inertia props（斷言 200）。 */
+    private function appProps(string $uri): array {
+        $props = [];
+
+        $this->get($uri)
+            ->assertOk()
+            ->assertInertia(function (Assert $page) use (&$props) {
+                $props = $page->toArray()['props'];
+            });
+
+        return $props;
+    }
+
+    /**
+     * 取 rows prop 的某一欄。
+     *
+     * 刻意回傳**欄值清單**而不是把整個 payload 轉成字串再做子字串比對——原本的
+     * assertSee('Beta entry') 只證明「頁面某處出現過這串字」，這裡證明「結果集就是這些列」，
+     * 順序錯、多撈一列、欄位錯位都會紅。
+     *
+     * @return array<int,string>
+     */
+    private function rowColumn(array $props, string $column): array {
+        return array_map(
+            fn ($row) => (string) (((array) $row)[$column] ?? ''),
+            $props['rows'] ?? []
+        );
+    }
+
+    /** 排序／篩選需要的「已登入且已啟用」讀者。 */
+    private function activeReader(): User {
+        $user = new User([
+            'name' => 'reader',
+            'email' => 'reader@example.com',
+            'confirmation_token' => Str::random(32),
+        ]);
+        $user->id = 90;
+        $user->is_active = 1;
+        $this->actingAs($user);
+
+        return $user;
+    }
+
     #[Test]
     public function testSortByValidColumnReturns200() {
         DB::table('TEST_CODES')->insert([
@@ -1282,13 +1331,14 @@ class CodesControllerTest extends TestCase {
             ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Apple'],
         ]);
 
-        $response = $this->get('/codes/TEST_CODES?sort_by=description&sort_dir=asc');
+        $this->activeReader();
+        $props = $this->appProps('/app/codes/TEST_CODES?sort_by=description&sort_dir=asc');
 
-        $response->assertStatus(200);
-        $response->assertViewHas('sortBy', 'description');
-        $response->assertViewHas('sortDir', 'asc');
-        $response->assertSee('Apple');
-        $response->assertSee('Banana');
+        $this->assertSame('description', $props['sort_by']);
+        $this->assertSame('asc', $props['sort_dir']);
+        // 原本只斷言「兩個字串都出現在頁面上」，這裡連**順序**一起釘住——正是 sort_by
+        // 這條測試的重點，而 assertSee 對順序是盲的。
+        $this->assertSame(['Apple', 'Banana'], $this->rowColumn($props, 'description'));
     }
 
     #[Test]
@@ -1297,10 +1347,10 @@ class CodesControllerTest extends TestCase {
             ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha'],
         ]);
 
-        $response = $this->get('/codes/TEST_CODES?sort_by=non_existent_column&sort_dir=asc');
+        $this->activeReader();
+        $props = $this->appProps('/app/codes/TEST_CODES?sort_by=non_existent_column&sort_dir=asc');
 
-        $response->assertStatus(200);
-        $response->assertViewHas('sortBy', '');
+        $this->assertSame('', $props['sort_by']);
     }
 
     #[Test]
@@ -1309,10 +1359,10 @@ class CodesControllerTest extends TestCase {
             ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha'],
         ]);
 
-        $response = $this->get('/codes/TEST_CODES?sort_by=description&sort_dir=INVALID');
+        $this->activeReader();
+        $props = $this->appProps('/app/codes/TEST_CODES?sort_by=description&sort_dir=INVALID');
 
-        $response->assertStatus(200);
-        $response->assertViewHas('sortDir', 'asc');
+        $this->assertSame('asc', $props['sort_dir']);
     }
 
     #[Test]
@@ -1323,13 +1373,11 @@ class CodesControllerTest extends TestCase {
             ['code_id' => 'C1', 'code_sub' => 'Z1', 'description' => 'Gamma entry'],
         ]);
 
-        $response = $this->get('/codes/TEST_CODES?filters[description]=Beta');
+        $this->activeReader();
+        $props = $this->appProps('/app/codes/TEST_CODES?filters[description]=Beta');
 
-        $response->assertStatus(200);
-        $response->assertSee('Beta entry');
-        $response->assertDontSee('Alpha entry');
-        $response->assertDontSee('Gamma entry');
-        $response->assertViewHas('filters', ['description' => 'Beta']);
+        $this->assertSame(['Beta entry'], $this->rowColumn($props, 'description'));
+        $this->assertSame(['description' => 'Beta'], (array) $props['filters']);
     }
 
     #[Test]
@@ -1338,10 +1386,12 @@ class CodesControllerTest extends TestCase {
             ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha'],
         ]);
 
-        $response = $this->get('/codes/TEST_CODES?filters[non_existent]=value');
+        $this->activeReader();
+        $props = $this->appProps('/app/codes/TEST_CODES?filters[non_existent]=value');
 
-        $response->assertStatus(200);
-        $response->assertViewHas('filters', []);
+        $this->assertSame([], (array) $props['filters']);
+        // 未知欄位被丟掉 ⇒ 沒有任何條件，整表照撈（否則「篩掉全部」也會讓 filters 為空）。
+        $this->assertSame(['Alpha'], $this->rowColumn($props, 'description'));
     }
 
     #[Test]
@@ -1350,10 +1400,11 @@ class CodesControllerTest extends TestCase {
             ['code_id' => 'A1', 'code_sub' => 'X1', 'description' => 'Alpha'],
         ]);
 
-        $response = $this->get('/codes/TEST_CODES?filters[description][]=array_attack');
+        $this->activeReader();
+        $props = $this->appProps('/app/codes/TEST_CODES?filters[description][]=array_attack');
 
-        $response->assertStatus(200);
-        $response->assertViewHas('filters', []);
+        $this->assertSame([], (array) $props['filters']);
+        $this->assertSame(['Alpha'], $this->rowColumn($props, 'description'));
     }
 
     #[Test]
@@ -1364,14 +1415,12 @@ class CodesControllerTest extends TestCase {
             ['code_id' => 'B1', 'code_sub' => 'Y1', 'description' => 'Banana'],
         ]);
 
-        $response = $this->get('/codes/TEST_CODES?filters[code_sub]=X1&sort_by=code_id&sort_dir=asc');
+        $this->activeReader();
+        $props = $this->appProps('/app/codes/TEST_CODES?filters[code_sub]=X1&sort_by=code_id&sort_dir=asc');
 
-        $response->assertStatus(200);
-        $response->assertSee('Apple');
-        $response->assertDontSee('Banana');
-        $response->assertDontSee('Cherry');
-        $response->assertViewHas('sortBy', 'code_id');
-        $response->assertViewHas('filters', ['code_sub' => 'X1']);
+        $this->assertSame(['Apple'], $this->rowColumn($props, 'description'));
+        $this->assertSame('code_id', $props['sort_by']);
+        $this->assertSame(['code_sub' => 'X1'], (array) $props['filters']);
     }
 
     #[Test]
@@ -1381,22 +1430,21 @@ class CodesControllerTest extends TestCase {
             ['code_id' => 'B1', 'code_sub' => 'Y1', 'description' => 'Beta'],
         ]);
 
-        $response = $this->get('/codes/TEST_CODES?filters[description]=');
+        // 空值篩選不需要登入——guardSortFilterRequiresAuth() 的判準是「有非空的 filters」，
+        // 全空就不觸發門檻。這條順帶釘住那個判準：改成「有 filters 鍵就擋」會讓它 302。
+        $props = $this->appProps('/app/codes/TEST_CODES?filters[description]=');
 
-        $response->assertStatus(200);
-        $response->assertSee('Alpha');
-        $response->assertSee('Beta');
-        $response->assertViewHas('filters', []);
+        $this->assertSame(['Alpha', 'Beta'], $this->rowColumn($props, 'description'));
+        $this->assertSame([], (array) $props['filters']);
     }
 
     #[Test]
     public function testViewReceivesFilterSortDirVariables() {
-        $response = $this->get('/codes/TEST_CODES');
+        $props = $this->appProps('/app/codes/TEST_CODES');
 
-        $response->assertStatus(200);
-        $response->assertViewHas('filters', []);
-        $response->assertViewHas('sortBy', '');
-        $response->assertViewHas('sortDir', 'asc');
+        $this->assertSame([], (array) $props['filters']);
+        $this->assertSame('', $props['sort_by']);
+        $this->assertSame('asc', $props['sort_dir']);
     }
 
     // ── Phase 3：JOIN 表 resolveColumnForQuery 單元測試 ────────────────
@@ -1420,24 +1468,23 @@ class CodesControllerTest extends TestCase {
             ['c_appt_code' => 'B2', 'c_appt_type_code' => 'T2'],
         ]);
 
+        $this->activeReader();
+
         // sort on JOIN alias column（由 getJoinedColumnNames 加入 $thead）
         $this->fakeDb->recordedOrderBys = [];
-        $response = $this->get('/codes/APPOINTMENT_CODE_TYPE_REL?sort_by=appt_name&sort_dir=asc');
-        $response->assertStatus(200);
-        $response->assertViewHas('sortBy', 'appt_name');
+        $props = $this->appProps('/app/codes/APPOINTMENT_CODE_TYPE_REL?sort_by=appt_name&sort_dir=asc');
+        $this->assertSame('appt_name', $props['sort_by']);
         // resolveColumnForQuery must resolve JOIN alias → fully-qualified expression
         $this->assertContains(['code.c_appt_desc_chn', 'asc'], $this->fakeDb->recordedOrderBys);
 
         // filter on base table column
-        $response2 = $this->get('/codes/APPOINTMENT_CODE_TYPE_REL?filters[c_appt_code]=A1');
-        $response2->assertStatus(200);
-        $response2->assertViewHas('filters', ['c_appt_code' => 'A1']);
+        $props2 = $this->appProps('/app/codes/APPOINTMENT_CODE_TYPE_REL?filters[c_appt_code]=A1');
+        $this->assertSame(['c_appt_code' => 'A1'], (array) $props2['filters']);
 
         // 不在 $thead 白名單的欄位 → sanitizeSortParameters 清空 sortBy → 200，無例外
         $this->fakeDb->recordedOrderBys = [];
-        $response3 = $this->get('/codes/APPOINTMENT_CODE_TYPE_REL?sort_by=non_existent_column');
-        $response3->assertStatus(200);
-        $response3->assertViewHas('sortBy', '');
+        $props3 = $this->appProps('/app/codes/APPOINTMENT_CODE_TYPE_REL?sort_by=non_existent_column');
+        $this->assertSame('', $props3['sort_by']);
         // no user-requested column should appear; PK tie-breakers are still recorded
         $this->assertNotContains('non_existent_column', array_column($this->fakeDb->recordedOrderBys, 0));
     }
@@ -1449,18 +1496,18 @@ class CodesControllerTest extends TestCase {
             ['c_office_id' => 2, 'c_office_tree_id' => 20],
         ]);
 
+        $this->activeReader();
+
         // sort on JOIN alias column
         $this->fakeDb->recordedOrderBys = [];
-        $response = $this->get('/codes/OFFICE_CODE_TYPE_REL?sort_by=office_name&sort_dir=desc');
-        $response->assertStatus(200);
-        $response->assertViewHas('sortBy', 'office_name');
+        $props = $this->appProps('/app/codes/OFFICE_CODE_TYPE_REL?sort_by=office_name&sort_dir=desc');
+        $this->assertSame('office_name', $props['sort_by']);
         // resolveColumnForQuery must resolve JOIN alias → fully-qualified expression
         $this->assertContains(['code.c_office_chn', 'desc'], $this->fakeDb->recordedOrderBys);
 
         // filter on base table column
-        $response2 = $this->get('/codes/OFFICE_CODE_TYPE_REL?filters[c_office_id]=1');
-        $response2->assertStatus(200);
-        $response2->assertViewHas('filters', ['c_office_id' => '1']);
+        $props2 = $this->appProps('/app/codes/OFFICE_CODE_TYPE_REL?filters[c_office_id]=1');
+        $this->assertSame(['c_office_id' => '1'], (array) $props2['filters']);
     }
 }
 

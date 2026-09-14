@@ -152,12 +152,12 @@ class PersonMapPointsTest extends TestCase {
         $this->assertSame('知州 · 密州', $office['label']);
 
         // 每筆帶記錄頁相對 URL（供 popup 開新分頁）與官名中英
-        $this->assertStringStartsWith('/basicinformation/1001/addresses/edit', $addr['url']);
+        $this->assertStringStartsWith('/app/basicinformation/1001/addresses/edit-v2', $addr['url']);
         $this->assertStringContainsString('c_personid=1001', $addr['url']);
         $this->assertStringContainsString('c_addr_id=100', $addr['url']);
         $this->assertStringContainsString('c_addr_type=1', $addr['url']);
         $this->assertStringContainsString('c_sequence=1', $addr['url']);
-        $this->assertStringStartsWith('/basicinformation/1001/offices/edit', $office['url']);
+        $this->assertStringStartsWith('/app/basicinformation/1001/offices/edit-v2', $office['url']);
         $this->assertStringContainsString('c_office_id=9001', $office['url']);
         $this->assertStringContainsString('c_posting_id=5001', $office['url']);
         $this->assertSame('知州', $office['office_name']);

@@ -456,6 +456,7 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
 |---|---|---|---|
 | 7-U1 | **提案核准不經 mutation handler**，因此繞過守衛 | `OperationsProposalController::applyKinshipProposal()`／`applyAssocProposal()` → `BiogMainRepository::kinshipStoreById()` 等。**legacy 與 v2 共用這條路徑，兩邊一樣沒擋** | 影響僅限守衛上線前既有的 pending proposal（新提案在提交時已被擋）。要在核准分支補守衛嗎？補了之後審核者會看到「提案套用失敗」——該給什麼提示、還是改成自動退回？ |
 | 7-U2 | **`Duplicate_Collateral_Info()`** 複製 KIN_DATA／ASSOC_DATA 時會一併複製歷史 0 髒列 | `BasicInformationController::Duplicate_Collateral_Info()`；該端點無 `legacy.form` 閘門、仍在服役 | 跳過髒列並告警，還是整批拒絕複製？ |
+| 7-O1 | **`BiogMainRepository::altnameStoreById()`／`altnameUpdateById()`／`altnameDestroyById()` 成為孤兒** | 環節 2 刪掉 `BasicInformationAltnamesController` 後外部呼叫者歸零，但方法仍在（各含異體字掛鉤，`VariantReplaceHookCoverageTest` 的 `EXEMPT_DELEGATES` 把 `BiogMainRepository` 釘在 8 個掛鉤，看起來像「還有用」） | 刪除三個方法並把記數調成 6，還是保留？它們是大方法、含落地替換與索引同步，屬另一層（repository）的清理，不在環節 2 的「頁面／路由／controller」範圍內 |
 | 7-U3 | **`PossessionMutationHandler`／`PostingMutationHandler` 的 update 路徑**沒有未詳人物守衛（legacy 有；它們的 create 有） | 兩個 handler | 補齊以對齊 kin／assoc，還是維持現狀？ |
 
 - 結論寫回本文件 §二 D。

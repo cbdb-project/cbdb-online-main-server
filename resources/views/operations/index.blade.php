@@ -31,7 +31,6 @@ use App\Support\CompositePrimaryKey;
 @endsection
 
 @section('content')
-@include('biogmains.defense')
     <div class="card card-default">
         <div class="card-body">
             @if(!empty($history_context))

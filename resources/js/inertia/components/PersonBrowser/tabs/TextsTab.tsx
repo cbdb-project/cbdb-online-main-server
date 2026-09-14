@@ -1,14 +1,11 @@
 import React, { useState } from 'react';
 import TabPager from '../shared/TabPager';
-import LegacyCreateButton from '../shared/LegacyCreateButton';
-import LegacyEditButton from '../shared/LegacyEditButton';
-import LegacyDeleteButton from '../shared/LegacyDeleteButton';
 import { NavButton } from '../../ui/NavButton';
 import { useTabPager } from '../shared/useTabPager';
 import { formatBilingualLabel } from '../shared/formatters';
 import { stableKey } from '../shared/stableKey';
 import { getCsrfToken } from '../shared/csrf';
-import { buildEditV2CreateUrl, buildEditV2EditUrl } from '../shared/legacyEditUrl';
+import { buildEditV2CreateUrl, buildEditV2EditUrl } from '../shared/editorUrl';
 import SubresourceTable from '../../PersonEditorShared/SubresourceTable';
 import { useTranslation } from '../../../hooks/useTranslation';
 import { Button } from '../../ui/Button';
@@ -37,8 +34,6 @@ interface Props {
     canEdit: boolean;
     /** 可提案但無法直接編輯時為 true（送出提案而非直接寫入）。 */
     canPropose?: boolean;
-    /** 由 PersonBrowser 透過 props 注入的遷移開關（basicinformation.texts）。 */
-    textsEditorIsNew?: boolean;
     personId?: number | null;
     createEndpoint?: string;
     mutateEndpoint?: string;
@@ -51,7 +46,6 @@ export default function TextsTab({
     data,
     canEdit,
     canPropose = false,
-    textsEditorIsNew = false,
     personId = null,
     createEndpoint = '',
     mutateEndpoint = '',
@@ -67,7 +61,7 @@ export default function TextsTab({
     const [deleteError, setDeleteError] = useState<string | null>(null);
 
     // 新編輯器只有在 flag=new 且（可編輯或可提案）且必要端點齊全時啟用。
-    const useReactEditor = textsEditorIsNew && (canEdit || canPropose) && personId != null && !!createEndpoint && !!mutateEndpoint && !!deleteEndpoint;
+    const useReactEditor = (canEdit || canPropose) && personId != null && !!createEndpoint && !!mutateEndpoint && !!deleteEndpoint;
     // 無法直接編輯但可提案時，走提案模式（送出待審核提案而非直接寫入）。
     const proposalMode = !canEdit && canPropose;
     const createHref = buildEditV2CreateUrl('texts', personId);
@@ -118,9 +112,7 @@ export default function TextsTab({
                         {t('add_btn')}
                     </NavButton>
                 </div>
-            ) : (
-                <LegacyCreateButton tabKey="texts" canEdit={canEdit} />
-            )}
+            ) : null}
 
             <SubresourceTable
                 items={pageItems}
@@ -137,12 +129,7 @@ export default function TextsTab({
                         <NavButton size="sm" variant="outline" href={editHref(item)}>{t('edit_btn')}</NavButton>
                         <Button size="sm" variant="destructive" onClick={() => { setDeleteError(null); setDeleteTarget(item); }}>{t('delete_btn')}</Button>
                     </span>
-                ) : (
-                    <span style={actionCellStyle}>
-                        <LegacyEditButton tabKey="texts" pk={item.pk} canEdit={canEdit} />
-                        <LegacyDeleteButton tabKey="texts" pk={item.pk} canEdit={canEdit} />
-                    </span>
-                )) : undefined}
+                ) : null) : undefined}
             />
             <TabPager currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} showAll={showAll} onToggleShowAll={() => setShowAll(!showAll)} totalItems={totalItems} />
 

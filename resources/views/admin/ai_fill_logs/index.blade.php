@@ -100,19 +100,17 @@
                                         </span>
                                         <span class="ml-2">
                                             <i class="fas fa-id-badge"></i>
-                                            @if($logCategory === 'assoc')
-                                                <a href="{{ route('basicinformation.assoc.index', ['basicinformation' => $log->c_personid]) }}" class="text-white" target="_blank">
-                                                    {{ __('admin.ai_log_person', ['id' => $log->c_personid]) }}
-                                                </a>
-                                            @elseif($logCategory === 'status')
-                                                <a href="{{ route('basicinformation.statuses.index', ['basicinformation' => $log->c_personid]) }}" class="text-white" target="_blank">
-                                                    {{ __('admin.ai_log_person', ['id' => $log->c_personid]) }}
-                                                </a>
-                                            @else
-                                                <a href="{{ route('basicinformation.offices.index', ['basicinformation' => $log->c_personid]) }}" class="text-white" target="_blank">
-                                                    {{ __('admin.ai_log_person', ['id' => $log->c_personid]) }}
-                                                </a>
-                                            @endif
+                                            {{-- legacy 子資源列表頁（basicinformation.{assoc,statuses,offices}.index）已於
+                                                 Blade 下架計畫環節 2 刪除；改指 React 人物頁的對應分頁。
+                                                 本頁本身屬 A-10，於環節 4a 一併下架。 --}}
+                                            @php
+                                                $aiLogPersonTab = $logCategory === 'assoc'
+                                                    ? 'associations'
+                                                    : ($logCategory === 'status' ? 'statuses' : 'postings');
+                                            @endphp
+                                            <a href="{{ route('app.basicinformation.show', ['id' => $log->c_personid, 'tab' => $aiLogPersonTab], false) }}" class="text-white" target="_blank">
+                                                {{ __('admin.ai_log_person', ['id' => $log->c_personid]) }}
+                                            </a>
                                         </span>
                                         <span class="ml-2">
                                             <i class="fas fa-clock"></i>

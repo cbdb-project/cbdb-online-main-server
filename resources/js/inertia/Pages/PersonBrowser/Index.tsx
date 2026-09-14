@@ -22,18 +22,6 @@ interface PageProps {
     pinyinEndpoint: string;
     canEditBasicInfo: boolean;
     canProposeEdits: boolean;
-    altnameEditorIsNew: boolean;
-    addressesEditorIsNew: boolean;
-    textsEditorIsNew: boolean;
-    sourcesEditorIsNew: boolean;
-    officesEditorIsNew: boolean;
-    assocEditorIsNew: boolean;
-    kinshipEditorIsNew: boolean;
-    eventsEditorIsNew: boolean;
-    entriesEditorIsNew: boolean;
-    statusesEditorIsNew: boolean;
-    possessionEditorIsNew: boolean;
-    socialInstEditorIsNew: boolean;
     initialPersonId: number | null;
     initialKeyword: string;
     initialDynasty: string;
@@ -61,18 +49,6 @@ export default function PersonBrowserIndex() {
         pinyinEndpoint,
         canEditBasicInfo,
         canProposeEdits,
-        altnameEditorIsNew,
-        addressesEditorIsNew,
-        textsEditorIsNew,
-        sourcesEditorIsNew,
-        officesEditorIsNew,
-        assocEditorIsNew,
-        kinshipEditorIsNew,
-        eventsEditorIsNew,
-        entriesEditorIsNew,
-        statusesEditorIsNew,
-        possessionEditorIsNew,
-        socialInstEditorIsNew,
         initialPersonId,
         initialKeyword,
         initialDynasty,
@@ -593,18 +569,6 @@ export default function PersonBrowserIndex() {
                             pinyinEndpoint={pinyinEndpoint}
                             canEditBasicInfo={canEditBasicInfo}
                             canProposeEdits={canProposeEdits}
-                            altnameEditorIsNew={altnameEditorIsNew}
-                            addressesEditorIsNew={addressesEditorIsNew}
-                            textsEditorIsNew={textsEditorIsNew}
-                            sourcesEditorIsNew={sourcesEditorIsNew}
-                            officesEditorIsNew={officesEditorIsNew}
-                            assocEditorIsNew={assocEditorIsNew}
-                            kinshipEditorIsNew={kinshipEditorIsNew}
-                            eventsEditorIsNew={eventsEditorIsNew}
-                            entriesEditorIsNew={entriesEditorIsNew}
-                            statusesEditorIsNew={statusesEditorIsNew}
-                            possessionEditorIsNew={possessionEditorIsNew}
-                            socialInstEditorIsNew={socialInstEditorIsNew}
                             postCE={summary?.dynasty_start != null && summary.dynasty_start > 0}
                             onSelectPerson={guardedHandleSelect}
                             onBasicInfoSaved={handleBasicInfoSaved}

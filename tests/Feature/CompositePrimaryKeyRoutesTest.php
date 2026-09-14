@@ -27,13 +27,13 @@ class CompositePrimaryKeyRoutesTest extends TestCase {
         ];
 
         $url = CompositePrimaryKey::buildUrl(
-            'basicinformation.offices.edit.query',
+            'app.basicinformation.offices.editv2',
             ['id' => 1],
             $pk
         );
 
         // URL 應該是相對路徑（避免 HTTPS 混合內容問題）
-        $this->assertStringStartsWith('/basicinformation/1/offices/edit', $url);
+        $this->assertStringStartsWith('/app/basicinformation/1/offices/edit-v2', $url);
         $this->assertStringContainsString('c_office_id=123', $url);
         $this->assertStringContainsString('c_posting_id=456', $url);
     }
@@ -51,12 +51,12 @@ class CompositePrimaryKeyRoutesTest extends TestCase {
         ];
 
         $url = CompositePrimaryKey::buildUrl(
-            'basicinformation.altnames.edit.query',
+            'app.basicinformation.altnames.editv2',
             ['id' => 12345],
             $pk
         );
 
-        $this->assertStringStartsWith('/basicinformation/12345/altnames/edit', $url);
+        $this->assertStringStartsWith('/app/basicinformation/12345/altnames/edit-v2', $url);
         // 中文應該被 URL 編碼
         $this->assertStringContainsString('c_alt_name_chn=', $url);
 
@@ -88,7 +88,7 @@ class CompositePrimaryKeyRoutesTest extends TestCase {
         ];
 
         $url = CompositePrimaryKey::buildUrl(
-            'basicinformation.assoc.edit.query',
+            'app.basicinformation.assoc.editv2',
             ['id' => 12345],
             $pk
         );
@@ -101,44 +101,27 @@ class CompositePrimaryKeyRoutesTest extends TestCase {
     }
 
     /**
-     * 測試所有需要複合主鍵的路由都已定義
+     * 所有複合主鍵子資源都有對應的 React edit-v2 路由。
+     *
+     * 原本斷言的是 legacy `basicinformation.{seg}.{edit,update,destroy}.query` 共 36 條，
+     * 它們已於 Blade 下架計畫環節 2 全數刪除（見同檔下一個測試）。複合主鍵的 URL 組裝
+     * （CompositePrimaryKey::buildUrl）仍在服役，只是目標換成 /app 的 edit-v2。
      */
     #[Test]
-    public function all_composite_pk_routes_are_defined(): void {
+    public function all_composite_pk_editor_routes_are_defined(): void {
         $routes = [
-            'basicinformation.altnames.edit.query',
-            'basicinformation.altnames.update.query',
-            'basicinformation.altnames.destroy.query',
-            'basicinformation.addresses.edit.query',
-            'basicinformation.addresses.update.query',
-            'basicinformation.addresses.destroy.query',
-            'basicinformation.texts.edit.query',
-            'basicinformation.texts.update.query',
-            'basicinformation.texts.destroy.query',
-            'basicinformation.sources.edit.query',
-            'basicinformation.sources.update.query',
-            'basicinformation.sources.destroy.query',
-            'basicinformation.assoc.edit.query',
-            'basicinformation.assoc.update.query',
-            'basicinformation.assoc.destroy.query',
-            'basicinformation.kinship.edit.query',
-            'basicinformation.kinship.update.query',
-            'basicinformation.kinship.destroy.query',
-            'basicinformation.statuses.edit.query',
-            'basicinformation.statuses.update.query',
-            'basicinformation.statuses.destroy.query',
-            'basicinformation.entries.edit.query',
-            'basicinformation.entries.update.query',
-            'basicinformation.entries.destroy.query',
-            'basicinformation.events.edit.query',
-            'basicinformation.events.update.query',
-            'basicinformation.events.destroy.query',
-            'basicinformation.socialinst.edit.query',
-            'basicinformation.socialinst.update.query',
-            'basicinformation.socialinst.destroy.query',
-            'basicinformation.offices.edit.query',
-            'basicinformation.offices.update.query',
-            'basicinformation.offices.destroy.query',
+            'app.basicinformation.altnames.editv2',
+            'app.basicinformation.addresses.editv2',
+            'app.basicinformation.texts.editv2',
+            'app.basicinformation.sources.editv2',
+            'app.basicinformation.assoc.editv2',
+            'app.basicinformation.kinship.editv2',
+            'app.basicinformation.statuses.editv2',
+            'app.basicinformation.entries.editv2',
+            'app.basicinformation.events.editv2',
+            'app.basicinformation.socialinst.editv2',
+            'app.basicinformation.offices.editv2',
+            'app.basicinformation.possession.editv2',
         ];
 
         foreach ($routes as $routeName) {
@@ -150,35 +133,49 @@ class CompositePrimaryKeyRoutesTest extends TestCase {
     }
 
     /**
-     * 測試新路由策略：保留 edit/update，移除舊 destroy resource 路由
+     * CompositePrimaryKey::APP_EDIT_ROUTE_MAP 裡的每個路由名都必須真的存在。
+     *
+     * 這是 buildResourceEditUrl 的護欄：該 map 一旦指向不存在的路由名，operations 的
+     * 「查閱／修改提案」連結就會在產 payload 時拋 RouteNotFoundException（整頁 500），
+     * 而不是只壞掉一個連結。
      */
     #[Test]
-    public function resource_routes_follow_new_destroy_policy(): void {
-        $keptResourceRoutes = [
-            'basicinformation.offices.edit',
-            'basicinformation.offices.update',
-            'basicinformation.altnames.edit',
-            'basicinformation.altnames.update',
-        ];
-
-        foreach ($keptResourceRoutes as $routeName) {
+    public function app_edit_route_map_points_only_at_existing_routes(): void {
+        foreach (CompositePrimaryKey::APP_EDIT_ROUTE_MAP as $table => $routeName) {
+            $this->assertIsString($routeName, "APP_EDIT_ROUTE_MAP['{$table}'] 應為單一路由名");
             $this->assertTrue(
                 \Illuminate\Support\Facades\Route::has($routeName),
-                "Route '{$routeName}' should be defined"
+                "APP_EDIT_ROUTE_MAP['{$table}'] 指向的路由 '{$routeName}' 不存在"
             );
         }
+    }
 
-        $removedDestroyRoutes = [
-            'basicinformation.offices.destroy',
-            'basicinformation.altnames.destroy',
-        ];
+    /**
+     * legacy 子資源路由已全數下架（Blade 下架計畫環節 2）。
+     *
+     * 這個測試是「不要偷偷加回來」的護欄：legacy 表單路由連同視圖、controller、
+     * LegacyBladeFormGate 一併刪除，任何一條重新出現都代表下架沒有做乾淨。
+     */
+    #[Test]
+    public function legacy_subresource_routes_are_all_retired(): void {
+        $segments = ['altnames', 'addresses', 'texts', 'sources', 'assoc', 'kinship',
+            'statuses', 'entries', 'events', 'socialinst', 'offices', 'possession'];
 
-        foreach ($removedDestroyRoutes as $routeName) {
-            $this->assertFalse(
-                \Illuminate\Support\Facades\Route::has($routeName),
-                "Legacy route '{$routeName}' should be removed"
-            );
+        foreach ($segments as $seg) {
+            foreach (['edit.query', 'update.query', 'destroy.query', 'index', 'create', 'store', 'edit', 'update'] as $action) {
+                $routeName = "basicinformation.{$seg}.{$action}";
+                $this->assertFalse(
+                    \Illuminate\Support\Facades\Route::has($routeName),
+                    "Legacy route '{$routeName}' 應已下架"
+                );
+            }
         }
+
+        // 人物層：顯示頁保留路由名（302 導向 /app），但 legacy 提案端點已下架。
+        $this->assertTrue(\Illuminate\Support\Facades\Route::has('basicinformation.index'));
+        $this->assertTrue(\Illuminate\Support\Facades\Route::has('basicinformation.show'));
+        $this->assertFalse(\Illuminate\Support\Facades\Route::has('basicinformation.proposal.store'));
+        $this->assertFalse(\Illuminate\Support\Facades\Route::has('basicinformation.proposal.update'));
     }
 
     /**
@@ -230,16 +227,16 @@ class CompositePrimaryKeyRoutesTest extends TestCase {
 
         // 預設是相對 URL
         $relativeUrl = CompositePrimaryKey::buildUrl(
-            'basicinformation.offices.edit.query',
+            'app.basicinformation.offices.editv2',
             ['id' => 1],
             $pk,
             false
         );
-        $this->assertStringStartsWith('/basicinformation', $relativeUrl);
+        $this->assertStringStartsWith('/app/basicinformation', $relativeUrl);
 
         // 絕對 URL 應該包含 host
         $absoluteUrl = CompositePrimaryKey::buildUrl(
-            'basicinformation.offices.edit.query',
+            'app.basicinformation.offices.editv2',
             ['id' => 1],
             $pk,
             true

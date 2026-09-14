@@ -14,7 +14,7 @@ import SelectionDialog from '../../components/SelectionDialog';
  * 與 PersonBrowser/Index 共用同一組分頁引擎（BrowserTabs + TabContentLoader），但：
  *   - 聚焦單一人物（無左側搜尋/人物列表 sidebar）；
  *   - basic_info 分頁進場即可直接錄入（basicInfoStartEditing）；
- *   - 12 子資源分頁各自帶 React 錄入/編輯/刪除（由各 *EditorIsNew flag 控制）。
+ *   - 12 子資源分頁各自帶 React 錄入/編輯/刪除（Blade 下架計畫環節 2 起無條件啟用，不再有 flag）。
  * 資料端點指向「編輯者/訪客可用」的 app.basicinformation.summary/.tab（非 superadmin-only）。
  */
 interface PageProps {
@@ -32,19 +32,6 @@ interface PageProps {
     pinyinEndpoint: string;
     canEditBasicInfo: boolean;
     canProposeEdits: boolean;
-    basicInfoEditorIsNew: boolean;
-    altnameEditorIsNew: boolean;
-    addressesEditorIsNew: boolean;
-    textsEditorIsNew: boolean;
-    sourcesEditorIsNew: boolean;
-    officesEditorIsNew: boolean;
-    assocEditorIsNew: boolean;
-    kinshipEditorIsNew: boolean;
-    eventsEditorIsNew: boolean;
-    entriesEditorIsNew: boolean;
-    statusesEditorIsNew: boolean;
-    possessionEditorIsNew: boolean;
-    socialInstEditorIsNew: boolean;
 }
 
 export default function PersonEditor() {
@@ -61,19 +48,6 @@ export default function PersonEditor() {
         pinyinEndpoint,
         canEditBasicInfo,
         canProposeEdits,
-        basicInfoEditorIsNew,
-        altnameEditorIsNew,
-        addressesEditorIsNew,
-        textsEditorIsNew,
-        sourcesEditorIsNew,
-        officesEditorIsNew,
-        assocEditorIsNew,
-        kinshipEditorIsNew,
-        eventsEditorIsNew,
-        entriesEditorIsNew,
-        statusesEditorIsNew,
-        possessionEditorIsNew,
-        socialInstEditorIsNew,
     } = usePage<PageProps>().props;
 
     const tPerson = useTranslation('person');
@@ -244,20 +218,6 @@ export default function PersonEditor() {
                         pinyinEndpoint={pinyinEndpoint}
                         canEditBasicInfo={canEditBasicInfo}
                         canProposeEdits={canProposeEdits}
-                        basicInfoEditorIsNew={basicInfoEditorIsNew}
-                        basicInfoStartEditing={!basicInfoEditorIsNew}
-                        altnameEditorIsNew={altnameEditorIsNew}
-                        addressesEditorIsNew={addressesEditorIsNew}
-                        textsEditorIsNew={textsEditorIsNew}
-                        sourcesEditorIsNew={sourcesEditorIsNew}
-                        officesEditorIsNew={officesEditorIsNew}
-                        assocEditorIsNew={assocEditorIsNew}
-                        kinshipEditorIsNew={kinshipEditorIsNew}
-                        eventsEditorIsNew={eventsEditorIsNew}
-                        entriesEditorIsNew={entriesEditorIsNew}
-                        statusesEditorIsNew={statusesEditorIsNew}
-                        possessionEditorIsNew={possessionEditorIsNew}
-                        socialInstEditorIsNew={socialInstEditorIsNew}
                         postCE={summary?.dynasty_start != null && summary.dynasty_start > 0}
                         onBasicInfoSaved={handleBasicInfoSaved}
                         onSubresourceChanged={handleBasicInfoSaved}

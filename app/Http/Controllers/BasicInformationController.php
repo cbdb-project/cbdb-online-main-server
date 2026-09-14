@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\BasicInformationRequest;
 use App\Models\BiogMain;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\ChoronymRepository;
@@ -13,7 +12,6 @@ use App\Repositories\OperationRepository;
 use App\Repositories\ToolsRepository;
 use App\Repositories\YearRangeRepository;
 use App\Services\AuditLogService;
-use App\Services\BracketNormalizer;
 use App\Services\CharVariantMapService;
 use App\Services\NameSearchIndexService;
 use App\Services\PersonBrowserService;
@@ -86,46 +84,10 @@ class BasicInformationController extends Controller {
         return $personId;
     }
 
-    /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function index(Request $request) {
-        // 获取查询参数
-        $q = trim((string) ($request->input('q') ?? ''));
-        $num = $request->input('num', 20);
-        $cDyInput = $request->input('c_dy');
-        $cDy = $cDyInput === null ? '' : trim((string) $cDyInput);
-
-        // 如果有搜尋關鍵字，統計朝代分佈（用於篩選下拉選單）
-        $dynastyFacets = [];
-        if ($q !== '') {
-            $dynastyFacets = BiogMainRepository::dynastyFacetsByQuery($q);
-        }
-
-        // 驗證 c_dy 是否在當前查詢的朝代分佈中；若不存在則 redirect 到不帶 c_dy 的乾淨 URL
-        if ($cDy !== null && $cDy !== '' && !empty($dynastyFacets)) {
-            $validDynasties = collect($dynastyFacets)->pluck('c_dy')->map(fn ($v) => (string) $v)->toArray();
-            if (!in_array((string) $cDy, $validDynasties, true)) {
-                $params = $request->only(['q', 'num']);
-
-                return redirect()->route('basicinformation.index', array_filter($params, fn ($v) => $v !== null && $v !== ''));
-            }
-        }
-
-        // 使用 Repository 查询数据
-        $names = $this->biogMainRepository->namesByQuery($request, $num);
-
-        return view('biogmains.basicinformation.index', [
-            'page_title' => __('person.person_records'),
-            'page_description' => __('person.person_records'),
-            'names' => $names,
-            'q' => $q,
-            'c_dy' => $cDy,
-            'dynastyFacets' => $dynastyFacets,
-        ]);
-    }
+    // Legacy Blade 的 index／create／store／show／edit／update 已於 Blade 下架計畫環節 2
+    // 刪除：對應路由改為 302 導向 /app 對應頁（顯示頁）或 410（寫入端），視圖也已刪除。
+    // 仍保留的是 appIndex／appShow／app*EditV2 等 React 端點，以及未被閘門擋過、無 React
+    // 對應的 saveas／Duplicate_Collateral_Info／destroy（見計畫 D-5）。
 
     /**
      * Inertia + React 版：人物列表（實質首頁）。授權/查詢邏輯與 Blade index 一致。
@@ -1612,20 +1574,6 @@ class BasicInformationController extends Controller {
             'pinyinEndpoint' => '/api/select/search/pinyin',
             'canEditBasicInfo' => $user ? ($user->isActive() && $user->canWriteDirectly()) : false,
             'canProposeEdits' => $user ? $user->canPropose() : false,
-            // basic_info 分頁編輯入口（flag=new 時導向獨立 BasicInfoEditor edit-v2，含年號轉換）。
-            'basicInfoEditorIsNew' => migration_flag_is_new('basicinformation.editor'),
-            'altnameEditorIsNew' => migration_flag_is_new('basicinformation.altname'),
-            'addressesEditorIsNew' => migration_flag_is_new('basicinformation.addresses'),
-            'textsEditorIsNew' => migration_flag_is_new('basicinformation.texts'),
-            'sourcesEditorIsNew' => migration_flag_is_new('basicinformation.sources'),
-            'officesEditorIsNew' => migration_flag_is_new('basicinformation.offices'),
-            'assocEditorIsNew' => migration_flag_is_new('basicinformation.assoc'),
-            'kinshipEditorIsNew' => migration_flag_is_new('basicinformation.kinship'),
-            'eventsEditorIsNew' => migration_flag_is_new('basicinformation.events'),
-            'entriesEditorIsNew' => migration_flag_is_new('basicinformation.entries'),
-            'statusesEditorIsNew' => migration_flag_is_new('basicinformation.statuses'),
-            'possessionEditorIsNew' => migration_flag_is_new('basicinformation.possession'),
-            'socialInstEditorIsNew' => migration_flag_is_new('basicinformation.socialinst'),
         ];
     }
 
@@ -1693,271 +1641,6 @@ class BasicInformationController extends Controller {
                 'person' => is_array($t = trans('person')) ? $t : [],
             ],
         ]);
-    }
-
-    /**
-     * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function create() {
-        $temp_id = BiogMain::max('c_personid') + 1;
-
-        return view('biogmains.basicinformation.create', [
-            'page_title' => __('person.person_records'),
-            'page_description' => __('person.person_records') . ' – ' . __('common.add'),
-            'temp_id' => $temp_id,
-            'breadcrumbs' => [
-                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
-                ['label' => __('common.add'), 'url' => '#'],
-            ],
-        ]);
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\Request $request
-     * @return \Illuminate\Http\Response
-     */
-    public function store(Request $request) {
-        if (!Auth::check()) {
-            flash('請登入後編輯 @ '.Carbon::now(), 'error');
-
-            return redirect()->back();
-        } elseif (!Auth::user()->isActive()) {
-            flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
-
-            return redirect()->back();
-        }
-        $data = $request->all();
-        //        dd(!BiogMain::where('c_personid', $data['c_personid'])->get()->isEmpty());
-        if ($data['c_personid'] == null or $data['c_personid'] == 0 or !BiogMain::where('c_personid', $data['c_personid'])->get()->isEmpty()) {
-            flash('person id 未填或已存在 '.Carbon::now(), 'error');
-
-            return redirect()->back();
-        } elseif ((int)$data['c_personid'] - (BiogMain::max('c_personid')) > 10000) {
-            flash('person id 过大 '.Carbon::now(), 'error');
-
-            return redirect()->back();
-        }
-
-        //20190531判別是否為眾包用戶
-        if (Auth::user()->isCrowdsourcingUser()) {
-            $data = $this->toolRepository->timestamp($data, true);
-            $this->operationRepository->store(Auth::id(), $data['c_personid'], 1, 'BIOG_MAIN', $data['c_personid'], $data, '', 2);
-            flash('眾包紀錄 Create success @ '.Carbon::now(), 'success');
-
-            return redirect()->route('basicinformation.index');
-        } else {
-            // 使用 Repository 進行儲存（內含事務與審計）
-            $storeResult = $this->biogMainRepository->store($request);
-            $flight = $storeResult['model'];
-
-            if (Schema::hasTable('CBDB__NAME_FTS')) {
-                $this->nameSearchIndexService->reindexPerson($flight);
-            }
-
-            // 非阻塞提示：異體字落地替換（嚴格模式），比照既有 flash(..., 'info') 慣例。
-            foreach (CharVariantMapService::buildNotices($storeResult['variant_replaced'] ?? []) as $notice) {
-                flash($notice.' @ '.Carbon::now(), 'info');
-            }
-
-            flash('Create success @ '.Carbon::now(), 'success');
-
-            return redirect()->route('basicinformation.edit', $flight->c_personid);
-        }
-        //20190531修改結束
-    }
-
-    /**
-     * Display the specified resource.
-     *
-     * @param  int $id
-     * @return \Illuminate\Http\Response
-     */
-    public function show($id) {
-        $personId = $this->normalizePersonId($id);
-        $biogbasicinformation = $this->biogMainRepository->byPersonId($personId);
-
-        if (!$biogbasicinformation) {
-            abort(404);
-        }
-
-        $dynasties = $this->dynastyRepository->dynasties();
-        $nianhaos = $this->nianhaoRepository->nianhaos();
-        $yearRange = $this->yearRangeRepository->yearRange();
-
-        // 處理 basicinformation 可能為 null 或缺少字段的情況
-        $personLabel = $personId;
-
-        try {
-            if ($biogbasicinformation) {
-                $nameChn = $biogbasicinformation->c_name_chn ?? '';
-                $name = $biogbasicinformation->c_name ?? '';
-                if ($nameChn || $name) {
-                    $personLabel .= ' - ' . $nameChn;
-                    if ($name) {
-                        $personLabel .= ' (' . $name . ')';
-                    }
-                }
-            }
-        } catch (\Exception $e) {
-            // 如果 byPersonId 失敗（例如在測試環境中表結構不完整），只使用 ID
-        }
-
-        return view('biogmains.basicinformation.edit', [
-            'basicinformation' => $biogbasicinformation,
-            'dynasties' => $dynasties,
-            'nianhaos' => $nianhaos,
-            'yearRange' => $yearRange,
-            'page_title' => __('person.person_records'),
-            'page_description' => __('person.person_records') . ' – ' . __('common.view'),
-            'readonly' => true,
-            'breadcrumbs' => [
-                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
-                ['label' => $personLabel, 'url' => route('basicinformation.show', $personId)],
-                ['label' => __('common.view'), 'url' => '#'],
-            ],
-        ]);
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  int $id
-     * @return \Illuminate\Http\Response
-     */
-    public function edit($id) {
-        $personId = $this->normalizePersonId($id);
-
-        $biogbasicinformation = $this->biogMainRepository->byPersonId($personId);
-
-        if (!$biogbasicinformation) {
-            abort(404);
-        }
-
-        $dynasties = $this->dynastyRepository->dynasties();
-        $nianhaos = $this->nianhaoRepository->nianhaos();
-        $yearRange = $this->yearRangeRepository->yearRange();
-
-        // 處理 basicinformation 可能為 null 或缺少字段的情況
-        $personLabel = $personId;
-
-        try {
-            if ($biogbasicinformation) {
-                $nameChn = $biogbasicinformation->c_name_chn ?? '';
-                $name = $biogbasicinformation->c_name ?? '';
-                if ($nameChn || $name) {
-                    $personLabel .= ' - ' . $nameChn;
-                    if ($name) {
-                        $personLabel .= ' (' . $name . ')';
-                    }
-                }
-            }
-        } catch (\Exception $e) {
-            // 如果 byPersonId 失敗（例如在測試環境中表結構不完整），只使用 ID
-        }
-
-        return view('biogmains.basicinformation.edit', [
-            'basicinformation' => $biogbasicinformation,
-            'dynasties' => $dynasties,
-            'nianhaos' => $nianhaos,
-            'yearRange' => $yearRange,
-            'page_title' => __('person.person_records'),
-            'page_description' => __('person.person_records'),
-            'breadcrumbs' => [
-                ['label' => __('person.person_records'), 'url' => route('basicinformation.index')],
-                ['label' => $personLabel, 'url' => route('basicinformation.edit', $personId)],
-                ['label' => __('common.edit'), 'url' => '#'],
-            ],
-        ]);
-    }
-
-    /**
-     * Update the specified resource in storage.
-     *
-     * @param BasicInformationRequest|Request $request
-     * @param  int $id
-     * @return \Illuminate\Http\Response
-     */
-    public function update(BasicInformationRequest $request, $id) {
-        if (!Auth::check()) {
-            flash('請登入後編輯 @ '.Carbon::now(), 'error');
-
-            return redirect()->back();
-        } elseif (!Auth::user()->isActive()) {
-            flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
-
-            return redirect()->back();
-        }
-
-        // 檢查動作類型
-        $action = $request->input('action', 'save');
-
-        if ($action === 'proposal') {
-            // 基本資料表提案前，需先經過姓名正規化與時間戳邏輯，確保提案內容完整
-            $data = $request->all();
-
-            // 姓名合成邏輯
-            $data['c_name_chn'] = ($data['c_surname_chn'] ?? '') . ($data['c_mingzi_chn'] ?? '');
-            $data['c_name'] = trim(($data['c_surname'] ?? '') . ' ' . ($data['c_mingzi'] ?? ''));
-            $data['c_name_proper'] = trim(($data['c_mingzi_proper'] ?? '') . ' ' . ($data['c_surname_proper'] ?? ''));
-            $data['c_name_rm'] = trim(($data['c_mingzi_rm'] ?? '') . ' ' . ($data['c_surname_rm'] ?? ''));
-
-            // 括號正規化：全角轉半角、括號前後補空格
-            $data = BracketNormalizer::normalizeBiogMain($data);
-
-            // 數據類型轉換
-            $female = $data['c_female'] ?? null;
-            $data['c_female'] = ($female === null || $female === '' || $female === 'NULL')
-                ? null
-                : (int) $female;
-            $data['c_by_intercalary'] = (int)($data['c_by_intercalary'] ?? 0);
-            $data['c_dy_intercalary'] = (int)($data['c_dy_intercalary'] ?? 0);
-
-            // 時間戳
-            $data = $this->toolRepository->timestamp($data);
-
-            // 替換 Request 中的數據（以便 ProposalController 提取）
-            $request->replace($data);
-
-            return app(\App\Http\Controllers\BasicInformationProposalController::class)
-                ->proposalUpdateWithPk($request, $id, 'biogmain', ['c_personid' => $id]);
-        }
-
-        $result = $this->biogMainRepository->updateById($request, $id);
-
-        // 檢查是否有實質變更
-        if (isset($result['no_changes']) && $result['no_changes']) {
-            flash('無實質更新，資料未變更 @ '.Carbon::now(), 'info');
-
-            return redirect()->route('basicinformation.edit', $id);
-        }
-
-        // 非阻塞提示：異體字落地替換（嚴格模式），比照既有 flash(..., 'info') 慣例。
-        foreach (CharVariantMapService::buildNotices($result['variant_replaced'] ?? []) as $notice) {
-            flash($notice.' @ '.Carbon::now(), 'info');
-        }
-
-        //20190531判別是否為眾包用戶
-        if (Auth::user()->isCrowdsourcingUser()) {
-            flash('眾包紀錄 Update success @ '.Carbon::now(), 'success');
-
-            return redirect()->route('basicinformation.index');
-        } else {
-            if (Schema::hasTable('CBDB__NAME_FTS')) {
-                $person = BiogMain::find($id);
-                if ($person) {
-                    $this->nameSearchIndexService->reindexPerson($person);
-                }
-            }
-
-            flash('Update success @ '.Carbon::now(), 'success');
-
-            return redirect()->route('basicinformation.edit', $id);
-        }
-        //20190531修改結束
     }
 
     //20190223新增另存功能

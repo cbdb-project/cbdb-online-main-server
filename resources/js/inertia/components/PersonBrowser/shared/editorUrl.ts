@@ -1,3 +1,10 @@
+/**
+ * React 人物編輯器（edit-v2）的 URL 組裝。
+ *
+ * 這個檔原名 legacyEditUrl.ts，同時放著 legacy Blade 表單 URL（buildLegacyEditUrl 等）與
+ * React 編輯器 URL。Blade 下架計畫環節 2 刪掉 legacy 路由後，前三個函式已無對應端點
+ * （再產生也只會 404），故一併移除並更名。
+ */
 const TAB_SEGMENTS: Record<string, string> = {
     alt_names: 'altnames',
     addresses: 'addresses',
@@ -14,72 +21,6 @@ const TAB_SEGMENTS: Record<string, string> = {
 };
 
 export type LegacyPk = Record<string, string | number | boolean | null | undefined>;
-
-export function buildLegacyEditUrl(tabKey: string, pk: LegacyPk, fallbackPersonId?: number | null): string | null {
-    const segment = TAB_SEGMENTS[tabKey];
-    if (!segment) {
-        return null;
-    }
-
-    const personId = normalizePersonId(pk.c_personid, fallbackPersonId ?? getCurrentPersonIdFromLocation());
-    if (personId === null) {
-        return null;
-    }
-
-    const params = new URLSearchParams();
-    Object.entries(pk).forEach(([key, value]) => {
-        if (value === undefined) {
-            return;
-        }
-
-        params.set(key, value === null ? 'NULL' : String(value));
-    });
-
-    const query = params.toString();
-    const path = `/basicinformation/${personId}/${segment}/edit`;
-
-    return query ? `${path}?${query}` : path;
-}
-
-export function buildLegacyDeleteUrl(tabKey: string, pk: LegacyPk, fallbackPersonId?: number | null): string | null {
-    const segment = TAB_SEGMENTS[tabKey];
-    if (!segment) {
-        return null;
-    }
-
-    const personId = normalizePersonId(pk.c_personid, fallbackPersonId ?? getCurrentPersonIdFromLocation());
-    if (personId === null) {
-        return null;
-    }
-
-    const params = new URLSearchParams();
-    Object.entries(pk).forEach(([key, value]) => {
-        if (value === undefined) {
-            return;
-        }
-
-        params.set(key, value === null ? 'NULL' : String(value));
-    });
-
-    const query = params.toString();
-    const path = `/basicinformation/${personId}/${segment}/delete`;
-
-    return query ? `${path}?${query}` : path;
-}
-
-export function buildLegacyCreateUrl(tabKey: string, fallbackPersonId?: number | null): string | null {
-    const segment = TAB_SEGMENTS[tabKey];
-    if (!segment) {
-        return null;
-    }
-
-    const personId = normalizePersonId(fallbackPersonId ?? getCurrentPersonIdFromLocation());
-    if (personId === null) {
-        return null;
-    }
-
-    return `/basicinformation/${personId}/${segment}/create`;
-}
 
 /**
  * 新版 React/Inertia 編輯器（edit-v2）URL（#34 詳情中樞接線）。

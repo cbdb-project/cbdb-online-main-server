@@ -663,26 +663,75 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
     **全 repo 零測試覆蓋**——唯一覆蓋它的就是本環節刪掉的那條。這與 4b「封路但未刪碼」的
     姿態一致（請求根本到不了它），但 `LEGACY_PAGE_RETIREMENT=false` 回退會重新暴露一個
     沒有測試的方法。4b-4 刪掉它時這筆自然消失。
-  - **4b-2c-2 待做**：codes 讀取面（`CodesControllerTest` 剩的 32 條、
-    `CodesBooleanFilterIntegrationTest` 5 條、`OperationsIndexLinksTest` 剩的 1 條）。
-    這批**不能照抄前綴替換**——它們斷言 Blade 視圖變數與 HTML。已測繪出 prop 對照：
-    `filters`→`filters`、`sortBy`→`sort_by`、`sortDir`→`sort_dir`、
-    `booleanEnabled`→`boolean_enabled`、`booleanFilterAvailable`→`boolean_filter_available`、
-    `filterErrors`→`filter_errors`、`filterDescriptions`→`filter_descriptions`、
-    `useCursorPagination`→`use_cursor`、`keyColumns`→`key_columns`。
-    🔴 **`appliedFilters`（3 條）沒有對應的 prop，而且這不是斷言換法的問題、是 parity 落差**
-    （初稿我寫「改成斷言分頁連結、比原本更強」——**兩個前提都不成立**，review 實測推翻）：
-    - 它在共用 payload 的第 798 行，有**兩個**消費者：分頁 `appends`（第 763–764 行）
-      **以及** `resources/views/codes/show.blade.php:15` 的
-      `$linkFilters = $appliedFilters ?? $filters;`（驅動欄位排序／篩選連結，不只分頁）。
-    - **Inertia payload 裡根本沒有分頁連結可斷言**：`meta` 只有
-      `current_page`／`last_page`／`per_page`／`total`／`from`／`to`，`cursor` 是原始 id。
-    - React 的導覽是**前端**組的：`resources/js/inertia/Pages/Codes/Show.tsx` 的 `visit()`
-      用 `Object.entries(useFilters).filter(([, v]) => v !== '')`——判準是**非空**，不是
-      **已套用**。布林語法錯誤的欄位是非空的 ⇒ **React 會把它回灌進 URL**，Blade 不會。
-    ⇒ 這是**生產行為的決定**，不是移植動作：要嘛補一個 `applied_filters` prop 並讓 `visit()`
-    改用它，要嘛明知並接受這個分歧（後果是「壞掉的篩選條件黏在網址上、每次換頁都再報一次錯」，
-    不是資料損壞）。**4b-2c-2 開工前要先拍板**，那 3 條測試的移植形式取決於這個決定。
+  - **4b-2c-2 ✅ 已完成（2026-09-15）——codes 讀取面移植完畢，codes 側自此全面脫離 legacy**：
+    `CodesControllerTest` 剩的 32 條、`CodesBooleanFilterIntegrationTest` 5 條、
+    `OperationsIndexLinksTest` 最後 1 條全部改打 `/app/codes/*`。三個檔的類級／方法級
+    `#[Group('legacy-parity')]` 與 `useLegacyBladePages()` 全部移除
+    ⇒ **legacy-parity 183 → 125**，剩下的全在 4b-3 的 manage／profile／admin 側。
+
+    **視圖變數 → Inertia prop 的對照**（9 組，已逐條驗證）：
+    `sortBy`→`sort_by`、`sortDir`→`sort_dir`、`booleanEnabled`→`boolean_enabled`、
+    `booleanFilterAvailable`→`boolean_filter_available`、`filterErrors`→`filter_errors`、
+    `filterDescriptions`→`filter_descriptions`、`useCursorPagination`→`use_cursor`、
+    `keyColumns`→`key_columns`、`appliedFilters`→**`applied_filters`（本環節新增）**。
+
+    🔴 **本環節唯一的生產行為改動：補回 `applied_filters`（遷移時掉的一個行為）。**
+    4b-2c-1 已查出這是 parity 落差而非斷言換法問題。決定是**補回 Blade 的行為**（保守選擇：
+    恢復遷移前的樣子，而不是發明新行為）：
+    - `CodesController::appShow()` 新增 `applied_filters` prop（只含**實際套用**的欄位）。
+    - `Show.tsx` 的 `visit()` 改成**由呼叫端明示** `useFilters`／`useSearch`。
+      🔴 **第一版我憑直覺切分，切錯了兩處（review 用 Blade 原始碼證偽）**：我寫「送出篩選表單、
+      搜尋、布林開關本來就該帶輸入框的原始值」，但 Blade 的**搜尋表單**送的 hidden input
+      是 `$linkFilters`（＝appliedFilters，`codes/show.blade.php:87`），不是 filter-row 的輸入；
+      而 `#filter-form` 的 hidden `search` 是 `$search`（**已送出**的，第 134 行），不是搜尋框
+      裡打到一半的字。**正確的對照表是照 Blade 每個表單／連結實際送什麼定的**：
+
+      | 互動 | filters | search |
+      |---|---|---|
+      | 搜尋送出 `doSearch` | **applied** | 輸入框 |
+      | 套用篩選 `applyFilters` | 輸入框 | **已送出** |
+      | 排序／換頁 `navigate` | **applied** | **已送出** |
+      | 布林開關 `toggleBoolean` | 輸入框（原始，§9.2 降級） | **已送出** |
+
+      少了 search 那一欄，「搜尋框打到一半 → 點欄位標題排序／點第 2 頁」會把沒送出的字
+      一併套用，而且還帶著另一個結果集的 `page=N`——同一類缺陷的另一半。
+    - 沒有這道，布林語法錯誤的欄位（非空）會被回灌進網址，**壞掉的條件黏在 URL 上、
+      每次換頁都再報一次錯**。
+    - 鑑別力實測：把 `applied_filters` 退回 `filters`（即回到「非空」判準）⇒ **3 條紅**。
+
+    **移植後普遍比原本強**（`assertSee` 只證明「頁面某處出現過這串字」）：
+    - 排序那幾條改成斷言**整個欄值清單**，連順序一起釘住——`assertSee('Apple')` 對順序是盲的。
+    - `testTextCodesUsesExplicitPrimaryKeyOverride` 改成斷言 `thead` 的**完整內容**，
+      立刻揭露原測試從來沒發現的事實：實際表頭是 8 欄且順序不同
+      （多一個 `c_bibl_cat_code`、`c_title` 在 `c_title_chn` 之前）——逐一 `assertSee` 永遠看不見。
+    - `testColumnFiltersAndSortAreAppliedSafely` 原本拿兩個字串在 HTML 裡的**位置**相比，
+      改成直接比較欄值清單。
+    - 編輯頁稽核欄那條原本用 `strpos($content, 'name="c_created_by"')` 再往後找 value／readonly
+      ——**位置式比對，改版型就可能假綠**。改成斷言 `values` 與 `column_behaviour` 兩個 prop，
+      並補上「只有 `c_modified_*` 有替換預覽、`c_created_*` 沒有」這條原本沒驗的分界。
+    - 訪客那條原本靠「頁面上沒有 `btn btn-sm btn-info`」間接驗，改成斷言 `can_edit` prop。
+
+    ⚠️ **React 端的排序／篩選需要登入且已啟用帳號**（`guardSortFilterRequiresAuth()`），
+    Blade 端沒有這道門檻 ⇒ 帶 `sort_by`／`filters` 的測試一律先 `actingAs()`。
+    門檻的**擋下**路徑另有覆蓋
+    （`CodesShowInertiaTest::guest_sort_or_filter_on_kinship_codes_computed_column_requires_login()`），
+    這裡走的是放行路徑。順帶：`filters[description]=`（空值）那條**不**需要登入，
+    因為判準是「有非空的 filters」——那條測試因此也釘住了這個判準。
+
+    📌 **有幾條的斷言必然變成「伺服器端的那一半」**：Blade 版由伺服器把分頁連結、hidden input、
+    toggle 連結整條組好，所以原測試可以斷言 HTML 字串；**React 版那些連結是前端組的**，
+    伺服器能負責的就是 prop。
+    🔴 **但「寫明對應關係」不等於「還有人守」**（review 指出）：`resources/js` 下原本沒有
+    `Codes/Show` 的任何 vitest，所以被拿掉的 `assertSee('/codes/TEXT_CODES/T001/edit')`
+    ——全 repo 唯一釘住「單欄主鍵表的 id 是 `T001` 而非 `T001_._…`」的東西——移植後**真的沒人守**。
+    ⇒ 把那兩段純邏輯抽成 `resources/js/inertia/Pages/Codes/showNavigation.ts`
+    （`buildRowId()`／`buildShowParams()`）並補 `showNavigation.test.ts`（12 條）。
+    實測：`buildRowId()` 改成忽略 key_columns ⇒ 3 條紅。
+    另外兩條填充式的補救也一併處理：`testAdvancedFilterToggleShownWhenOff` 原本我補了一條
+    與 toggle 無關的 `use_cursor` 斷言充數（已移除並註明那段沒有伺服器端對應物）；
+    `testColumnFiltersAndSortAreAppliedSafely` 漏了 `sort_by` 斷言——只驗列序不夠，
+    因為 `sort_by` 被整個丟掉時主鍵 tie-breaker 會產生**一模一樣**的順序。
+
   - **4b-3 待做**：manage／profile／admin 側（`ManagePagesLoadTest` 12、`UserProfileTest` 17、
     `InactiveAccountAccessTest` 20、`AdminExplainSqlTest` 6、3 個 batch-load 共 68、
     `UnidirectionalRelationshipRepairControllerTest` 2）。

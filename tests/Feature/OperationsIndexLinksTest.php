@@ -7,7 +7,6 @@ use App\Models\User;
 use App\Support\EntityAggregateRegistry;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -25,9 +24,10 @@ use Tests\TestCase;
  *
  * 加上 1 條只加了一行、1 條被刪（同義反覆，見下方註解）。
  *
- * 唯一還需要 kill switch 的是 `test_legacy_codes_edit_page_resolves_the_right_composite_row`
- * ——它從原本那條的後半段拆出來，要開 legacy codes 編輯頁確認 id 解析，而那個頁面屬
- * **環節 4b**。它是本檔唯一仍掛 `#[Group('legacy-parity')]` 的測試。
+ * ── 2026-09-15（Blade 下架環節 4b-2c-2）─────────────────────────
+ * 最後一條還耦合 legacy 頁的 `test_legacy_codes_edit_page_resolves_the_right_composite_row`
+ * 已改打 `/app/codes/…/edit`（並改名為 `test_codes_edit_page_resolves_the_right_composite_row`），
+ * 本檔自此不再有任何 `#[Group('legacy-parity')]` 測試。
  */
 class OperationsIndexLinksTest extends TestCase {
     protected function setUp(): void {
@@ -440,22 +440,20 @@ class OperationsIndexLinksTest extends TestCase {
     }
 
     /**
-     * 上一條的後半段：legacy Blade codes 編輯頁要真的開出 404794 那一列（不是 500001）。
+     * 上一條的後半段：codes 編輯頁要真的開出 404794 那一列（不是 500001）。
      *
-     * ⚠️ **本檔唯一還耦合 legacy 頁的測試**，所以單獨掛 `#[Group('legacy-parity')]`——
-     * 那個群組是專案文件化的「legacy 耦合測試一鍵清單」（計畫 §三第 15 欄）。
-     * 若只在註解寫「環節 4b 要一併移除」，沒有任何機械化手段找得出它，
-     * 屆時它會以「不在任何清單上的紅」出現，正是分流機制要避免的情況。
+     * ── 2026-09-15（Blade 下架環節 4b-2c-2）─────────────────────────
+     * 原本打 legacy Blade 頁並用 `assertSee('404794')` ／ `assertDontSee('500001')` 掃 HTML，
+     * 是本檔最後一條掛 `#[Group('legacy-parity')]` 的測試。已改打 `/app/codes/…/edit`
+     * 並斷言 `values` prop——**比原本強**：`assertSee('404794')` 只要那串數字出現在頁面
+     * 任何地方（含隱藏欄位、JSON、麵包屑）就綠，而這裡指名「`c_merged_from_personid`
+     * 這一欄就是 404794」。
      *
-     * legacy codes 編輯頁屬**環節 4b**（表單／寫入頁），本環節 4a 不刪它，故 per-test
-     * 局部關閉封路。4b 刪該頁時，**整條測試**移除即可——連結指向的斷言已在上一條，
-     * 這裡只驗「那個頁面對 id 的解析」。
+     * 這條測的是 `buildConditionsFromId()` 對「`&` 串接的具名複合主鍵」的解析：兩列只差
+     * `c_merged_from_personid`，少解析一個鍵就會開到 500001 那一列。
      */
     #[Test]
-    #[Group('legacy-parity')]
-    public function test_legacy_codes_edit_page_resolves_the_right_composite_row(): void {
-        config(['migration_flags.pages.codes' => 'old']);
-
+    public function test_codes_edit_page_resolves_the_right_composite_row(): void {
         $user = User::forceCreate([
             'name' => 'Hongsu Wang',
             'email' => 'merged-person-legacy-edit@example.com',
@@ -470,14 +468,18 @@ class OperationsIndexLinksTest extends TestCase {
             ['c_personid' => 108625, 'c_merged_from_personid' => 404794],
         ]);
 
-        $link = '/codes/MERGED_PERSON_DATA/c_personid=108625&c_merged_from_personid=404794/edit';
+        $values = null;
 
-        $this->useLegacyBladePages();
-        $this->actingAs($user)->get($link)
+        $this->actingAs($user)
+            ->get('/app/codes/MERGED_PERSON_DATA/c_personid=108625&c_merged_from_personid=404794/edit')
             ->assertOk()
             ->assertSessionMissing('flash_notification')
-            ->assertSee('404794')
-            ->assertDontSee('500001');
+            ->assertInertia(function ($page) use (&$values) {
+                $values = (array) $page->toArray()['props']['values'];
+            });
+
+        $this->assertSame(108625, (int) $values['c_personid']);
+        $this->assertSame(404794, (int) $values['c_merged_from_personid']);
     }
 
     // 原本這裡有 test_person_specific_link_priority_logic：它自己用 if/else 組出

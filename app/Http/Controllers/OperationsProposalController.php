@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\UnknownPersonProposalException;
 use App\Models\Operation;
 use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
@@ -10,6 +11,7 @@ use App\Services\CharVariantMapService;
 use App\Services\NameSearchIndexService;
 use App\Support\CompositePrimaryKey;
 use App\Support\SelfReferencingTreeGuard;
+use App\Support\UnknownPerson;
 use App\Support\VariantEquivalentLookup;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
@@ -204,6 +206,16 @@ class OperationsProposalController extends Controller {
                 'file' => $e->getFile().':'.$e->getLine(),
             ]);
             flash('審核失敗：資料庫操作發生衝突或錯誤（可能對應記錄已存在或已被變更），本次未核准。請重新整理後確認資料狀態，或聯絡管理員。', 'error');
+
+            return redirect()->back();
+        } catch (UnknownPersonProposalException $e) {
+            // 正常的業務拒絕（非系統錯誤）：走 warning 通道，不污染 ERROR 告警。
+            Log::warning('提案核准被未詳人物守衛中止', [
+                'operation_id' => $operation->id,
+                'table' => $table,
+                'message' => $e->getMessage(),
+            ]);
+            flash('審核失敗：'.$e->getMessage(), 'error');
 
             return redirect()->back();
         } catch (\Throwable $e) {
@@ -704,13 +716,60 @@ class OperationsProposalController extends Controller {
         return $changes;
     }
 
+    /**
+     * 提案核准路徑的「未詳」人物守衛（計畫 7-U1）。
+     *
+     * 核准 KIN_DATA／ASSOC_DATA 提案時**不經 mutation handler**，而是直接呼叫
+     * `BiogMainRepository::kinshipStoreById()` 等 legacy repository 方法，所以
+     * `Concerns\BlocksUnknownPersonRelations` 完全罩不到——legacy 與 v2 共用這條路徑，
+     * 兩邊一樣沒擋。新提案在**提交時**（direct 與 proposal 兩種 mode）已被守衛擋下，
+     * 所以實際能撞到這裡的只有「守衛上線前就已存在的 pending proposal」。
+     *
+     * **刻意不自動退回提案**：這裡只中止本次核准並把理由 flash 給審核者，提案本身維持 pending。
+     * 自動退回會替審核者做掉一個不可逆的決定，而這批提案數量有限、人工判斷（退回或請提案人
+     * 改對象）比機械退回合適。
+     *
+     * 丟的是專屬的 `UnknownPersonProposalException` 而不是泛用 `\RuntimeException`：這是一次
+     * **正常的業務拒絕**，不是系統錯誤。`approve()` 有專屬 catch 走 `Log::warning`，否則它會被
+     * 記成 ERROR 污染告警通道（與同檔 `MirrorConflictException` 的既有處理一致）。
+     *
+     * @param int    $personId    記錄擁有者
+     * @param array  $data        提案 payload（改鍵時新值在這裡）
+     * @param array  $original    原始列（未改鍵時值在這裡）
+     * @param string $column      對象 id 欄名（c_kin_id／c_assoc_id）
+     * @param string $recordLabel 記錄類型（「親屬」／「社會關係」）
+     * @param string $targetLabel 對象類型（「親屬」／「社會關係對象」）
+     */
+    protected function blockUnknownPersonProposal(
+        int $personId,
+        array $data,
+        array $original,
+        string $column,
+        string $recordLabel,
+        string $targetLabel
+    ): void {
+        if (UnknownPerson::isUnknown($personId)) {
+            throw new UnknownPersonProposalException("「未詳」人物不能有{$recordLabel}記錄，無法核准此提案。");
+        }
+
+        // 對象 id 同時是主鍵成員：改鍵時生效值在 $data，未改鍵時在 $original。
+        // 0／-999 的判定（含「非數值不視為未詳」——提案 payload 可能是任意字串）集中在 UnknownPerson。
+        if (UnknownPerson::isUnknown($data[$column] ?? ($original[$column] ?? null))) {
+            throw new UnknownPersonProposalException("不能將「未詳」人物加為{$targetLabel}，無法核准此提案。");
+        }
+    }
+
     protected function applyKinshipProposal(
         Operation $operation,
         array $data,
         array $original,
         array $auxiliaryPayload
     ): array {
-        $personId = (int) ($operation->c_personid ?? $data['c_personid'] ?? $original['c_personid'] ?? 0);
+        // `??` 只對 null 短路，$operation->c_personid 對舊／測試資料可能是 **0**，優先取它會讓
+        // 真人 id 被 0 蓋掉（同檔 applyViaMutationHandler() 的註解已記載此陷阱）。加上未詳守衛後，
+        // 後果從「悄悄寫一列 c_personid = 0」升級成「這筆提案永遠核准不了、而且錯誤訊息指向錯的東西」。
+        $personId = (int) ($data['c_personid'] ?? $original['c_personid'] ?? ($operation->c_personid ?: 0));
+        $this->blockUnknownPersonProposal($personId, $data, $original, 'c_kin_id', '親屬', '親屬');
         $requestPayload = array_merge($data, $auxiliaryPayload);
         $request = Request::create('/', 'POST', $requestPayload);
 
@@ -750,7 +809,11 @@ class OperationsProposalController extends Controller {
         array $original,
         array $auxiliaryPayload
     ): array {
-        $personId = (int) ($operation->c_personid ?? $data['c_personid'] ?? $original['c_personid'] ?? 0);
+        // `??` 只對 null 短路，$operation->c_personid 對舊／測試資料可能是 **0**，優先取它會讓
+        // 真人 id 被 0 蓋掉（同檔 applyViaMutationHandler() 的註解已記載此陷阱）。加上未詳守衛後，
+        // 後果從「悄悄寫一列 c_personid = 0」升級成「這筆提案永遠核准不了、而且錯誤訊息指向錯的東西」。
+        $personId = (int) ($data['c_personid'] ?? $original['c_personid'] ?? ($operation->c_personid ?: 0));
+        $this->blockUnknownPersonProposal($personId, $data, $original, 'c_assoc_id', '社會關係', '社會關係對象');
         $request = Request::create('/', 'POST', array_merge($data, $auxiliaryPayload));
 
         if ((int) $operation->op_type === Operation::TYPE_PROPOSAL_CREATE) {

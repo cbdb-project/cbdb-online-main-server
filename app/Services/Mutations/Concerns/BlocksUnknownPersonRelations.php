@@ -2,6 +2,7 @@
 
 namespace App\Services\Mutations\Concerns;
 
+use App\Support\UnknownPerson;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -27,19 +28,20 @@ use Illuminate\Http\JsonResponse;
  *  2. legacy 的 delete 路徑沒有這道攔截，本 trait 也**不掛到 delete handler**——不阻止
  *     清理歷史上已經存在的 0 資料是正確的。
  *
- * ⚠️ **本守衛覆蓋不到的路徑（既存缺口，非本次造成）**：
- *  - **提案核准**不經 mutation handler：KIN_DATA／ASSOC_DATA 的核准走
- *    `OperationsProposalController::applyKinshipProposal()`／`applyAssocProposal()`
- *    → `BiogMainRepository::kinshipStoreById()` 等 legacy repository 方法（見該 controller
- *    的 `applyProposal()` 分支）。legacy 與 v2 共用這條路徑，所以**兩邊一樣沒擋**。
- *    影響僅限「本守衛上線前已存在的 pending proposal」——新提案在提交時（direct 與
- *    proposal 兩種 mode）都已被擋，不會再產生。
- *  - `BasicInformationController::Duplicate_Collateral_Info()` 直接複製 KIN_DATA／
- *    ASSOC_DATA 列，來源若有歷史 0 髒列會被一併複製。該端點無 legacy.form 閘門（該閘門已隨環節 2 移除）、仍在服役。
+ * **同族路徑的覆蓋現況**（環節 7 已收斂，2026-09-14）：
+ *  - **提案核准**不經 mutation handler（`OperationsProposalController::applyKinshipProposal()`／
+ *    `applyAssocProposal()` → `BiogMainRepository::kinshipStoreById()` 等），所以本 trait 罩不到。
+ *    已在該 controller 用 `blockUnknownPersonProposal()` 補上等價守衛（中止核准、提案維持
+ *    pending、理由 flash 給審核者；刻意不自動退回）。
+ *  - `BasicInformationController::Duplicate_Collateral_Info()` 逐列複製 KIN_DATA／ASSOC_DATA，
+ *    已用 `shouldSkipUnknownPersonRelationRow()` 跳過歷史 0／-999 髒列並記 warning
+ *    （跳過而非整批拒絕，與同函式的異體字去重器一致）。
+ *  - `PossessionMutationHandler`／`PostingMutationHandler` 的 **update** 側原本沒有擁有者守衛
+ *    （create 側早就有），已各自補上；三條入口都掛：一般 update 與兩條「僅改地址」快捷路徑。
  *
- * 兩者都登記在 Blade 下架計畫的環節 7（D 類缺口評估）；本次刻意不動，因為它們是
- * **既存狀態、不是本次改動造成的回歸**，且都牽涉到需要人決定的政策（核准被擋時審核者
- * 該看到什麼、複製時該跳過還是整批拒絕）。
+ * ⚠️ **仍未覆蓋**：`app/Services/Mutations` 之外、不經 handler 直接落庫的路徑。已知的一條是
+ *    `app/Services/Import/OfficeImportService.php`（批次匯入 POSTED_TO_OFFICE_DATA）。
+ *    這類路徑沒有機械化把關，只有 code review 擋得住。
  */
 trait BlocksUnknownPersonRelations {
     /**
@@ -50,7 +52,7 @@ trait BlocksUnknownPersonRelations {
      * @param string $verb      動作（「新增」／「修改」）
      */
     protected function blockUnknownOwner(int $personId, string $recordLabel, string $verb): ?JsonResponse {
-        if ($personId !== 0) {
+        if (!UnknownPerson::isUnknown($personId)) {
             return null;
         }
 
@@ -81,14 +83,10 @@ trait BlocksUnknownPersonRelations {
         string $column,
         string $targetLabel
     ): ?JsonResponse {
+        // 0／-999 的判定集中在 UnknownPerson（含「非數值不視為未詳」）；取不到值時它回 false
+        // 不攔截——那屬於主鍵不完整，由 CompositePrimaryKey::validateOrFail() 負責報錯。
         $value = $changes[$column] ?? ($targetPk[$column] ?? null);
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        // -999 是「未詳」的另一種表達，v2 各 handler 稍後會把它正規化成 0；
-        // 這裡提前一併視為 0，否則送 -999 就能繞過守衛（legacy 是先 merge 再擋，同義）。
-        if ((int) $value !== 0 && (int) $value !== -999) {
+        if (!UnknownPerson::isUnknown($value)) {
             return null;
         }
 

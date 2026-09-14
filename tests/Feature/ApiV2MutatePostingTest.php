@@ -648,4 +648,79 @@ class ApiV2MutatePostingTest extends TestCase {
         $response->assertOk()
             ->assertJson(['ok' => true, 'resource' => 'postings']);
     }
+
+    // ── 「未詳」人物守衛（計畫 7-U3）─────────────────────────
+
+    /**
+     * personid 0 不能**修改**任官記錄——對齊 PostingCreateHandler:106 的 create 側守衛。
+     *
+     * legacy BasicInformationOfficesController 兩側都沒擋，所以這不是遷移漏搬，
+     * 而是 v2 自己補到一半。三條入口都要擋：一般 update、僅改地址 direct、僅改地址 proposal。
+     */
+    #[Test]
+    public function testUnknownPersonCannotUpdatePosting(): void {
+        $this->actingAs($this->makeUser(email: 'posting-unknown@example.com'));
+        $this->seedPosting(['c_personid' => 0, 'c_notes' => '髒列']);
+
+        $this->postJson('/api/v2/mutate', $this->postingPayload([
+            'person_id' => 0,
+            'changes' => ['c_notes' => '試圖修改'],
+        ]))
+            ->assertStatus(422)
+            ->assertJsonPath('errors.person_id.0', 'invalid');
+
+        // 真的沒寫進去（不是只回錯誤碼卻照樣落庫）。
+        $this->assertSame('髒列', DB::table('POSTED_TO_OFFICE_DATA')->where('c_posting_id', 400)->value('c_notes'));
+    }
+
+    /** 僅改地址的兩條快捷路徑不經 parent::handle()，守衛必須各自掛一次。 */
+    #[Test]
+    public function testUnknownPersonCannotUpdatePostingAddressesOnly(): void {
+        $this->seedPosting(['c_personid' => 0]);
+        $this->seedAddr(130);
+
+        foreach (['direct', 'proposal'] as $mode) {
+            $this->actingAs($this->makeUser(email: "posting-unknown-addr-{$mode}@example.com"));
+            $this->postJson('/api/v2/mutate', [
+                'resource' => 'postings',
+                'person_id' => 0,
+                'mode' => $mode,
+                'operation' => 'update',
+                'target' => ['pk' => ['c_office_id' => 300, 'c_posting_id' => 400]],
+                'changes' => ['c_addr' => [140]],
+            ])
+                ->assertStatus(422)
+                ->assertJsonPath('errors.person_id.0', 'invalid');
+        }
+
+        // proposal 圈本來就不寫副表，所以下面兩條只護得到 direct 圈；真正要鎖的是
+        // 「回 422 卻照樣寫了一筆待審提案」。
+        $this->assertDatabaseCount('operations', 0);
+
+        // 地址副表完全沒動。
+        $this->assertDatabaseHas('POSTED_TO_ADDR_DATA', ['c_posting_id' => 400, 'c_addr_id' => 130]);
+        $this->assertDatabaseMissing('POSTED_TO_ADDR_DATA', ['c_posting_id' => 400, 'c_addr_id' => 140]);
+    }
+
+    /**
+     * 守衛排在授權**之後**：無直寫權的使用者要拿到 403，不是 422。
+     *
+     * 這條是環節 1.5 踩過的坑的回歸測試——守衛擺在授權前會把授權失敗洩漏成「資料有問題」。
+     *
+     * **必須用「已登入、帳號啟用、但不能直寫」的眾包用戶**：`/api/v2/mutate` 在
+     * `MutationController::store()` 第一行就 `guardActiveUser()`，未登入請求一律先回 401、
+     * 連 handler 都進不去——拿未登入來測等於什麼都沒測（本測試第一版就是這個假綠，
+     * 把守衛搬到授權前仍然綠）。眾包用戶 `isActive()` 為 true 所以穿得過 controller 閘門，
+     * `canWriteDirectly()` 為 false 所以會停在 handler 的 `authorizeDirect()`。
+     */
+    #[Test]
+    public function testUnknownPersonPostingGuardRunsAfterAuthorization(): void {
+        $this->actingAs($this->makeUser(User::STATUS_ACTIVE, User::ROLE_CROWDSOURCING, 'posting-unknown-authz@example.com'));
+        $this->seedPosting(['c_personid' => 0]);
+
+        $this->postJson('/api/v2/mutate', $this->postingPayload([
+            'person_id' => 0,
+            'changes' => ['c_notes' => '無直寫權'],
+        ]))->assertStatus(403);
+    }
 }

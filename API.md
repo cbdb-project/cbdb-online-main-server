@@ -400,7 +400,7 @@ Token 有效期：建立時可指定 `expires_in`（1～3650 天），未指定�
 | resource | 字串 | ✔ | 資源名或別名（後端自動轉小寫，見 4.5） |
 | mode | 字串 | — | `direct`（預設）或 `proposal` |
 | operation | 字串 | — | `create` / `update` / `delete`。`/api/v2/mutate` 預設 `update`；`/api/v2/create` 與 `/api/v2/delete` 固定為對應動作，帶了也會被忽略 |
-| person_id | 數字 | ✔ | 該列所屬人物 ID。**必須與 `target.pk` 內的人物欄一致，也必須與資料庫該列的人物欄一致**，否則 422 `person_id: mismatch`。`possessions` 與 `postings` 的主鍵不含 `c_personid`，此時只比對資料庫該列的 `c_personid`；這兩者的 `create` 另外拒絕 `person_id = 0`（422 `person_id: invalid`）。**即使是與人物無關的資源（代碼表、複合實體聚合），`person_id` 仍為必填**（未提供即 422），請填相關人物 ID 或任一非空值 |
+| person_id | 數字 | ✔ | 該列所屬人物 ID。**必須與 `target.pk` 內的人物欄一致，也必須與資料庫該列的人物欄一致**，否則 422 `person_id: mismatch`。`possessions` 與 `postings` 的主鍵不含 `c_personid`，此時只比對資料庫該列的 `c_personid`；這兩者的 `create` **與 `update`** 都拒絕 `person_id` 為 `0`／`-999`（「未詳」人物（判定是「**轉為整數後**等於 `0` 或 `-999`」，與資料庫寫入 INTEGER 欄的轉型一致，所以 `"0e10"`、`"-999.0"`、`0.5` 這類也會被擋——它們落庫後就是 `0`／`-999`）；422 `person_id: invalid`）——`update` 的這道檢查自 2026-09 起生效，在此之前歷史髒列可被修改。**即使是與人物無關的資源（代碼表、複合實體聚合），`person_id` 仍為必填**（未提供即 422），請填相關人物 ID 或任一非空值 |
 | target.pk | 物件 | ✔ | 目標列的**完整**複合主鍵，缺任一欄即 422（見 4.4）。少數 create（如 `postings`、`possessions`）的主鍵由系統配發，此時送空物件 `{}` 即可 |
 | changes | 物件 | **update 必填** | 要寫入的欄位。`update` 缺 `changes` 回 422 `changes: required`、空物件回 422 `changes: empty`；**`create` 的 `changes` 非必填**（只帶完整 `target.pk` 也可能成功）。`delete`：走 `/api/v2/delete` 或 `batch_mutate` 時可省略，但**走 `/api/v2/mutate` 並帶 `operation: "delete"` 時仍必須帶 `changes` 鍵**（可為空物件），否則 422 `changes: required`；內容會被忽略 |
 | meta.comment | 字串 | — | 提案說明；`direct` 模式則寫入該筆 operation 的 `__note` |
@@ -483,7 +483,7 @@ CBDB 子資源表幾乎都是複合主鍵，且不使用 Eloquent 主鍵行為�
 | 404 | 目標列不存在（訊息形如 `ALTNAME_DATA 記錄不存在`） | — |
 | 409 | 主鍵衝突或狀態衝突 | `target.pk: conflict` / `duplicate` / `pending_proposal_exists`、`changes: conflict`、`mirror_conflict`、`mirror_suspected`、`mirror_delete_multiple`、`mirror: conflict` |
 | 419 | CSRF token 不符（只會發生在 `resubmit`、`opposite-edges`） | — |
-| 422 | 參數校驗失敗 | `target.pk: required`、`target.pk.<欄名>: required` / `numeric`（代碼表 create）、`person_id: required`、`pk`（主鍵缺欄位）、`person_id: mismatch`、`changes: required` / `empty` / `no_supported_fields` / `no_effective_changes` / `disallowed_fields: <欄位清單>` / `foreign_key_violation` / `not_null_violation` / `invalid_value` / `tree_cycle`（代碼表寫入）、各欄位級規則、`mirror_integrity: fail_closed` |
+| 422 | 參數校驗失敗 | `target.pk: required`、`target.pk.<欄名>: required` / `numeric`（代碼表 create）、`person_id: required`、`pk`（主鍵缺欄位）、`person_id: mismatch`、`changes: required` / `empty` / `no_supported_fields` / `no_effective_changes` / `disallowed_fields: <欄位清單>` / `foreign_key_violation` / `not_null_violation` / `invalid_value` / `tree_cycle`（代碼表寫入）、各欄位級規則、`mirror_integrity: fail_closed`、`unknown_person_not_allowed`（關係類資源的未詳人物守衛） |
 | 429 | 超過限流。**本章的 `/api/v2` 寫入端點在應用程式層沒有限流，不會由應用程式回 429**（見 1.3）；會回 429 的是 `api` 群組端點（600 次／分鐘）、`/api/mcp`（預設 120 次／分鐘）與少數自帶額度的端點（見 14.9） | — |
 | 500 | 未預期的伺服器錯誤 | 代碼表 create 另有設定錯誤時的 `pk: schema_mismatch` / `auto_assign_unsupported` / `text_key_in_variant_scope` / `schema_unavailable`（主鍵登錄與 `CompositePrimaryKey::SCHEMAS` 不一致、複合或文本主鍵誤設自動配發、文本主鍵落在異體字替換範圍內、讀不到欄位型別），屬部署設定問題、不是呼叫端能修的 |
 | 501 | `resource` / `mode` / `operation` 組合不支援 | `resource`、`mode`、`operation`（此處的值是**字串**，不是字串陣列） |
@@ -504,9 +504,10 @@ CBDB 子資源表幾乎都是複合主鍵，且不使用 Eloquent 主鍵行為�
 | `changes: ["empty"]` | `update` 的 `changes` 是空物件 |
 | `changes: ["no_supported_fields"]` | `changes` 內沒有任何該資源可寫的欄位 |
 | `changes: ["disallowed_fields: c_foo, c_bar"]` | 送了白名單外的欄位。多數人物子資源的 `update`／`create` 會**整筆拒絕**（見下方警告） |
-| `person_id: ["invalid"]` | `postings`／`possessions` 的 `create` 收到 `person_id = 0` |
+| `person_id: ["invalid"]` | `postings`／`possessions` 的 `create` 或 `update` 收到「未詳」人物的 `person_id`（判定是「**轉為整數後**等於 `0` 或 `-999`」，與資料庫寫入 INTEGER 欄的轉型一致，所以 `"0e10"`、`"-999.0"`、`0.5` 這類也會被擋——它們落庫後就是 `0`／`-999`）。`update` 含「僅改地址」那條路徑 |
 | `changes: ["no_effective_changes"]` | 送出的值與現值完全相同（後端以字串比對），沒有任何實際變更 |
 | `person_id: ["mismatch"]` | `person_id` 與 `target.pk` 內人物欄不符，或與資料庫該列的人物欄不符 |
+| `person_id: ["unknown_person_not_allowed"]`<br>`c_kin_id`／`c_assoc_id: ["unknown_person_not_allowed"]` | `kinship`／`associations` 的擁有者或對象是「未詳」人物（轉為整數後等於 `0` 或 `-999`）。`create` 與 `update` 皆然；`delete` **不受此限**（清理歷史髒列是合法操作） |
 | `pk: ["缺少必要的複合主鍵參數：..."]` | `target.pk` 缺欄位 |
 | `target.pk.c_lastyear: ["required"]` | 代碼表 `create` 的複合主鍵缺欄位（逐欄回報，不是整包 `pk`） |
 | `target.pk.c_firstyear: ["numeric"]` | 代碼表 `create` 的主鍵值不是整數（不會靜默轉成 `0`） |
@@ -1018,6 +1019,7 @@ Authorization: Bearer <token>
 - **額外可送的非資料表欄位**（互逆鏡像用，見〈社會關係與親屬的互逆鏡像〉）：`c_assocship_pair`、`c_kinship_pair`、`c_assoc_kinship_pair`。未送時後端會以代碼表的權威反向碼（`ASSOC_CODES.c_assoc_pair`／`KINSHIP_CODES.c_kin_pair1`）自動補齊。**這三個欄位不做有效性驗證**（送不存在的碼會被靜默接受並寫進鏡像列），與 `kinship` 的 `c_kinship_pair` 會驗證的行為不同——請自行確認送的是合法配對碼。
 - **這個資源的寫入會同時動到對方人物的那一列**（互逆鏡像），詳見〈社會關係與親屬的互逆鏡像〉。`update` 的「補建缺失鏡像」只在**顯式送了任一 pair 欄位**時才啟用；只改備註等欄位不會臆造鏡像。
 - 兩個哨兵主鍵欄的 `update` 例外：送 `c_text_title: null` 或 `c_assoc_first_year: null` **不會清空**，會被還原成 `[n/a]`／`-9999`。
+- **「未詳」人物不得作為關係的擁有者或對象**：`person_id` 或 `c_assoc_id` 為「未詳」人物（轉為整數後等於 `0` 或 `-999`）一律 422 `unknown_person_not_allowed`（`create` 與 `update` 皆然）。自 2026-09 起，**核准既有的 pending proposal** 若命中同一條件也會被中止——提案維持 `pending`、資料完全未動，審核者會看到理由訊息（提案不會被自動退回）。
 
 ### 9.8 kinship（KIN_DATA，親屬關係）
 
@@ -1027,11 +1029,13 @@ Authorization: Bearer <token>
 - 哨兵欄：`c_source`
 - **額外可送的非資料表欄位**：`c_kinship_pair`（指定反向親屬碼）。未送時以 `KINSHIP_CODES.c_kin_pair1` 推導；送了不合法的配對碼會回 422（此回應**只有 `message`、沒有 `errors`**），且因為檢查發生在寫入之前，資料完全未動。
 - **這個資源的寫入會同時動到對方人物的那一列**（互逆鏡像），詳見〈社會關係與親屬的互逆鏡像〉。與 `associations` 不同，`kinship` 的 `update` **不會**補建缺失的鏡像列（只同步已存在的那一列）。
+- **「未詳」人物不得作為親屬關係的擁有者或對象**：`person_id` 或 `c_kin_id` 為「未詳」人物（轉為整數後等於 `0` 或 `-999`）一律 422 `unknown_person_not_allowed`（`create` 與 `update` 皆然）。核准既有 pending proposal 時同樣會被中止，語義同 9.7。
 
 ### 9.9 possessions（POSSESSION_DATA，財產）
 
 - `target.pk`：`c_possession_record_id`（單一流水號主鍵）
-- **create**：`c_possession_record_id` 由系統配發，`target.pk` 送空物件 `{}`；`person_id` 不可為 `0`（422 `person_id: invalid`）。
+- **create**：`c_possession_record_id` 由系統配發，`target.pk` 送空物件 `{}`。
+- **`person_id` 不可為「未詳」人物**（判定是「**轉為整數後**等於 `0` 或 `-999`」，與資料庫寫入 INTEGER 欄的轉型一致，所以 `"0e10"`、`"-999.0"`、`0.5` 這類也會被擋——它們落庫後就是 `0`／`-999`），`create` 與 `update` 皆然（422 `person_id: invalid`）；`update` 含「只送 `c_addr_id`」那條僅改地址的路徑。歷史上已存在的 `c_personid = 0` 髒列因此**只能刪、不能改**（`c_personid` 本來就是不可改的定位欄，修復手段是刪除後重建）。
 - **create／update** 白名單：`c_sequence`、`c_possession_act_code`、`c_possession_desc`、`c_possession_desc_chn`、`c_quantity`、`c_measure_code`、`c_possession_yr`、`c_possession_nh_code`、`c_possession_nh_yr`、`c_possession_yr_range`、`c_source`、`c_pages`、`c_notes`
 - 哨兵欄：`c_source`、`c_measure_code`、`c_possession_act_code`
 - **地址副表**：`changes.c_addr_id` 可送**陣列**（地點 ID 列表），寫入 `POSSESSION_ADDR`；`update` 可用 `c_addr_cleared: "1"` 清空；proposal 模式存於提案的 `__proposal_aux`，核准時才寫入。
@@ -1049,7 +1053,8 @@ Authorization: Bearer <token>
 ### 9.11 postings（POSTED_TO_OFFICE_DATA，任官）
 
 - `target.pk`：`c_office_id`、`c_posting_id`（**不含** `c_personid`）
-- **create**：`c_posting_id` 由系統配發，`target.pk` 送空物件 `{}`，但**必須在 `changes` 內帶 `c_office_id`**（否則 422 `changes: c_office_id required`）；`person_id` 不可為 `0`。
+- **create**：`c_posting_id` 由系統配發，`target.pk` 送空物件 `{}`，但**必須在 `changes` 內帶 `c_office_id`**（否則 422 `changes: c_office_id required`）。
+- **`person_id` 不可為「未詳」人物**（判定是「**轉為整數後**等於 `0` 或 `-999`」，與資料庫寫入 INTEGER 欄的轉型一致，所以 `"0e10"`、`"-999.0"`、`0.5` 這類也會被擋——它們落庫後就是 `0`／`-999`），`create` 與 `update` 皆然（422 `person_id: invalid`）；`update` 含「只送 `c_addr`」那條僅改地址的路徑。歷史上已存在的 `c_personid = 0` 髒列因此只能刪、不能改。
 - **create／update** 白名單：`c_office_id`、`c_sequence`、`c_source`、`c_pages`、`c_notes`、`c_firstyear`、`c_fy_nh_code`、`c_fy_nh_year`、`c_fy_range`、`c_fy_intercalary`、`c_fy_month`、`c_fy_day`、`c_fy_day_gz`、`c_lastyear`、`c_ly_nh_code`、`c_ly_nh_year`、`c_ly_range`、`c_ly_intercalary`、`c_ly_month`、`c_ly_day`、`c_ly_day_gz`、`c_appt_code`、`c_assume_office_code`、`c_dy`、`c_inst_code`、`c_inst_name_code`、`c_office_category_id`
 - 哨兵欄：`c_source`、`c_appt_code`
 - **任官地址副表**：`changes.c_addr` 可送**陣列**（任官地點），寫入 `POSTED_TO_ADDR_DATA`；`update` 可用 `c_addr_cleared: "1"` 清空；proposal 模式存於 `__proposal_aux`，核准時才寫入。

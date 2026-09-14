@@ -512,6 +512,78 @@ class VariantReplaceCrowdsourcingAndV1Test extends TestCase {
             $table->string('c_modified_date')->nullable();
         });
     }
+
+    /**
+     * `Duplicate_Collateral_Info()` 不得把「指向未詳人物」的歷史髒列一併複製（計畫 7-U2）。
+     *
+     * KIN_DATA／ASSOC_DATA 裡存在 `c_kin_id = 0`／`c_assoc_id = 0`（或擁有者是 0）的歷史列——
+     * 那是一條指向不存在人物的邊。原樣複製等於**憑空多產生一條**同樣的髒邊，而且掛在一個
+     * 今天才建立的人物底下。v2 的 create／update 已由 BlocksUnknownPersonRelations 擋住，
+     * 這條複製路徑是最後一條漏網（該端點無閘門、仍在服役）。
+     *
+     * 行為是**跳過該列並記 warning**，不是整批拒絕——與同一函式裡的異體字去重器一致：
+     * 複製是便利功能，少複製一條本來就壞掉的列，比讓整個複製永久失敗好；原始髒列不動。
+     *
+     * 四個迴圈都要驗到：正向 kin／鏡像 kin／正向 assoc／鏡像 assoc。
+     */
+    #[Test]
+    public function testDuplicateCollateralInfoSkipsUnknownPersonRelationRows(): void {
+        $this->createCollateralTables();
+
+        $editor = User::forceCreate([
+            'name' => '編輯者',
+            'email' => 'dup-unknown@example.com',
+            'confirmation_token' => 'tok-dup-unknown',
+            'is_active' => User::STATUS_ACTIVE,
+            'is_admin' => User::ROLE_SUPER_ADMIN,
+        ]);
+        $this->actingAs($editor);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 9200, 'c_name_chn' => '被複製者']);
+
+        DB::table('KIN_DATA')->insert([
+            // 正向：本人的親屬列，對象是未詳（0）→ 必須跳過。
+            ['c_personid' => 9200, 'c_kin_id' => 0, 'c_kin_code' => 100, 'c_notes' => '髒：對象未詳'],
+            // 正向：-999 與 0 同義 → 也必須跳過。
+            ['c_personid' => 9200, 'c_kin_id' => -999, 'c_kin_code' => 102, 'c_notes' => '髒：對象 -999'],
+            // 正向對照：正常對象 → 必須照常複製。
+            ['c_personid' => 9200, 'c_kin_id' => 3000, 'c_kin_code' => 104, 'c_notes' => '正常'],
+            // 鏡像：別人指向本人，但那個「別人」是未詳（0）→ 必須跳過。
+            ['c_personid' => 0, 'c_kin_id' => 9200, 'c_kin_code' => 101, 'c_notes' => '髒：擁有者未詳'],
+            // 鏡像對照：正常擁有者 → 必須照常複製。
+            ['c_personid' => 3000, 'c_kin_id' => 9200, 'c_kin_code' => 105, 'c_notes' => '正常鏡像'],
+        ]);
+
+        DB::table('ASSOC_DATA')->insert([
+            ['c_personid' => 9200, 'c_assoc_code' => 1, 'c_assoc_id' => 0, 'c_text_title' => 'A', 'c_assoc_first_year' => 1060, 'c_notes' => '髒：對象未詳'],
+            ['c_personid' => 9200, 'c_assoc_code' => 2, 'c_assoc_id' => 3000, 'c_text_title' => 'B', 'c_assoc_first_year' => 1061, 'c_notes' => '正常'],
+            ['c_personid' => 0, 'c_assoc_code' => 3, 'c_assoc_id' => 9200, 'c_text_title' => 'C', 'c_assoc_first_year' => 1062, 'c_notes' => '髒：擁有者未詳'],
+            ['c_personid' => 3000, 'c_assoc_code' => 4, 'c_assoc_id' => 9200, 'c_text_title' => 'D', 'c_assoc_first_year' => 1063, 'c_notes' => '正常鏡像'],
+        ]);
+
+        $this->get('/basicinformation/9200/Duplicate_Collateral_Info');
+
+        $newId = (int) DB::table('BIOG_MAIN')->where('c_personid', '!=', 9200)->value('c_personid');
+        $this->assertGreaterThan(0, $newId, '應複製出一列新人物');
+
+        // 新人物底下：只有兩條正常邊，四條髒邊一條都沒複製。
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => $newId, 'c_kin_id' => 0]);
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => $newId, 'c_kin_id' => -999]);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => $newId, 'c_kin_id' => 3000, 'c_kin_code' => 104]);
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 0, 'c_kin_id' => $newId]);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 3000, 'c_kin_id' => $newId, 'c_kin_code' => 105]);
+
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => $newId, 'c_assoc_id' => 0]);
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => $newId, 'c_assoc_id' => 3000, 'c_assoc_code' => 2]);
+        $this->assertDatabaseMissing('ASSOC_DATA', ['c_personid' => 0, 'c_assoc_id' => $newId]);
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 3000, 'c_assoc_id' => $newId, 'c_assoc_code' => 4]);
+
+        // 原始髒列完全不動（D6：既有資料不做回溯校正，只是不再擴散）。
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 9200, 'c_kin_id' => 0, 'c_kin_code' => 100]);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 0, 'c_kin_id' => 9200, 'c_kin_code' => 101]);
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 9200, 'c_assoc_id' => 0, 'c_assoc_code' => 1]);
+        $this->assertDatabaseHas('ASSOC_DATA', ['c_personid' => 0, 'c_assoc_id' => 9200, 'c_assoc_code' => 3]);
+    }
     // ── review round 2 補的覆蓋 ─────────────────────────────
 
     /**
@@ -662,5 +734,69 @@ class VariantReplaceCrowdsourcingAndV1Test extends TestCase {
             'is_active' => User::STATUS_ACTIVE,
             'is_admin' => User::ROLE_SUPER_ADMIN,
         ]);
+    }
+
+    /**
+     * 複製「未詳」人物本身要在入口擋（review finding 9）。
+     *
+     * 兩個鏡像迴圈是 `WHERE c_kin_id = $id` / `WHERE c_assoc_id = $id`，$id = 0 會撈出
+     * **全庫所有指向未詳的髒邊**、全部重新指向新建人物並批次 insert。逐列守衛擋不住——
+     * 那一側的 `c_personid` 是合法人物，看起來完全正常。
+     */
+    #[Test]
+    public function testDuplicateCollateralInfoRefusesToCopyTheUnknownPerson(): void {
+        $this->createCollateralTables();
+
+        $editor = User::forceCreate([
+            'name' => '編輯者',
+            'email' => 'dup-unknown-self@example.com',
+            'confirmation_token' => 'tok-dup-self',
+            'is_active' => User::STATUS_ACTIVE,
+            'is_admin' => User::ROLE_SUPER_ADMIN,
+        ]);
+        $this->actingAs($editor);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 0, 'c_name_chn' => '未詳']);
+        // 全庫的髒邊：若入口沒擋，這兩條會被複製到新建人物底下。
+        DB::table('KIN_DATA')->insert(['c_personid' => 5000, 'c_kin_id' => 0, 'c_kin_code' => 100]);
+        DB::table('ASSOC_DATA')->insert([
+            'c_personid' => 5000, 'c_assoc_code' => 1, 'c_assoc_id' => 0,
+            'c_text_title' => 'X', 'c_assoc_first_year' => 1060,
+        ]);
+
+        $this->get('/basicinformation/0/Duplicate_Collateral_Info');
+
+        // 完全沒有建立新人物，也沒有複製任何列。
+        $this->assertSame(1, DB::table('BIOG_MAIN')->count(), '不得為「未詳」人物建立複本');
+        $this->assertSame(1, DB::table('KIN_DATA')->count());
+        $this->assertSame(1, DB::table('ASSOC_DATA')->count());
+    }
+
+    /**
+     * 複製「未詳」人物的守衛排在授權**之後**（codex review）。
+     *
+     * 擺在授權前的話，無直寫權的使用者複製 `/0/...` 會看到「未詳人物不能複製」而不是權限拒絕——
+     * 把授權失敗洩漏成「資料有問題」，與本專案其他守衛的排序規則不一致。
+     */
+    #[Test]
+    public function testDuplicateCollateralInfoChecksAuthorizationBeforeTheUnknownPersonGuard(): void {
+        $this->createCollateralTables();
+
+        $crowdsourcer = User::forceCreate([
+            'name' => '眾包用戶',
+            'email' => 'dup-unknown-authz@example.com',
+            'confirmation_token' => 'tok-dup-authz',
+            'is_active' => User::STATUS_ACTIVE,
+            'is_admin' => User::ROLE_CROWDSOURCING,
+        ]);
+        $this->actingAs($crowdsourcer);
+
+        DB::table('BIOG_MAIN')->insert(['c_personid' => 0, 'c_name_chn' => '未詳']);
+
+        $this->get('/basicinformation/0/Duplicate_Collateral_Info');
+
+        $flash = session('flash_notification', collect())->toArray();
+        $this->assertStringContainsString('該用戶沒有權限', $flash[0]['message'] ?? '', '應先回權限拒絕，而不是未詳人物訊息');
+        $this->assertSame(1, DB::table('BIOG_MAIN')->count());
     }
 }

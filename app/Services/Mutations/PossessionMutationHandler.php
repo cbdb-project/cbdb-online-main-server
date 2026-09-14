@@ -7,6 +7,7 @@ use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
 use App\Support\CompositePrimaryKey;
+use App\Support\UnknownPerson;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -47,6 +48,50 @@ class PossessionMutationHandler extends AbstractPersonSubresourceMutationHandler
         }
     }
 
+    /**
+     * 「未詳」人物（personid 0）不得**修改**財產記錄。
+     *
+     * `PossessionCreateHandler:89` 早就擋了 create，update 這一側一直沒有對應守衛——
+     * legacy `BasicInformationPossessionController` 兩側都沒擋（grep 該檔已刪版本的
+     * 「未詳」得 0 筆），所以這不是遷移漏搬，而是 v2 自己補到一半。對齊
+     * KinshipMutationHandler／AssociationMutationHandler 的做法把它補齊。
+     *
+     * **刻意不 `use BlocksUnknownPersonRelations`**：那個 trait 的 `blockUnknownOwner()` 簽章不同、
+     * 錯誤鍵也不同（`unknown_person_not_allowed`）。財產／任官不是雙向關係，錯誤形狀刻意與
+     * 同資源的 create 路徑逐字相同（`['person_id' => ['invalid']]`），而不是
+     * `BlocksUnknownPersonRelations` 的 `unknown_person_not_allowed`：財產不是雙向關係，
+     * 前端對這兩條路徑用的是同一個錯誤處理分支。
+     *
+     * 歷史上已存在的 personid 0 髒列因此變成「只能刪、不能改」——與 kin／assoc 的既有
+     * 取捨一致（c_personid 是主鍵成員，本來就改不動，修復手段只有刪除後重建）。
+     */
+    private function blockUnknownPossessionOwner(int $personId): ?JsonResponse {
+        if (!UnknownPerson::isUnknown($personId)) {
+            return null;
+        }
+
+        return $this->errorResponse('「未詳」人物不能修改財產記錄。', 422, ['person_id' => ['invalid']]);
+    }
+
+    /**
+     * 覆寫：在授權之後、任何寫入之前插入未詳人物守衛。
+     *
+     * 放在授權**之後**是刻意的：擺在前面會讓未登入請求拿到 422 而不是 401/403。
+     * `authorizeDirect()`／`authorizeProposal()` 無副作用，父類稍後再呼叫一次是安全的。
+     */
+    protected function handleAfterVariantReset(string $resource, string $mode, string $operation, int $personId, array $targetPk, array $changes, array $meta = []): JsonResponse {
+        $authorizationError = $mode === 'proposal' ? $this->authorizeProposal() : $this->authorizeDirect();
+        if ($authorizationError) {
+            return $authorizationError;
+        }
+
+        if ($blocked = $this->blockUnknownPossessionOwner($personId)) {
+            return $blocked;
+        }
+
+        return parent::handleAfterVariantReset($resource, $mode, $operation, $personId, $targetPk, $changes, $meta);
+    }
+
     /** direct 財產更新成功後同交易同步 POSSESSION_ADDR（record_id 固定，刪重插整組）。 */
     protected function afterDirectUpdate(int $personId, array $targetPk, array $updateData, array $newArray, ?Operation $operation): void {
         if ($this->pendingIncomingAddr === null) {
@@ -69,6 +114,10 @@ class PossessionMutationHandler extends AbstractPersonSubresourceMutationHandler
     private function handleAddressOnlyDirect(int $personId, array $targetPk): JsonResponse {
         if ($authError = $this->authorizeDirect()) {
             return $authError;
+        }
+        // 這條路徑不經 parent::handle()，所以守衛要自己掛一次（僅改地址也是修改）。
+        if ($blocked = $this->blockUnknownPossessionOwner($personId)) {
+            return $blocked;
         }
         $original = $this->findPossessionRow($targetPk);
         if (!$original) {
@@ -101,6 +150,10 @@ class PossessionMutationHandler extends AbstractPersonSubresourceMutationHandler
     private function handleAddressOnlyProposal(int $personId, array $targetPk, array $meta): JsonResponse {
         if ($authError = $this->authorizeProposal()) {
             return $authError;
+        }
+        // 這條路徑不經 parent::handle()，所以守衛要自己掛一次（僅改地址也是修改）。
+        if ($blocked = $this->blockUnknownPossessionOwner($personId)) {
+            return $blocked;
         }
         $original = $this->findPossessionRow($targetPk);
         if (!$original) {

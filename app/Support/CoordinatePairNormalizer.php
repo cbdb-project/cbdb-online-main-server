@@ -76,8 +76,19 @@ final class CoordinatePairNormalizer {
     /**
      * 帶經緯度的資料表 → 其座標欄位對（經度欄, 緯度欄）。
      *
-     * 全庫只有這兩張表有 `x_coord`／`y_coord`（`PLACE_CODES` 已由
+     * 全庫只有這兩張表有名為 `x_coord`／`y_coord` 的欄（`PLACE_CODES` 已由
      * `2025_11_17_100000_drop_place_codes_table.php` 移除）。
+     *
+     * **但「帶座標的表」不只這兩張，而另一張刻意不登記：**
+     * `SOCIAL_INSTITUTION_ADDR` 的座標欄叫 `inst_xcoord`／`inst_ycoord`，而且兩欄都是
+     * `double NOT NULL` **並且是複合主鍵的成員**（實測 `SHOW COLUMNS`：`null=NO key=PRI`；
+     * 見 `CompositePrimaryKey::SCHEMAS`）。把它加進 `PAIRS` 會讓歸零寫 `NULL` 進 NOT NULL
+     * 的主鍵欄——那是資料庫層的 1048（500），不是一個更乾淨的 NULL。所以那張表**必須留在
+     * 外面**，不是漏了。
+     *
+     * 連帶要知道 `CoordinatePairRegistryGuardTest` 的反向把關只比對字面的
+     * `x_coord`／`y_coord`：換個欄名的座標表它看不到。那是刻意的下限而非缺陷——
+     * 但也因此，新增帶座標的表時**不能只靠那支測試提醒**。
      *
      * `ADDRESSES` 是 `cbdb:regenerate-addresses-table` 由 `ADDR_CODES` 以
      * `INSERT ... SELECT ac.x_coord, ac.y_coord` 重建的派生快取，那條 raw SQL 路徑沒有

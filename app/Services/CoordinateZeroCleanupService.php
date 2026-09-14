@@ -12,9 +12,12 @@ use Illuminate\Support\Facades\DB;
  *
  * 寫入端守衛（{@see CoordinatePairNormalizer} 及其掛鉤）只管**新的寫入**。它管不到：
  *
- *  - **上游資料重灌**。`ADDR_CODES` 的 316 列 `0,0` 就是這樣來的——那些列的
- *    `c_created_by`／`c_modified_by` 全部是 `NULL`，也就是**從來沒有被應用寫過**，
- *    是當年原始 CBDB 匯入帶進來的。下一次上游重灌會再帶一批。
+ *  - **上游資料重灌**。`ADDR_CODES` 的 316 列 `0,0` 幾乎確定是這樣來的：它們散佈在整個
+ *    id 區間、涵蓋明代衛所等一整批同類地名，看起來是一次匯入的產物而非逐筆編輯。
+ *    （**不要用稽核欄去推論這件事**：`c_created_by`／`c_modified_by` 是
+ *    `2026_09_10_000000_add_audit_columns_to_addr_codes_table` 才加上的 nullable 欄、
+ *    而且那支 migration 不回填，所以每一列既有資料必然是 NULL——那些 NULL 只證明
+ *    「加欄之後沒被編輯過」，證不了「從來沒被應用寫過」。）下一次上游重灌會再帶一批。
  *  - **從零建起的部署**。跑完所有 migration 的新環境若匯入了舊 dump，同樣帶著零值。
  *
  * 所以這個 service 是那道「地板」：跑完之後全庫沒有零座標，而且**重複跑是幂等的**
@@ -50,6 +53,13 @@ class CoordinateZeroCleanupService {
      * @return array{table: string, scanned: int, cleared: int, skipped_non_numeric: array<int, array<string, mixed>>}
      */
     public function cleanTable(string $table, bool $dryRun = false): array {
+        // 表名先歸一成登記時的大寫拼法。`pairsFor()`／`keyColumnFor()` 都是大小寫不敏感地
+        // 比對，但後面 `DB::table($table)` 用的是原樣字串——於是 `--table=addr_codes`
+        // 會通過兩道閘門，然後在 case-sensitive 的 MySQL（Linux 上的預設）拋一個未捕捉的
+        // QueryException，而不是走到乾淨的 InvalidArgumentException。SQLite 大小寫不敏感，
+        // 所以測試環境看不到這個差異。
+        $table = strtoupper($table);
+
         $pairs = CoordinatePairNormalizer::pairsFor($table);
         if ($pairs === []) {
             throw new \InvalidArgumentException($table.' 沒有登記座標欄位對，無法清理。');

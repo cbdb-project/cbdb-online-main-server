@@ -7,6 +7,7 @@ use App\Repositories\BiogMainRepository;
 use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
 use App\Support\CompositePrimaryKey;
+use App\Support\UnknownPerson;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -102,7 +103,9 @@ class PostingCreateHandler extends AbstractMutationHandler {
             return $authorizationError;
         }
 
-        if ((int) $personId === 0) {
+        // -999 與 0 同義（「未詳」）。原本只擋 0，於是 person_id = -999 可以直接落庫成
+        // c_personid = -999——比 0 更糟，因為連正規化都沒發生。判定集中在 UnknownPerson。
+        if (UnknownPerson::isUnknown($personId)) {
             return $this->errorResponse('「未詳」人物不能新增任官記錄。', 422, ['person_id' => ['invalid']]);
         }
 

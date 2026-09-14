@@ -1881,4 +1881,259 @@ class OperationsProposalControllerTest extends TestCase {
             '另一形那列不該被動到'
         );
     }
+
+    // ── 「未詳」人物守衛（計畫 7-U1）─────────────────────────
+
+    /**
+     * 核准 ASSOC 提案時，對象是「未詳」人物（c_assoc_id = 0）必須中止核准。
+     *
+     * 核准路徑**不經 mutation handler**（直接呼叫 BiogMainRepository），所以
+     * Services\Mutations\Concerns\BlocksUnknownPersonRelations 完全罩不到。新提案在提交時
+     * 已被擋，能撞到這裡的只有守衛上線前既存的 pending proposal——但那正是需要擋的東西。
+     *
+     * 刻意**不自動退回**：提案維持 pending，由審核者看訊息後自行決定退回或請提案人改對象。
+     */
+    #[Test]
+    public function testApproveAssocProposalBlockedWhenTargetIsUnknownPerson(): void {
+        $fwd = [
+            'c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 0,
+            'c_kin_code' => 0, 'c_kin_id' => 0, 'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0,
+            'c_text_title' => '史記', 'c_assoc_first_year' => 1080,
+        ];
+        DB::table('ASSOC_DATA')->insert(array_merge($fwd, ['c_source' => 10, 'c_notes' => '原備註']));
+
+        $this->actingAs($this->makeAdmin());
+        $operation = $this->makeAssocUpdateProposal(
+            $fwd,
+            ['c_source' => 10, 'c_notes' => '提案改後'],
+            ['c_source' => 10, 'c_notes' => '原備註']
+        );
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])
+            ->assertRedirect();
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('pending', $payload['__review_status'] ?? null, '未詳對象應中止核准、維持 pending');
+        $this->assertSame('原備註', DB::table('ASSOC_DATA')->where(['c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 0])->value('c_notes'));
+
+        // 鎖完整訊息與 type：子字串比對過寬，而且 `catch (\Throwable)` 會讓任何無關的 500
+        // 走同一條 flash + redirect，只驗 assertRedirect() 的話那也算綠。
+        $flash = session('flash_notification', collect())->toArray();
+        $this->assertSame('審核失敗：不能將「未詳」人物加為社會關係對象，無法核准此提案。', $flash[0]['message'] ?? '');
+        $this->assertSame('error', $flash[0]['level'] ?? $flash[0]['type'] ?? null);
+    }
+
+    /** 同一守衛在 KIN_DATA 的 CREATE 核准路徑上也要生效（c_kin_id = 0）。 */
+    #[Test]
+    public function testApproveKinshipCreateProposalBlockedWhenTargetIsUnknownPerson(): void {
+        $this->actingAs($this->makeAdmin());
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource' => 'KIN_DATA',
+            'resource_id' => '1000-0-100',
+            'resource_data' => [
+                'c_personid' => 1000, 'c_kin_id' => 0, 'c_kin_code' => 100, 'c_source' => 10, 'c_kinship_pair' => 101,
+                '__key_columns' => ['c_personid', 'c_kin_id', 'c_kin_code'],
+                '__review_status' => 'pending',
+                '__proposal_meta' => ['action' => 'create', 'submitted_by' => 'tester'],
+            ],
+        ]);
+        $operation->c_personid = 1000;
+        $operation->save();
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])
+            ->assertRedirect();
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('pending', $payload['__review_status'] ?? null, '未詳對象應中止核准、維持 pending');
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 0, 'c_kin_code' => 100]);
+
+        $flash = session('flash_notification', collect())->toArray();
+        $this->assertSame('審核失敗：不能將「未詳」人物加為親屬，無法核准此提案。', $flash[0]['message'] ?? '');
+        $this->assertSame('error', $flash[0]['level'] ?? $flash[0]['type'] ?? null);
+    }
+
+    /**
+     * -999 與 0 同義：repository 稍後會正規化成 0，所以守衛必須提前一併擋。
+     *
+     * 少了這一條，送 -999 的提案照樣核准成功並寫進一條指向 0 的邊——這正是 legacy assoc
+     * controller 的既有漏洞（先擋原值、後正規化）。
+     */
+    #[Test]
+    public function testApproveKinshipCreateProposalBlocksNegative999Target(): void {
+        $this->actingAs($this->makeAdmin());
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource' => 'KIN_DATA',
+            'resource_id' => '1000--999-100',
+            'resource_data' => [
+                'c_personid' => 1000, 'c_kin_id' => -999, 'c_kin_code' => 100, 'c_source' => 10, 'c_kinship_pair' => 101,
+                '__key_columns' => ['c_personid', 'c_kin_id', 'c_kin_code'],
+                '__review_status' => 'pending',
+                '__proposal_meta' => ['action' => 'create', 'submitted_by' => 'tester'],
+            ],
+        ]);
+        $operation->c_personid = 1000;
+        $operation->save();
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])
+            ->assertRedirect();
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('pending', $payload['__review_status'] ?? null);
+        $this->assertSame(0, DB::table('KIN_DATA')->count(), '-999 不得繞過守衛寫進任何列');
+    }
+
+    /** 對照（不誤擋）：對象是正常人物時核准照常通過。 */
+    #[Test]
+    public function testApproveKinshipCreateProposalStillSucceedsForRealTarget(): void {
+        $this->actingAs($this->makeAdmin());
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource' => 'KIN_DATA',
+            'resource_id' => '1000-2000-100',
+            'resource_data' => [
+                'c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100, 'c_source' => 10, 'c_kinship_pair' => 101,
+                '__key_columns' => ['c_personid', 'c_kin_id', 'c_kin_code'],
+                '__review_status' => 'pending',
+                '__proposal_meta' => ['action' => 'create', 'submitted_by' => 'tester'],
+            ],
+        ]);
+        $operation->c_personid = 1000;
+        $operation->save();
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])
+            ->assertRedirect();
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status'] ?? null);
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100]);
+    }
+
+    /**
+     * P4：`$personId === 0`（**擁有者本身**是未詳）那一支原本零覆蓋。
+     *
+     * 對抗性 review 實測：整支刪掉，既有 5 條測試全綠。這裡送一筆擁有者是 0 的親屬提案補上。
+     * 注意 `proposalOperation()` 預設 `c_personid = 0`，所以這條刻意**不**覆寫它——
+     * payload 裡的 `c_personid` 也是 0，兩個來源一致才測得到「擁有者未詳」而非取值順序。
+     */
+    #[Test]
+    public function testApproveKinshipProposalBlockedWhenOwnerIsUnknownPerson(): void {
+        $this->actingAs($this->makeAdmin());
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource' => 'KIN_DATA',
+            'resource_id' => '0-2000-100',
+            'resource_data' => [
+                'c_personid' => 0, 'c_kin_id' => 2000, 'c_kin_code' => 100, 'c_source' => 10, 'c_kinship_pair' => 101,
+                '__key_columns' => ['c_personid', 'c_kin_id', 'c_kin_code'],
+                '__review_status' => 'pending',
+                '__proposal_meta' => ['action' => 'create', 'submitted_by' => 'tester'],
+            ],
+        ]);
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])
+            ->assertRedirect();
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('pending', $payload['__review_status'] ?? null);
+        $this->assertSame(0, DB::table('KIN_DATA')->count(), '擁有者未詳時不得寫入任何列');
+
+        $flash = session('flash_notification', collect())->toArray();
+        $this->assertSame('審核失敗：「未詳」人物不能有親屬記錄，無法核准此提案。', $flash[0]['message'] ?? '');
+    }
+
+    /**
+     * P5：對象 id 只存在於 `resource_original`（**未改鍵**）那條 fallback 原本零覆蓋。
+     *
+     * 對抗性 review 實測：把 `?? ($original[$column] ?? null)` 拿掉，既有測試全綠——因為
+     * `makeAssocUpdateProposal()` 把 PK 同時 merge 進 data 與 original 兩邊。這裡刻意讓
+     * `resource_data` **只含內容欄**、PK 只在 `resource_original`，正是守衛註解描述的情境。
+     */
+    #[Test]
+    public function testApproveAssocProposalBlockedWhenUnknownTargetOnlyInOriginal(): void {
+        $fwd = [
+            'c_personid' => 1000, 'c_assoc_code' => 100, 'c_assoc_id' => 0,
+            'c_kin_code' => 0, 'c_kin_id' => 0, 'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0,
+            'c_text_title' => '史記', 'c_assoc_first_year' => 1080,
+        ];
+        DB::table('ASSOC_DATA')->insert(array_merge($fwd, ['c_source' => 10, 'c_notes' => '原備註']));
+
+        $this->actingAs($this->makeAdmin());
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+            'resource' => 'ASSOC_DATA',
+            'resource_id' => '1000-100-0-0-0-0-0-史記-1080',
+            // 只有內容欄，沒有任何 PK 欄——生效的 c_assoc_id 只能從 resource_original 取。
+            'resource_data' => [
+                'c_source' => 10, 'c_notes' => '提案改後',
+                '__key_columns' => array_keys($fwd),
+                '__review_status' => 'pending',
+                '__proposal_meta' => ['action' => 'update', 'submitted_by' => 'tester'],
+            ],
+            'resource_original' => array_merge($fwd, ['c_source' => 10, 'c_notes' => '原備註']),
+        ]);
+        $operation->c_personid = 1000;
+        $operation->save();
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])
+            ->assertRedirect();
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('pending', $payload['__review_status'] ?? null);
+        $this->assertSame('原備註', DB::table('ASSOC_DATA')->where(['c_personid' => 1000, 'c_assoc_code' => 100])->value('c_notes'));
+
+        $flash = session('flash_notification', collect())->toArray();
+        $this->assertSame('審核失敗：不能將「未詳」人物加為社會關係對象，無法核准此提案。', $flash[0]['message'] ?? '');
+    }
+
+    /**
+     * `$personId` 取值順序的回歸鎖（codex review）。
+     *
+     * 原本寫成 `$operation->c_personid ?? $data[...] ?? $original[...] ?? 0`——`??` 只對 null 短路，
+     * 所以 `operation.c_personid = 0`（舊／測試資料常見）會直接勝出、把 payload 裡的真人 id 蓋掉。
+     * 加上未詳守衛後，後果從「悄悄寫一列 c_personid = 0」升級成「這筆提案永遠核准不了，
+     * 而且審核者看到的訊息是『「未詳」人物不能有親屬記錄』——指向錯的東西」。
+     *
+     * 這條刻意讓 `operation->c_personid` 維持 `proposalOperation()` 的預設 0、payload 帶真人 id，
+     * 並斷言核准**成功**且落庫的是真人 id。取值順序改回去就會紅。
+     */
+    #[Test]
+    public function testApproveKinshipProposalPrefersPayloadPersonIdOverZeroOperationColumn(): void {
+        $this->actingAs($this->makeAdmin());
+
+        $operation = $this->proposalOperation([
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource' => 'KIN_DATA',
+            'resource_id' => '1000-2000-100',
+            'resource_data' => [
+                'c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100, 'c_source' => 10, 'c_kinship_pair' => 101,
+                '__key_columns' => ['c_personid', 'c_kin_id', 'c_kin_code'],
+                '__review_status' => 'pending',
+                '__proposal_meta' => ['action' => 'create', 'submitted_by' => 'tester'],
+            ],
+        ]);
+        // 刻意不設 $operation->c_personid（維持預設 0）——這正是 `??` 陷阱的觸發條件。
+        $this->assertSame(0, (int) $operation->c_personid);
+
+        $this->post(route('operations.proposals.approve', $operation), ['review_comment' => '核准'])
+            ->assertRedirect();
+
+        $operation->refresh();
+        $payload = json_decode($operation->resource_data, true);
+        $this->assertSame('approved', $payload['__review_status'] ?? null, 'payload 帶真人 id 時不該被 operation 的 0 蓋掉');
+        $this->assertDatabaseHas('KIN_DATA', ['c_personid' => 1000, 'c_kin_id' => 2000, 'c_kin_code' => 100]);
+        $this->assertDatabaseMissing('KIN_DATA', ['c_personid' => 0]);
+    }
 }

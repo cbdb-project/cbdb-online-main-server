@@ -596,4 +596,28 @@ class ApiV2CreatePostingTest extends TestCase {
 
         $this->postJson('/api/v2/create', $this->createPayload(['mode' => 'direct']))->assertStatus(403);
     }
+
+    /**
+     * create 的未詳人物守衛必須同時擋 `0` 與 `-999`（codex review）。
+     *
+     * 原本只比對 `(int) $personId === 0`，於是 `person_id = -999` 直接落庫成 `c_personid = -999`——
+     * 比 0 更糟，因為連正規化都沒發生，而且 API.md 宣稱兩者都擋。判定已集中到 UnknownPerson。
+     */
+    #[Test]
+    public function testUnknownPersonCannotCreatePostingWithNegative999(): void {
+        $this->actingAs($this->makeUser(email: 'posting-unknown-create@example.com'));
+
+        $this->postJson('/api/v2/create', [
+            'resource' => 'postings',
+            'person_id' => -999,
+            'mode' => 'direct',
+            'operation' => 'create',
+            'target' => ['pk' => (object) []],
+            'changes' => ['c_office_id' => 300, 'c_notes' => '髒'],
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.person_id.0', 'invalid');
+
+        $this->assertSame(0, DB::table('POSTED_TO_OFFICE_DATA')->count());
+    }
 }

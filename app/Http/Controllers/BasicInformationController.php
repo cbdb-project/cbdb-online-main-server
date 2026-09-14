@@ -16,6 +16,7 @@ use App\Services\CharVariantMapService;
 use App\Services\NameSearchIndexService;
 use App\Services\PersonBrowserService;
 use App\Support\CompositePrimaryKey;
+use App\Support\UnknownPerson;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -1713,6 +1714,40 @@ class BasicInformationController extends Controller {
         return false;
     }
 
+    /**
+     * 複製工具用的「未詳人物髒列」跳過器（計畫 7-U2）。
+     *
+     * `Duplicate_Collateral_Info()` 逐列複製 KIN_DATA／ASSOC_DATA。歷史資料裡存在
+     * 「對象是 personid 0」或「擁有者是 personid 0」的髒列——那是一條指向不存在人物的邊。
+     * 原樣複製等於**憑空多產生一條**同樣的髒邊（而且是在今天、掛在一個剛建立的人物底下），
+     * 所以在這裡擋掉。v2 的 create／update 路徑已由
+     * `Services\Mutations\Concerns\BlocksUnknownPersonRelations` 擋住，這裡是最後一條漏網。
+     *
+     * **跳過而非整批拒絕**，理由與上面的異體字去重器相同：複製是便利功能，少複製一條本來
+     * 就壞掉的列，比讓整個複製對這些人物永久失敗好；且原始資料完全不動，髒列仍留在原處
+     * 可供日後清理。跳過會記 `Log::warning`，否則沒人知道少了什麼。
+     *
+     * 檢查的是**沒有被改寫成 $new_id 的那一側**：正向迴圈改寫 c_personid，所以查對象欄；
+     * 鏡像迴圈改寫對象欄，所以查 c_personid。-999 與 0 同義，一併視為未詳。
+     *
+     * @param array<string,mixed> $row    已改寫好新人物 id 的列
+     * @param string              $column 要檢查的那一側欄名
+     */
+    protected function shouldSkipUnknownPersonRelationRow(string $table, array $row, string $column): bool {
+        $value = $row[$column] ?? null;
+        if (!UnknownPerson::isUnknown($value)) {
+            return false;
+        }
+
+        Log::warning('複製時跳過指向「未詳」人物的關係列', [
+            'table' => $table,
+            'column' => $column,
+            'value' => $value,
+        ]);
+
+        return true;
+    }
+
     public function Duplicate_Collateral_Info($id) {
         if (!Auth::check()) {
             flash('請登入後編輯 @ '.Carbon::now(), 'error');
@@ -1720,6 +1755,16 @@ class BasicInformationController extends Controller {
             return redirect()->back();
         } elseif (!Auth::user()->canWriteDirectly()) {
             flash('該用戶沒有權限，請聯絡管理員 @ '.Carbon::now(), 'error');
+
+            return redirect()->back();
+        }
+
+        // 複製「未詳」人物本身：兩個鏡像迴圈是 WHERE c_kin_id = $id / c_assoc_id = $id，
+        // $id = 0 會撈出**全庫所有指向未詳的髒邊**、把它們全部重新指向新建人物並批次 insert。
+        // 逐列守衛擋不住（那一側的 c_personid 是合法人物），只能在入口擋。
+        // 排在授權**之後**：擺在前面會讓無直寫權的使用者看到「未詳人物不能複製」而不是權限拒絕。
+        if (UnknownPerson::isUnknown($id)) {
+            flash('「未詳」人物不能複製 @ '.Carbon::now(), 'error');
 
             return redirect()->back();
         }
@@ -1850,6 +1895,10 @@ class BasicInformationController extends Controller {
                 // operations／audit 的 resource_id 與 row_pk 組裝（BIOG_SOURCE_DATA 的 c_pages、
                 // ASSOC_DATA 的 c_text_title 都是文本型主鍵成員，三者必須看到同一個字形）。
                 $kin_data = CharVariantMapService::replaceRow($kin_data, 'KIN_DATA')['data'];
+                // 正向：擁有者已改寫為新人物，對象欄照抄，可能是歷史 0 髒列。
+                if ($this->shouldSkipUnknownPersonRelationRow('KIN_DATA', $kin_data, 'c_kin_id')) {
+                    continue;
+                }
                 if ($this->shouldSkipDuplicateAfterVariantReplacement('KIN_DATA', $kin_data, $seenKeys)) {
                     continue;
                 }
@@ -1888,6 +1937,10 @@ class BasicInformationController extends Controller {
                 // operations／audit 的 resource_id 與 row_pk 組裝（BIOG_SOURCE_DATA 的 c_pages、
                 // ASSOC_DATA 的 c_text_title 都是文本型主鍵成員，三者必須看到同一個字形）。
                 $kin_data = CharVariantMapService::replaceRow($kin_data, 'KIN_DATA')['data'];
+                // 鏡像：對象欄已改寫為新人物，擁有者照抄，可能是歷史 0 髒列。
+                if ($this->shouldSkipUnknownPersonRelationRow('KIN_DATA', $kin_data, 'c_personid')) {
+                    continue;
+                }
                 if ($this->shouldSkipDuplicateAfterVariantReplacement('KIN_DATA', $kin_data, $seenKeys)) {
                     continue;
                 }
@@ -1932,6 +1985,10 @@ class BasicInformationController extends Controller {
                 // operations／audit 的 resource_id 與 row_pk 組裝（BIOG_SOURCE_DATA 的 c_pages、
                 // ASSOC_DATA 的 c_text_title 都是文本型主鍵成員，三者必須看到同一個字形）。
                 $assoc_data = CharVariantMapService::replaceRow($assoc_data, 'ASSOC_DATA')['data'];
+                // 正向：擁有者已改寫為新人物，對象欄照抄，可能是歷史 0 髒列。
+                if ($this->shouldSkipUnknownPersonRelationRow('ASSOC_DATA', $assoc_data, 'c_assoc_id')) {
+                    continue;
+                }
                 if ($this->shouldSkipDuplicateAfterVariantReplacement('ASSOC_DATA', $assoc_data, $seenKeys)) {
                     continue;
                 }
@@ -1988,6 +2045,10 @@ class BasicInformationController extends Controller {
                 // operations／audit 的 resource_id 與 row_pk 組裝（BIOG_SOURCE_DATA 的 c_pages、
                 // ASSOC_DATA 的 c_text_title 都是文本型主鍵成員，三者必須看到同一個字形）。
                 $assoc_data = CharVariantMapService::replaceRow($assoc_data, 'ASSOC_DATA')['data'];
+                // 鏡像：對象欄已改寫為新人物，擁有者照抄，可能是歷史 0 髒列。
+                if ($this->shouldSkipUnknownPersonRelationRow('ASSOC_DATA', $assoc_data, 'c_personid')) {
+                    continue;
+                }
                 if ($this->shouldSkipDuplicateAfterVariantReplacement('ASSOC_DATA', $assoc_data, $seenKeys)) {
                     continue;
                 }

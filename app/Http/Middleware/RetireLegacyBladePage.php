@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -26,6 +27,10 @@ use Illuminate\Support\Facades\Route;
  * ⚠️ **302 不是 301**：觀察期必須用暫時導向。301 會被瀏覽器與 CDN 長期快取，
  * `git revert` 只還原伺服器——已經收到 301 的 client 未必會再請求舊 URL，
  * 「可逆」在 301 之下並不成立。確定永久下架後才在環節 4 升級。
+ *
+ * ⚠️ **controller middleware 排在 route middleware 之後**，所以本閘門會先跑：未登入的
+ * legacy 非 GET 請求現在拿到 410 而不是 302 導向 `/login`（例：`PUT /manage/1`）。
+ * 不是安全問題（410 不洩漏任何資訊），但與封路前的行為不同，值得知道。
  *
  * ⚠️ CSRF 順序：`VerifyCsrfToken` 屬 `web` group、跑在本 middleware **之前**，
  * 所以真實世界未帶 token 的 legacy POST 會先拿到 419 而不是 410（測試環境跳過 CSRF
@@ -58,7 +63,15 @@ class RetireLegacyBladePage {
         // 目標路由不存在時放行原 controller，而不是 500。這是 fail-open 的刻意選擇：
         // 封路只是過渡手段，若因設定錯誤導向不到目標，讓使用者看到（仍在的）舊頁
         // 遠優於整頁 500。
+        //
+        // 但**不能靜默**：日後誰把某條 app.* 路由改名，production 就會無聲復活一個 Blade
+        // 頁——沒有 500、沒有 log、測試也不會紅。記一筆 warning 把「靜默」換成「可觀測」。
         if (!Route::has($target)) {
+            Log::warning('legacy.page 導向目標路由不存在，已放行原 legacy 頁面', [
+                'target' => $target,
+                'uri' => $request->path(),
+            ]);
+
             return $next($request);
         }
 

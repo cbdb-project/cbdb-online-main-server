@@ -423,7 +423,7 @@ class CrowdsourcingController extends Controller {
 
         }
 
-        return redirect()->route('crowdsourcing.index');
+        return redirect()->route('app.crowdsourcing.index');
     }
 
     public function reject($id) {
@@ -440,6 +440,6 @@ class CrowdsourcingController extends Controller {
         DB::table('operations')->where('id', $id)->update(['crowdsourcing_status' => 3, 'updated_at' => $updated_at]);
         flash('Reject success @ '.Carbon::now(), 'success');
 
-        return redirect()->route('crowdsourcing.index');
+        return redirect()->route('app.crowdsourcing.index');
     }
 }

@@ -117,7 +117,7 @@ class CodesProposalEditInertiaTest extends TestCase {
                 'code_id' => 5,
                 'description' => 'edited proposal',
             ])
-            ->assertRedirect(route('operations.index', ['proposals_only' => 1]));
+            ->assertRedirect(route('app.operations.index', ['proposals_only' => 1]));
 
         $op = DB::table('operations')->find($opId);
         $this->assertStringContainsString('edited proposal', $op->resource_data);
@@ -130,7 +130,7 @@ class CodesProposalEditInertiaTest extends TestCase {
 
         $this->actingAs($user)
             ->delete(route('app.codes.proposals.cancel', ['table_name' => 'TEST_PROP_CODES', 'operation' => $opId]), ['reason' => '撤回測試'])
-            ->assertRedirect(route('operations.index', ['proposals_only' => 1]));
+            ->assertRedirect(route('app.operations.index', ['proposals_only' => 1]));
 
         $op = DB::table('operations')->find($opId);
         $this->assertStringContainsString('cancelled', $op->resource_data);

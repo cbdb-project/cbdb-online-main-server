@@ -865,7 +865,7 @@ class CodesController extends Controller {
         if ($this->isReadOnlyTable($table)) {
             flash('該代碼表為只讀，禁止編輯。', 'warning');
 
-            return redirect()->route('codes.show', ['table_name' => $table]);
+            return redirect()->route('app.codes.show', ['table_name' => $table]);
         }
         if ($table) {
             try {
@@ -917,7 +917,7 @@ class CodesController extends Controller {
 
         }
 
-        return redirect()->route('codes.index');
+        return redirect()->route('app.codes.index');
     }
 
     /**
@@ -1425,7 +1425,7 @@ class CodesController extends Controller {
         if ($this->isReadOnlyTable($table)) {
             flash('該代碼表為只讀，禁止新增。', 'warning');
 
-            return redirect()->route('codes.show', ['table_name' => $table]);
+            return redirect()->route('app.codes.show', ['table_name' => $table]);
         }
         $columns = $this->getTableColumns($table);
         $keyColumns = $this->getKeyColumns($table);
@@ -1763,7 +1763,7 @@ class CodesController extends Controller {
         flash('提案內容已更新，等待審核 @ '.Carbon::now(), 'success');
         $this->flashVariantNotices($variantReplaced);
 
-        return redirect()->route('operations.index', ['proposals_only' => 1]);
+        return redirect()->route('app.operations.index', ['proposals_only' => 1]);
     }
 
     public function proposalCancel(Request $request, $table_name, $operationId) {
@@ -1794,7 +1794,7 @@ class CodesController extends Controller {
 
         flash('提案已撤回 @ '.Carbon::now(), 'info');
 
-        return redirect()->route('operations.index', ['proposals_only' => 1]);
+        return redirect()->route('app.operations.index', ['proposals_only' => 1]);
     }
 
     //20210315增加table_name等於SOCIAL_INSTITUTION_CODES的例外判斷式，將預設自動增加的$id遮除。
@@ -3068,7 +3068,7 @@ class CodesController extends Controller {
         if ($this->isReadOnlyTable($table)) {
             flash('該代碼表為只讀，禁止編輯或提案。', 'warning');
 
-            return redirect()->route('codes.show', ['table_name' => $table]);
+            return redirect()->route('app.codes.show', ['table_name' => $table]);
         }
 
         return null;

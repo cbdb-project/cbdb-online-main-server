@@ -1380,7 +1380,7 @@ class OperationsController extends Controller {
             flash(__('operations.restore_failed', ['error' => $e->getMessage(), 'time' => Carbon::now()]), 'error');
         }
 
-        return redirect()->route('operations.index');
+        return redirect()->route('app.operations.index');
     }
 
     protected function performRestore(Operation $operation) {

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -21,6 +22,11 @@ use Tests\TestCase;
  * 同時釘住一條紅線：**審計不得記錄密碼雜湊或 token 明文／雜湊**。洩漏的審計日誌不該
  * 變成第二個憑證來源。
  */
+/**
+ * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
+ * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
+ */
+#[Group('legacy-parity')]
 class SecurityAuditLogTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();

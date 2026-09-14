@@ -9,10 +9,16 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\SeedsPinyinDictionary;
 use Tests\TestCase;
 
+/**
+ * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
+ * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
+ */
+#[Group('legacy-parity')]
 class AdminBatchLoadSocialInstitutesTest extends TestCase {
     use SeedsPinyinDictionary;
 

@@ -6,9 +6,15 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
+/**
+ * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
+ * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
+ */
+#[Group('legacy-parity')]
 class UserProfileTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
@@ -91,7 +97,7 @@ class UserProfileTest extends TestCase {
             'avatar' => 'avatar0.png',
         ]);
 
-        $response->assertRedirect('/profile');
+        $response->assertRedirect('/app/profile');
         $response->assertSessionHas('success');
 
         $user->refresh();
@@ -121,7 +127,7 @@ class UserProfileTest extends TestCase {
             'new_password_confirmation' => 'newpassword',
         ]);
 
-        $response->assertRedirect('/profile');
+        $response->assertRedirect('/app/profile');
         $response->assertSessionHas('success');
 
         $user->refresh();
@@ -258,7 +264,7 @@ class UserProfileTest extends TestCase {
             'avatar' => 'avatar0.png',
         ]);
 
-        $response->assertRedirect('/profile');
+        $response->assertRedirect('/app/profile');
         $response->assertSessionHas('success');
 
         $user->refresh();
@@ -327,7 +333,7 @@ class UserProfileTest extends TestCase {
             'avatar' => 'avatar0.png',
         ]);
 
-        $response->assertRedirect('/profile');
+        $response->assertRedirect('/app/profile');
         $response->assertSessionHas('success');
 
         $user->refresh();
@@ -353,7 +359,7 @@ class UserProfileTest extends TestCase {
             'avatar' => 'avatar10.png',
         ]);
 
-        $response->assertRedirect('/profile');
+        $response->assertRedirect('/app/profile');
         $response->assertSessionHas('success');
 
         $user->refresh();
@@ -453,7 +459,7 @@ class UserProfileTest extends TestCase {
             'avatar' => 'avatar0.png',
         ]);
 
-        $response->assertRedirect('/profile');
+        $response->assertRedirect('/app/profile');
         $response->assertSessionHas('success');
 
         $user->refresh();
@@ -470,7 +476,7 @@ class UserProfileTest extends TestCase {
                 'avatar' => $avatarName,
             ]);
 
-            $response->assertRedirect('/profile');
+            $response->assertRedirect('/app/profile');
             $response->assertSessionHas('success');
 
             $user->refresh();

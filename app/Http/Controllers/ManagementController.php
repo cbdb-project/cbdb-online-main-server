@@ -186,7 +186,7 @@ class ManagementController extends Controller {
         if (!$user) {
             flash('用戶不存在 @ '.Carbon::now(), 'error');
 
-            return redirect()->route('manage.index');
+            return redirect()->route('app.manage.index');
         }
 
         return view('manage.edit', [
@@ -254,7 +254,7 @@ class ManagementController extends Controller {
         if (!$user) {
             flash('用戶不存在 @ '.Carbon::now(), 'error');
 
-            return redirect()->route('manage.index');
+            return redirect()->route('app.manage.index');
         }
 
         return $this->performUserUpdate($request, $user, 'manage.index');

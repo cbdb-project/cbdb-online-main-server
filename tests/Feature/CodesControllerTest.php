@@ -12,9 +12,15 @@ use Illuminate\Database\QueryException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
+/**
+ * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
+ * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
+ */
+#[Group('legacy-parity')]
 class CodesControllerTest extends TestCase {
     protected $operationSpy;
     protected $originalDb;
@@ -1084,10 +1090,10 @@ class CodesControllerTest extends TestCase {
             'updated_at' => Carbon::now()->format('Y-m-d H:i:s'),
         ]);
 
-        $response = $this->from(route('operations.index', ['proposals_only' => 1]))
+        $response = $this->from(route('app.operations.index', ['proposals_only' => 1]))
             ->delete(route('codes.proposals.cancel', ['table_name' => 'TEST_CODES', 'operation' => 4]));
 
-        $response->assertRedirect(route('operations.index', ['proposals_only' => 1]));
+        $response->assertRedirect(route('app.operations.index', ['proposals_only' => 1]));
 
         $row = DB::table('operations')->first();
         $stored = json_decode($row->resource_data, true);
@@ -1142,7 +1148,7 @@ class CodesControllerTest extends TestCase {
                 '__proposal_comment' => 'Updated info',
             ]);
 
-        $response->assertRedirect(route('operations.index', ['proposals_only' => 1]));
+        $response->assertRedirect(route('app.operations.index', ['proposals_only' => 1]));
 
         $row = DB::table('operations')->first();
         $this->assertNotNull($row);
@@ -1187,7 +1193,7 @@ class CodesControllerTest extends TestCase {
             ->patch(route('codes.proposals.update', ['table_name' => 'TEXT_CODES', 'operation' => 8]), [
                 'c_textid' => 'T500',
                 'c_title' => 'Lvzhai',
-            ])->assertRedirect(route('operations.index', ['proposals_only' => 1]));
+            ])->assertRedirect(route('app.operations.index', ['proposals_only' => 1]));
 
         $stored = json_decode(DB::table('operations')->first()->resource_data, true);
         $this->assertSame('Lüzhai', $stored['c_title']); // 提案 payload 已歸一化

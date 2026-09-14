@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -13,6 +14,11 @@ use Tests\TestCase;
  * 既有的增修／稽核／列表機制對這張新表同樣生效（不需要新寫稽核邏輯）。
  * 見 docs/CHAR_VARIANT_MAP_CALL_SITE_WIRING_PLAN.md 步驟 6。
  */
+/**
+ * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
+ * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
+ */
+#[Group('legacy-parity')]
 class CodesCharVariantMapAuditTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();

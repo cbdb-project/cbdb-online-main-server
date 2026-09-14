@@ -1874,7 +1874,15 @@ class CodesController extends Controller {
     public function appStore(Request $request, $table_name) {
         $table = $this->guardTable($table_name);
 
-        // 編輯頁尚未遷移（P2-4），成功後暫導向 app.codes.show。
+        // 📌 這裡把 app.codes.show 同時當 $showRoute 與 $editRoute，於是**新增成功後落在列表頁**，
+        // 而 Blade 版（store()）落在新列的編輯頁。原註解寫「編輯頁尚未遷移（P2-4），成功後暫導向
+        // app.codes.show」——那個前提早已不成立（`app.codes.edit` 存在且有 CodesEditInertiaTest
+        // 覆蓋），所以這不再是「暫時」，而是現行行為。
+        // 🔴 副作用：performStore() 一律傳 ['table_name' => …, 'id' => $id]，而 app.codes.show
+        // 沒有 {id} 路徑段 ⇒ 實際落在 /app/codes/{table}?id={新列的 id}，多帶一個列表頁
+        // 不使用的 query 參數。現行行為（含那個參數）已由
+        // CodesCreateInertiaTest::store_inserts_row_and_redirects 指名釘住
+        // （Blade 下架環節 4b-2b）。要不要改回落在編輯頁是產品決定；改之前先看那條測試。
         return $this->performStore($request, $table, 'app.codes.show', 'app.codes.show');
     }
 

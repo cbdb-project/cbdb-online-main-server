@@ -111,6 +111,23 @@ class CodesCreateInertiaTest extends TestCase {
                 ->where('tier2_fields', ['c_name']));
     }
 
+    /**
+     * ⚠️ **重導目標要指名，不要用裸 `assertRedirect()`**（Blade 下架環節 4b-2b，codex 查出）：
+     * `$showRoute`／`$editRoute` 這兩個字串是 Blade／app 薄殼**唯一**的差別，而
+     * `RouteActionsExistTest` 只檢查「方法存在」、**抓不到 route name 寫錯**。目前它們靠仍是
+     * legacy-parity 的 `CodesControllerTest` 釘著，那批在環節 4b-2c 退役後就只剩這裡。
+     *
+     * 這裡釘的是**現行行為**：`appStore()` 把 `app.codes.show` 同時當 `$showRoute` 與
+     * `$editRoute`，所以新增成功後落在**列表頁**（Blade 版落在新列的編輯頁）。那個差異是
+     * 既有的、`appStore()` 的舊註解說「編輯頁尚未遷移所以暫導向 show」但前提早已不成立。
+     * **要不要改回落在編輯頁是產品決定，不在本環節**；在改之前，先讓它不會被無聲改掉。
+     *
+     * 🔴 **指名之後才看見的副作用**：`performStore()` 一律傳
+     * `['table_name' => …, 'id' => $id]`，而 `app.codes.show` **沒有 `{id}` 路徑段**
+     * ⇒ 新增成功後實際落在 **`/app/codes/{table}?id=42`**，多帶一個列表頁不使用的
+     * query 參數。這是上面那條過期接線留下的痕跡（Blade 的 `codes.edit` 吃得下 `{id}`，
+     * `app.codes.show` 吃不下）。一併釘住，改接線時才會看見它消失。
+     */
     #[Test]
     public function store_inserts_row_and_redirects(): void {
         $this->actingAs($this->activeUser())
@@ -118,7 +135,7 @@ class CodesCreateInertiaTest extends TestCase {
                 'code_id' => 42,
                 'description' => 'answer',
             ])
-            ->assertRedirect();
+            ->assertRedirect(route('app.codes.show', ['table_name' => 'TEST_CREATE_CODES', 'id' => 42]));
 
         $this->assertDatabaseHas('TEST_CREATE_CODES', ['code_id' => 42, 'description' => 'answer']);
     }

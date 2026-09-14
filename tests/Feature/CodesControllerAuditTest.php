@@ -5,26 +5,22 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * §D-2：/codes 直寫路徑（store/update/destroy）補寫 audit_log，使 UI 與 v2 API 審計一致。
+ * §D-2：codes 直寫路徑（store/update/destroy）補寫 audit_log，使 UI 與 v2 API 審計一致。
+ *
+ * ── 2026-09-14（Blade 下架環節 4b-2b）─────────────────────────
+ * 原本打 legacy `/codes/*`；改打 `/app/codes/*` 後 3 條全綠、零斷言改動（`performStore`／
+ * `performUpdate`／`performDestroy` 是 Blade 與 React 共用的同一份實作）。
+ * 鑑別力已重新驗證（改壞生產碼、跑測試、還原）：把 `recordOperation()` 尾端那段
+ * `audit_log` 寫入短路掉 ⇒ 本檔 2 條紅（連同 `CodesCharVariantMapAuditTest` 共 4 條）；
+ * 拆掉 `performDestroy()` 開頭的「刪除已停用」護欄 ⇒ 第 3 條紅。
  */
-/**
- * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
- * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
- */
-#[Group('legacy-parity')]
 class CodesControllerAuditTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
-
-        // 本類驗的是 legacy Blade 頁的行為。Blade 下架計畫環節 3「先封路、不刪碼」把那些
-        // 路由改成 302／410，但頁面本身還在、還部署著、還能被 kill switch 叫回來，
-        // 所以這份覆蓋在觀察期內仍有意義——局部關閉封路即可。環節 4 實體刪除時一併移除。
-        $this->useLegacyBladePages();
 
         $compiled = sys_get_temp_dir().'/cbdb-test-views-codes-audit';
         if (!is_dir($compiled)) {
@@ -96,7 +92,7 @@ class CodesControllerAuditTest extends TestCase {
     public function store_writes_audit_log_insert(): void {
         $this->actingAs($this->activeUser());
 
-        $this->post('/codes/TEST_AUDIT_CODES', ['code_id' => 7, 'description' => 'hello']);
+        $this->post('/app/codes/TEST_AUDIT_CODES', ['code_id' => 7, 'description' => 'hello']);
 
         $audit = DB::table('audit_log')->where('table_name', 'TEST_AUDIT_CODES')->first();
         $this->assertNotNull($audit);
@@ -112,7 +108,7 @@ class CodesControllerAuditTest extends TestCase {
         $this->actingAs($this->activeUser());
         DB::table('TEST_AUDIT_CODES')->insert(['code_id' => 8, 'description' => 'before']);
 
-        $this->put('/codes/TEST_AUDIT_CODES/8', ['code_id' => 8, 'description' => 'after']);
+        $this->put('/app/codes/TEST_AUDIT_CODES/8', ['code_id' => 8, 'description' => 'after']);
 
         $audit = DB::table('audit_log')->where('operation', 'UPDATE')->first();
         $this->assertNotNull($audit);
@@ -127,7 +123,7 @@ class CodesControllerAuditTest extends TestCase {
         $this->actingAs($this->activeUser());
         DB::table('TEST_AUDIT_CODES')->insert(['code_id' => 9, 'description' => 'doomed']);
 
-        $this->delete('/codes/TEST_AUDIT_CODES/9');
+        $this->delete('/app/codes/TEST_AUDIT_CODES/9');
 
         $this->assertDatabaseHas('TEST_AUDIT_CODES', ['code_id' => 9]);
         $this->assertNull(DB::table('audit_log')->where('operation', 'DELETE')->first());

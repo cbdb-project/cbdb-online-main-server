@@ -78,12 +78,12 @@ handler 的 `changes` 是**使用者意圖**——白名單刻意不含稽核欄
   `superseded_by`、新提案記 `resubmit_of`；handler 拒絕則整筆回滾、舊提案維持待審。
   改版動機：舊流程復用 codes 通用編輯頁，按 Schema **全欄**渲染並整包回寫 `resource_data`，
   會把稽核欄等系統欄以 null 鍵灌進 payload（op 351725 事故——核准重放撞白名單 422 的實際成因）。
-- **撤回**（提案者）：標記 `cancelled`、記錄撤回者／時間／原因。codes 與人物提案走 `codes.proposals.cancel`（以表名為路徑段）；實體聚合提案的 `resource` 是聚合名，走與資源無關的 `DELETE /operations/{operation}/cancel`（`operations.proposals.cancel`），規則相同（登入且啟用、提案人本人、pending／rejected）。
+- **撤回**（提案者）：標記 `cancelled`、記錄撤回者／時間／原因。codes 與人物提案走 **`app.codes.proposals.cancel`**（以表名為路徑段；legacy 的 `codes.proposals.cancel` 已於 Blade 下架環節 4b-1 封成 410）；實體聚合提案的 `resource` 是聚合名，走與資源無關的 `DELETE /operations/{operation}/cancel`（`operations.proposals.cancel`），規則相同（登入且啟用、提案人本人、pending／rejected）。
 - 提案列表：`/operations?proposals_only=1`，可按狀態篩選；行內按鈕依身分顯示。
 
 ## 5. 已知限制
 
-- 「修改提案」的 codes 通用編輯頁（`codes.proposals.*`）仍服務：codes 代碼表提案、`BIOG_MAIN`
+- 「修改提案」的 codes 通用編輯頁（**`app.codes.proposals.*`**，React 版）仍服務：codes 代碼表提案、`BIOG_MAIN`
   提案與 delete 提案（無對應編輯器）。**人物 12 個子資源已改走各自的 edit-v2 編輯器**（見 §4）；
   **實體聚合提案改走各實體的新增／編輯頁**（`?proposal={id}` 預填聚合意圖，實體級刪除提案不出「修改提案」）。
 - 修改提案的預填只涵蓋主表使用者欄位：任官／財產／事件的**地址副表意圖**（存於

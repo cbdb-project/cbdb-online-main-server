@@ -37,8 +37,9 @@ php artisan route:list --json
 > 留著那個 middleware 會讓它的兩條 fail-open 路徑（導向目標不存在時放行、kill switch 關閉時放行）
 > 變成 500 而不是「看到舊頁」。
 >
-> **現況**：封路身分清單 = 35 − 10 = **25**（13 條 GET→302 + 12 條非 GET／空方法→410），
-> 與 `exactly_the_manifested_routes_are_gated()` 寫死的 25 條逐條吻合。
+> **現況**：封路身分清單 = 35 − 10（環節 4a-3 改 closure）+ 8（環節 4b-1 收斂後新封）= **33**
+> （14 條 GET→302 + 19 條寫入端→410），與 `exactly_the_manifested_routes_are_gated()`
+> 寫死的 33 條逐條吻合。「不動」那組因此從 19 條降為 **11 條**。
 > **在正常封路設定下**（`LEGACY_PAGE_RETIREMENT=true`）對外可觀測的行為完全不變：那 10 條裡的
 > **9 條唯讀 GET** 改由 closure 產生同樣的 302（並保留 query string），`POST /merge-preview`
 > 則維持 410（只是從 `legacy.page:gone` 換成 closure 直接 `abort(410)`）。
@@ -49,21 +50,37 @@ php artisan route:list --json
 >
 > 🔴 **那 9 條唯讀頁自此沒有 kill switch 級回退**（`LEGACY_PAGE_RETIREMENT=false` 對它們無作用），
 > 見 `LegacyBladePageRetirementTest::legacy_readonly_pages_redirect_without_the_kill_switch()`。
-> 35 + 19 + 11 = 65，與 `route:list` 實測總數相符——**讀者可以自行驗證有沒有漏**。
+> 環節 3 當時：35 + 19 + 11 = 65，與 `route:list` 實測總數相符。
+> **現況（環節 4a-3 + 4b-1 之後）**：33 封路 + 11 不動 + 10 closure（9 redirect + 1 abort）
+> + 11 不在範圍 = 65，總數不變——**讀者可以自行驗證有沒有漏**。
 
 ---
 
-## 🔴 不動（19 條）
+## 🔴 不動（**11 條**，原 19 條）
+
+> 環節 4b-1 把其中 8 條封掉了（下方 A 類 1 條 + B 類 6 條 + 與 A 同 URI 的 GET proposal-edit）。
 
 **動了就壞。** 這些不是「legacy 殘留」，是現行系統的一部分。
 
-### A. 真的「動了就壞」（1 條）
+### A. 真的「動了就壞」（1 條）✅ **已於環節 4b-1 收斂並封路**
+
+> `OperationsController` 產 payload 那一行已改指 `app.codes.proposals.edit`（React 版早就存在），
+> 所以三條 `codes/{t}/proposals/{op}` 都封起來了：GET→302、PATCH／DELETE→410。
+
 
 | Method | URI | 為什麼 |
 |---|---|---|
-| PATCH | `codes/{table_name}/proposals/{operation}` | `resources/views/codes/proposal-edit.blade.php` 的表單 action 就是它，而**那個 Blade 頁是 React operations 頁的連結目標**（見下方 B 的 `codes.proposals.edit`）。一鎖三條 |
+| PATCH | `codes/{table_name}/proposals/{operation}` | 當時的理由：`codes/proposal-edit.blade.php` 的表單 action 就是它，而那個 Blade 頁是 React operations 頁的連結目標，**一鎖三條**。<br>✅ **環節 4b-1 已收斂**：`OperationsController` 產 payload 的兩行（`urls.edit_proposal` 與 `urls.cancel_proposal`）都改指 `app.codes.proposals.*`，所以這三條全部封起來了（GET→302、PATCH／DELETE→410）。**React 已不再消費任何 legacy `codes.proposals.*` 路由**，4b-4 可以直接刪 |
 
-### B. 刻意留到環節 4（6 條）——封了不會壞，但收斂還沒做
+### B. 刻意留到環節 4（6 條）✅ **已於環節 4b-1 收斂並封路**
+
+> 3 個 batch-load controller 的 `listRouteName()` 已收斂成**一律回 `app.admin.*`**，
+> 所以那 5 條 POST 不再有「多一跳 302 把 flash 吃掉」的問題，已全部封成 410；
+> `DELETE codes/{t}/proposals/{op}` 隨 A 類一起封。
+> ⚠️ 連帶的行為變化：legacy POST 完成後**落在 React 列表**（不再回 Blade 列表）。
+> 三個 legacy 測試檔的 `assertRedirect()` 期望已同步改成 `app.admin.*`——那是收斂**刻意**
+> 造成的，不是回歸；它們 `$this->get(route('admin.batch-load-*'))` 打 Blade 頁的部分**沒有動**。
+
 
 這 6 條的 `app/*` 孿生路由**都存在**，React 打的是 `app/*` 那條，legacy 這條是另一個 route
 object，封它不影響 React。之所以先留著：
@@ -75,18 +92,19 @@ object，封它不影響 React。之所以先留著：
 | POST | `admin/batch-load-book-titles/update-pinyin` | 同上 |
 | POST | `admin/batch-load-offices` | 同上（`AdminBatchLoadOfficesController:58`） |
 | POST | `admin/batch-load-social-institutes` | 同上 |
-| DELETE | `codes/{table_name}/proposals/{operation}` | `app.codes.proposals.cancel` 存在；React ops 頁用的是 `operations/{op}/cancel`（另一個 controller），legacy 這條實際無人呼叫。與 PATCH 同 URI，一起留著避免半封半留造成混淆 |
+| DELETE | `codes/{table_name}/proposals/{operation}` | 🔴 **這一格原本的理由是錯的**：它寫「React ops 頁用的是 `operations/{op}/cancel`，legacy 這條實際無人呼叫」——那**只對實體（entity）提案成立**。`serializeOperationRow()` 的 `urls.cancel_proposal` 是三元式，**else 分支就是 codes 表提案**，走的正是這條 legacy DELETE。環節 4b-1 照抄這句話把它封掉，結果 codes 表提案的提案人無法從 `/app/operations` 撤回自己的提案（410），而且當時**全套測試皆綠**。<br>✅ 已改指 `app.codes.proposals.cancel` 並補上回歸測試 |
 
 > 📌 **可達性低但非零**：legacy 表單頁已被 302，只有「已經開著舊頁的分頁」才送得出這些 POST。
 > 這也是它們排在環節 4b、而不是現在硬封的理由——現在封掉只會讓那種情境從「flash 消失」
 > 變成「410 錯誤頁」，對使用者更糟。
 
-### C. React 正在呼叫的 action endpoint（12 條）——PHP payload 或前端硬編碼
+### C. React 正在呼叫的 action endpoint（**11 條**，原 12 條）——PHP payload 或前端硬編碼
+
+> `GET codes/{table_name}/proposals/{operation}/edit` 那一列已於環節 4b-1 完成收斂並封路，已從本表移除。
 
 | Method | URI | 誰在用 |
 |---|---|---|
 | GET | `codes/{table_name}/export` | `CodesController::appShow()` 硬編碼 `'/codes/'.$table.'/export'` → `Pages/Codes/Show.tsx` 的下載連結；**`app/codes/{table}/export` 路由不存在** |
-| GET | `codes/{table_name}/proposals/{operation}/edit` | `OperationsController.php:1104` 的 `edit_proposal` payload → `Pages/Admin/Operations/Index.tsx` 的「修改提案」。**無 `Route::has()` 保護，刪掉會在產 payload 時拋 `RouteNotFoundException` ⇒ `/app/operations` 整頁 500**。<br>📌 **修法（環節 4 前置，一行）**：`app.codes.proposals.edit` → `CodesController@appProposalEdit`（React 版 `Codes/ProposalEdit`）**早就存在**；把 `OperationsController.php:1104` 改指它，就能同時解鎖本條與上方 A、B 的兩條 `codes/{t}/proposals/{op}` |
 | GET | `crowdsourcing/{id}/confirm` | `CrowdsourcingController.php:183` 的 `confirm_url` → `Pages/Admin/Crowdsourcing/Index.tsx` 的 `<a href>`。🔴 **GET 動詞的寫入端**——按「GET 一律 302」的規則會直接命中它 |
 | GET | `crowdsourcing/{id}/reject` | 同上（`:184` 的 `reject_url`） |
 | POST | `operations/{operation}/approve` | `OperationsController.php:1045` 的 `urls.approve` |
@@ -255,4 +273,5 @@ legacy 頁**立刻復活**——不需重新部署、不需 `git revert`。
 
 觀察期（建議 1–2 週）結束、確認無書籤／外部連結損失後，才進環節 4 的實體刪除。屆時：
 - 302 可升級為 301；
-- 「不動」那 19 條要**逐條處理**：共用方法的 legacy 路由可刪（保留 `app/*` 那條）；React 正在呼叫的要先把 payload 改指 `app/*` 端點（或新建）才能刪。
+- 「不動」那組要**逐條處理**：共用方法的 legacy 路由可刪（保留 `app/*` 那條）；React 正在呼叫的要先把 payload 改指 `app/*` 端點（或新建）才能刪。
+  **環節 4b-1 已處理 8 條**（原 19 → 現 **11**）：3 條 `codes/{t}/proposals/{op}` 與 5 條 batch-load 寫入端。剩下 11 條的消費者仍在（見上方 C 表）。

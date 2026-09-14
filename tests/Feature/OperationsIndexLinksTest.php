@@ -1470,4 +1470,72 @@ class OperationsIndexLinksTest extends TestCase {
 
         $this->assertSame('/app/codes/NIAN_HAO/464/edit', $this->firstResourceLink($user));
     }
+    // ── codes 表提案的 payload URL（環節 4b-1 補的缺口）────────────
+
+    /**
+     * 🔴 codes 表提案的「修改提案」與「撤回」連結都必須指 React 版。
+     *
+     * `serializeOperationRow()` 的 `urls.edit_proposal` 與 `urls.cancel_proposal` 都是三元式，
+     * `$isEntityProposal ? …實體版… : …codes 表版…`。本檔原有 20 幾條實體提案測試只覆蓋
+     * **前半**，else 分支（codes 表提案）**完全沒有測試**——所以環節 4b-1 把
+     * `codes.proposals.cancel` 封成 410 時，「提案人無法從 /app/operations 撤回自己的 codes
+     * 表提案」這個回歸**全套測試皆綠**、是 review 手動實測才抓到的。
+     *
+     * 兩件事一起驗（4a-3 的教訓：只比對字串擋不住封路）：
+     *  ① payload URL 的字串等於 React 版；
+     *  ② **實際打那兩個 URL**，確認不是 410／404——字串對了但路由被封掉，使用者一樣點不動。
+     */
+    #[Test]
+    public function test_code_table_proposal_urls_point_at_the_react_endpoints_and_are_reachable(): void {
+        config(['migration_flags.pages.codes' => 'new']);
+        $user = $this->activeUser('codes-proposal-urls@example.com');
+
+        $operation = Operation::create([
+            'user_id' => $user->id,
+            'c_personid' => 0,
+            'op_type' => Operation::TYPE_PROPOSAL_UPDATE,
+            'resource' => 'NIAN_HAO',
+            'resource_id' => 'c_nianhao_id=464',
+            'resource_data' => json_encode([
+                'c_nianhao_id' => 464,
+                'c_nianhao_chn' => '提案年號',
+                '__key_columns' => ['c_nianhao_id'],
+                '__review_status' => 'pending',
+                '__proposal_meta' => [
+                    'submitted_by' => $user->name,
+                    'submitted_by_id' => $user->id,
+                    'submitted_at' => '2026-09-01 00:00:00',
+                ],
+            ], JSON_UNESCAPED_UNICODE),
+            'resource_original' => json_encode(['c_nianhao_id' => 464, 'c_nianhao_chn' => '原年號'], JSON_UNESCAPED_UNICODE),
+            'crowdsourcing_status' => 0,
+        ]);
+
+        \DB::table('NIAN_HAO')->insert(['c_nianhao_id' => 464, 'c_nianhao_chn' => '原年號']);
+
+        $urls = $this->firstRow($user, '?proposals_only=1')['urls'];
+
+        // ① 字串：兩條都要指 /app/...
+        $this->assertSame(
+            '/app/codes/NIAN_HAO/proposals/'.$operation->id.'/edit',
+            $urls['edit_proposal'] ?? null,
+            'codes 表提案的「修改提案」必須指 React 版——legacy 那條在環節 4b-1 已封成 302'
+        );
+        $this->assertSame(
+            '/app/codes/NIAN_HAO/proposals/'.$operation->id,
+            $urls['cancel_proposal'] ?? null,
+            'codes 表提案的「撤回」必須指 React 版——legacy 那條在環節 4b-1 已封成 410'
+        );
+
+        // ② 真的打得動：修改提案頁要開得出來。
+        $this->actingAs($user)->get($urls['edit_proposal'])->assertOk();
+
+        // 撤回要真的撤掉（而不是 410）。它結尾 redirect 回 React operations 頁。
+        $this->actingAs($user)
+            ->delete($urls['cancel_proposal'])
+            ->assertRedirect(route('app.operations.index', ['proposals_only' => 1], false));
+
+        $payload = json_decode((string) $operation->fresh()->resource_data, true);
+        $this->assertSame('cancelled', $payload['__review_status'] ?? null, '撤回應把提案標成 cancelled');
+    }
 }

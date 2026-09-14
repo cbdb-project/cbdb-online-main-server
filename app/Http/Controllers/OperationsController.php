@@ -1027,9 +1027,16 @@ class OperationsController extends Controller {
                 'edit_proposal' => $isEntityProposal
                     ? $this->entityProposalEditUrl($item, $resourceDataParsed)
                     : $this->buildProposalEditUrl($item, $resourceName, $resourceDataParsed),
+                // ⚠️ 這個三元式的 **else 分支是 codes 表提案**（$isEntityProposal 只在
+                // resource_data.__entity_aggregate === true 時為真）。原本它指 legacy
+                // `codes.proposals.cancel`——manifest 曾寫「legacy 這條實際無人呼叫」，那句話
+                // **只對 entity 提案成立**，漏看了這一半。環節 4b-1 封掉那條 DELETE 之後，
+                // codes 表提案的提案人在 /app/operations 按「撤回」會拿到 410。
+                // `CodesController@proposalCancel` 是新舊共用 method、結尾無條件 redirect 到
+                // app.operations.index，所以改指 React 版是乾淨的 drop-in。
                 'cancel_proposal' => $isEntityProposal
                     ? route('operations.proposals.cancel', $item->id, false)
-                    : route('codes.proposals.cancel', ['table_name' => $resourceName, 'operation' => $item->id], false),
+                    : route('app.codes.proposals.cancel', ['table_name' => $resourceName, 'operation' => $item->id], false),
             ],
         ];
     }
@@ -1081,7 +1088,12 @@ class OperationsController extends Controller {
             return route($routeName, $params, false);
         }
 
-        return route('codes.proposals.edit', ['table_name' => $resourceName, 'operation' => $item->id], false);
+        // 指 React 版（`Codes/ProposalEdit`）。這一行**沒有 `Route::has()` 保護**，所以它指向的
+        // 路由一旦消失就會拋 RouteNotFoundException、讓 `/app/operations` 整頁 500。
+        // 原本指 legacy `codes.proposals.edit`，等於把整個 React operations 頁繫在一條 legacy
+        // 路由上（manifest 的 A 類「動了就壞」就是這條）。改指 `app.codes.proposals.edit` 之後，
+        // 三條 `codes/{t}/proposals/{op}` 才能在環節 4b 安全下架。
+        return route('app.codes.proposals.edit', ['table_name' => $resourceName, 'operation' => $item->id], false);
     }
 
     /**

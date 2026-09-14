@@ -27,7 +27,8 @@
 供 `serializeOperationRow` 共用；defense.blade.php 守衛重複定義時自動略過，行為一致。
 
 ## 寫入路徑安全
-所有寫入端點（`operations.restore`、`operations.proposals.approve/reject`、`codes.proposals.edit/cancel`）**完全未改動**。
+所有寫入端點（`operations.restore`、`operations.proposals.approve/reject`、`codes.proposals.edit/cancel`）在當時**完全未改動**。
+📌 **後續**：`codes.proposals.edit/update/cancel` 已於 Blade 下架環節 4b-1 封路（GET→302、PATCH／DELETE→410），payload 改指 `app.codes.proposals.*`；`operations.*` 那幾條仍未改動。
 React 動作按鈕以 Inertia `router.post`/`router.delete` 對既有端點送出（CSRF 自動處理），處理後 redirect 回列表。
 
 ## 版面 parity

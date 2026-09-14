@@ -19,6 +19,19 @@ use Tests\TestCase;
  * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
  */
 #[Group('legacy-parity')]
+/**
+ * ⚠️ **環節 4b-1 收斂**：`listRouteName()` 原本依 `$request->is('app/*')` 二選一，現在**一律**
+ * 回傳 `app.admin.*`。理由：環節 3 把 legacy GET 封成 302 之後，legacy POST 完成 → redirect 到
+ * legacy 列表 → 再被封路 302 ⇒ 多一跳，而 `laracasts/flash` 只活一個請求，所以匯入結果的
+ * 成功／失敗提示會被 session 老化掉、**靜默消失**。
+ *
+ * 所以本檔的 `assertRedirect(route('admin.batch-load-offices'))` 都改成 `app.admin.batch-load-offices`
+ * ——那是收斂**刻意造成**的行為變化，不是回歸。
+ *
+ * ⚠️ 只改 `assertRedirect(...)`：其餘 `$this->get(route('admin.batch-load-offices'))` 是**刻意**打
+ * legacy Blade 頁（本檔以 useLegacyBladePages() 局部關閉封路），要驗的正是 Blade 的渲染，
+ * 不能一併改掉。本檔的完整分流留到 4b 的測試分流階段。
+ */
 class AdminBatchLoadOfficesTest extends TestCase {
     use SeedsPinyinDictionary;
 
@@ -198,7 +211,7 @@ class AdminBatchLoadOfficesTest extends TestCase {
             'entries' => "宗人府供事\tClerk in the Imperial Clan Court\t清\t200501\t宗人府\t4763",
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-offices'));
+        $response->assertRedirect(route('app.admin.batch-load-offices'));
 
         $record = DB::table('OFFICE_CODES')->first();
         $this->assertNotNull($record);
@@ -242,7 +255,7 @@ class AdminBatchLoadOfficesTest extends TestCase {
             'entries' => "宗人府供事\tClerk in the Imperial Clan Court\t清\t999999\t宗人府\t4763",
         ]);
 
-        $response->assertRedirect(route('admin.batch-load-offices'));
+        $response->assertRedirect(route('app.admin.batch-load-offices'));
         $response->assertSessionHas('batch_errors');
 
         $this->assertSame(0, DB::table('OFFICE_CODES')->count());
@@ -288,7 +301,7 @@ class AdminBatchLoadOfficesTest extends TestCase {
 
         $this->post(route('admin.batch-load-offices.store'), [
             'entries' => "宗人府供事\tClerk\t淸\t200501\t宗人府\t4763",
-        ])->assertRedirect(route('admin.batch-load-offices'));
+        ])->assertRedirect(route('app.admin.batch-load-offices'));
 
         $this->assertDatabaseHas('OFFICE_CODES', ['c_office_id' => 1, 'c_dy' => 20]);
     }
@@ -305,7 +318,7 @@ class AdminBatchLoadOfficesTest extends TestCase {
 
         $this->post(route('admin.batch-load-offices.store'), [
             'entries' => "宗人府供事\tClerk\t清\t200501\t宗人府\t4763",
-        ])->assertRedirect(route('admin.batch-load-offices'));
+        ])->assertRedirect(route('app.admin.batch-load-offices'));
 
         $this->assertDatabaseHas('OFFICE_CODES', ['c_office_id' => 1, 'c_dy' => 20]);
     }
@@ -323,7 +336,7 @@ class AdminBatchLoadOfficesTest extends TestCase {
 
         $this->post(route('admin.batch-load-offices.store'), [
             'entries' => "淸吏司\tClerk\t清\t200501\t宗人府\t4763",
-        ])->assertRedirect(route('admin.batch-load-offices'));
+        ])->assertRedirect(route('app.admin.batch-load-offices'));
 
         $record = DB::table('OFFICE_CODES')->first();
         $this->assertSame('清吏司', $record->c_office_chn, '職名應以參考形落庫');

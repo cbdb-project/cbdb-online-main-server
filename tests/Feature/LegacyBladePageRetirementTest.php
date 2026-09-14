@@ -15,12 +15,13 @@ use Tests\TestCase;
  * 環節 3「先封路、不刪碼」的行為契約。
  *
  * 對應 docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md：A-1…A-17 的 legacy 顯示頁 302
- * 導向 `/app` 對應頁、legacy 寫入端 410 Gone，而 **19 條「不動」的路由完好無損**。
+ * 導向 `/app` 對應頁、legacy 寫入端 410 Gone，而 **11 條「不動」的路由完好無損**
+ * （環節 3 當時是 19 條，環節 4b-1 收斂後把其中 8 條也封掉了）。
  *
  * 這一檔的重點不是「導向有沒有成功」，而是**三件容易做錯的事**：
  *
  *  1. **不能按 URI prefix 套規則**。同一個 URI 的不同 method 處置不同——`admin/explainsql`
- *     的 GET 要導向、POST 要 410；`codes/{t}/proposals/{op}` 的 PATCH/DELETE 是新舊共用、
+ *     的 GET 要導向、POST 要 410；`codes/{table_name}/export` 是 React 自己在呼叫的端點、
  *     完全不能動。下面的「不動」清單就是這件事的護欄。
  *  2. **GET 不等於唯讀**。`crowdsourcing/{id}/confirm|reject` 是 **GET 動詞的寫入端**，
  *     而且 React 正以 `<a href>` 呼叫它們；按「GET 一律導向」會直接把審核功能導掉。
@@ -82,6 +83,10 @@ class LegacyBladePageRetirementTest extends TestCase {
      */
     public static function gatedDisplayPageProvider(): array {
         return [
+            // 環節 4b-1 收斂後才封得起來：它是 React operations 頁「修改提案」連結的目標，
+            // 而 OperationsController 產那個 payload 時**沒有 Route::has() 保護**——
+            // 所以得先把那一行改指 app.codes.proposals.edit 才能封這條。
+            'codes proposal edit' => ['/codes/ADDR_CODES/proposals/1/edit', '/app/codes/ADDR_CODES/proposals/1/edit'],
             'profile' => ['/profile', '/app/profile'],
             'codes index' => ['/codes', '/app/codes'],
             'codes show' => ['/codes/ADDR_CODES', '/app/codes/ADDR_CODES'],
@@ -146,6 +151,17 @@ class LegacyBladePageRetirementTest extends TestCase {
      */
     public static function gatedWriteEndpointProvider(): array {
         return [
+            // 環節 4b-1 收斂後才封得起來（manifest 的 B 類）：3 個 batch-load controller 的
+            // listRouteName() 原本依 $request->is('app/*') 回傳 redirect 目標，legacy POST 走
+            // legacy 分支會多一跳 302 而讓匯入結果的 flash 被 session 老化掉。已收斂成一律 app.*。
+            'batch books store' => ['post', '/admin/batch-load-book-titles'],
+            'batch books undo' => ['post', '/admin/batch-load-book-titles/undo'],
+            'batch books pinyin' => ['post', '/admin/batch-load-book-titles/update-pinyin'],
+            'batch offices store' => ['post', '/admin/batch-load-offices'],
+            'batch social store' => ['post', '/admin/batch-load-social-institutes'],
+            // 與上面那條 GET proposal-edit 同 URI 家族，一起封（manifest 的 A 類）。
+            'codes proposal update' => ['patch', '/codes/ADDR_CODES/proposals/1'],
+            'codes proposal cancel' => ['delete', '/codes/ADDR_CODES/proposals/1'],
             'codes store' => ['post', '/codes/ADDR_CODES'],
             'codes update' => ['put', '/codes/ADDR_CODES/1'],
             'codes destroy' => ['delete', '/codes/ADDR_CODES/1'],
@@ -170,24 +186,19 @@ class LegacyBladePageRetirementTest extends TestCase {
             ->assertStatus(410);
     }
 
-    // ── 「不動」的 19 條：必須完好無損 ──────────────────────────
+    // ── 「不動」的 11 條：必須完好無損 ──────────────────────────
+    //
+    // 原本是 19 條。環節 4b-1 把其中 8 條封掉了——它們是 manifest 記錄的
+    // 「封了不會壞，但收斂還沒做」那兩組（A 類 1 條 + B 類 6 條，加上與 A 同 URI 的
+    // GET proposal-edit）。收斂做完之後它們移到上面的封路 provider。
 
     /**
      * @return array<string, array{0: string, 1: string}>
      */
     public static function untouchedRouteProvider(): array {
         return [
-            // 新舊共用同一個 controller method
-            'batch books store' => ['POST', 'admin/batch-load-book-titles'],
-            'batch books undo' => ['POST', 'admin/batch-load-book-titles/undo'],
-            'batch books pinyin' => ['POST', 'admin/batch-load-book-titles/update-pinyin'],
-            'batch offices store' => ['POST', 'admin/batch-load-offices'],
-            'batch social store' => ['POST', 'admin/batch-load-social-institutes'],
-            'codes proposal update' => ['PATCH', 'codes/{table_name}/proposals/{operation}'],
-            'codes proposal cancel' => ['DELETE', 'codes/{table_name}/proposals/{operation}'],
             // React 正在呼叫的 action endpoint
             'codes export' => ['GET|HEAD', 'codes/{table_name}/export'],
-            'codes proposal edit' => ['GET|HEAD', 'codes/{table_name}/proposals/{operation}/edit'],
             'crowdsourcing confirm' => ['GET|HEAD', 'crowdsourcing/{id}/confirm'],
             'crowdsourcing reject' => ['GET|HEAD', 'crowdsourcing/{id}/reject'],
             'operations approve' => ['POST', 'operations/{operation}/approve'],
@@ -202,7 +213,7 @@ class LegacyBladePageRetirementTest extends TestCase {
     }
 
     /**
-     * 這是本檔最重要的斷言：**封路 middleware 不得掛到這 19 條上**。
+     * 這是本檔最重要的斷言：**封路 middleware 不得掛到這 11 條上**。
      *
      * 它們分成兩類：新舊共用同一個 controller method（動了 `/app` 那邊會一起壞），
      * 以及 React 正在呼叫的 action endpoint（PHP 端把 URL 組進 Inertia payload，
@@ -249,6 +260,7 @@ class LegacyBladePageRetirementTest extends TestCase {
     #[Test]
     public function exactly_the_manifested_routes_are_gated(): void {
         $expected = [
+            'DELETE codes/{table_name}/proposals/{operation}',
             'DELETE codes/{table_name}/{id}',
             'DELETE manage/{manage}',
             'GET admin/batch-load-book-titles',
@@ -260,13 +272,20 @@ class LegacyBladePageRetirementTest extends TestCase {
             'GET codes',
             'GET codes/{table_name}',
             'GET codes/{table_name}/create',
+            'GET codes/{table_name}/proposals/{operation}/edit',
             'GET codes/{table_name}/{id}/edit',
             'GET manage',
             'GET manage/create',
             'GET manage/{manage}',
             'GET manage/{manage}/edit',
             'GET profile',
+            'PATCH codes/{table_name}/proposals/{operation}',
             'PATCH profile',
+            'POST admin/batch-load-book-titles',
+            'POST admin/batch-load-book-titles/undo',
+            'POST admin/batch-load-book-titles/update-pinyin',
+            'POST admin/batch-load-offices',
+            'POST admin/batch-load-social-institutes',
             'POST admin/explainsql',
             'POST codes/{table_name}',
             'POST codes/{table_name}/proposal',
@@ -400,7 +419,7 @@ class LegacyBladePageRetirementTest extends TestCase {
                 ->assertStatus(302, "翻 flag 不應讓 {$uri} 回到 Blade 版（封路 middleware 不讀 flag）");
         }
 
-        // 寫入端（`legacy.page:gone`）同樣不讀 flag：25 條封路裡有 12 條是這型，
+        // 寫入端（`legacy.page:gone`）同樣不讀 flag：33 條封路裡有 19 條是這型，
         // 只驗導向型會漏掉一半。
         foreach ([['patch', '/profile'], ['post', '/codes/DYNASTIES']] as [$method, $uri]) {
             $this->actingAs($user)
@@ -439,7 +458,7 @@ class LegacyBladePageRetirementTest extends TestCase {
      * 🔴 環節 4a-3 的核心行為變化：這 9 條唯讀頁的 Blade 視圖與 controller 方法**已實體刪除**，
      * 所以它們改成純 redirect closure、**不再受 kill switch 控制**。
      *
-     * 為什麼值得一條專屬測試：其餘 25 條封路的賣點是「`LEGACY_PAGE_RETIREMENT=false` 就能
+     * 為什麼值得一條專屬測試：其餘 33 條封路的賣點是「`LEGACY_PAGE_RETIREMENT=false` 就能
      * 即時叫回 Blade 頁」。這 9 條沒有那個能力了——而**光看 302 的狀態碼分辨不出來**。
      * 若日後有人誤以為 kill switch 能救回它們（例如照著舊 runbook 操作），
      * 這條測試是唯一寫死「不能」的地方。

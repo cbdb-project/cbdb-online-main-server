@@ -21,8 +21,10 @@ use Illuminate\Support\Facades\Route;
  *
  * ⚠️ **刻意不用 `Route::redirect()`**：它底層是 `Route::any()`，會把同一 URI 的所有
  * HTTP method 一起接管——而 manifest 已證明**同一個 URI 的不同 method 處置不同**
- * （例：`admin/explainsql` 的 GET 要導向、POST 要 410；`codes/{t}/proposals/{op}` 的
- * PATCH/DELETE 是新舊共用、完全不能動）。
+ * （例：`admin/explainsql` 的 GET 要導向、POST 要 410；`codes/{table_name}/export` 是
+ * React 自己在呼叫的端點、完全不能動，而同前綴的 `codes/{table_name}` GET 要導向）。
+ *（原本這裡舉的例子是 `codes/{t}/proposals/{op}` 的 PATCH/DELETE「新舊共用、完全不能動」，
+ * 那在環節 4b-1 收斂後已不成立——它們現在封成 410。論證本身不變，只是例子換掉。）
  *
  * ⚠️ **302 不是 301**：觀察期必須用暫時導向。301 會被瀏覽器與 CDN 長期快取，
  * `git revert` 只還原伺服器——已經收到 301 的 client 未必會再請求舊 URL，

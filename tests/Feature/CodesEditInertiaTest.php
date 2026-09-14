@@ -121,7 +121,9 @@ class CodesEditInertiaTest extends TestCase {
                 'code_id' => 5,
                 'description' => 'new',
             ])
-            ->assertRedirect();
+            // 指名目標（理由見 CodesCreateInertiaTest::store_inserts_row_and_redirects 的說明）：
+            // 更新成功走 $editRoute ⇒ 回該列的編輯頁。
+            ->assertRedirect(route('app.codes.edit', ['table_name' => 'TEST_EDIT_CODES', 'id' => 5]));
 
         $this->assertDatabaseHas('TEST_EDIT_CODES', ['code_id' => 5, 'description' => 'new']);
     }
@@ -143,7 +145,8 @@ class CodesEditInertiaTest extends TestCase {
                 'code_id' => 5,
                 'description' => 'proposed change',
             ])
-            ->assertRedirect();
+            // 修改提案成功也走 $editRoute（與直接更新同一個目標）。
+            ->assertRedirect(route('app.codes.edit', ['table_name' => 'TEST_EDIT_CODES', 'id' => 5]));
 
         // 原值不變、提案已記錄
         $this->assertDatabaseHas('TEST_EDIT_CODES', ['code_id' => 5, 'description' => 'old']);

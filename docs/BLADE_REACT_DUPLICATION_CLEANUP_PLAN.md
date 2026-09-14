@@ -545,7 +545,87 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
     改用行定位重做。**動 controller 方法一律用行定位，不要用跨行 regex。**
     另一次：把 `route('admin.batch-load-*')` 全域替換成 `app.*`，結果連
     `$this->get(...)`（刻意打 Blade 頁）也被改掉 ⇒ 只能改 `assertRedirect(...)` 內的。
-  - **4b-2／4b-3 待做**：codes 側與 manage／profile／admin 側的測試分流。
+  - **4b-2a ✅ 已完成（2026-09-14）——codes 側 K 類測試搬遷（不刪任何生產碼）**：
+    codes 側分流範圍 3501 行、97 條，結果 **A 21｜B 4｜C 63｜K 9**。
+    `CodesControllerTest`（2049 行、61 條）裡有 8 條**既不打 HTTP、也不碰 Blade**，
+    只是住在 legacy 檔、被 setUp 的 `useLegacyBladePages()` 連坐 ⇒ 搬到
+    `tests/Unit/CodesResolveColumnForQueryTest.php`（防注入白名單，4 條）與
+    `tests/Unit/CodesTableListingTest.php`（ui_hidden 兩分支／description 接線／
+    config↔lang `table_desc` parity，4 條）。放 `tests/Unit` 是照 repo 既有同型先例
+    （`CodesControllerGuardSortFilterTest` 同樣的 reflection 手法、`CodesTableDescriptionTest`
+    同樣的 config／翻譯注入）。
+    ⚠️ 其中一條原本依賴該檔底部約 **430 行的 `FakeDatabaseManager`／`FakeSchemaBuilder`／
+    `FakeQueryBuilder`**（只服務那一檔、不隨檔搬家）⇒ 改成真的建一張
+    `APPOINTMENT_CODE_TYPE_REL`。**C 類移植一律改用真 SQLite，不要照抄那組假 DB。**
+    另一條的 dot-prefix 斷言由 `malicious.injection` **改寫**成 `other.c_appt_code`——
+    dot 後半改用真實欄名，才證明是「先看到 dot 就拒」，而非靠欄名不存在順帶擋掉。
+    🔴 **同型陷阱換位重演**：ui_hidden 的 **repository 層**過濾被搬走救回了，但**路由層**
+    （`/app/codes` 首頁真的看不到隱藏表）**零測試**——全 repo 其他 codes 測試一律把
+    `ui_hidden` 設成 `[]` 排除干擾，唯一的路由層斷言就是那條待刪的 legacy 測試。
+    已先移植到 `CodesIndexInertiaTest::ui_hidden_tables_are_absent_from_the_index_route()`
+    （實測停掉過濾 ⇒ 3 條紅），**再**刪 legacy 那條。`CodesControllerTest` 61 → **52**。
+    `OfficeCodesExportTest` 的 3 條改斷言 `/app/codes/{table}` 的 `exportable` prop
+    （**該 prop 原本全 repo 零斷言**）；「export 路由 404」那半原樣保留——`codes.export`
+    **沒掛 `legacy.page`、不在 4b 範圍**，且「`export_columns` 設成空陣列」沒有別的測試覆蓋。
+    legacy-parity 223 → **211**。
+  - **4b-2b ✅ 已完成（2026-09-14）——codes 寫入面三檔整批改打 React 端**：
+    📌 **原計畫把 C 類拆成「第 1／2／3 級」各自逐條移植，實查後改用更便宜的切法**：
+    codes 寫入面的三個檔（`CodesVariantReplacementTest` 22、`CodesControllerAuditTest` 3、
+    `CodesCharVariantMapAuditTest` 3，共 **28 條**）**完全沒有 Blade 斷言**
+    （`assertSee`／`assertViewIs`／`assertViewHas` 全庫零命中），唯一的 legacy 耦合就是
+    **URI 前綴**。原因是 `store`／`update`／`destroy`／`proposalStore`／`proposalUpdate`
+    這 **5 對** Blade／app 方法都只是薄殼，差別僅在傳給 `perform*` 共用實作的
+    `$showRoute`／`$editRoute` 字串 ⇒ `'/codes/` → `'/app/codes/` 的前綴替換即完成移植，
+    **27／28 條零斷言改動直接全綠**。
+    🔴 **4b-4 的前置事實（第一版我寫成「6 組」，被 review 用路由表證偽）**：
+    `proposalUpdateExisting()` 與 `proposalCancel()` **不是薄殼**——`codes.proposals.update`／
+    `codes.proposals.cancel` 與 `app.codes.proposals.*` 四條路由**指向同一個方法**。
+    4b-4 只能刪那 5 個 legacy 薄殼，**這兩個方法必須留**；把它們當薄殼刪掉會同時打死 React 版。
+    ⚠️ **另一條 4b-4 的護欄缺口**（review 實測）：`RouteActionsExistTest` 只檢查**方法存在**，
+    **抓不到 route name 字串寫錯**。`$showRoute`／`$editRoute` 目前由仍是 legacy-parity 的
+    `CodesControllerTest`（5 處）釘著；那批在 4b-2c 退役後，只剩
+    `CodesCreateInertiaTest`／`CodesEditInertiaTest` 各一條守重導目標——4b-2c 不可把它們一起弄掉。
+    📌 **順帶揭露一個既有的 parity 落差**：`appStore()` 把 `'app.codes.show'` 同時當
+    `$showRoute` **與** `$editRoute`，註解寫「編輯頁尚未遷移（P2-4），成功後暫導向 app.codes.show」
+    ——那個前提早已不成立（`app.codes.edit` 存在且有測試）。於是 **Blade 新增成功後落在新列的
+    編輯頁、React 落在列表頁**。已把過期註解改成陳述現況；「要不要改回落在編輯頁」是產品決定，
+    **不在本環節**——但先讓它不會被無聲改掉。
+    🔴 **我在這一段寫錯過一次（codex 查出）**：我照抄 review 的說法寫「`CodesCreateInertiaTest`
+    已把落在列表釘成預期」，實際那條測試（`store_inserts_row_and_redirects`）用的是**裸**
+    `assertRedirect()`，改成導向 `app.codes.edit` 照樣會綠——而且這句話與我下一句「目前無人
+    看守」自相矛盾。review 引的行號其實是**另一條測試**（`propose.store` 的 `$showRoute`）。
+    **兩份說法衝突時、或引用的行號與結論對不上時要自己開檔看**（與 4b-1 同一個教訓）。
+    已補：`CodesCreateInertiaTest::store_inserts_row_and_redirects` 與
+    `CodesEditInertiaTest` 的 `update`／`propose_update` 三條裸 `assertRedirect()` 全部**指名目標**。
+    📌 **指名之後才看見的副作用**：`performStore()` 一律傳 `['table_name' => …, 'id' => $id]`，
+    而 `app.codes.show` **沒有 `{id}` 路徑段** ⇒ 新增成功後實際落在
+    **`/app/codes/{table}?id=42`**，多帶一個列表頁不使用的 query 參數。這正是那條過期接線
+    留下的痕跡（Blade 的 `codes.edit` 吃得下 `{id}`，`app.codes.show` 吃不下）。已一併釘住。
+    ⚠️ **PUT／PATCH 不可寫死 `assertStatus(302)`**：帶 `X-Inertia` 標頭時 Inertia middleware
+    會把 PUT／PATCH／DELETE 的 302 轉成 **303**（POST 仍 302）。移植前那個字面值是**偶然**
+    對的（測試沒送那個標頭），移植後它變成一份會誤導人的文件 ⇒ 5 處改用 `assertRedirect()`，
+    成功分支順帶指名重導目標（比裸狀態碼更強）。**4b-2c 移植時同一個坑會再出現。**
+    唯一要改斷言的是 `char_variant_map` 列表那條：Inertia 把 props 塞進 `data-page`，
+    中文被 HTML 實體化＋JSON 轉義，原本的 `assertSee($variant)` **一個字都掃不到**
+    （實測會紅）⇒ 改斷言 `rows` prop 的 `c_variant_char` 欄「不多不少就是那 7 個字」，
+    比原本的「頁面某處出現過那個字」更強。
+    🔴 **「全綠」不等於「還守得住」**——URI 換掉之後必須重新證明鑑別力，否則等於把 28 條
+    測試搬到一個它們其實沒覆蓋到的入口。四組 mutation 實測（改壞生產碼→跑→還原）：
+    ① `CharVariantMapService::replaceRow()` 改成 no-op（**回傳形狀要照原樣
+    `['data'=>…,'replaced'=>[]]`**——第一次我回傳 list，22 條全紅那是型別壞掉不是鑑別力）
+    ⇒ **12 條紅**；② `findExistingRowInEitherVariantForm()` 回 `null`（拿掉 D7 兩形並存探查）
+    ⇒ **4 條紅**，正是本檔最重要的那組（少了它，替換會**製造**重複列）；
+    ③ 短路 `recordOperation()` 尾端的 `audit_log` 寫入 ⇒ **4 條紅**；
+    ④ 拆掉 `performDestroy()` 的「刪除已停用」護欄 ⇒ **1 條紅**。
+    legacy-parity 211 → **183**。
+  - **4b-2c 待做**：codes 讀取面（`CodesControllerTest` 52 條、`CodesBooleanFilterIntegrationTest`
+    5 條、`OperationsIndexLinksTest` 剩的 1 條）。這批**不能照抄 4b-2b 的前綴替換**——
+    它們大量斷言 Blade 視圖變數（`testViewReceivesFilterSortDirVariables`、
+    `testToggleOffLinkPreservesRawErrorColumn`、`testCreateViewPlacesPrimaryKeyFirstWithDefaultValue`
+    等）與 HTML，要逐條決定對應的 Inertia prop。
+  - **4b-3 待做**：manage／profile／admin 側（`ManagePagesLoadTest` 12、`UserProfileTest` 17、
+    `InactiveAccountAccessTest` 20、`AdminExplainSqlTest` 6、3 個 batch-load 共 68、
+    `UnidirectionalRelationshipRepairControllerTest` 2）。
   - **4b-4 待做**：實體刪除。
 **每刪一條 route 前，用三個方向各掃一次** `app/`、`resources/js/`、`tests/`：① **route name**（`route('x')`）、② **URI prefix**（`url('crowdsourcing/…')`、字串拼接——`CrowdsourcingController.php:183-184` 就是這型，route name grep 抓不到）、③ **controller action**。並把結果列進該 commit 的刪除清單。另外 `grep -rn "RouteName\|routeName" app/Http/Controllers` 找 `listRouteName()` 這類**回傳路由名字串**的分支
 - **4c 認證與入口**：auth 4 頁、welcome（同時移除 4 個 Auth controller 與 `WelcomeController` 的 flag 分支）

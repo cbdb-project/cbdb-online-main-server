@@ -7,7 +7,6 @@ use App\Services\CharVariantMapService;
 use App\Support\VariantReplaceScope;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -19,24 +18,36 @@ use Tests\TestCase;
  * proposalUpdateExisting）共用同一個掛鉤，且 Blade 與 React 版共用 perform*，
  * 所以一次涵蓋兩個入口。
  *
+ * ── 2026-09-14（Blade 下架環節 4b-2b）─────────────────────────
+ *
+ * 本檔原本整批打 legacy Blade 寫入端（`/codes/*`）並在 setUp 裡 `useLegacyBladePages()`。
+ * **改打 React 端（`/app/codes/*`）之後 22 條全綠、零斷言改動**——因為上面那句
+ * 「Blade 與 React 版共用 perform*」是真的：`store`／`appStore`、`update`／`appUpdate`、
+ * `destroy`／`appDestroy`、`proposalStore`／`appProposeStore`、`proposalUpdate`／
+ * `appProposalUpdate` 這 **5 對**薄殼，差別僅在傳給共用實作的
+ * `$showRoute`／`$editRoute` 字串。
+ * ⚠️ `proposalUpdateExisting()` 與 `proposalCancel()` **不是薄殼**——legacy 與 app
+ * 兩條路由都直接指向它們同一個方法，所以 4b-4 刪 legacy 薄殼時這兩個必須留。
+ *
+ * 🔴 **但「全綠」不等於「還守得住」**：URI 換了之後必須重新證明鑑別力，否則就是把
+ * 22 條測試搬到一個它們其實沒有覆蓋到的入口。已實測：把
+ * `CharVariantMapService::replaceRow()` 改成原樣回傳（no-op 掛鉤，回傳形狀照原樣
+ * `['data' => …, 'replaced' => []]`）⇒ **12 條紅**；
+ * 只拿掉 D7 的兩形並存探查（`findExistingRowInEitherVariantForm()` 只查參考形）
+ * ⇒ **4 條紅**（正是本檔最重要的那一組：少了它，替換會*製造*重複列）。
+ *
+ * ⚠️ 唯一需要改斷言的是 `char_variant_map` 的列表頁那條，它在
+ * `CodesCharVariantMapAuditTest` 裡（Inertia 把 props 塞進 `data-page`，中文被轉義，
+ * `assertSee` 一個字都掃不到）。
+ *
  * 註：`operations.resource_id`（序列化主鍵）在 Codes UI 這條路徑上**結構上不可能**被替換
  * ——該表的主鍵欄要嘛是數字，要嘛是已排除的代碼鍵（`ENTRY_TYPES.c_entry_type`、
  * `SOCIAL_INSTITUTION_TYPES.c_inst_type_code` 等）。用數字主鍵去斷言「它沒被改寫」
  * 證明不了任何事，所以這裡不做那條測試；排除本身由 `VariantReplaceScopeTest` 斷言。
  */
-/**
- * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
- * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
- */
-#[Group('legacy-parity')]
 class CodesVariantReplacementTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
-
-        // 本類驗的是 legacy Blade 頁的行為。Blade 下架計畫環節 3「先封路、不刪碼」把那些
-        // 路由改成 302／410，但頁面本身還在、還部署著、還能被 kill switch 叫回來，
-        // 所以這份覆蓋在觀察期內仍有意義——局部關閉封路即可。環節 4 實體刪除時一併移除。
-        $this->useLegacyBladePages();
 
         $compiled = sys_get_temp_dir().'/cbdb-test-views-codes-variant-replacement';
         if (!is_dir($compiled)) {
@@ -182,7 +193,7 @@ class CodesVariantReplacementTest extends TestCase {
     public function testStoreReplacesChineseTextColumnAndFlashesNotice(): void {
         $this->actingAs($this->activeUser());
 
-        $this->post('/codes/ADDR_CODES', [
+        $this->post('/app/codes/ADDR_CODES', [
             'c_addr_id' => 1,
             'c_name_chn' => '淸河縣',
             'c_name' => 'Qinghe',
@@ -198,15 +209,22 @@ class CodesVariantReplacementTest extends TestCase {
         $this->assertFlashContains('清');
     }
 
+    /**
+     * ⚠️ **PUT／PATCH 一律用 `assertRedirect()`、不要寫死 302**（4b-2b review 實測）：
+     * 帶 `X-Inertia` 標頭時 Inertia middleware 會把 PUT／PATCH／DELETE 的 302 轉成 **303**
+     * （POST 仍是 302）。這幾條原本寫 `assertStatus(302)` 只是因為測試沒送那個標頭——
+     * 移植前那個字面值是**偶然**對的，移植後它變成一份會誤導人的文件。
+     * `assertRedirect()` 對形狀不敏感，指名目標時還比裸狀態碼更強。
+     */
     #[Test]
     public function testUpdateReplacesChineseTextColumnAndFlashesNotice(): void {
         $this->actingAs($this->activeUser());
         DB::table('ADDR_CODES')->insert(['c_addr_id' => 1, 'c_name_chn' => '某縣']);
 
-        $this->put('/codes/ADDR_CODES/1', [
+        $this->put('/app/codes/ADDR_CODES/1', [
             'c_addr_id' => 1,
             'c_name_chn' => '淸河縣',
-        ])->assertStatus(302);
+        ])->assertRedirect(route('app.codes.edit', ['table_name' => 'ADDR_CODES', 'id' => 1]));
 
         $this->assertSame('清河縣', DB::table('ADDR_CODES')->where('c_addr_id', 1)->value('c_name_chn'));
         $this->assertFlashContains('清');
@@ -217,7 +235,7 @@ class CodesVariantReplacementTest extends TestCase {
     public function testNoNoticeWhenNothingWasReplaced(): void {
         $this->actingAs($this->activeUser());
 
-        $this->post('/codes/ADDR_CODES', [
+        $this->post('/app/codes/ADDR_CODES', [
             'c_addr_id' => 2,
             'c_name_chn' => '無異體字',
         ])->assertStatus(302);
@@ -239,7 +257,7 @@ class CodesVariantReplacementTest extends TestCase {
     public function testCharVariantMapItselfIsNeverReplaced(): void {
         $this->actingAs($this->activeUser());
 
-        $this->post('/codes/char_variant_map', [
+        $this->post('/app/codes/char_variant_map', [
             'id' => 900,
             'c_variant_char' => '龴',
             'c_reference_char' => '乂',
@@ -253,7 +271,7 @@ class CodesVariantReplacementTest extends TestCase {
 
         // 正向對照：同一條路徑對**沒有**被排除的表確實會替換。少了這一段，
         // 上面的斷言在「掛鉤根本不存在」時也會綠（純負向斷言的假綠）。
-        $this->post('/codes/ADDR_CODES', [
+        $this->post('/app/codes/ADDR_CODES', [
             'c_addr_id' => 77,
             'c_name_chn' => '淸',
         ])->assertStatus(302);
@@ -272,7 +290,7 @@ class CodesVariantReplacementTest extends TestCase {
     public function testPinyinDictionaryKeyIsNeverReplaced(): void {
         $this->actingAs($this->activeUser());
 
-        $this->post('/codes/pinyin', [
+        $this->post('/app/codes/pinyin', [
             'id' => 901,
             'c_chn' => '淸',
             'c_pinyin' => 'qing',
@@ -285,7 +303,7 @@ class CodesVariantReplacementTest extends TestCase {
         );
 
         // 正向對照（同上，防假綠）
-        $this->post('/codes/ADDR_CODES', [
+        $this->post('/app/codes/ADDR_CODES', [
             'c_addr_id' => 78,
             'c_name_chn' => '淸',
         ])->assertStatus(302);
@@ -302,7 +320,7 @@ class CodesVariantReplacementTest extends TestCase {
     public function testStoreRejectsMultiCodepointMapping(): void {
         $this->actingAs($this->activeUser());
 
-        $this->post('/codes/char_variant_map', [
+        $this->post('/app/codes/char_variant_map', [
             'id' => 902,
             'c_variant_char' => '甲乙',
             'c_reference_char' => '丙',
@@ -318,7 +336,7 @@ class CodesVariantReplacementTest extends TestCase {
         $this->actingAs($this->activeUser());
 
         // 表裡已有 淸→清；新增 清→淸 會成環
-        $this->post('/codes/char_variant_map', [
+        $this->post('/app/codes/char_variant_map', [
             'id' => 903,
             'c_variant_char' => '清',
             'c_reference_char' => '淸',
@@ -340,12 +358,12 @@ class CodesVariantReplacementTest extends TestCase {
         $this->actingAs($this->activeUser());
         $id = DB::table('char_variant_map')->where('c_variant_char', '淸')->value('id');
 
-        $this->put("/codes/char_variant_map/{$id}", [
+        $this->put("/app/codes/char_variant_map/{$id}", [
             'id' => $id,
             'c_variant_char' => '淸',
             'c_reference_char' => '菁',
             'c_strict_excluded' => 0,
-        ])->assertStatus(302);
+        ])->assertRedirect(route('app.codes.edit', ['table_name' => 'char_variant_map', 'id' => $id]));
 
         $this->assertSame(
             '菁',
@@ -362,7 +380,7 @@ class CodesVariantReplacementTest extends TestCase {
         // 先讓快取暖起來（此時「厰」還沒有對照）
         $this->assertSame('厰', CharVariantMapService::replaceLenient('厰')['text']);
 
-        $this->post('/codes/char_variant_map', [
+        $this->post('/app/codes/char_variant_map', [
             'id' => 904,
             'c_variant_char' => '厰',
             'c_reference_char' => '廠',
@@ -390,7 +408,7 @@ class CodesVariantReplacementTest extends TestCase {
         ]);
         $this->actingAs($user);
 
-        $this->post('/codes/ADDR_CODES/proposal', [
+        $this->post('/app/codes/ADDR_CODES/proposal', [
             'c_addr_id' => 9,
             'c_name_chn' => '淸河縣',
         ])->assertStatus(302);
@@ -419,7 +437,7 @@ class CodesVariantReplacementTest extends TestCase {
         DB::table('ADDR_CODES')->insert(['c_addr_id' => 21, 'c_name_chn' => '淸河縣']);
 
         // 使用者把表單原樣送回（值與既有列一致），替換仍會把它歸一成參考字形
-        $this->post('/codes/ADDR_CODES/21/proposal', [
+        $this->post('/app/codes/ADDR_CODES/21/proposal', [
             'c_addr_id' => 21,
             'c_name_chn' => '淸河縣',
         ])->assertStatus(302);
@@ -480,11 +498,11 @@ class CodesVariantReplacementTest extends TestCase {
         // 刻意**不送 id**：excludeId 必須取自權威來源 operation.resource_id。
         // 舊寫法讀 request body 的 id，缺值時 (int)'' = 0 ⇒ 不排除 id=2 的舊邊
         // ⇒ 合法修改被誤報成環。這一行就是 #3 那個改動的全部意義。
-        $this->patch("/codes/char_variant_map/proposals/{$operationId}", [
+        $this->patch("/app/codes/char_variant_map/proposals/{$operationId}", [
             'c_variant_char' => '丙',
             'c_reference_char' => '乙',
             'c_strict_excluded' => 1,
-        ])->assertStatus(302);
+        ])->assertRedirect(route('app.operations.index', ['proposals_only' => 1]));
 
         $payload = json_decode(
             (string) DB::table('operations')->where('id', $operationId)->value('resource_data'),
@@ -513,7 +531,7 @@ class CodesVariantReplacementTest extends TestCase {
         DB::table('ADDR_CODES')->insert(['c_addr_id' => 31, 'c_name_chn' => '清河縣']);
 
         // 使用者送出變體字形 → 被替換回「清河縣」→ 與既有列一致 → 無 diff
-        $this->post('/codes/ADDR_CODES/31/proposal', [
+        $this->post('/app/codes/ADDR_CODES/31/proposal', [
             'c_addr_id' => 31,
             'c_name_chn' => '淸河縣',
         ])->assertStatus(302);
@@ -538,7 +556,7 @@ class CodesVariantReplacementTest extends TestCase {
         DB::table('ADDR_CODES')->insert(['c_addr_id' => 41, 'c_name_chn' => '清河縣']);
 
         // 主鍵撞既有列 → 走「資料已存在，請改用修改提案」
-        $this->post('/codes/ADDR_CODES/proposal', [
+        $this->post('/app/codes/ADDR_CODES/proposal', [
             'c_addr_id' => 41,
             'c_name_chn' => '淸河縣',
         ])->assertStatus(302);
@@ -565,7 +583,7 @@ class CodesVariantReplacementTest extends TestCase {
             'c_personid' => 1, 'c_alt_name_chn' => '淸客', 'c_alt_name_type_code' => 4,
         ]);
 
-        $this->post('/codes/ALTNAME_DATA', [
+        $this->post('/app/codes/ALTNAME_DATA', [
             'c_personid' => 1,
             'c_alt_name_chn' => '淸客',
             'c_alt_name_type_code' => 4,
@@ -593,7 +611,7 @@ class CodesVariantReplacementTest extends TestCase {
             'c_personid' => 2, 'c_alt_name_chn' => '淸客', 'c_alt_name_type_code' => 4,
         ]);
 
-        $this->post('/codes/ALTNAME_DATA/proposal', [
+        $this->post('/app/codes/ALTNAME_DATA/proposal', [
             'c_personid' => 2,
             'c_alt_name_chn' => '淸客',
             'c_alt_name_type_code' => 4,
@@ -626,7 +644,7 @@ class CodesVariantReplacementTest extends TestCase {
             'c_personid' => 7, 'c_alt_name_chn' => '菁客', 'c_alt_name_type_code' => 4,
         ]);
 
-        $this->post('/codes/ALTNAME_DATA', [
+        $this->post('/app/codes/ALTNAME_DATA', [
             'c_personid' => 7,
             'c_alt_name_chn' => '靑客',
             'c_alt_name_type_code' => 4,
@@ -669,7 +687,7 @@ class CodesVariantReplacementTest extends TestCase {
             'crowdsourcing_status' => 0,
         ]);
 
-        $this->post('/codes/ALTNAME_DATA/proposal', [
+        $this->post('/app/codes/ALTNAME_DATA/proposal', [
             'c_personid' => 9,
             'c_alt_name_chn' => '淸客',
             'c_alt_name_type_code' => 4,
@@ -708,7 +726,7 @@ class CodesVariantReplacementTest extends TestCase {
         ]);
 
         // 新輸入用**另外兩個**變體，歸一後同樣是「甲甲」
-        $this->post('/codes/ALTNAME_DATA', [
+        $this->post('/app/codes/ALTNAME_DATA', [
             'c_personid' => 51,
             'c_alt_name_chn' => '㆔㆕',
             'c_alt_name_type_code' => 4,
@@ -748,7 +766,7 @@ class CodesVariantReplacementTest extends TestCase {
             'crowdsourcing_status' => 0,
         ]);
 
-        $this->post('/codes/ALTNAME_DATA/proposal', [
+        $this->post('/app/codes/ALTNAME_DATA/proposal', [
             'c_personid' => 62,
             'c_alt_name_chn' => '淸客',
             'c_alt_name_type_code' => 4,
@@ -766,7 +784,7 @@ class CodesVariantReplacementTest extends TestCase {
             'c_personid' => 3, 'c_alt_name_chn' => '淸客', 'c_alt_name_type_code' => 4,
         ]);
 
-        $this->post('/codes/ALTNAME_DATA', [
+        $this->post('/app/codes/ALTNAME_DATA', [
             'c_personid' => 3,
             'c_alt_name_chn' => '淸客',
             'c_alt_name_type_code' => 5, // 不同的 type code ⇒ 不同主鍵
@@ -786,12 +804,12 @@ class CodesVariantReplacementTest extends TestCase {
         $this->actingAs($this->activeUser());
         $id = DB::table('char_variant_map')->where('c_variant_char', '淸')->value('id');
 
-        $this->put("/codes/char_variant_map/{$id}", [
+        $this->put("/app/codes/char_variant_map/{$id}", [
             'id' => $id,
             'c_variant_char' => '淸',
             'c_reference_char' => '兩個字',
             'c_strict_excluded' => 0,
-        ])->assertStatus(302);
+        ])->assertRedirect();  // 拒絕分支走 back()，目標視來源而定，故不指名
 
         $this->assertSame(
             '清',

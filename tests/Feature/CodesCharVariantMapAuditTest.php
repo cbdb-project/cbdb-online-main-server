@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use PHPUnit\Framework\Attributes\Group;
+use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -13,20 +13,14 @@ use Tests\TestCase;
  * 步驟 6：char_variant_map 註冊進 config('codes.tables') 後，確認 Codes UI
  * 既有的增修／稽核／列表機制對這張新表同樣生效（不需要新寫稽核邏輯）。
  * 見 docs/CHAR_VARIANT_MAP_CALL_SITE_WIRING_PLAN.md 步驟 6。
+ *
+ * ── 2026-09-14（Blade 下架環節 4b-2b）─────────────────────────
+ * 原本打 legacy `/codes/*`；改打 `/app/codes/*`。兩條稽核測試零斷言改動，
+ * 列表那條改成斷言 Inertia 的 `rows` prop（理由見該方法上的註解）。
  */
-/**
- * @legacy-parity 本類驗 legacy Blade 頁的行為，以 useLegacyBladePages() 局部關閉環節 3 的封路。
- * 環節 4 實體刪除那些頁面時，本檔要做環節 1.5 那樣的逐測試分流（哪些改測 React 版、哪些刪）。
- */
-#[Group('legacy-parity')]
 class CodesCharVariantMapAuditTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
-
-        // 本類驗的是 legacy Blade 頁的行為。Blade 下架計畫環節 3「先封路、不刪碼」把那些
-        // 路由改成 302／410，但頁面本身還在、還部署著、還能被 kill switch 叫回來，
-        // 所以這份覆蓋在觀察期內仍有意義——局部關閉封路即可。環節 4 實體刪除時一併移除。
-        $this->useLegacyBladePages();
 
         $compiled = sys_get_temp_dir().'/cbdb-test-views-codes-charvariantmap';
         if (!is_dir($compiled)) {
@@ -116,24 +110,42 @@ class CodesCharVariantMapAuditTest extends TestCase {
         ]);
     }
 
+    /**
+     * ── 2026-09-14（Blade 下架環節 4b-2b）─────────────────────────
+     *
+     * 原本打 legacy Blade show 頁、用 `assertSee($variant)` 逐字掃 HTML。改打
+     * `/app/codes/char_variant_map` 之後**不能沿用 `assertSee`**：Inertia 把 props
+     * 塞進 `data-page` 屬性，中文會被 HTML 實體化＋JSON 轉義，那 7 個字一個都掃不到
+     * （實測會紅）。改成直接斷言 `rows` prop。
+     *
+     * 順帶比原斷言強：`assertSee` 只證明「頁面某處出現過那個字」，這裡證明
+     * **`c_variant_char` 欄確實是那 7 個字、且不多不少**——`show()` 少撈一列、
+     * 多撈一列、或把欄位對錯都會紅。
+     */
     #[Test]
     public function show_lists_all_seven_seed_rows(): void {
         $this->actingAs($this->activeUser());
         $this->seedSevenRows();
 
-        $response = $this->get('/codes/char_variant_map');
+        $variants = null;
 
-        $response->assertOk();
-        foreach (['愼', '槀', '峯', '靑', '頴', '淸', '厰'] as $variant) {
-            $response->assertSee($variant);
-        }
+        $this->get('/app/codes/char_variant_map')
+            ->assertOk()
+            ->assertInertia(function (Assert $page) use (&$variants) {
+                $variants = array_column($page->toArray()['props']['rows'], 'c_variant_char');
+            });
+
+        sort($variants);
+        $expected = ['愼', '槀', '峯', '靑', '頴', '淸', '厰'];
+        sort($expected);
+        $this->assertSame($expected, $variants);
     }
 
     #[Test]
     public function store_writes_audit_log_insert(): void {
         $this->actingAs($this->activeUser());
 
-        $response = $this->post('/codes/char_variant_map', [
+        $response = $this->post('/app/codes/char_variant_map', [
             'id' => 100,
             'c_variant_char' => '試',
             'c_reference_char' => '试',
@@ -167,14 +179,15 @@ class CodesCharVariantMapAuditTest extends TestCase {
         // 多字元的對照（幂等論證只在單一 codepoint 下成立，見計畫 D8）。原本這裡用的
         // 「新參考字」是 4 個字、本來就不是合法的「參考字」，改用單一字元。
         // 本測試的主體是稽核紀錄，不是多字元是否放行。
-        $response = $this->put('/codes/char_variant_map/101', [
+        $response = $this->put('/app/codes/char_variant_map/101', [
             'id' => 101,
             'c_variant_char' => '舊',
             'c_reference_char' => '新',
             'c_strict_excluded' => 0,
         ]);
 
-        $response->assertStatus(302);
+        // 見 CodesVariantReplacementTest 的同名說明：PUT 帶 X-Inertia 會是 303，不寫死 302。
+        $response->assertRedirect(route('app.codes.edit', ['table_name' => 'char_variant_map', 'id' => 101]));
 
         $audit = DB::table('audit_log')->where('table_name', 'char_variant_map')->where('operation', 'UPDATE')->first();
         $this->assertNotNull($audit);

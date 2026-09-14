@@ -180,7 +180,7 @@
 | 13c | **React 端硬編碼的 legacy URL** | 每個環節開始前重跑：<br>`grep -rnE "['\"\`]/(basicinformation\|codes\|operations\|manage\|view\|dashboard\|profile\|crowdsourcing\|admin\|welcome)" resources/js/inertia \| grep -v '/app/'` | 已知命中：`PersonEditorShared/PersonBanner.tsx:88` 的 `?? '/admin/audit-logs'` fallback（環節 4a 後失效）；`TabContentLoader.tsx:260-261` 的 `saveas`／`Duplicate_Collateral_Info`（**必須保留**，見 D-5）；`AuthLayout.tsx:29`、`Pages/Profile/Edit.tsx:121` 的 `/home`（安全，`/home` 路由不刪） |
 | 14 | `package.json` + lockfile | 移除 `admin-lte`、`jquery`、`@ttskch/select2-bootstrap4-theme`、`datatables.net`、`datatables.net-bs4`、`@vitejs/plugin-vue`、`@vue/compiler-sfc`、`vue`，並視 grep 結果評估 `lodash`、`sass`。`npm install` 後提交 lockfile | 每個套件刪除前先 `grep -rn "<pkg>" resources/js` 確認 inertia 端零 import。⚠️ ① `app.js:22` `import select2 from 'select2'`，但 **`select2` 不在 `package.json`**（靠 `admin-lte` 的依賴樹解析）——刪完跑 `npm ls select2` 確認走乾淨；② **`@fortawesome/fontawesome-free` 不可刪**，`resources/css/inertia.css:23` 直接 `@import` 它 |
 | 15 | `tests/**` | 刪除純 legacy 的 Feature 測試；含新舊對照者移除 legacy 斷言；移除 **`TestCase::useLegacyPersonForms()`**（`tests/TestCase.php:35-43`，把 `basicinformation.*` flag 壓成 `old`）——注意它**不在 `setUp()` 裡，是各 legacy 測試自行呼叫的 opt-in helper**，移除時要一併處理所有呼叫端 | ✅ **環節 1.5 已完成分流**：14 個 `useLegacyPersonForms()` 呼叫端全部標上 `#[Group('legacy-parity')]`，`./vendor/bin/phpunit --group legacy-parity` 可一鍵列出全部 199 個測試（即環節 2 的刪除清單）；兩個 needs-v2-first 的缺口已補齊 v2 等價覆蓋。<br>⚠️ 直接依賴 flag 的還有 `LegacyBladeFormGateTest`、`FlagAwareUrlHelpersTest`、`NavigationSchemaTest`、`AuthPagesInertiaTest`、`CodesIndexInertiaTest`、`CodesPersonPickerTest`、`InertiaSharedPropsTest`、`OperationsIndexLinksTest`、`OperationsProposalResourceLinkTest`、`CompositePrimaryKeyTest`，全部要改。<br>⚠️ ② **`useLegacyPersonForms()` 有 14 個呼叫端**（環節 1.5 實測；已全部標 `#[Group('legacy-parity')]`）（`BasicInformation{Addresses,Altnames,Sources,Texts}ControllerTest`、`BasicInformationPagesLoadTest`、`BasicInformationProposalTest`、`BiogMainBasicInfoNameMergeTest`、`BiogMainProposalTest`、`EventStatusWriteActionsTest`、`FormUrlEncodingTest`、`NameSearchIndexAutoSyncTest`、`OfficeStoreRedirectTest`、`ProposalNormalizationTest`、`UnknownPersonKinshipAssocBlockTest` …），直接刪 helper ⇒ 14 檔 `Call to undefined method`。<br>⚠️ ③ **`tests/Unit/VariantReplaceHookCoverageTest.php` 必定會紅**，見下方專節 |
-| 16 | 文檔 | `AGENTS.md`（「舊版 Blade 仍實體保留／翻回 `old` 即回退」整段改寫）、`README.md`（**逐行**：`:64` 的「AdminLTE 3 + Blade 仍實體保留作回退相容期／Phase 7 未執行」、`:65-66` 的入口清單含 `app.js`／`jquery-global.js`、`:114`、`:117`——`:64` 與 `:114` 是**對外承諾**「flag 改回 old 即可回退」，與 AGENTS.md 同等級，不改就是文件說謊）、`CHANGELOG.md`、`docs/ADMINLTE.md`（改為「已下架」歷史文件）、`docs/ADMINLTE4_UPGRADE_FEASIBILITY.md`（標註已被取代）、`docs/REACT_INERTIA_MIGRATION_PLAN.md`（§五雙殼／§五之二回退保證／附錄 C 禁止清單全部失效）、`docs/REACT_MIGRATION_BACKLOG.md`（P6-C1/C2、P7-1..3 → `retired`）、`docs/VIEWS.md`、`docs/migration-specs/*.md`（22 份 fidelity spec 加「歷史存檔」抬頭） | ⚠️ **`docs/CODES_SORT_FILTER_AUTH_GATE.md` 必須改寫**——該文記載「把 `codes` flag 切回 `old` 會重新暴露無門檻的深分頁排序查詢」；Blade 版刪除後此風險**消失**，結論需更新，否則會誤導未來的安全評估 |
+| 16 | 文檔 | `AGENTS.md`（「舊版 Blade 仍實體保留／翻回 `old` 即回退」整段改寫）、~~`README.md`（`:64`／`:114` 的對外承諾「flag 改回 old 即可回退」）~~ ✅ **已於環節 3 改為 `LEGACY_PAGE_RETIREMENT=false`**，不需再動；`:65-66` 的入口清單（含 `app.js`／`jquery-global.js`）留到環節 5、`CHANGELOG.md`、`docs/ADMINLTE.md`（改為「已下架」歷史文件）、`docs/ADMINLTE4_UPGRADE_FEASIBILITY.md`（標註已被取代）、`docs/REACT_INERTIA_MIGRATION_PLAN.md`（§五雙殼／§五之二回退保證／附錄 C 禁止清單全部失效）——✅ 回退保證那組（開頭里程碑、§五之二兩條、§八）已於環節 6a 加上限縮前言；雙殼與附錄 C 留到環節 5、`docs/REACT_MIGRATION_BACKLOG.md`（P6-C1/C2、P7-1..3 → `retired`）、~~`docs/VIEWS.md`~~（實查：只是 `/view/{key}` 資料目錄，零 flag／回退陳述，**不需改**）、~~`docs/migration-specs/*.md`（22 份 fidelity spec 加「歷史存檔」抬頭）~~ ✅ **已於環節 6a 全數加上** | ✅ **`docs/CODES_SORT_FILTER_AUTH_GATE.md` 已於環節 6a 改寫**（連帶 `AGENTS.md` 高風險備忘、`CHANGELOG.md` 的歷史條目加註、`docs/REACT_INERTIA_MIGRATION_PLAN.md` 的回退保證）。原文記載「把 `codes` flag 切回 `old` 會重新暴露無門檻的深分頁排序查詢」——**環節 3 之後已不成立**（封路 middleware 不讀 flag），真正的條件變成 `LEGACY_PAGE_RETIREMENT=false`。環節 4 實體刪除 Blade 版 `show()` 後此風險才**消失**，屆時要再更新一次。📌 `docs/VIEWS.md` 實查後**不需改**：它只是 `/view/{key}` 的資料目錄，無任何回退／flag 陳述 |
 | 17 | `API.md` / `docs/openapi/openapi.yaml` | **本計畫預設不動任何 API 路由／欄位／授權／錯誤碼**，故無需更新。**若某個環節實際動到了對外端點語義（例如把 legacy 端點改成導向／410），必須在同一 commit 同步 `API.md`**（AGENTS.md 文檔維護原則） | ✅ **實查結果：環節 3 無需更新 `API.md`**。`API.md` 收錄的是 v1／v2 的 API 端點，唯一與本次相關的是 `GET /codes/{table_name}/export`（`API.md:1686`）——而那條**沒有被封路**（React 匯出鈕正在用），敘述仍然正確。legacy web 表單端點從不在 `API.md` 範圍內。環節 4 實體刪除時再複查一次 |
 
 | 18 | `app/Providers/AppServiceProvider.php` | 環節 5 移除 `View::composer('layouts.dashboard-v3', …)`（`:81`）與 `Paginator::useBootstrap()`（`:53`） | ⚠️ 該 composer 是 `shouldRetainQueryDetails()`（`:113-160`，QueryProfile 明細保留機制）的**唯一消費者**。刪 layout 後它不會 500、只是永遠不觸發 ⇒ 一整段帶安全註解的邏輯變成看不見的死碼。**必須明確決定：廢除，還是改接 React（`HandleInertiaRequests` 目前沒有分享它）** |
@@ -471,10 +471,25 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
 - 改寫 `docs/ADMINLTE.md`、標註 `docs/ADMINLTE4_UPGRADE_FEASIBILITY.md` 已被取代。
 
 ### 環節 6 — 文檔與 env 收尾
+
+#### 6a — 回退鍵陳述修正 ✅ **已完成（2026-09-14，與環節 4 無依賴，故先做）**
+
+環節 3 之後「把 `MIGRATION_FLAG_*` 切回 `old` 就能回到 Blade」對已封路頁面**已不成立**，但多份文檔仍這樣寫。其中 `AGENTS.md` 與 `docs/CODES_SORT_FILTER_AUTH_GATE.md` 的版本是**安全陳述**——它們說「翻 flag 會重新暴露無門檻的深分頁排序查詢」，而真正會暴露的是 `LEGACY_PAGE_RETIREMENT=false`。任何人照舊文檔動用 kill switch 回退，就是在不知情的情況下打開那個查詢。已修：
+
+- **權威來源**：`config/migration_flags.php` 的「不變量」段與 `view` 那一列（下游文檔都指過來這裡，不改上游等於沒改完）。
+- `AGENTS.md` 高風險備忘與專案現況段；`docs/CODES_SORT_FILTER_AUTH_GATE.md` §2／§6／§7。
+- `docs/REACT_INERTIA_MIGRATION_PLAN.md`：限縮前言管住「切換 = 導覽指向」與「回退保證」兩條（原本註解掛在第二條下面，讀者先撞到第一條），另修 §八與開頭里程碑。
+- 🔴 **`docs/PERSON_PROPOSAL_PATHS.md` 與 `docs/APPROVAL_FLOWS.md`**（AGENTS.md 標為必讀）仍描述「flag=old 完整放行」這條**已隨環節 2 實體刪除**的路徑——最容易讓人照錯資訊做安全評估。
+- `CHANGELOG.md` 兩條歷史條目加 `📌 後續` 註記（**加註不改寫**，避免舊條目說謊）。
+- 測試護欄 `LegacyBladePageRetirementTest::migration_flags_no_longer_reopen_gated_legacy_pages()`：把 flag 遞迴翻成 `old`，斷言 7 條顯示頁仍 302、2 條寫入端仍 410，並以 `assertViewIs()` 證明kill switch 才是真的鑰匙。**否則那些文檔只是另一句會再過時的話。**
+
+⚠️ **刻意沒有一併宣稱「flag 已全面失效」**：`auth.*` 與 `welcome` 的 flag 分支在 controller 內部、路由**未**封路，翻 flag 仍然會渲染 Blade（`tests/Feature/AuthPagesInertiaTest.php` 有四個綠測釘住）。第一版的措辭寫成全站級斷言，被 review 用那幾個測試證偽。
+
+#### 6b — 其餘收尾（依賴環節 4／5）
 - 更新 `AGENTS.md`、`README.md`、`CHANGELOG.md`、`docs/REACT_INERTIA_MIGRATION_PLAN.md`、`docs/REACT_MIGRATION_BACKLOG.md`、`docs/VIEWS.md`、`docs/CODES_SORT_FILTER_AUTH_GATE.md`。
 - `.env.example` 加入 §三第 11 欄的註解段落。
 - `CHANGELOG.md` 完整列出 §三之四 的 `.env` 清理清單（部署者依此在各機器手動清除）並註明需 `config:clear && config:cache`。
-- `docs/migration-specs/**` 22 份加「歷史存檔」抬頭。
+- ~~`docs/migration-specs/**` 22 份加「歷史存檔」抬頭~~ ✅ 已於 6a 完成。
 
 ### 環節 7（獨立，不阻塞前六個環節）— D 類缺口評估 ✅ **已完成（2026-09-14）**
 

@@ -345,4 +345,72 @@ class LegacyBladePageRetirementTest extends TestCase {
         $this->assertNotSame(410, $status);
         $this->assertLessThan(500, $status, '同理：5xx 會讓上面那個斷言變成假綠');
     }
+
+    /**
+     * 🔴 **封路不讀 migration flag**——這是回退鍵改變的核心，值得寫死。
+     *
+     * 環節 3 之前，`codes` 這批頁面把 `MIGRATION_FLAG_*` 翻回 `old` 就會回到 Blade 版；
+     * 環節 3 之後 `legacy.page` middleware 排在 controller 之前、且完全不看 flag，所以翻 flag
+     * **沒有任何效果**。這不只是行為差異，而是一個**安全**陳述：
+     * `docs/CODES_SORT_FILTER_AUTH_GATE.md` 記載「Blade 版 `codes/{table_name}` 是無門檻的深分頁
+     * 排序查詢」，而它重新暴露的條件已經從「翻 flag」變成「`LEGACY_PAGE_RETIREMENT=false`」。
+     *
+     * 沒有這條測試，那份文檔就只是另一句會再次過時的話。
+     */
+    #[Test]
+    public function migration_flags_no_longer_reopen_gated_legacy_pages(): void {
+        $user = $this->superAdmin();
+
+        // 把整批頁面 flag 全翻回 old——封路仍然生效。
+        //
+        // ⚠️ **必須遞迴**：`pages` 含 `admin`／`auth`／`query-playground` 三個巢狀群組，
+        // 非遞迴的 array_map 會把 `pages.admin` 從陣列壓成字串 'old'，於是
+        // `migration_flag('admin.explain-sql')` 的 Arr::get 中途撞到字串回 null、
+        // 落到 `migration_flags.default`——覆寫變成空轉。
+        $flipToOld = static function (array $pages) use (&$flipToOld): array {
+            return array_map(
+                static fn ($value) => is_array($value) ? $flipToOld($value) : 'old',
+                $pages
+            );
+        };
+        // ⚠️ default 刻意釘成 **'new'**（與覆寫值相反）：若釘成 'old'，下面的
+        // `assertSame('old', ...)` 就分不出「遞迴覆寫成功」與「解析失敗後 fallback 到 default」
+        // ——兩者都會回 'old'，斷言照綠。設成 'new' 之後，只有真的讀到覆寫值才會是 'old'。
+        config([
+            'migration_flags.default' => 'new',
+            'migration_flags.pages' => $flipToOld((array) config('migration_flags.pages', [])),
+        ]);
+
+        // 覆寫真的生效了（否則下面整個測試是空轉）。
+        $this->assertSame('old', migration_flag('codes'), '扁平 key 的覆寫必須生效');
+        $this->assertSame('old', migration_flag('admin.explain-sql'), '巢狀群組的覆寫必須也生效');
+        // 反面對照：沒被覆寫的未知 key 才會拿到 default，證明上面兩條不是 fallback。
+        $this->assertSame('new', migration_flag('a-key-that-does-not-exist'));
+
+        // 顯示頁：仍然 302。涵蓋三種 middleware 組合——純 legacy.page（codes／operations／manage）、
+        // 與 `auth` 併掛（dashboard／view/{key}，順序敏感）。
+        foreach (['/codes', '/codes/DYNASTIES', '/admin/explainsql', '/operations', '/manage',
+            '/dashboard', '/view/dynasties'] as $uri) {
+            $this->actingAs($user)
+                ->get($uri)
+                ->assertStatus(302, "翻 flag 不應讓 {$uri} 回到 Blade 版（封路 middleware 不讀 flag）");
+        }
+
+        // 寫入端（`legacy.page:gone`）同樣不讀 flag：35 條封路裡有 16 條是這型，
+        // 只驗導向型會漏掉一半。
+        foreach ([['patch', '/profile'], ['post', '/codes/DYNASTIES']] as [$method, $uri]) {
+            $this->actingAs($user)
+                ->{$method}($uri, [])
+                ->assertStatus(410, "翻 flag 不應讓 {$method} {$uri} 復活");
+        }
+
+        // 對照：真正的鑰匙是 kill switch，且它與 flag 無關（flag 此刻仍是 old）。
+        // 斷言 assertViewIs 而非只看 200——把「回到 **Blade 版**」寫實，
+        // 免得日後這條路由被改成回 Inertia 時測試還是綠的。
+        config(['legacy_page_retirement.enabled' => false]);
+        $this->actingAs($user)
+            ->get('/admin/explainsql')
+            ->assertOk()
+            ->assertViewIs('admin.explain_sql');
+    }
 }

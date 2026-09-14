@@ -102,12 +102,13 @@ flag 已翻 `new`、真正在用的 React／`/api/v2` 人工輸入寫入面**。
 
 ### 4.1 有意排除、非遺漏的路徑（逐一交代，供 review 對帳）
 
-- **所有舊 Blade 控制器路徑（休眠、flag=new）**：`BasicInformationController::update()` 的 proposal 分支
-  （L1743-1771）、`BasicInformationAltnamesController` 的 proposal 分支（L111-114 新增、L447-458 編輯）
-  等，會繞過上表掛點、直接交 `BasicInformationProposalController` 逐字寫入 `operations`。**本 PR 不改這些
-  舊 Blade 控制器**（遵 AGENTS.md）。這些路徑目前**不可達**（頁面 flag 全為 `new`）；風險僅存在於「有人
-  把 flag 手動翻回 `old`」的回退情境，屆時應**連同回退一起**在 Blade 側補守衛（並非本 PR 職責）。M1 生成
-  路徑守衛在任何情況下仍有效。→ 見 §9「回退期殘留風險」。
+- **所有舊 Blade 控制器路徑**：`BasicInformationController::update()` 的 proposal 分支、
+  `BasicInformationAltnamesController` 的 proposal 分支等，會繞過上表掛點、直接交
+  `BasicInformationProposalController` 逐字寫入 `operations`。**本 PR 不改這些舊 Blade 控制器**（遵 AGENTS.md）。
+  當時的說法是「目前不可達（flag 全為 new），風險僅存在於有人把 flag 翻回 old 的回退情境」。
+  ✅ **2026-09-14 起這個殘留風險已歸零**：Blade 下架環節 2 把這些 controller、路由與 15 個
+  `MIGRATION_FLAG_BASICINFO_*` flag 全部**實體刪除**——**沒有任何 flag 能把它們翻回來**。
+  → 見 §9。
 - **BIOG「複製」路徑（無手動輸入）**：`BasicInformationController::saveas()`（L1822）、
   `Duplicate_Collateral_Info()`（L1868）直接 `BiogMain::create($data)` 複製既有 DB 列，**不接受手打拼音**——
   值來自來源列（Phase A 已於源頭清理），無「重新污染」風險，故不納入。
@@ -209,7 +210,7 @@ public const BIOG_MAIN_PINYIN_V_FIELDS = ['c_surname', 'c_mingzi', 'c_name'];
 | 後端測試（正向 / 不誤傷 / `c_alt_name` 不轉 / proposal / 冪等）| ✅ |
 | 前端測試（偵測、規則與後端位元一致、彈窗流程）| ✅ |
 | 修正 §D-12 誤列 `_rm`／`_proper` 的條文 | ✅ |
-| 舊 Blade 控制器（biog/altname proposal 分支等） | ❌ 不改（遵 AGENTS.md；休眠、僅回退期殘留，見 §9） |
+| 舊 Blade 控制器（biog/altname proposal 分支等） | ✅ **已無需處理**：環節 2 實體刪除，見 §9 |
 | Code 表（CodesController／書名內聯） | ❌ 留 Phase B（見 §5，記入待辦） |
 
 ## 9. 回退期殘留風險（明確記錄，非本 PR 職責）
@@ -217,11 +218,17 @@ public const BIOG_MAIN_PINYIN_V_FIELDS = ['c_surname', 'c_mingzi', 'c_name'];
 本 PR 關閉的是**目前人工可達**的手動輸入面（React／`/api/v2`）。以下是**已知、有意排除**的非 UI／遺留
 寫入面，逐一交代（codex 盤點），供日後對帳；均非「一般使用者在現行 UI 手動輸入」之列：
 
-1. **舊 Blade 控制器（休眠，flag=new）**：若有人把某頁 flag 從 `new` 翻回 `old`，該頁舊 Blade 控制器
-   （§4.1）會重新可達，其手動輸入的 `v` 不會被本 PR 掛點攔到。
-   - 觸發：明確的管理員回退動作（非一般使用者）。緩解：M1 生成守衛仍有效。
-   - 正解：任何 Blade 回退應**連同**在對應 Blade 控制器補一次 `PinyinUmlaut::normalizeFields()`（沿用本 PR
-     helper／allowlist，成本極低），列入回退檢查清單，而非在本 PR 預改休眠舊碼。
+1. ~~**舊 Blade 控制器（休眠，flag=new）**：若有人把某頁 flag 從 `new` 翻回 `old`，該頁舊 Blade
+   控制器（§4.1）會重新可達，其手動輸入的 `v` 不會被本 PR 掛點攔到。~~
+   ✅ **已於 2026-09-14 歸零**（Blade 下架環節 2）：人物編輯與別名的 legacy controller、路由與
+   15 個 `MIGRATION_FLAG_BASICINFO_*` flag **全部實體刪除**，觸發條件（「把 flag 翻回 old」）
+   已不存在——**沒有任何 flag 能把它們翻回來**，所以也不需要「回退檢查清單」那一條。
+   - ⚠️ 仍活著的例外：`saveas()`／`Duplicate_Collateral_Info()`（見 §4.1 下一條，**不接受手打拼音**，
+     值來自來源列）與 v1 token API。兩者與本項無關。
+   - ⚠️ 其餘 legacy 頁面（codes／manage／profile 等）是**封路但未刪碼**，而它們的回退鍵是
+     `LEGACY_PAGE_RETIREMENT=false`（**不是** migration flag）。若日後真的動用那個 kill switch，
+     `CodesController` 的手打拼音面會重新可達——那屬於本文 §5 記入待辦的 Phase B（Code 表），
+     不是本項。
 
 2. ~~**Legacy `/api/v1/add`、`/api/v1/update`（程式化整合 API，非 UI）**~~ — **已於資安加固 P2-8
    整組刪除，本節不再適用。**

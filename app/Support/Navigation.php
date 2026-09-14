@@ -20,7 +20,13 @@ use Illuminate\Support\Facades\Schema;
  *    glob，供 React 以目前路由 / Blade 以 request()->routeIs() 判定），同時保留
  *    active.pages（既有 $page_title 字串）以相容尚未遷移的 Blade 頁面。
  *  - 連結指向受 feature flag 控制（config/migration_flags.php）：flag='new' 且新
- *    路由存在時指向新頁，否則指向舊頁。flag 預設 'old'，只能由人 flip。
+ *    路由存在時指向新頁，否則指向舊頁。只能由人 flip。
+ *  - 🔴 **現況（2026-09）**：config 裡每個已知頁面都明設 'new'，`'default' => 'old'` 只影響
+ *    **config 沒列到的 key**。而且多數 legacy 頁面已被 `legacy.page` middleware 封路，
+ *    所以把 flag 翻回 'old' 只會讓本類產出指向一個已被封路的舊 URL——**多繞一跳（302 回 /app）、
+ *    不會真的回到 Blade**（回退鍵是 LEGACY_PAGE_RETIREMENT=false）。
+ *    ⚠️ 例外：auth.* 與 welcome 未封路，其 flag 仍決定渲染 Blade 或 React；
+ *    basicinformation.* 的 flag 已隨環節 2 刪除，相關節點恆指 /app。
  *
  * 節點結構：
  *  [
@@ -423,7 +429,10 @@ class Navigation {
 
     /**
      * 依 feature flag 解析連結：flag='new' 且新路由存在時指向新頁，否則舊頁。
-     * 目前所有 flag 預設 'old'；新頁路由就緒後僅需翻 flag。
+     *
+     * 🔴 **現況（2026-09）**：已知頁面的 flag 都明設 'new'，`'default' => 'old'` 只作用於
+     * config 沒列到的 key。翻回 'old' 只會讓連結指向一個已被封路（302）的舊 URL，
+     * 不會真的回到 Blade——詳見類別 docblock。
      */
     protected static function url(string $flagKey, string $oldRoute, ?string $newRoute = null, array $params = []): ?string {
         if (migration_flag_is_new($flagKey) && $newRoute !== null && Route::has($newRoute)) {

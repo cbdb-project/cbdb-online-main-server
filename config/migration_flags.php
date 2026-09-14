@@ -10,7 +10,16 @@
 | 導覽單一來源 App\Support\Navigation 依此決定側邊欄連結指向新或舊頁。
 |
 | 不變量：
-|   - 預設一律 'old'，flip 成 'new' = 上線新頁，改回 = 即時回退，不需改碼。
+|   - 'default' => 'old' 只是 **unknown-key fallback**：本檔列出的每個已知頁面都明設 'new'
+|     （全站已於 2026-06-26 翻 new 上線），所以 default 只影響「本檔沒列到的 key」。
+|   - 🔴 **「改回 'old' 即時回退」只對「未被封路」的頁面成立**（2026-09 起）：
+|     Blade 下架計畫環節 3 之後，多數 legacy 頁面由 `legacy.page` middleware 封路
+|     （顯示頁 302／寫入端 410），**該 middleware 不讀本檔任何 flag**。那批頁面的回退鍵是
+|     LEGACY_PAGE_RETIREMENT=false（見 config/legacy_page_retirement.php）；本檔的 flag
+|     對它們只影響**連結／URL payload 的指向**（Navigation 側邊欄、code_table_edit_url()、
+|     CodesController 的 URL payload、HandleInertiaRequests::profileUrl()、audit-log URL 等），
+|     **不影響 legacy 頁面是否可開啟或其渲染**。仍由 flag 決定渲染的只剩 'auth' 與 'welcome'
+|     （分支在 controller 內部、路由未封路）。人物編輯 basicinformation.* 已實體刪除、無法回退。
 |   - 「翻 flag 上線」只能由人執行（見計畫附錄 C 寫入禁止清單）；
 |     AI executor 不得自動切換。
 |   - 可用環境變數覆蓋（部署時），key 形如 MIGRATION_FLAG_<UPPER_SNAKE>。
@@ -70,7 +79,9 @@ return [
             'nl-query-logs' => env('MIGRATION_FLAG_NL_QUERY_LOGS', 'new'),
         ],
 
-        // View Tables（React 版已翻 new 上線，2026-06-26；flag 可逆回 old）
+        // View Tables（React 版已翻 new 上線，2026-06-26）
+        // ⚠️ 已封路（routes/web.php 的 view／view/{key} 掛 legacy.page）：翻回 old 不會回到 Blade，
+        // 只會改變連結指向。回退鍵是 LEGACY_PAGE_RETIREMENT=false。
         'view' => env('MIGRATION_FLAG_VIEW', 'new'),
 
         // Phase 6 — 認證頁與入口（已翻 new 上線；flag 可逆回 old）

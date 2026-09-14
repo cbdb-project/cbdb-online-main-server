@@ -125,7 +125,13 @@ class LegacyBladePageRetirementTest extends TestCase {
             ->assertStatus(302);
 
         $target = (string) $response->headers->get('Location');
-        $this->assertStringStartsWith('http://localhost/app/codes/ADDR_CODES?', $target);
+        // 期望值由 route() 產生，不寫死主機名：`http://localhost` 只是 `APP_URL` 沒設時的
+        // 預設值，任何把它設成別的值的環境（例如 `http://localhost:8000`）都會讓這條斷言
+        // 在一個與被測行為無關的地方紅。用 route() 還順帶鎖住「導向的是那個具名路由」。
+        $this->assertStringStartsWith(
+            route('app.codes.show', ['table_name' => 'ADDR_CODES']).'?',
+            $target
+        );
 
         parse_str((string) parse_url($target, PHP_URL_QUERY), $params);
         $this->assertSame(['page' => '3', 'sort_by' => 'c_addr_id'], $params);

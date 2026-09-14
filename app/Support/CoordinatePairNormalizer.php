@@ -64,9 +64,11 @@ namespace App\Support;
  *   {@see CodeTableFieldValidator::validate()} 該回 422 的事；在這裡先清成 `NULL`
  *   會把一個該報錯的請求變成「靜默存成沒有座標」。同理，一對之中只要有這種值，
  *   整對都不動——否則 `x=0, y="east"` 會變成 200 而不是 422。
- *   **注意這個「交給驗證層」的前提只在 v2 API 上成立**：`CodesController` 從來沒有
- *   呼叫過 `CodeTableFieldValidator`，所以那條路必須自己補上座標的數值檢查，否則
- *   `x_coord=0e0` 會被 MariaDB 轉成 `0` 而重新造出這個類要防的那一列。
+ *   **注意這個「交給驗證層」的前提只在 v2 API 上成立**：`CodesController` 與提案核准重放
+ *   都沒有欄位驗證層（`CodeTableFieldValidator` 沒有任何 controller 引用它），
+ *   `x_coord=0e0` 會被非 strict sql_mode 的 MariaDB 轉成 `0` 而重新造出這個類要防的那
+ *   一列。那兩條路因此自己呼叫 {@see self::invalidColumns()}——表單回欄位錯誤、核准與
+ *   還原中止。**新開的寫入路徑若沒有驗證層，必須比照辦理。**
  * - 未登記的資料表一律不處理（fail-closed，與 {@see VariantReplaceScope} 同樣的取向）。
  *   **新增任何帶經緯度的資料表時，要同步加進 `PAIRS`。**
  */
@@ -81,14 +83,13 @@ final class CoordinatePairNormalizer {
      * `INSERT ... SELECT ac.x_coord, ac.y_coord` 重建的派生快取，那條 raw SQL 路徑沒有
      * PHP 陣列、本類掛不上去，也不需要——源頭乾淨，派生物就乾淨。
      *
-     * **今天這筆登記實際生效的地方只有一處**：`ADDRESSES` 的 create 提案核准重放
-     *（`OperationsProposalController::applyCreateProposal()`）。它另有一條活的互動式
-     * 寫入端——`ADDRESSES` 在 `config/codes.php` 的清單裡、不在
-     * `CodesController::$readOnlyTables`，而且它沒有真正的主鍵（原始 schema 只有一個
-     * 非唯一 `KEY`），於是 `getKeyColumns()` 掉到「取前兩個物理欄」的 fallback，實測回
-     * `['c_addr_id', 'c_addr_cbd']`，所以只要表單把這兩欄填了 `POST /codes/ADDRESSES`
-     * 就會真的 insert——但**那條路徑目前還沒掛上本類**（`CodesController` 從不呼叫它），
-     * 所以這筆登記對它還沒有任何保護作用。接上它是下一個階段的事。
+     * 登記它是因為它**另有一條活的互動式寫入端，而那條路已經掛上本類**：`ADDRESSES` 在
+     * `config/codes.php` 的清單裡、不在 `CodesController::$readOnlyTables`，而且它沒有真正
+     * 的主鍵（原始 schema 只有一個非唯一 `KEY`），於是 `getKeyColumns()` 掉到「取前兩個
+     * 物理欄」的 fallback，實測回 `['c_addr_id', 'c_addr_cbd']`——只要表單把這兩欄填了，
+     * `POST /codes/ADDRESSES` 就會真的 insert，而它走的是已掛鉤的 `performStore()`。
+     * 另一條生效路徑是 `ADDRESSES` 的 create 提案核准重放
+     *（`OperationsProposalController::applyCreateProposal()`）。
      *（更新那一側到不了：`RegenerateAddresses` 對每一列都寫 `NULL AS c_addr_cbd`，
      * `where c_addr_cbd = <值>` 永遠命不中，「找不到目標列」守衛會先擋下。）
      *

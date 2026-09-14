@@ -117,6 +117,52 @@
   眾包回填都還活著）。只有已被閘門下架**且**有替代品的路徑才豁免。
 - 背景與逐步執行紀錄：[docs/CHAR_VARIANT_MAP_TEXT_COLUMN_ROLLOUT_PLAN.md](./docs/CHAR_VARIANT_MAP_TEXT_COLUMN_ROLLOUT_PLAN.md)。
 
+### 1.4 經緯度寫入一律經「空白／零值 → NULL」歸零
+- `0,0` 不是東亞的任何地點，而是「沒有座標」被寫成了一個看起來合法的數字。讀取端早就這麼
+  判（[CoordinateValidator](./app/Support/CoordinateValidator.php) 判 `zero_axis`／
+  `non_numeric` 為不可連結），而且零值會**主動製造錯誤答案**：舊版 v1 的鄰近地點查詢是
+  `ADDR_CODES.x_coord BETWEEN other.x_coord ± 0.03` 的自連接，所有 `0,0` 列因此互為
+  「鄰居」（實測 316 列產生 99,856 對）。`ADDR_CODES` 那 316 列已於 2026-09-14 清理／回填。
+- 任何**會把經緯度寫進資料庫**的新路徑，落庫前必須經過
+  [CoordinatePairNormalizer](./app/Support/CoordinatePairNormalizer.php) 的
+  `normalizeRow($data, $table)`。範圍由 `PAIRS` 登記決定，未登記的表 fail-closed（不處理），
+  所以 `$table` 要傳**目標資料表**。**新增任何帶經緯度的資料表時，必須同步加進 `PAIRS`**
+  （`tests/Unit/CoordinatePairRegistryGuardTest.php` 會在漏登記時紅）。
+- **座標是一對，不是兩個獨立的欄**：一對之中任一軸空白或為零，整對都寫 `NULL`——**包含
+  呼叫端沒送的那一軸**。只有一軸的座標對每個消費端都不可用。這件事會讓
+  `result.updated_fields` 出現呼叫端沒送的欄位，是對外契約的一部分（見 API.md §13.1）。
+- **掛鉤位置的硬約束與 §1.3 不同**：座標不是主鍵、不是查重鍵、不是拼音來源，所以「必須早於
+  PK 計算」那一組在這裡是空的。取而代之的是**必須早於變更偵測**與 `CodeTableFieldValidator
+  ::normalize()`。少了前者，`{x_coord: 0}` 打在座標已是 NULL 的列上會寫一次 `NULL` 覆蓋
+  `NULL`——什麼都沒變，卻蓋掉 `c_modified_*`（違反 §1.2）並寫出 before／after 相同的
+  `operations`／`audit_log`。
+- **`create` 與 `update` 對「只送一軸」刻意不同**：`create` 走整列模式（payload 就是要
+  insert 的完整列，缺席的那一軸必然是 NULL，所以半截對一併清空）；逐欄 `update` 不動
+  （那一層看不到資料庫，另一軸可能本來就有值，擅自補寫會刪掉呼叫端沒提到的資料）。
+- **繼承 `AbstractCodeTableMutationHandler`／`CodeTableCreateHandler` 就自動生效**
+  （trait `Concerns\NormalizesCoordinatePairs`）。**人物子資源的基底沒有掛**——那些表沒有
+  座標欄；哪天有了要自己掛。
+- **非數值的值不歸零、交給驗證層回 422**（`"east"`、`"0e0"`、`"+40.5"`）。把它們靜默清成
+  `NULL` 會把一個該報錯的請求變成「存成沒有座標」。**但這個前提只在 v2 API 上成立**：
+  `CodesController` 與提案核准重放**都沒有**欄位驗證層，所以那兩條路自己呼叫
+  `CoordinatePairNormalizer::invalidColumns()`——表單路徑回欄位錯誤、核准／還原路徑中止。
+  新開的寫入路徑若沒有驗證層，必須比照辦理，否則 MariaDB 在非 strict sql_mode 下會把
+  `"0e0"` 靜默轉成 `0`（實測）。
+- **歸零發生了就要讓使用者知道**：v2 走 `withWriteNotices()`（成功／409／422 都要掛），
+  表單與還原走 `flashCoordinateNotices*()`。`cleared_with_partner` 是唯一「系統丟掉了使用者
+  真的填進去的值」的情形，絕不可以靜默。看得到原始列的呼叫端要用
+  `dropNoOpCoordinateNotices()` 濾掉「沒送來、原值本來就是 NULL」的假損失。
+- **`restore` 要歸零，這與 §1.3 對 restore 的豁免刻意不同。** §1.3 豁免 restore 是因為
+  「歷史字形本身就是事實」，改寫還原內容是資訊的損失；`0,0` 不承載任何資訊，還原它是
+  **重新武裝一個 bug**。而 restore 本來就不是位元級忠實重放——它已經會蓋掉 `c_modified_*`。
+- 「零」的判定用**精確比較**（`(float) $v === 0.0`），刻意**不讀** `config('chgis_map.epsilon')`：
+  那是 `CHGIS_MAP_EPSILON` 可調的讀取端容差，讓它驅動破壞性寫入等於把地圖調參變成刪資料的
+  開關。兩邊的關係是**包含**（本類清空的 ⊂ validator 判無效的），由測試斷言而非共用旋鈕保證。
+- 寫入端守衛只管新的寫入。上游重灌與新部署的地板靠
+  `php artisan cbdb:normalize-addr-coords`（幂等，**每次上游匯入後都該跑**）與共用同一份
+  邏輯的一次性 data migration（`2026_09_14_000000_normalize_zero_coordinates_in_addr_codes`）。
+  那支清理刻意不寫 `operations`／`audit_log`、不蓋 `c_modified_*`——它是資料清理而非編輯行為。
+
 ### 2. 複合主鍵
 - Laravel Eloquent 不支援複合主鍵。
 - 複合主鍵表請使用 Query Builder，不要建立仰賴 Eloquent 主鍵行為的模型。
@@ -198,6 +244,7 @@ php artisan cbdb:fetch-chgis-map        # 下載 CHGIS 底圖（缺檔才下載�
 - 改了前端資源時，跑 `npm run build`
 - **改了 API（路由／請求回應欄位／授權／錯誤碼／resource 別名或白名單）時，同步更新 `API.md`**（見「文檔維護原則」）
 - **新增或修改「把文本寫進資料庫」的路徑時，確認已掛上異體字落地替換**（§1.3；繼承既有基底類別即自動生效，不繼承的要自己掛；只有「確實不需要掛」或「寫入委派給下層」才登記進 `tests/Unit/VariantReplaceHookCoverageTest.php` 的例外清冊，並跑該測試確認沒紅）
+- **新增或修改「把經緯度寫進資料庫」的路徑時，確認已掛上座標歸零**（§1.4；繼承兩個代碼表 handler 即自動生效，其他路徑要自己掛；沒有欄位驗證層的路徑還要自己呼叫 `invalidColumns()`。新增帶經緯度的資料表要同步加進 `CoordinatePairNormalizer::PAIRS`，並跑 `tests/Unit/CoordinatePairRegistryGuardTest.php` 確認沒紅）
 - commit message 使用繁體中文
 
 ## 高風險區域備忘

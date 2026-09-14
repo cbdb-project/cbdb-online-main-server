@@ -1393,7 +1393,7 @@ class CodesController extends Controller {
                 // 這個衝突可能是落地替換自己造成的（使用者輸入的是自認為不同的字形），
                 // 不附上通知的話使用者無從得知系統改了字。
                 $this->flashVariantNotices($variantReplaced);
-                $this->flashCoordinateNotices($coordinateCleared ?? []);
+                $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
 
                 return redirect()->back()
                     ->withInput()
@@ -1405,7 +1405,7 @@ class CodesController extends Controller {
                 \Illuminate\Support\Facades\Log::warning('Codes 更新完整性違規', ['table' => $table, 'error' => $e->getMessage()]);
                 flash('更新失敗：必填欄位未填寫或關聯值不存在。', 'error');
                 $this->flashVariantNotices($variantReplaced);
-                $this->flashCoordinateNotices($coordinateCleared ?? []);
+                $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
 
                 return redirect()->back()
                     ->withInput()
@@ -1421,7 +1421,7 @@ class CodesController extends Controller {
 
         flash('Update success @ '.Carbon::now(), 'success');
         $this->flashVariantNotices($variantReplaced);
-        $this->flashCoordinateNotices($coordinateCleared ?? []);
+        $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
         $this->resetVariantMapCacheIfNeeded($table);
 
         $id = $this->buildCompositeId($keyColumns, $updatedRow);
@@ -1555,7 +1555,12 @@ class CodesController extends Controller {
         $payload = $this->normalizeCodeTablePinyin($table, $payload);
         // 經緯度「空白／零值 → NULL」＋座標專用的數值檢查（見 normalizeCoordinatePairs()）。
         // 提案階段就歸一，核准端才不需要補救，審核者看到的也才是實際會落庫的值。
-        [$payload, $coordinateCleared, $coordinateInvalid] = $this->normalizeCoordinatePairs($table, $payload);
+        //
+        // **整列模式**：這是新增提案，$payload 就是核准時 applyCreateProposal() 會直接
+        // INSERT 的那一列，所以缺席的那一軸必然落庫成 NULL——「只送了經度」在這裡已經是
+        // 半截座標。與同表的直接新增（performStore）對稱。第一版漏了這個參數，於是
+        // 手工組的 POST 可以用提案路徑繞過直接新增擋得住的半截對（審查端到端證明過）。
+        [$payload, $coordinateCleared, $coordinateInvalid] = $this->normalizeCoordinatePairs($table, $payload, true);
         if ($coordinateInvalid !== []) {
             return $this->coordinateValidationError($coordinateInvalid);
         }
@@ -1585,7 +1590,7 @@ class CodesController extends Controller {
             // 才撞上既有列（或才變成「沒有修改」）。少了通知，加上 withInput() 回填的是
             // **替換前**的原始輸入，使用者會完全無從理解為什麼。
             $this->flashVariantNotices($variantReplaced);
-            $this->flashCoordinateNotices($coordinateCleared ?? []);
+            $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
 
             return redirect()->back()->withInput();
         }
@@ -1597,7 +1602,7 @@ class CodesController extends Controller {
             flash('提案失敗：已有其他新增提案使用相同主鍵，請調整後再提交。', 'warning');
             // 同上：這個衝突可能是落地替換造成的。
             $this->flashVariantNotices($variantReplaced);
-            $this->flashCoordinateNotices($coordinateCleared ?? []);
+            $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
 
             return redirect()->back()->withInput();
         }
@@ -1619,7 +1624,7 @@ class CodesController extends Controller {
         // 含異體字的資料再原樣送出，替換就會產生 diff、記成一筆他自己沒察覺的提案。
         // 至少要讓他看到「系統把字改了」。
         $this->flashVariantNotices($variantReplaced);
-        $this->flashCoordinateNotices($coordinateCleared ?? []);
+        $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
 
         return redirect()->route($showRoute, ['table_name' => $table]);
     }
@@ -1698,15 +1703,19 @@ class CodesController extends Controller {
 
         $data = $this->extractFormData($request, $table);
         $data = $this->normalizeCodeTablePinyin($table, $data); // §D-6：編輯既有提案時亦歸一化 Tier 1，避免核准落庫仍帶 v
+        $isCreate = (int) $operation['op_type'] === Operation::TYPE_PROPOSAL_CREATE;
         // 經緯度「空白／零值 → NULL」＋座標專用的數值檢查（見 normalizeCoordinatePairs()）。
         // 編輯既有提案時同樣要歸一，否則核准時才歸一會讓審核者看到的與落庫的不一致。
-        [$data, $coordinateCleared, $coordinateInvalid] = $this->normalizeCoordinatePairs($table, $data);
+        //
+        // 整列模式**只對新增提案開**：那時 $data 就是核准時會直接 INSERT 的一列，缺席的
+        // 那一軸必然是 NULL。修改提案則相反——核准走的是差集，另一軸可能在資料庫裡本來
+        // 就有值，擅自補寫會刪掉提案人沒提到的資料。
+        [$data, $coordinateCleared, $coordinateInvalid] = $this->normalizeCoordinatePairs($table, $data, $isCreate);
         if ($coordinateInvalid !== []) {
             return $this->coordinateValidationError($coordinateInvalid);
         }
         // 異體字落地替換：同上，在主鍵查重之前。
         [$data, $variantReplaced] = $this->applyVariantReplacement($table, $data);
-        $isCreate = (int) $operation['op_type'] === Operation::TYPE_PROPOSAL_CREATE;
         // 修改既有對照的提案時必須把「被取代的舊邊」排除，否則合法的改動會被誤報成環
         // （表有 乙→甲、甲→丙，把那列改成 丙→乙 是合法的 甲→丙→乙）。
         // create 提案沒有既有列可排除，傳空條件即可。
@@ -1738,7 +1747,7 @@ class CodesController extends Controller {
                 flash('提案失敗：資料已存在，請改用修改提案。', 'warning');
                 // 同 performProposalStore 的同名分支：衝突可能是落地替換造成的。
                 $this->flashVariantNotices($variantReplaced);
-                $this->flashCoordinateNotices($coordinateCleared ?? []);
+                $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
 
                 return redirect()->back()->withInput();
             }
@@ -1748,7 +1757,7 @@ class CodesController extends Controller {
                 flash('提案失敗：已有其他新增提案使用相同主鍵，請調整後再提交。', 'warning');
                 // 同上：這個衝突可能是落地替換造成的。
                 $this->flashVariantNotices($variantReplaced);
-                $this->flashCoordinateNotices($coordinateCleared ?? []);
+                $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
 
                 return redirect()->back()->withInput();
             }
@@ -1791,7 +1800,7 @@ class CodesController extends Controller {
 
         flash('提案內容已更新，等待審核 @ '.Carbon::now(), 'success');
         $this->flashVariantNotices($variantReplaced);
-        $this->flashCoordinateNotices($coordinateCleared ?? []);
+        $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
 
         return redirect()->route('app.operations.index', ['proposals_only' => 1]);
     }
@@ -1890,7 +1899,7 @@ class CodesController extends Controller {
         if ($this->findExistingRowInEitherVariantForm($table, $keyColumns, $data)) {
             flash('新增失敗：主鍵或唯一值已存在。', 'error');
             $this->flashVariantNotices($variantReplaced);
-            $this->flashCoordinateNotices($coordinateCleared ?? []);
+            $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
 
             return redirect()->back()
                 ->withInput()
@@ -1921,7 +1930,7 @@ class CodesController extends Controller {
                 // 這個衝突可能是落地替換自己造成的（使用者輸入的是自認為不同的字形），
                 // 不附上通知的話使用者無從得知系統改了字。
                 $this->flashVariantNotices($variantReplaced);
-                $this->flashCoordinateNotices($coordinateCleared ?? []);
+                $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
 
                 return redirect()->back()
                     ->withInput()
@@ -1934,7 +1943,7 @@ class CodesController extends Controller {
                 \Illuminate\Support\Facades\Log::warning('Codes 新增完整性違規', ['table' => $table, 'error' => $e->getMessage()]);
                 flash('新增失敗：必填欄位未填寫或關聯值不存在。', 'error');
                 $this->flashVariantNotices($variantReplaced);
-                $this->flashCoordinateNotices($coordinateCleared ?? []);
+                $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
 
                 return redirect()->back()
                     ->withInput()
@@ -1954,7 +1963,7 @@ class CodesController extends Controller {
         // 讓錄入者知道系統改了字（落地替換是無條件套用、沒有「保留」選項，所以用非阻塞
         // 的 flash 而不是要使用者做決定的彈窗）。
         $this->flashVariantNotices($variantReplaced);
-        $this->flashCoordinateNotices($coordinateCleared ?? []);
+        $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
         $this->resetVariantMapCacheIfNeeded($table);
 
         return redirect()->route($editRoute, ['table_name' => $table, 'id' => $id]);
@@ -2020,7 +2029,7 @@ class CodesController extends Controller {
             // 才撞上既有列（或才變成「沒有修改」）。少了通知，加上 withInput() 回填的是
             // **替換前**的原始輸入，使用者會完全無從理解為什麼。
             $this->flashVariantNotices($variantReplaced);
-            $this->flashCoordinateNotices($coordinateCleared ?? []);
+            $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
 
             return redirect()->back()->withInput();
         }
@@ -2042,7 +2051,7 @@ class CodesController extends Controller {
         // 含異體字的資料再原樣送出，替換就會產生 diff、記成一筆他自己沒察覺的提案。
         // 至少要讓他看到「系統把字改了」。
         $this->flashVariantNotices($variantReplaced);
-        $this->flashCoordinateNotices($coordinateCleared ?? []);
+        $this->flashCoordinateNotices($coordinateCleared, $originalRow ?? []);
 
         return redirect()->route($editRoute, ['table_name' => $table, 'id' => $id]);
     }
@@ -2608,12 +2617,17 @@ class CodesController extends Controller {
      * **刻意不在這裡套用整份 {@see \App\Support\CodeTableFieldValidator}。** 那份驗證的型別
      * 清單是照各表的 v2 `allowed_fields` 寫的，而這個表單會把**整列所有欄位**一起 post
      * 回來，於是：
-     *  - `long_text_fields` 只為三張表登記過，`ETHNICITY_TRIBE_CODES.c_notes`、
-     *    `TEXT_CODES.c_notes`、`TEXT_INSTANCE_DATA.c_notes` 都是 longtext 卻沒登記——
-     *    使用者在一列備註超過 255 字的資料上改任何無關欄位都會硬 422；
+     *  - **255 字元上限會誤傷 longtext 欄**：`validate()` 對不在 `long_text_fields` 的字串
+     *    一律套 255 上限，而那份清單是逐表登記的——**update 端（`code_table_mutations.php`）
+     *    只有 `ADMIN_CAT_CODES` 與 `ADDR_CODES` 宣告了它**（create 端多一個 `TEXT_CODES`）。
+     *    於是 `TEXT_CODES.c_notes`、`TEXT_INSTANCE_DATA.c_notes`、
+     *    `ETHNICITY_TRIBE_CODES.c_notes` 這些 longtext 欄在編輯時都會撞上上限——而編輯
+     *    表單會把既有的 `c_notes` 原樣 post 回來，所以使用者在一列備註超過 255 字的資料上
+     *    改任何無關欄位都會硬 422；
      *  - `not_null_fields` 會與既有的 `applyColumnDefaultsForBlanks()` 相衝
      *    （`ADDR_CODES.c_admin_cat_code` 是 NOT NULL DEFAULT 0，現在留白是吃預設值）；
-     *  - `looksNumeric()` 不 trim，貼上來的「 1200」現在存得進去、之後會開始 422；
+     *  - `integer_ranges` 不在 config 裡（由 handler 的 trait 依實際 schema 推導），
+     *    controller 要複製一份才能用，而複製一份型別推導正是最容易漂移的東西；
      *  - 兩份 config 只覆蓋 16 張表，而 `config/codes.php` 有 82 張。
      * 窄範圍的座標檢查沒有那個爆炸半徑，而且判定共用 `CoordinatePairNormalizer` 自己的
      * 謂詞，所以與 v2 那條路「什麼算合法座標」由構造保證一致。
@@ -2637,8 +2651,44 @@ class CodesController extends Controller {
         return [$result['data'], $result['cleared'], []];
     }
 
-    /** 把座標歸零通知 flash 出來（沒有就什麼都不做）。 */
-    protected function flashCoordinateNotices(array $cleared): void {
+    /**
+     * 把座標歸零通知 flash 出來（沒有就什麼都不做）。
+     *
+     * `$originalRow` 用來濾掉「什麼都沒發生」的假損失，規則與
+     * `NormalizesCoordinatePairs::dropNoOpCoordinateNotices()` 相同：只有**沒被送來**
+     * （由歸一補寫）**且原值本來就是 NULL** 的伙伴欄才濾掉。少了這道，
+     * `PUT /app/codes/ADDR_CODES/{id}` 只送 `x_coord=0`、而該列的 `y_coord` 本來就是 NULL 時，
+     * 會冒出一句「y_coord 一併視為 NULL」——宣告了一個沒發生的損失。
+     *
+     * 反過來，**送來了**的欄一律保留通知，即使原值是 NULL：那正是「填了經度、因為緯度留空
+     * 而被整對丟棄」的情形，是唯一真的丟掉使用者輸入的場景。
+     *
+     * @param array<string,string> $cleared
+     * @param array<string,mixed>|object $originalRow 寫入前的那一列；新增時傳空陣列
+     */
+    protected function flashCoordinateNotices(array $cleared, $originalRow = []): void {
+        if ($cleared === []) {
+            return;
+        }
+
+        $original = [];
+        foreach ((array) $originalRow as $key => $value) {
+            $original[strtolower((string) $key)] = $value;
+        }
+
+        $submitted = array_map('strtolower', array_keys(request()->all()));
+        foreach ($cleared as $column => $reason) {
+            if ($reason !== CoordinatePairNormalizer::REASON_PARTNER) {
+                continue;
+            }
+            if (in_array(strtolower((string) $column), $submitted, true)) {
+                continue;  // 使用者自己送的，即使原值是 NULL 也要說
+            }
+            if (($original[strtolower((string) $column)] ?? null) === null) {
+                unset($cleared[$column]);
+            }
+        }
+
         foreach (CoordinatePairNormalizer::buildNotices($cleared) as $notice) {
             flash($notice, 'warning');
         }

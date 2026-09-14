@@ -330,7 +330,7 @@ class CodesUiZeroCoordinateTest extends TestCase {
         $this->actAsEditor('codes-coord-prop@example.com');
         $this->seedRow(['x_coord' => 113.11134338, 'y_coord' => 40.37184906]);
 
-        $this->post('/codes/ADDR_CODES/4338/proposal', [
+        $this->post('/app/codes/ADDR_CODES/4338/proposal', [
             'c_name_chn' => '安定衛',
             'c_admin_cat_code' => 176,
             'x_coord' => '0',
@@ -338,9 +338,9 @@ class CodesUiZeroCoordinateTest extends TestCase {
         ]);
 
         $op = DB::table('operations')->where('resource', 'ADDR_CODES')->first();
-        if ($op === null) {
-            $this->markTestSkipped('此環境沒有建立提案（路由或授權不同），改由 v2 提案測試覆蓋');
-        }
+        // 刻意不用 markTestSkipped 當退路：上游把 legacy `/codes/.../proposal` 封成 410 時，
+        // 這支測試曾經因此靜默跳過、什麼都沒驗到。一支會無聲停止工作的測試比一支會紅的更糟。
+        $this->assertNotNull($op, '提案沒有建立，這支測試就守不住任何東西——請檢查路由或授權');
         $payload = json_decode($op->resource_data, true);
         $this->assertNull($payload['x_coord'], '提案 payload 就該存歸一後的值');
         $this->assertNull($payload['y_coord']);
@@ -420,5 +420,166 @@ class CodesUiZeroCoordinateTest extends TestCase {
 
         // 中止還原，原值毫髮無傷——絕不可以變成 0。
         $this->assertSame(113.11134338, (float) $this->row()->x_coord);
+    }
+
+    // ── 審查指出零覆蓋的三個掛鉤點 ──────────────────────────
+
+    #[Test]
+    public function testAProposalCreatePayloadIsNormalizedAsACompleteRow(): void {
+        // 這是審查端到端證明過的 bug：`performProposalStore` 原本用逐欄模式，但那個 payload
+        // **就是**核准時 applyCreateProposal() 會直接 INSERT 的一列。於是手工組的 POST 可以
+        // 用提案路徑繞過直接新增擋得住的半截對。
+        $this->actAsEditor('codes-prop-create@example.com');
+
+        $this->post('/app/codes/ADDR_CODES/proposal', [
+            'c_addr_id' => '9005',
+            'c_name_chn' => '半截提案',
+            'c_admin_cat_code' => '176',
+            'x_coord' => '105.36354',
+            // 刻意完全不送 y_coord（不是留空——留空會被 middleware 轉成 null 而觸發歸一）
+        ]);
+
+        $op = DB::table('operations')->where('resource', 'ADDR_CODES')->first();
+        if ($op === null) {
+            $this->fail('提案沒有建立，這支測試就守不住任何東西——請檢查路由或授權');
+        }
+        $payload = json_decode($op->resource_data, true);
+        $this->assertArrayHasKey('x_coord', $payload);
+        $this->assertNull(
+            $payload['x_coord'],
+            '新增提案的 payload 就是要 INSERT 的整列，半截座標必須在這裡就被清掉'
+        );
+        $this->assertArrayHasKey('y_coord', $payload);
+        $this->assertNull($payload['y_coord']);
+    }
+
+    #[Test]
+    public function testEditingAnExistingCreateProposalAlsoNormalizesAsACompleteRow(): void {
+        $admin = User::forceCreate([
+            'name' => 'prop editor',
+            'email' => 'codes-prop-edit@example.com',
+            'confirmation_token' => 'token-prop-edit',
+            'is_active' => User::STATUS_ACTIVE,
+            'is_admin' => User::ROLE_SUPER_ADMIN,
+        ]);
+
+        $operationId = DB::table('operations')->insertGetId([
+            'user_id' => $admin->id,
+            'c_personid' => 0,
+            'op_type' => Operation::TYPE_PROPOSAL_CREATE,
+            'resource' => 'ADDR_CODES',
+            'resource_id' => 'c_addr_id=9006',
+            'resource_data' => json_encode([
+                'c_addr_id' => 9006,
+                'c_name_chn' => '待編輯',
+                'c_admin_cat_code' => 176,
+                '__review_status' => 'pending',
+                '__key_columns' => ['c_addr_id'],
+            ], JSON_UNESCAPED_UNICODE),
+            'resource_original' => json_encode([]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($admin);
+        $this->patch('/app/codes/ADDR_CODES/proposals/'.$operationId, [
+            'c_addr_id' => '9006',
+            'c_name_chn' => '待編輯',
+            'c_admin_cat_code' => '176',
+            'x_coord' => '105.36354',
+        ]);
+
+        $payload = json_decode(
+            DB::table('operations')->where('id', $operationId)->value('resource_data'),
+            true
+        );
+        $this->assertArrayHasKey('x_coord', $payload);
+        $this->assertNull(
+            $payload['x_coord'],
+            '編輯新增提案時同樣是整列，半截座標必須被清掉'
+        );
+        $this->assertArrayHasKey('y_coord', $payload);
+        $this->assertNull($payload['y_coord']);
+    }
+
+    #[Test]
+    public function testRestoringADeletedRowWithZeroCoordinatesDoesNotPutTheZeroBack(): void {
+        // restoreDelete 原本零覆蓋。它重建一列被刪的資料，快照裡的 0,0 同樣不該回到資料庫。
+        $admin = User::forceCreate([
+            'name' => 'restore delete admin',
+            'email' => 'restore-del@example.com',
+            'confirmation_token' => 'token-restore-del',
+            'is_active' => User::STATUS_ACTIVE,
+            'is_admin' => User::ROLE_SUPER_ADMIN,
+        ]);
+
+        // 被刪掉的那一列（資料庫裡現在沒有它）
+        $deletedRow = [
+            'c_addr_id' => 9007,
+            'c_name' => 'Deleted',
+            'c_name_chn' => '已刪除',
+            'c_admin_cat_code' => 176,
+            'x_coord' => 0,
+            'y_coord' => 0,
+        ];
+
+        $operationId = DB::table('operations')->insertGetId([
+            'user_id' => $admin->id,
+            'c_personid' => 0,
+            'op_type' => Operation::TYPE_DELETE,
+            'resource' => 'ADDR_CODES',
+            'resource_id' => 'c_addr_id=9007',
+            'resource_data' => json_encode($deletedRow, JSON_UNESCAPED_UNICODE),
+            'resource_original' => json_encode($deletedRow, JSON_UNESCAPED_UNICODE),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($admin);
+        $this->post('/operations/'.$operationId.'/restore');
+
+        $row = $this->row(9007);
+        $this->assertNotNull($row, '還原應該把這一列建回來');
+        $this->assertNull($row->x_coord, '重建被刪的列時也不可以把 0,0 放回去');
+        $this->assertNull($row->y_coord);
+    }
+
+    #[Test]
+    public function testRestoreTellsTheRestorerThatItZeroedACoordinate(): void {
+        // 還原者的意圖是「把資料變回快照的樣子」；系統沒照字面做就要講——尤其是半髒快照，
+        // 那個真實的 113.5 會被一併清掉。
+        $admin = User::forceCreate([
+            'name' => 'restore notice admin',
+            'email' => 'restore-notice@example.com',
+            'confirmation_token' => 'token-restore-notice',
+            'is_active' => User::STATUS_ACTIVE,
+            'is_admin' => User::ROLE_SUPER_ADMIN,
+        ]);
+        $this->seedRow(['x_coord' => 105.0, 'y_coord' => 30.0]);
+
+        $before = (array) $this->row();
+        $halfDirty = array_merge($before, ['x_coord' => 113.5, 'y_coord' => 0]);
+
+        $operationId = DB::table('operations')->insertGetId([
+            'user_id' => $admin->id,
+            'c_personid' => 0,
+            'op_type' => Operation::TYPE_UPDATE,
+            'resource' => 'ADDR_CODES',
+            'resource_id' => 'c_addr_id=4338',
+            'resource_data' => json_encode($before, JSON_UNESCAPED_UNICODE),
+            'resource_original' => json_encode($halfDirty, JSON_UNESCAPED_UNICODE),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($admin);
+        $this->post('/operations/'.$operationId.'/restore');
+
+        $this->assertNull($this->row()->x_coord, '半髒快照的真實經度應該被一併清掉');
+        $this->assertStringContainsString(
+            'x_coord',
+            json_encode(session()->all(), JSON_UNESCAPED_UNICODE),
+            '還原順手丟掉了一個真實的經度值，卻沒有任何訊息告訴還原者'
+        );
     }
 }

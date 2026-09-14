@@ -1498,7 +1498,7 @@ class BiogMainRepository {
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         // 異體字落地替換（型別驅動）。提案核准走這條路（applyKinshipProposal／
         // applyAssocProposal 不重放 v2 handler，直接呼叫本方法），所以 S3 的基底掛鉤覆蓋不到。
-        // legacy Blade 路徑共用本方法（flag=new 下已被 LegacyBladeFormGate 下架），共用同一份
+        // legacy Blade 路徑共用本方法（flag=new 下已於 Blade 下架計畫環節 2 實體刪除），共用同一份
         // 替換語義本來就是想要的。掛在哨兵正規化之後、timestamp() 與任何 PK 計算之前；
         // 稽核欄由排除清單擋住。
         // KIN_DATA 的主鍵三欄都是數值，替換不會改鍵（不涉 D7）。
@@ -1581,7 +1581,7 @@ class BiogMainRepository {
         $data['c_source'] = $data['c_source'] == -999 ? '0' : $data['c_source'];
         // 異體字落地替換（型別驅動）。提案核准走這條路（applyKinshipProposal／
         // applyAssocProposal 不重放 v2 handler，直接呼叫本方法），所以 S3 的基底掛鉤覆蓋不到。
-        // legacy Blade 路徑共用本方法（flag=new 下已被 LegacyBladeFormGate 下架），共用同一份
+        // legacy Blade 路徑共用本方法（flag=new 下已於 Blade 下架計畫環節 2 實體刪除），共用同一份
         // 替換語義本來就是想要的。掛在哨兵正規化之後、timestamp() 與任何 PK 計算之前；
         // 稽核欄由排除清單擋住。
         // KIN_DATA 的主鍵三欄都是數值，替換不會改鍵（不涉 D7）。
@@ -2465,7 +2465,7 @@ class BiogMainRepository {
         $data = Arr::except($data, ['_method', '_token', 'action', '__proposal_comment', 'c_assocship_pair', 'c_kinship_pair', 'c_assoc_kinship_pair', 'ai_fill_log_id']);
         // 異體字落地替換（型別驅動）。提案核准走這條路（applyKinshipProposal／
         // applyAssocProposal 不重放 v2 handler，直接呼叫本方法），所以 S3 的基底掛鉤覆蓋不到。
-        // legacy Blade 路徑共用本方法（flag=new 下已被 LegacyBladeFormGate 下架），共用同一份
+        // legacy Blade 路徑共用本方法（flag=new 下已於 Blade 下架計畫環節 2 實體刪除），共用同一份
         // 替換語義本來就是想要的。掛在哨兵正規化之後、timestamp() 與任何 PK 計算之前；
         // 稽核欄由排除清單擋住。
         // 只替換 $data（要寫入的值）。定位既有列用的是 $id 解析出來的舊 PK，**不可替換**：
@@ -3213,7 +3213,7 @@ class BiogMainRepository {
         }
         // 異體字落地替換（型別驅動）。提案核准走這條路（applyKinshipProposal／
         // applyAssocProposal 不重放 v2 handler，直接呼叫本方法），所以 S3 的基底掛鉤覆蓋不到。
-        // legacy Blade 路徑共用本方法（flag=new 下已被 LegacyBladeFormGate 下架），共用同一份
+        // legacy Blade 路徑共用本方法（flag=new 下已於 Blade 下架計畫環節 2 實體刪除），共用同一份
         // 替換語義本來就是想要的。掛在哨兵正規化之後、timestamp() 與任何 PK 計算之前；
         // 稽核欄由排除清單擋住。
         // ⚠️ ASSOC_DATA.c_text_title 是主鍵成員，替換等於改鍵——必須在下方 insert 與

@@ -20,7 +20,7 @@ const TAB_SEGMENTS: Record<string, string> = {
     postings: 'offices',
 };
 
-export type LegacyPk = Record<string, string | number | boolean | null | undefined>;
+export type EditorPk = Record<string, string | number | boolean | null | undefined>;
 
 /**
  * 新版 React/Inertia 編輯器（edit-v2）URL（#34 詳情中樞接線）。
@@ -42,7 +42,7 @@ export function buildEditV2CreateUrl(tabKey: string, fallbackPersonId?: number |
     return `/app/basicinformation/${personId}/${segment}/edit-v2`;
 }
 
-export function buildEditV2EditUrl(tabKey: string, pk: LegacyPk, fallbackPersonId?: number | null): string | null {
+export function buildEditV2EditUrl(tabKey: string, pk: EditorPk, fallbackPersonId?: number | null): string | null {
     const segment = TAB_SEGMENTS[tabKey];
     if (!segment) {
         return null;

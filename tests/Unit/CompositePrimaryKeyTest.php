@@ -910,12 +910,10 @@ class CompositePrimaryKeyTest extends TestCase {
         );
 
         $this->assertNotNull($url);
-        $this->assertStringContainsString('/basicinformation/12345/offices/edit', $url);
+        $this->assertStringStartsWith('/app/basicinformation/12345/offices/edit-v2', $url);
         $this->assertStringContainsString('c_office_id=448', $url);
         $this->assertStringContainsString('c_posting_id=130', $url);
     }
-
-    // === EDIT_ROUTE_MAP 測試 ===
 
     // === buildResourceEditUrl 測試 ===
 
@@ -935,7 +933,7 @@ class CompositePrimaryKeyTest extends TestCase {
         );
 
         $this->assertNotNull($url);
-        $this->assertStringContainsString('/basicinformation/12345/offices/edit', $url);
+        $this->assertStringStartsWith('/app/basicinformation/12345/offices/edit-v2', $url);
         $this->assertStringContainsString('c_office_id=448', $url);
         $this->assertStringContainsString('c_posting_id=130', $url);
     }
@@ -950,39 +948,45 @@ class CompositePrimaryKeyTest extends TestCase {
         );
 
         $this->assertNotNull($url);
-        $this->assertStringContainsString('/basicinformation/12345/offices/edit', $url);
+        $this->assertStringStartsWith('/app/basicinformation/12345/offices/edit-v2', $url);
         $this->assertStringContainsString('c_office_id=448', $url);
         $this->assertStringContainsString('c_posting_id=130', $url);
     }
 
-    // === buildResourceEditUrl flag-aware（子資源 flag=new → React /app edit-v2，帶完整 PK query）===
+    // === buildResourceEditUrl → React /app edit-v2（帶完整 PK query）===
+    // 原本是 flag-aware（flag=old 退回 legacy .edit.query）；那些 flag 與 legacy 路由已於
+    // Blade 下架計畫環節 2 移除，行為改為無條件。下面仍刻意把 flag 塞回 config，
+    // 作為「塞回去也不得復活 legacy」的護欄。
 
     #[Test]
-    public function it_builds_app_editv2_url_when_subresource_flag_is_new(): void {
-        config()->set('migration_flags.pages.basicinformation.offices', 'new');
+    public function it_builds_app_editv2_url_and_ignores_reintroduced_subresource_flag(): void {
+        // 護欄：塞回 flag（即使是 'old'）也不得復活已刪除的 legacy 編輯頁。
+        config()->set('migration_flags.pages.basicinformation.offices', 'old');
         $url = CompositePrimaryKey::buildResourceEditUrl('POSTED_TO_OFFICE_DATA', '448-130', 12345);
 
         $this->assertNotNull($url);
-        $this->assertStringContainsString('/app/basicinformation/12345/offices/edit-v2', $url);
+        $this->assertStringStartsWith('/app/basicinformation/12345/offices/edit-v2', $url);
         $this->assertStringContainsString('c_office_id=448', $url);
         $this->assertStringContainsString('c_posting_id=130', $url);
         $this->assertStringNotContainsString('/offices/edit?', $url); // 非 legacy
     }
 
     #[Test]
-    public function it_builds_app_editv2_url_for_addr_alias_when_offices_flag_is_new(): void {
+    public function it_builds_app_editv2_url_for_addr_alias_ignoring_reintroduced_flag(): void {
         // POSTED_TO_ADDR_DATA 別名共用 offices editv2（PK 經 office schema 解析）。
-        config()->set('migration_flags.pages.basicinformation.offices', 'new');
+        // 護欄：塞回 flag（即使是 'old'）也不得復活已刪除的 legacy 編輯頁。
+        config()->set('migration_flags.pages.basicinformation.offices', 'old');
         $url = CompositePrimaryKey::buildResourceEditUrl('POSTED_TO_ADDR_DATA', '448-130', 12345);
 
         $this->assertNotNull($url);
-        $this->assertStringContainsString('/app/basicinformation/12345/offices/edit-v2', $url);
+        $this->assertStringStartsWith('/app/basicinformation/12345/offices/edit-v2', $url);
         $this->assertStringContainsString('c_office_id=448', $url);
     }
 
     #[Test]
-    public function it_builds_app_editv2_url_for_assoc_with_full_pk_when_flag_new(): void {
-        config()->set('migration_flags.pages.basicinformation.assoc', 'new');
+    public function it_builds_app_editv2_url_for_assoc_with_full_pk(): void {
+        // 護欄：塞回 flag（即使是 'old'）也不得復活已刪除的 legacy 編輯頁。
+        config()->set('migration_flags.pages.basicinformation.assoc', 'old');
         $rid = CompositePrimaryKey::buildStoredResourceId([
             'c_personid' => 1762, 'c_assoc_code' => 197, 'c_assoc_id' => 3767,
             'c_kin_code' => 0, 'c_kin_id' => 0, 'c_assoc_kin_code' => 0, 'c_assoc_kin_id' => 0,
@@ -1046,7 +1050,7 @@ class CompositePrimaryKeyTest extends TestCase {
         );
 
         $this->assertNotNull($url);
-        $this->assertStringContainsString('/basicinformation/12345/offices/edit', $url);
+        $this->assertStringStartsWith('/app/basicinformation/12345/offices/edit-v2', $url);
         $this->assertStringContainsString('c_office_id=448', $url);
         $this->assertStringContainsString('c_posting_id=130', $url);
     }

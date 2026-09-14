@@ -279,7 +279,6 @@ class CodesPersonPickerTest extends TestCase {
     public function picker_ships_a_person_edit_url_template(): void {
         // URL 由後端產生、前端只換 __ID__；元件不寫死 /app/ 路徑。
         // 斷言字面值而非再呼叫 person_page_url()——拿同一個 helper 比對自己等於什麼都沒鎖。
-        config(['migration_flags.pages.basicinformation.editor' => 'new']);
 
         $this->editAssoc()
             ->assertOk()

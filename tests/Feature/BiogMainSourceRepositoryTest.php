@@ -13,7 +13,14 @@ use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
-class BasicInformationSourcesControllerTest extends TestCase {
+/**
+ * BIOG_SOURCE_DATA 的 repository 層寫入行為（稽核欄、operations／原始快照）。
+ *
+ * 原名 BasicInformationSourcesControllerTest——那個 controller 已於 Blade 下架計畫環節 2
+ * 刪除，但本檔留下的四個測試**不打任何路由**，是直接 new BiogMainRepository() 呼叫
+ * sourceStoreById()／sourceUpdateById()／sourceDestroyById()，與 controller 無關，故更名保留。
+ */
+class BiogMainSourceRepositoryTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
 

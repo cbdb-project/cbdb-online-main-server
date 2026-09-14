@@ -693,6 +693,55 @@ class ApiV2MutateTest extends TestCase {
         $response->assertStatus(422);
         $this->assertNotEmpty($response->json('notices'), '422 也要帶異體字通知');
         $this->assertDatabaseHas('BIOG_MAIN', ['c_personid' => 138841, 'c_notes' => '清流']);
+
+        // 「無實質變更」不只是不改資料列，也**不得留下任何紀錄**——否則 operations 會被一堆
+        // 空更新灌滿、audit_log 出現 old===new 的噪音列。原 BiogMainBasicInfoNameMergeTest
+        // ::testNameMergeWithNoChanges 有這組斷言，該檔隨 Blade 下架計畫環節 2 刪除，補在這裡。
+        $this->assertSame(0, DB::table('operations')->count(), '無實質變更不得寫 operations');
+        $this->assertSame(0, DB::table('audit_log')->count(), '無實質變更不得寫 audit_log');
+    }
+
+    // ── 授權（resource=basicinformation）────────────────────────
+
+    /**
+     * 未登入與未啟用帳號都不得更新人物主檔。
+     *
+     * 原 BiogMainBasicInfoNameMergeTest 的 testGuestCannotUpdateNames／
+     * testInactiveUserCannotUpdateNames 走 legacy `PATCH /basicinformation/{id}`，
+     * 該路由已於 Blade 下架計畫環節 2 改為 410。同一組 middleware 的 v2 斷言補在這裡
+     * （其他 resource 有、`basicinformation` 這個 resource 原本沒有）。
+     */
+    #[Test]
+    public function testGuestCannotMutateBiogMain() {
+        $this->seedBiogMain();
+
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'basicinformation',
+            'person_id' => 138841,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_personid' => 138841]],
+            'changes' => ['c_notes' => '未登入不該寫得進去'],
+        ])->assertStatus(401)->assertJson(['ok' => false]);
+
+        $this->assertDatabaseMissing('BIOG_MAIN', ['c_personid' => 138841, 'c_notes' => '未登入不該寫得進去']);
+    }
+
+    #[Test]
+    public function testInactiveUserCannotMutateBiogMain() {
+        $this->actingAs($this->makeUser(User::STATUS_INACTIVE, User::ROLE_REGULAR, 'biog-inactive@example.com'));
+        $this->seedBiogMain();
+
+        $this->postJson('/api/v2/mutate', [
+            'resource' => 'basicinformation',
+            'person_id' => 138841,
+            'mode' => 'direct',
+            'operation' => 'update',
+            'target' => ['pk' => ['c_personid' => 138841]],
+            'changes' => ['c_notes' => '未啟用不該寫得進去'],
+        ])->assertStatus(403)->assertJson(['ok' => false]);
+
+        $this->assertDatabaseMissing('BIOG_MAIN', ['c_personid' => 138841, 'c_notes' => '未啟用不該寫得進去']);
     }
 
     /**

@@ -2,6 +2,15 @@
 
 namespace App\Support;
 
+/**
+ * 人物頁歷史紀錄（audit log／operations）的分頁定義。
+ *
+ * ⚠️ 下面兩個 map 的**鍵是 legacy 路由名，已無對應路由**（Blade 下架計畫環節 2 刪除）；
+ * 以路由名查表的 resolveFromRoute() 也已隨之移除（全庫零呼叫）。留下鍵只是為了保持
+ * 陣列結構與可讀的來源標記——**現行的查表入口是 resolveFromPage()**（以 `history_page`
+ * 這個 page 值查），值（page／label／tables）仍然全部在服役。
+ * 消費者：AdminAuditLogController::resolveHistoryContext()、OperationsController 同名方法。
+ */
 class BasicInformationHistory {
     private const EXACT_ROUTE_MAP = [
         'basicinformation.edit' => [
@@ -78,24 +87,6 @@ class BasicInformationHistory {
             'tables' => ['BIOG_SOURCE_DATA'],
         ],
     ];
-
-    public static function resolveFromRoute(?string $routeName): ?array {
-        if (!is_string($routeName) || $routeName === '') {
-            return null;
-        }
-
-        if (isset(self::EXACT_ROUTE_MAP[$routeName])) {
-            return self::normalizeDefinition(self::EXACT_ROUTE_MAP[$routeName]);
-        }
-
-        foreach (self::PREFIX_ROUTE_MAP as $prefix => $definition) {
-            if (str_starts_with($routeName, $prefix)) {
-                return self::normalizeDefinition($definition);
-            }
-        }
-
-        return null;
-    }
 
     public static function resolveFromPage(?string $page): ?array {
         $page = trim((string) $page);

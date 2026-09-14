@@ -1813,14 +1813,31 @@ class PersonBrowserTest extends TestCase {
         );
     }
 
+    /**
+     * 可提案但不可直接寫入（眾包）用戶開新增人物頁：回 501，**不得導向**。
+     *
+     * 原測試斷言的是「導回 legacy 新增頁」（`route('basicinformation.create')`）。Blade
+     * 下架計畫環節 2 之後那條路由只是一個 302 導回 `/app/basicinformation/create` 的 shim，
+     * 於是變成
+     *   /app/basicinformation/create → /basicinformation/create → /app/basicinformation/create …
+     * 無限導向（ERR_TOO_MANY_REDIRECTS）；而原註解所指的「舊版眾包新增流程」頁面本身也
+     * 已隨該環節刪除，目的地不存在。舊測試把這個迴圈寫死成期望值，所以不會示警。
+     *
+     * 入口是真的可達的：`appIndex` 的 `can_add` 只看 `Auth::check() && isActive()`，
+     * 啟用中的眾包用戶看得到「新增」按鈕。
+     *
+     * 現行行為改為 501 並附說明。這條斷言同時是「不得再退回導向」的護欄。
+     */
     #[Test]
-    public function test_app_basicinformation_create_redirects_proposal_only_user_to_legacy(): void {
-        // 可提案但不可直接寫入（眾包）用戶：BIOG_MAIN create proposal v2 回 501，導回舊版。
+    public function test_app_basicinformation_create_returns_501_for_proposal_only_user(): void {
         $crowdUser = User::factory()->create(['is_active' => 1, 'is_admin' => User::ROLE_CROWDSOURCING]);
 
-        $response = $this->actingAs($crowdUser)
-            ->get(route('app.basicinformation.create'));
+        $response = $this->actingAs($crowdUser)->get(route('app.basicinformation.create'));
 
-        $response->assertRedirect(route('basicinformation.create'));
+        $response->assertStatus(501);
+        $this->assertFalse(
+            $response->isRedirect(),
+            '不得導向——legacy 新增頁已刪除，導過去會變成無限迴圈'
+        );
     }
 }

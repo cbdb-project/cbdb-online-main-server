@@ -223,7 +223,7 @@ handler 以 direct 語義重放、`__applied_operation_id` 記回供「比較」
 - [app/Http/Controllers/OperationsProposalController.php](../app/Http/Controllers/OperationsProposalController.php)
   ——`HANDLER_ROUTED_RESOURCES`、`applyProposal()`、`applyViaMutationHandler()`、`AUDIT_COLUMNS`
 - [app/Support/AuditActor.php](../app/Support/AuditActor.php)（稽核署名，§4.7）
-- [app/Http/Middleware/LegacyBladeFormGate.php](../app/Http/Middleware/LegacyBladeFormGate.php)（legacy 表單下架閘門）
+- [app/Http/Middleware/LegacyBladeFormGate.php（已於 2026-09-14 隨 Blade 下架計畫環節 2 刪除）](../app/Http/Middleware/LegacyBladeFormGate.php（已於 2026-09-14 隨 Blade 下架計畫環節 2 刪除）)（legacy 表單下架閘門）
 - [app/Services/Mutations/MutationHandlerRegistry.php](../app/Services/Mutations/MutationHandlerRegistry.php)
 - [app/Services/Mutations/AbstractPersonSubresourceCreateHandler.php](../app/Services/Mutations/AbstractPersonSubresourceCreateHandler.php)
   ／[…MutationHandler.php](../app/Services/Mutations/AbstractPersonSubresourceMutationHandler.php)

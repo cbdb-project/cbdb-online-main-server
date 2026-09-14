@@ -34,7 +34,6 @@ interface Props {
     canEditBasicInfo: boolean;
     canProposeEdits?: boolean;
     /** basic_info 分頁進場即進入編輯狀態（編輯主界面用；PersonBrowser 不傳 → 維持原行為）。 */
-    basicInfoStartEditing?: boolean;
     /** flag=new 時 basic_info 改為「檢視 + 編輯按鈕導向獨立 BasicInfoEditor（含年號轉換）」。 */
     postCE?: boolean;
     onSelectPerson?: (personId: number) => void;
@@ -71,7 +70,6 @@ export default function TabContentLoader({
     pinyinEndpoint,
     canEditBasicInfo,
     canProposeEdits = false,
-    basicInfoStartEditing = false,
     postCE = false,
     onSelectPerson,
     onBasicInfoSaved,
@@ -244,6 +242,8 @@ export default function TabContentLoader({
             );
         }
 
+        // 只在「沒有 personId」時走到（PersonEditor 必有；PersonBrowser 未選人時也不會
+        // 拿到 basic_info 資料）。保留成防禦性退路，避免 personId 為 null 時整頁空白。
         return (
             <BasicInfoView
                 sections={basicData?.sections || []}
@@ -252,7 +252,6 @@ export default function TabContentLoader({
                 mutateEndpoint={mutateEndpoint}
                 pinyinEndpoint={pinyinEndpoint}
                 canEdit={canEditBasicInfo}
-                startEditing={basicInfoStartEditing}
                 onEditorStateChange={onBasicInfoEditorStateChange}
                 onRegisterSaveHandler={onRegisterBasicInfoSaveHandler}
                 onSaved={() => {

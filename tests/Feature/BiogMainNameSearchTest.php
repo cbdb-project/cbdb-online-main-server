@@ -738,4 +738,98 @@ class BiogMainNameSearchTest extends TestCase {
         $personIds = collect($result->items())->pluck('c_personid')->map(fn ($id) => (int)$id)->toArray();
         $this->assertContains(3001, $personIds, '搜索「宗氏」應該能找到「宗氏（李白妻）」');
     }
+
+    /**
+     * 拼音詞邊界比對的共用夾具：三個帶尾巴的名字、一個純名字、一個「q 是它前綴但非詞邊界」的名字。
+     * 刻意不建 FTS 列 → 落到 LIKE 退路（與正式環境一致：FTS 僅索引中文）。
+     */
+    private function seedPinyinTailFixtures(): void {
+        DB::table('BIOG_MAIN')->insert([
+            ['c_personid' => 6001, 'c_name_chn' => '賈公彥', 'c_name' => 'Jia Gongyan',     'c_surname' => 'Jia', 'c_mingzi' => 'Gongyan',     'c_dy' => 14, 'c_index_addr_id' => 100],
+            ['c_personid' => 6002, 'c_name_chn' => '賈公彥', 'c_name' => 'Jia Gongyan (2)', 'c_surname' => 'Jia', 'c_mingzi' => 'Gongyan (2)', 'c_dy' => 14, 'c_index_addr_id' => 100],
+            ['c_personid' => 6003, 'c_name_chn' => '郭氏(趙禎妻)', 'c_name' => 'Guo Shi (Wife of Zhao Zhen )', 'c_surname' => 'Guo', 'c_mingzi' => 'Shi (Wife of Zhao Zhen )', 'c_dy' => 15, 'c_index_addr_id' => 100],
+            ['c_personid' => 6004, 'c_name_chn' => '郝懿行', 'c_name' => 'Hao Yixing',      'c_surname' => 'Hao', 'c_mingzi' => 'Yixing',      'c_dy' => 15, 'c_index_addr_id' => 100],
+            ['c_personid' => 6005, 'c_name_chn' => '郝翼',   'c_name' => 'Hao Yi',          'c_surname' => 'Hao', 'c_mingzi' => 'Yi',          'c_dy' => 15, 'c_index_addr_id' => 100],
+            ['c_personid' => 6006, 'c_name_chn' => '李_',    'c_name' => 'Li_',             'c_surname' => 'Li',  'c_mingzi' => '_',           'c_dy' => 15, 'c_index_addr_id' => 100],
+        ]);
+    }
+
+    private function pinyinIdsFor(string $q): array {
+        return collect(BiogMainRepository::namesByQuery(new Request(['q' => $q]), 50)->items())
+            ->pluck('c_personid')->map(fn ($id) => (int) $id)->sort()->values()->all();
+    }
+
+    #[Test]
+    public function test_pinyin_query_matches_names_with_disambiguation_suffix(): void {
+        // 迴歸：#154 把拼音改成整值精確比對後，"Jia Gongyan" 找不到 "Jia Gongyan (2)"（prod 31089）。
+        // 詞邊界前綴應同時命中無尾巴與帶尾巴的同名人。
+        $this->seedPinyinTailFixtures();
+
+        $ids = $this->pinyinIdsFor('Jia Gongyan');
+
+        $this->assertContains(6001, $ids, '應命中無後綴的 Jia Gongyan');
+        $this->assertContains(6002, $ids, '應命中帶 (2) 消歧後綴的 Jia Gongyan (2)');
+    }
+
+    #[Test]
+    public function test_pinyin_query_matches_names_with_descriptive_parenthetical(): void {
+        // 同一個原因的另一面：說明性括號（prod 上約 49,900 人）。搜 "Guo Shi" 應找到 "Guo Shi (Wife of Zhao Zhen )"。
+        $this->seedPinyinTailFixtures();
+
+        $this->assertContains(6003, $this->pinyinIdsFor('Guo Shi'), '應命中帶 (Wife of …) 說明的 Guo Shi');
+        $this->assertContains(6003, $this->pinyinIdsFor('Shi'), '只打名（c_mingzi 詞邊界前綴）亦應命中');
+    }
+
+    #[Test]
+    public function test_pinyin_query_still_requires_word_boundary(): void {
+        // #154 的驗收案例必須保住："hao yi" 不得撈到 "Hao Yixing"，"Li" 不得撈到 "Liu"／"Lin"。
+        $this->seedPinyinTailFixtures();
+
+        $ids = $this->pinyinIdsFor('hao yi');
+        $this->assertContains(6005, $ids, '"hao yi" 應命中 c_name 正是 Hao Yi 的人');
+        $this->assertNotContains(6004, $ids, '"hao yi" 不得以子字串命中 Hao Yixing');
+
+        $this->assertNotContains(6004, $this->pinyinIdsFor('Hao Yix'), '非詞邊界的前綴不得命中');
+    }
+
+    #[Test]
+    public function test_pinyin_query_escapes_like_wildcards(): void {
+        // 改成前綴比對後 %／_ 從無害變有害：使用者輸入的萬用字元必須當字面。
+        $this->seedPinyinTailFixtures();
+
+        // "Li_" 若未跳脫會當「Li + 任一字元」，撈到 c_surname='Lin' 之類；這裡它只能命中 c_name 字面是 Li_ 的 6006。
+        $this->assertSame([6006], $this->pinyinIdsFor('Li_'));
+        // "%" 未跳脫等於全表；跳脫後不命中任何人。
+        $this->assertSame([], $this->pinyinIdsFor('Jia%'));
+
+        // 中文欄的子字串條件（c_name_chn LIKE '%q%'）同樣要跳脫：q 只打 "%" 不得撈全表，
+        // q 只打 "_" 只能命中 c_name_chn 字面含底線的 6006（v1 /api/name 未認證可達，此處是唯一防線）。
+        $this->assertSame([], $this->pinyinIdsFor('%'));
+        $this->assertSame([6006], $this->pinyinIdsFor('_'));
+        $this->assertSame(0, (int) BiogMainRepository::dynastyFacetsByQuery('%')->sum('count'), '朝代分面同樣不得被 % 撈全表');
+    }
+
+    #[Test]
+    public function test_chinese_fts_query_escapes_like_wildcards(): void {
+        // 含漢字的輸入走 CBDB__NAME_FTS 前綴查詢，那兩條 LIKE 同樣要跳脫：
+        // 「蘇_」不得以單字元萬用命中「蘇軾」（1001）／「蘇轍」（1002），「蘇%」不得撈到所有蘇姓。
+        // 反向對照：「蘇」本身仍走 FTS 命中兩人，證明不是整條路徑被關掉。
+        $this->assertContains(1001, $this->pinyinIdsFor('蘇'));
+
+        $this->assertSame([], $this->pinyinIdsFor('蘇_'), 'FTS 前綴查詢的 _ 必須當字面');
+        $this->assertSame([], $this->pinyinIdsFor('蘇%'), 'FTS 前綴查詢的 % 必須當字面');
+        $this->assertSame(0, (int) BiogMainRepository::dynastyFacetsByQuery('蘇_')->sum('count'), '朝代分面的 FTS 查詢同樣要跳脫');
+    }
+
+    #[Test]
+    public function test_pinyin_dynasty_facets_stay_in_sync_with_result_total(): void {
+        // namesByQuery 與 dynastyFacetsByQuery 共用 applyPinyinNameMatch；facet 總數必須等於列表總數。
+        $this->seedPinyinTailFixtures();
+
+        foreach (['Jia Gongyan', 'Guo Shi', 'hao yi'] as $q) {
+            $total = BiogMainRepository::namesByQuery(new Request(['q' => $q]), 50)->total();
+            $facets = BiogMainRepository::dynastyFacetsByQuery($q);
+            $this->assertSame($total, (int) $facets->sum('count'), "「{$q}」的朝代分面總數應等於列表總數");
+        }
+    }
 }

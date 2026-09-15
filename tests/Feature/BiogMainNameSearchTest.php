@@ -810,6 +810,18 @@ class BiogMainNameSearchTest extends TestCase {
     }
 
     #[Test]
+    public function test_chinese_fts_query_escapes_like_wildcards(): void {
+        // 含漢字的輸入走 CBDB__NAME_FTS 前綴查詢，那兩條 LIKE 同樣要跳脫：
+        // 「蘇_」不得以單字元萬用命中「蘇軾」（1001）／「蘇轍」（1002），「蘇%」不得撈到所有蘇姓。
+        // 反向對照：「蘇」本身仍走 FTS 命中兩人，證明不是整條路徑被關掉。
+        $this->assertContains(1001, $this->pinyinIdsFor('蘇'));
+
+        $this->assertSame([], $this->pinyinIdsFor('蘇_'), 'FTS 前綴查詢的 _ 必須當字面');
+        $this->assertSame([], $this->pinyinIdsFor('蘇%'), 'FTS 前綴查詢的 % 必須當字面');
+        $this->assertSame(0, (int) BiogMainRepository::dynastyFacetsByQuery('蘇_')->sum('count'), '朝代分面的 FTS 查詢同樣要跳脫');
+    }
+
+    #[Test]
     public function test_pinyin_dynasty_facets_stay_in_sync_with_result_total(): void {
         // namesByQuery 與 dynastyFacetsByQuery 共用 applyPinyinNameMatch；facet 總數必須等於列表總數。
         $this->seedPinyinTailFixtures();

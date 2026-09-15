@@ -559,7 +559,7 @@ class BiogMainRepository {
         $personIds = [];
         if (\App\Support\PinyinSearchNormalizer::isChineseQuery($request->q)) {
             $personIds = DB::table('CBDB__NAME_FTS')
-                ->where('search_term', 'LIKE', $request->q . '%')
+                ->whereRaw("search_term LIKE ? ESCAPE '|'", [self::escapeLike($request->q).'%'])
                 ->orderByRaw('LENGTH(search_term) ASC')  // 優先精確匹配
                 ->limit(500)  // 限制最多 500 個候選人
                 ->pluck('c_personid')
@@ -695,6 +695,7 @@ class BiogMainRepository {
      * 跳脫字元用 | 並要求呼叫端顯式寫 ESCAPE '|'：MariaDB 預設 escape 是反斜線，但 SQLite 沒有
      * 預設值，而 '\\' 這個字面在兩邊的長度又不同（MariaDB 是一個字元、SQLite 是兩個），
      * 用反斜線做不到可攜。namesByQuery／dynastyFacetsByQuery 的每一條 LIKE 都要經過這裡——
+     * 包含 CBDB__NAME_FTS 的前綴查詢（含漢字的輸入走那條，"蘇_" 不跳脫會命中「蘇軾」）——
      * 漏一條就等於留一個「q 只打 % 便撈全表」的入口（v1 /api/name 未認證可達）。
      */
     private static function escapeLike(?string $value): string {
@@ -750,7 +751,7 @@ class BiogMainRepository {
         $personIds = [];
         if (\App\Support\PinyinSearchNormalizer::isChineseQuery($q)) {
             $personIds = DB::table('CBDB__NAME_FTS')
-                ->where('search_term', 'LIKE', $q . '%')
+                ->whereRaw("search_term LIKE ? ESCAPE '|'", [self::escapeLike($q).'%'])
                 ->orderByRaw('LENGTH(search_term) ASC')
                 ->limit(500)
                 ->pluck('c_personid')

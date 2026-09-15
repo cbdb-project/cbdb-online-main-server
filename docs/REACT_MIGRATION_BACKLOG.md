@@ -209,9 +209,9 @@
 ## Phase 7 — 下架 AdminLTE（全部頁 `live`/`retired` 後）
 | # | 項目 | 狀態 |
 |---|---|---|
-| P7-1 | 移除 admin-lte/jquery/bootstrap/datatables.net-bs4/Select2 主題 | todo |
-| P7-2 | 移除 layouts/dashboard-v3 全套 + resources/js/app.js 的 Vue 掛載 | todo |
-| P7-3 | 更新 AGENTS.md / ADMINLTE.md / README.md / CHANGELOG.md；標註 ADMINLTE4_UPGRADE_FEASIBILITY.md 已被取代 | todo |
+| P7-1 | 移除 admin-lte/jquery/bootstrap/datatables.net-bs4/Select2 主題 | **retired**（2026-09-15，Blade 下架環節 5b；另含 vue／@vue/compiler-sfc／@vitejs/plugin-vue／axios／lodash／sass） |
+| P7-2 | 移除 layouts/dashboard-v3 全套 + resources/js/app.js 的 Vue 掛載 | **retired**（layout 6 檔於環節 5a、`app.js`／`datatables.js`／`jquery-global.js`／`Select.vue` 於 5b） |
+| P7-3 | 更新 AGENTS.md / ADMINLTE.md / README.md / CHANGELOG.md；標註 ADMINLTE4_UPGRADE_FEASIBILITY.md 已被取代 | **retired**（2026-09-15，環節 5b；`ADMINLTE.md` 改寫為歷史文件） |
 
 ## 已具 React 版、僅待切換 + 退役（非重寫）
 | 頁面 | React 路由 | 狀態 | 備註 |

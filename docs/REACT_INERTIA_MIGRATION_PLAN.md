@@ -122,7 +122,7 @@
 5. **複合主鍵子資源**：URL 沿用 `docs/COMPOSITE_PRIMARY_KEY_URL_DESIGN.md` 的 query-string pk 約定。**注意該文件記載 write-path 仍在收斂中**（texts/addresses/altname/entries 等仍走舊 path-based resource 路由、query-path 的 store/update/destroy 測試未齊）。**因此「複合主鍵 write-path 收斂 + 對應 Feature 測試」是 Phase 4 的硬前置**，否則 React 表單會蓋在未定型的寫入層上。
 6. ⚠️ **認證頁**：建議**最後處理或暫時保留 Blade 版**（登入/註冊互動簡單、收益低）。若要 React 化，改為 Inertia 頁即可，`laravel/ui` 後端不必換。
 7. **SSR 維持關閉**：本站為登入後的後台工具，首屏 SEO 非需求；維持 CSR，靠既有 per-page code-split 控制 bundle。
-8. **退場條件**：所有頁面遷移完成後，移除 `admin-lte`、`jquery`、`bootstrap`、`datatables.net-bs4`、Select2 主題、`layouts/dashboard-v3` 全套與 `resources/js/app.js` 的 Vue 掛載。**此時先前的 bootstrap deprecation 警告才真正消失** —— 它們是本工程的副產品，不是驅動因素。
+8. ~~**退場條件**：所有頁面遷移完成後，移除 `admin-lte`、`jquery`、`bootstrap`、`datatables.net-bs4`、Select2 主題、`layouts/dashboard-v3` 全套與 `resources/js/app.js` 的 Vue 掛載。~~ ✅ **已全數達成**（Blade 下架計畫環節 5a／5b，2026-09-15）：layout 6 檔、`app.js` 全套與 11 個 npm 相依都已移除。
 
 ---
 
@@ -176,9 +176,12 @@
 ### Phase 6 — 認證頁與入口（**S**）
 - ~~`auth/{login,register,passwords/email,passwords/reset}`、`welcome`~~ ✅ **已於 2026-09-15 的環節 4c 實體刪除**（連同 controller 內的 flag 分支）。死碼 `home.blade.php`、`auth/register2.blade.php` ✅ **已於 2026-09-14 刪除**（[Blade 下架計畫](./BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md) 環節 1／Backlog P6-C1、P6-C2）。
 
-### Phase 7 — 下架 AdminLTE（**M**）
-- 移除 `admin-lte`/`jquery`/`bootstrap`/`datatables.net-bs4`/Select2 主題、`layouts/dashboard-v3` 全套、`resources/js/app.js` 的 Vue 掛載與相關 jQuery 程式。
-- 同步更新 `AGENTS.md`、`ADMINLTE.md`、`README.md`、`CHANGELOG.md`。
+### Phase 7 — 下架 AdminLTE（**M**）✅ **已完成（2026-09-15）**
+- ✅ 移除 `admin-lte`/`jquery`/`bootstrap`/`datatables.net-bs4`/Select2 主題、`layouts/dashboard-v3` 全套、
+  `resources/js/app.js` 的 Vue 掛載與相關 jQuery 程式（Blade 下架計畫環節 5a／5b，另含 `vue`／
+  `@vue/compiler-sfc`／`@vitejs/plugin-vue`／`axios`／`lodash`／`sass`）。
+- ✅ 同步更新 `AGENTS.md`、`ADMINLTE.md`（改寫為歷史文件）、`README.md`、`CHANGELOG.md`。
+- 執行紀錄：[Blade 下架計畫](./BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md) 環節 5。
 
 > **明確排除**：`cbdbapi/person.blade.php` 是 XML/資料回應樣板（`response()->view()`），非互動頁面，不在「頁面重寫」範圍。
 
@@ -186,7 +189,12 @@
 
 ## 五、過渡期的「雙殼」現實（重要）
 
-兩套殼會**長期並存到 Phase 7**，必須正視其成本，不可當作「Phase 0 重建一次就好」：
+> 🔴 **本節已成為歷史（2026-09-15）**：雙殼期已結束。Blade 頁面全數實體刪除（環節 2／4a／4b／4c）、
+> AdminLTE 殼與資產於環節 5a／5b 移除，**現在只有 React 一套殼**。下面描述的成本、flag 切換與
+> 回退保證**都已不適用**——尤其 **flag 機制本身已於環節 4d-1 移除，沒有任何 runtime 回退鍵**，
+> 要回到 Blade 只能 git revert 並重新部署。保留本節是為了記錄當時的設計取捨。
+
+當時的判斷是：兩套殼會**長期並存到 Phase 7**，必須正視其成本，不可當作「Phase 0 重建一次就好」：
 
 - Blade 頁在 `dashboard-v3` 殼（AdminLTE 側邊欄、`localStorage` 深色模式、字串比對 active-state）；Inertia 頁在 `inertia.blade.php` + React `AppShell`。兩者是**不同根模板、不同 DOM、不同側邊欄**。使用者每點到一個尚未遷移的連結，就會在兩套殼之間切換。
 - 因此 React 側邊欄從 Phase 0 起就必須**同時連回約 100 個 Blade 路由**，並複製整棵導覽樹、角色閘門、待審提案 badge —— 這些在整個遷移期要與 Blade 側邊欄**雙份維護、保持同步**（深色模式狀態、語言、badge 數字）。
@@ -226,7 +234,7 @@
 |---|---|---|
 | **Phase 4 為全新開發（非接線）** | PersonBrowser tab 僅唯讀；12 編輯表單從零做 | 照 XL 排程；逐子資源 review + 回歸；先沉澱表單樣板於 Phase 2 |
 | 複合主鍵 write-path 未收斂 | texts/addresses/altname/entries 仍走舊路由、測試未齊 | 列為 Phase 4 硬前置；先完成收斂 + Feature 測試 |
-| 雙殼維護 | Blade 殼與 React 殼並存到 Phase 7 | nav schema 單一來源；明確接受雙份維護成本 |
+| 雙殼維護 ✅ 已結束 | Blade 殼與 React 殼並存到 Phase 7 | nav schema 單一來源；明確接受雙份維護成本。**2026-09-15**：Blade 殼已刪，`Navigation` 成為唯一消費端（環節 5a），節點的 Blade 專用 active 欄位亦移除（4d-2） |
 | Inertia 表單機制 | 驗證/CSRF/flash/上傳/old() | Phase 0 沉澱共用樣板；進每頁檢查清單 |
 | 授權下放 | share() 目前無 roles；前端閘門非授權 | Phase 0 增補 roles/can；後端逐路由授權 |
 | DataTables 功能落差 | 排序/篩選/**匯出/列印**/分頁 | Phase 0 `DataTable`（TanStack）+ 自建匯出 + 伺服器端分頁 |
@@ -276,6 +284,17 @@
 
 ## 附錄 C、自主執行協定（給 24/7 接手的 AI）
 
+> 🔴 **2026-09-15 狀態註記**：本協定是為**遷移期**寫的，遷移已結束（Phase 1–7 全部完成），
+> 其中數條前提已不存在，讀本節時請一併讀這裡：
+> - **feature flag 相關的每一條都失效**：`config/migration_flags.php` 與 `migration_flag()`
+>   已於 Blade 下架計畫環節 4d-1 移除。「翻 flag 上線／回退」「flag 預設仍指舊頁」
+>   「PR 改到 `migration_flags.php` 即 fail」都沒有對象了。
+> - **「刪除任何舊 Blade 頁/路由/套件（含 Phase 7 全套下架）必由人」這條人類關卡已由使用者逐段
+>   明確授權並執行完畢**（Blade 下架計畫環節 1–5）。⚠️ 這**不是**把規則廢掉：日後要刪任何
+>   服役中的頁面／路由／套件，仍須先取得使用者的明確授權，不得自行認定「照前例可刪」。
+> - 驗收 gate（review agent → codex → rebase 合併保持線性）與嚴重度判準**仍然有效**，
+>   Blade 下架的每一個環節都是照它執行的。
+>
 > 設計哲學：**「怎麼做」凍結、「做什麼」列全、「每個怎麼做」延後生成。** 標準穩定、scope 完整、細節 just-in-time。執行對象的單一真實來源是 [REACT_MIGRATION_BACKLOG.md](./REACT_MIGRATION_BACKLOG.md)。
 
 **前置（交接前必須先由人完成並合併）：**

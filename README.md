@@ -14,7 +14,7 @@
 
 ### 開發手記
 * [升級指南](./docs/UPGRADE.md) - Laravel 框架升級記錄
-* [AdminLTE 在 CBDB Online 項目中的使用分析](./docs/ADMINLTE.md)
+* [AdminLTE 的歷史與下架紀錄](./docs/ADMINLTE.md)（2026-09-15 完整下架，歷史文件）
 * [Proposal / Approval Flows](./docs/APPROVAL_FLOWS.md)
 * [人物提案路徑現況](./docs/PERSON_PROPOSAL_PATHS.md) - 三條核准路徑與逐資源總表
 * [代碼表格前端實作比較](./docs/CODES.md)
@@ -32,7 +32,7 @@
 * [SQLite 每週同步](#sqlite-每週同步) - 自動匯出並同步到 HuggingFace
 
 ### 更多文檔
-* [AdminLTE 4 升級可行性](./docs/ADMINLTE4_UPGRADE_FEASIBILITY.md)
+* [AdminLTE 4 升級可行性](./docs/ADMINLTE4_UPGRADE_FEASIBILITY.md)（⚠️ 已被 React/Inertia 遷移取代，歷史文件）
 * [AI 任官自動填充設計](./docs/AI_POSTING_AUTOFILL_DESIGN.md)
 * [API 認證方案](./docs/API_AUTHENTICATION.md)
 * [稽核日誌提案](./docs/AUDIT_LOG_PROPOSAL.md)
@@ -61,10 +61,12 @@
 
 ### 前端構建現況
 - 主要互動頁面均為 **React/Inertia**（人物列表/檢視/詳情中樞、13 個編輯器、Codes、營運管理工具、認證頁、Query Playground 等），React 元件在 `resources/js/inertia/**`。📌 遷移期的 feature flag（`config/migration_flags.php`、`migration_flag()`）已於 Blade 下架環節 4d-1 **整組移除**——沒有任何 runtime 回退鍵。
-- **所有 legacy Blade 頁面已實體刪除**（環節 4a／4b-4）：舊 URL 只剩 302 導向 `/app` 對應頁、legacy 寫入端回 410 的 closure。**AdminLTE 3 (Bootstrap 4) 的資產與 layout 檔仍在**（環節 5 待做），但已經沒有任何頁面 `@extends` 它們。🔴 **這批頁面已經沒有回退鍵了**：翻 migration flag 沒有效果，而 **`LEGACY_PAGE_RETIREMENT` 這個開關本身已於環節 4b-4c 移除**（middleware、config、Kernel 別名、env 變數全部刪除）。要回到 Blade 只能 git revert 並重新部署。**認證頁與首頁（`auth.*`／`welcome`）也已於環節 4c 實體刪除** —— 它們原本是最後一批「翻 flag 真的會渲染 Blade」的頁面，現在翻 `MIGRATION_FLAG_AUTH_*`／`MIGRATION_FLAG_WELCOME` 也**不再改變任何渲染**。人物編輯全套（`basicinformation.*`）與**唯讀頁**（`operations`／`dashboard`／`view`／`merge-preview`／`crowdsourcing`／`nl-query-logs`／`admin.audit-logs`／`admin.ai-fill-logs`）已**實體刪除**、無法回退（舊 URI 只剩 302 導向）。**表單／寫入頁（`codes` 全套／`manage`／`profile`／`admin.explainsql`／3 個 batch-load／`admin.cbdb-table-maintenance`／`admin.unidirectional-relationship-repair`）也已於環節 4b-4a／4b-4b 實體刪除**，同樣無法回退。逐條清單見 [docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md](docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md)。AdminLTE 實體下架未執行。新功能一律只做在 React/Inertia 路徑。
-- 構建系統為 **Vite**；主要入口：`resources/js/app.js`（AdminLTE/jQuery UI 組件）、`resources/js/datatables.js`、`resources/js/inertia/**`（React/Inertia）。
-- `resources/js/jquery-global.js` 將 jQuery 暴露到全局（供保留中的 Blade 頁使用）。
-- 所有頁面均使用 `@vite` 載入前端資源，**請勿引入外部 CDN 的 jQuery/Bootstrap**，以免版本衝突。
+- **所有 legacy Blade 頁面已實體刪除**（環節 4a／4b-4）：舊 URL 只剩 302 導向 `/app` 對應頁、legacy 寫入端回 410 的 closure。**AdminLTE 3 (Bootstrap 4) 已於環節 5 完整下架**（5a layout 6 檔、5b 前端資產與 npm 相依）。🔴 **這批頁面已經沒有回退鍵了**：翻 migration flag 沒有效果，而 **`LEGACY_PAGE_RETIREMENT` 這個開關本身已於環節 4b-4c 移除**（middleware、config、Kernel 別名、env 變數全部刪除）。要回到 Blade 只能 git revert 並重新部署。**認證頁與首頁（`auth.*`／`welcome`）也已於環節 4c 實體刪除** —— 它們原本是最後一批「翻 flag 真的會渲染 Blade」的頁面，現在翻 `MIGRATION_FLAG_AUTH_*`／`MIGRATION_FLAG_WELCOME` 也**不再改變任何渲染**。人物編輯全套（`basicinformation.*`）與**唯讀頁**（`operations`／`dashboard`／`view`／`merge-preview`／`crowdsourcing`／`nl-query-logs`／`admin.audit-logs`／`admin.ai-fill-logs`）已**實體刪除**、無法回退（舊 URI 只剩 302 導向）。**表單／寫入頁（`codes` 全套／`manage`／`profile`／`admin.explainsql`／3 個 batch-load／`admin.cbdb-table-maintenance`／`admin.unidirectional-relationship-repair`）也已於環節 4b-4a／4b-4b 實體刪除**，同樣無法回退。逐條清單見 [docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md](docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md)。新功能一律只做在 React/Inertia 路徑。
+- 構建系統為 **Vite**；入口只有 3 個：`resources/js/inertia/app.tsx`（React/Inertia，全站互動頁）、
+  `resources/js/historical-maps/app.js`、`resources/js/chgis-map/app.js`。
+  🔴 **不要重新引入 jQuery／Bootstrap／DataTables／Select2／Vue**——整套已於環節 5b 移除（含 npm 相依）。
+- 主站頁面均使用 `@vite` 載入前端資源，**請勿引入 jQuery／Bootstrap／DataTables／Select2／Vue**（不分 CDN 或 npm；整套已於 Blade 下架環節 5b 移除）。
+  例外是三個自給自足、不套任何殼的獨立頁：`resources/views/cbdbapi/person.blade.php`、`public/cbdbapi/index.html`（皆自帶 CDN Bootstrap 5.3）、`resources/views/maps/index.blade.php`（CDN Leaflet）。
 
 ⚠️ **重要**：本專案現已升級到 Laravel 12.x 並要求 PHP 8.2+。**建議使用 PHP 8.4** 以獲得最佳性能和安全性。Laravel 12 已完全支持 PHP 8.4。
 
@@ -113,8 +115,8 @@ php artisan cbdb:rebuild-person-change-index   # 部署後須跑一次：回填�
 - 主要 React/Inertia 線上路徑：`/app/basicinformation`（人物列表 / 詳情中樞 / 13 個編輯器）、`/app/query-playground`、`/app/codes`、`/app/operations` 等。
 - 舊版 Blade 路由已全面下架（顯示頁 302、寫入端 410）。**唯讀頁（環節 4a）與表單／寫入頁（環節 4b-4a／4b-4b）的視圖與 controller 方法都已實體刪除**，舊 URI 只剩 closure。🔴 **沒有任何回退鍵**：migration flag 無效，而 `LEGACY_PAGE_RETIREMENT` 這個開關已於環節 4b-4c 連同 middleware 一起移除。認證頁與首頁的 Blade 版已於環節 4c 刪除，`MIGRATION_FLAG_AUTH_*`／`MIGRATION_FLAG_WELCOME` 不再決定渲染。人物編輯全套已實體刪除。Query Playground 與外部資料庫引用瀏覽器本就硬導向 React、無 flag。皆不再新增功能；新功能一律做在 React/Inertia。
 - 前端入口：
-  - `resources/js/inertia/**`（React/Inertia，主要互動頁）
-  - `resources/js/app.js`、`resources/js/datatables.js`（保留中的 AdminLTE/Blade 頁）
+  - `resources/js/inertia/**`（React/Inertia，全站互動頁）
+  - `resources/js/historical-maps/**`、`resources/js/chgis-map/**`（兩支獨立地圖入口）
 
 ### 後端
 - 主要路由定義：`routes/web.php`

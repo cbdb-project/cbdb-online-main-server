@@ -4,6 +4,31 @@
 
 ## 2026-09
 
+### Blade 下架環節 5b：AdminLTE 前端資產與 npm 相依完整移除
+
+計畫：[docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)
+
+**AdminLTE 自此完整下架**（5a 刪 layout、5b 刪資產）。
+
+- 刪檔：`resources/js/{app.js（1,283 行）,jquery-global.js,datatables.js,components/Select.vue,utils/datetime.js}`、
+  `resources/css/{select2-overrides,mobile-responsive,ai-autofill}.css`。
+- `vite.config.js`：移除 `app.js`／`datatables.js` 兩個入口、`vue()` plugin、`vue` 別名。
+  **入口只剩 3 個**：`inertia/app.tsx`、`historical-maps/app.js`、`chgis-map/app.js`。
+- `package.json` 移除 11 個相依：`admin-lte`、`jquery`、`datatables.net`、`datatables.net-bs4`、
+  `@ttskch/select2-bootstrap4-theme`、`vue`、`@vue/compiler-sfc`、`@vitejs/plugin-vue`、
+  `axios`、`lodash`、`sass`。
+
+🔧 **部署者**：本次改了 `package.json`／`package-lock.json`，部署要跑 `npm ci`（或 `npm install`）
+再 `npm run build`。無 `.env` 變更、無資料庫變更。
+
+⚠️ **刻意保留**：`resources/js/utils/{disableNumberInputWheel,sqlFormatter}.js`（被 inertia 端 import）、
+`resources/js/chgis-map/`、`resources/js/historical-maps/`、`leaflet`、
+`@fortawesome/fontawesome-free`（React 仍用 `fas fa-*` class 名）。
+
+🔴 **不要重新引入 jQuery／Bootstrap／DataTables／Select2／Vue**——現在連 npm 相依都沒有了。
+文檔：`docs/ADMINLTE.md` 改寫為歷史文件、`docs/ADMINLTE4_UPGRADE_FEASIBILITY.md` 標註已被取代、
+`docs/REACT_MIGRATION_BACKLOG.md` 的 P7-1／2／3 全部 `retired`。
+
 ### Blade 下架環節 4d-2 + 5a：AdminLTE layout 實體刪除、導覽節點的 Blade 專用欄位移除
 
 計畫：[docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)

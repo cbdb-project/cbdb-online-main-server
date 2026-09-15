@@ -26,18 +26,24 @@ php artisan route:list --json
 | 4a-3 | 9 條唯讀頁 Blade **實體刪除**，改 redirect closure | 那 9 條不再掛 `legacy.page`，**沒有 kill switch 回退** |
 | 4b-1 | 3 條 `codes.proposals.*` 與 5 條 batch-load 寫入端收斂後補封 | 「不動」19 → 11 |
 | **4b-4a** | **`codes` 全套（12 條）Blade 實體刪除**，改 closure | **那 12 條不再掛 `legacy.page`、沒有 kill switch 回退** |
-
 | **4b-4b** | **其餘 21 條（manage／profile／admin）Blade 實體刪除**，改 closure | **`legacy.page` 歸零** |
+| **4b-4c** | **封路機制整組移除**（middleware／config／Kernel 別名／env／測試 opt-out） | 回退鍵**不存在**了 |
 
 ⇒ 🔴 **目前仍掛 `legacy.page` 的路由是 0 條**（實測 `Route::getRoutes()`）。
 **本文件自此是純歷史文件**——它記錄的是環節 3 當時的判斷過程與逐條理由，那些理由仍有參考價值
 （特別是「不動」那 11 條的判準），但「處置」欄已全部被後續環節取代。
-現況的權威來源是 `LegacyBladePageRetirementTest::no_route_is_gated_by_the_retirement_middleware_any_more()`
-——**那份會紅，本文件不會**。
+現況的權威來源是 `tests/Feature/LegacyBladePageRetirementTest.php`——**那份會紅，本文件不會**。
+其中三條最該先看：`the_retirement_middleware_and_its_kill_switch_no_longer_exist()`（機制不存在）、
+`no_route_declares_the_removed_legacy_page_middleware()`（沒有路由宣告它）、
+`migration_flags_cannot_bring_legacy_pages_back()`（翻 flag 也叫不回來）。
 
-🔴 **`RetireLegacyBladePage` 與 `config/legacy_page_retirement.php` 自此是死碼**，
-`LEGACY_PAGE_RETIREMENT=false` **沒有任何效果**。舊 runbook 裡「翻 kill switch 即可回退」
-那一步已作廢。
+🔴 **封路機制已於環節 4b-4c 整組移除**：`RetireLegacyBladePage`、
+`config/legacy_page_retirement.php`、Kernel 的 `legacy.page` 別名、`.env` 的
+`LEGACY_PAGE_RETIREMENT`、`TestCase::useLegacyBladePages()` 全部不存在了。
+舊 runbook 裡「翻 kill switch 即可回退」那一步**已作廢**，要回到 Blade 只能 git revert
+並重新部署。
+⚠️ **不要把那個 middleware 加回來**：它有兩條 fail-open 路徑（導向目標不存在時放行、
+開關關閉時放行），而 Blade 視圖全都刪了，落下去只會得到 500。要封路請直接寫 closure。
 
 ⚠️ **4b-4b 刻意保留、不可連坐刪除的**（它們**沒有 `app.` 雙胞胎**，React 頁面直接呼叫）：
 - `admin/unidirectional-relationship-repair/{kinship,assoc}`
@@ -244,8 +250,9 @@ legacy 寫入端，且 React 有各自的對應端點（`app/*` 或 `/api/v2/*`�
 > 把 `LEGACY_PAGE_RETIREMENT` 設成 `false` **不會叫回任何 Blade 頁**——照著做只會什麼都沒發生。
 > 要回到 Blade 只能 **git revert 並重新部署**。
 >
-> 護欄：`LegacyBladePageRetirementTest::no_route_is_gated_by_the_retirement_middleware_any_more()`
-> 與 `neither_the_kill_switch_nor_migration_flags_bring_legacy_pages_back()`。
+> 護欄：`LegacyBladePageRetirementTest::the_retirement_middleware_and_its_kill_switch_no_longer_exist()`、
+> `no_route_declares_the_removed_legacy_page_middleware()` 與
+> `migration_flags_cannot_bring_legacy_pages_back()`。
 >
 > **本節保留的唯一理由**是：舊的部署 runbook 可能還抄著這幾行，讀到這裡的人需要知道它為什麼
 > 不再有效。以下內容一律視為歷史。
@@ -290,15 +297,23 @@ legacy 頁**立刻復活**——不需重新部署、不需 `git revert`。
 
 ### 三個行為 caveat
 
-1. **controller middleware 排在 route middleware 之後**，所以封路先跑：未登入的 legacy 非 GET
-   請求現在拿到 **410 而不是 302 導向 `/login`**（例 `PUT /manage/1`）。不是安全問題
-   （410 不洩漏任何資訊），但與封路前不同。
+> 🔴 **以下三點描述的是環節 3 當時的 middleware 行為（已於環節 4b-4c 移除），純歷史。**
+> 特別是第 1 點：**它的結論在環節 4b-4b 被量測推翻**——實測未登入者打 `PUT /manage/1`
+> 在封路期拿到的是 **302 → `/login`**（`ManagementController` 建構式的 `auth` 先跑），
+> 不是 410。4b-4b 改成 closure 時因此弄丟了那道 `auth`，已用
+> `legacy_manage_routes_still_bounce_guests_to_login()` 補回並釘住。
+> **教訓：middleware 的實際順序要量，不要照清單推。**
+
+1. ~~**controller middleware 排在 route middleware 之後**，所以封路先跑：未登入的 legacy 非 GET
+   請求現在拿到 **410 而不是 302 導向 `/login`**（例 `PUT /manage/1`）~~ **——已被實測推翻，見上。**
 2. **`VerifyCsrfToken` 屬 `web` group、跑在封路之前**，所以真實世界未帶 token 的 legacy POST
    會先拿到 **419** 而不是 410（測試環境跳過 CSRF 才看得到 410）。與已移除的
    `LegacyBladeFormGate` 行為一致，非退化。
 3. **fail-open 但不靜默**：導向目標路由不存在時放行原 legacy 頁（過渡期讓使用者看到舊頁優於
    500），但會記一筆 `Log::warning`——否則日後誰改了 `app.*` 路由名，production 就會無聲
    復活一個 Blade 頁。
+   🔴 **正是這條 fail-open 讓那個 middleware 在今天變得危險**：Blade 視圖全都刪了，
+   「放行原 legacy 頁」等於 500。所以它被整組移除，而且**不要加回來**。
 
 ## 環節 4 的前置
 

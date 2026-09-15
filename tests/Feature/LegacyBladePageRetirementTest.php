@@ -260,7 +260,7 @@ class LegacyBladePageRetirementTest extends TestCase {
             'batch social store' => ['post', '/admin/batch-load-social-institutes'],
             // codes 這 7 條自環節 4b-4a 起是 `abort(410)` 的 closure，不再是 middleware
             // ——**狀態碼一樣，但 kill switch 對它們已無作用**（同 4a-3 的 merge-preview POST）。
-            // 專屬測試見 legacy_codes_endpoints_stay_retired_without_the_kill_switch()。
+            // 專屬測試見 legacy_codes_endpoints_stay_retired()。
             'codes proposal update' => ['patch', '/codes/ADDR_CODES/proposals/1'],
             'codes proposal cancel' => ['delete', '/codes/ADDR_CODES/proposals/1'],
             'codes store' => ['post', '/codes/ADDR_CODES'],
@@ -353,63 +353,98 @@ class LegacyBladePageRetirementTest extends TestCase {
     }
 
     /**
-     * ── 2026-09-15（Blade 下架環節 4b-4b）─────────────────────────────
+     * ── 2026-09-15（Blade 下架環節 4b-4c）─────────────────────────────
      *
-     * 🔴 **`legacy.page` 封路清單自此為空**：環節 4a-3／4b-4a／4b-4b 把 44 條路由
-     * 全部改成 closure，middleware 不再掛在任何路由上。
+     * 🔴 **封路機制本身已經移除**：`App\Http\Middleware\RetireLegacyBladePage`、
+     * `config/legacy_page_retirement.php`、Kernel 的 `legacy.page` 別名、
+     * `TestCase::useLegacyBladePages()` 與 `.env` 的 `LEGACY_PAGE_RETIREMENT` 全部不存在了。
      *
-     * 這條測試因此從「清單與 manifest 逐條吻合」變成「**必須是空的**」。
-     * 它仍然值得存在：日後若有人把 `legacy.page` 掛回任何路由（例如想「暫時封一下某頁」），
-     * 這裡會立刻紅——那個 middleware 的兩條 fail-open 路徑（導向目標不存在時放行、
-     * kill switch 關閉時放行）在視圖已刪的世界裡只會產生 500，不會產生「看到舊頁」。
+     * 為什麼值得一條測試：這是一個**不可逆的能力移除**。如果日後有人「為了暫時封一下某頁」
+     * 把 middleware 加回來，這條會紅並把理由攤在訊息裡——那個 middleware 有兩條 fail-open
+     * 路徑（導向目標不存在時放行、開關關閉時放行），而 Blade 視圖**全部都已經刪了**，
+     * 落下去只會得到 500，不會得到「看到舊頁」。要封路請直接寫 closure。
      *
-     * ⚠️ **`RetireLegacyBladePage` 與 `config/legacy_page_retirement.php` 自此是死碼**
-     *（無任何路由掛載）。刪除它們、以及 `TestCase::useLegacyBladePages()`（自環節 4b-3 起
-     * 零呼叫點），留給專屬的收尾環節做——那會連帶影響 `.env`／部署 runbook，值得單獨一輪。
+     * ⚠️ **這一條不足以取代下面那條全路由掃描**（我一度以為可以，被 review 實測推翻）：
+     * 我原本的理由是「機制刪掉之後，沒有那個別名、誰也掛不上，所以掃描那條變恆真」——
+     * **不成立**。Laravel 在路由註冊期**不驗證 alias 是否存在**：把
+     * `->middleware('legacy.page:app.codes.index')` 寫回某條路由，`gatherMiddleware()`
+     * 照樣回傳那個字串、`route:cache` 照樣成功，**只有請求期才炸**
+     *（`BindingResolutionException: Target class [legacy.page] does not exist` ⇒ 500）。
+     * 也就是說「有人把 legacy.page 寫回路由」這個**最現實的重犯路徑**，只有掃描那條抓得到。
      */
     #[Test]
-    public function no_route_is_gated_by_the_retirement_middleware_any_more(): void {
-        $gated = [];
+    public function the_retirement_middleware_and_its_kill_switch_no_longer_exist(): void {
+        $this->assertFalse(
+            class_exists('App\Http\Middleware\RetireLegacyBladePage'),
+            '封路 middleware 已於環節 4b-4c 移除；要封路請直接寫 closure（理由見本測試 docblock）'
+        );
+        // ⚠️ `config()` 這條排在 `file_exists` **之前**：在 `config:cache` 過的環境裡，
+        // 真正會出問題的是「快取檔裡還留著那個鍵」，而不是原始檔在不在（review 指出，
+        // 原本的順序會讓 file_exists 先紅、看不到這條的訊息）。
+        $this->assertNull(
+            config('legacy_page_retirement.enabled'),
+            'kill switch 的 config 鍵不該再存在（含 bootstrap/cache/config.php）'
+        );
+        $this->assertFalse(
+            file_exists(config_path('legacy_page_retirement.php')),
+            'kill switch 的 config 已移除；它沒有作用對象了'
+        );
+        $this->assertFalse(
+            method_exists($this, 'useLegacyBladePages'),
+            'opt-out helper 已移除；沒有 legacy 頁面可以 opt-out 回去了'
+        );
+    }
+
+    /**
+     * 🔴 **沒有任何路由可以宣告已移除的 `legacy.page` middleware。**
+     *
+     * 這條與上面那條是**兩件事、缺一不可**（review 實測證明）：
+     *  - 上面守「機制的檔案不存在」——有人把 middleware 檔還原時會紅；
+     *  - 這條守「沒有路由宣告它」——有人**只在路由上寫回字串**時會紅，而那才是最現實的
+     *    重犯路徑（「我只是想暫時封一下某頁」）。Laravel 註冊期不驗證 alias，所以那種寫法
+     *    在 `route:list`／`route:cache` 都看不出問題，直到有人打那條 URL 才 500。
+     *
+     * 訊息刻意寫明替代做法，因為紅的時候人多半正在做那件事。
+     */
+    #[Test]
+    public function no_route_declares_the_removed_legacy_page_middleware(): void {
+        $declared = [];
         foreach (Route::getRoutes() as $route) {
             foreach ($route->gatherMiddleware() as $m) {
                 if (is_string($m) && str_starts_with($m, 'legacy.page')) {
                     $methods = implode('|', array_values(array_diff($route->methods(), ['HEAD'])));
-                    $gated[] = $methods.' '.$route->uri();
+                    $declared[] = $methods.' '.$route->uri();
 
                     break;
                 }
             }
         }
 
-        sort($gated);
+        sort($declared);
 
         $this->assertSame(
             [],
-            $gated,
-            'legacy.page 已於環節 4b-4b 全面退場；若要重新掛上，請先確認對應的 Blade 視圖還在'
-            .'——視圖不存在時那個 middleware 的 fail-open 路徑只會產生 500。'
+            $declared,
+            '`legacy.page` middleware 已於環節 4b-4c 移除，掛上它的路由在請求期會 500'
+            .'（BindingResolutionException）。要封路請直接寫 closure——'
+            .'那個 middleware 原本的兩條 fail-open 路徑在 Blade 視圖已全刪的情況下只會產生 500。'
         );
     }
 
     /**
-     * ── 2026-09-15（環節 4b-4b）：kill switch 已無作用對象 ────────────────
+     * 🔴 **兩把舊鑰匙都打不開了**（環節 4b-4c）。
      *
-     * 原本這裡有三條測試：`the_kill_switch_restores_the_legacy_pages()`、
-     * `the_kill_switch_also_restores_legacy_write_endpoints()`、
-     * `migration_flags_no_longer_reopen_gated_legacy_pages()`。它們驗的都是
-     * 「封路可以用 config 即時關閉／flag 關不掉」——**在沒有任何路由掛封路之後，
-     * 三條都變成空轉**（不管 config 與 flag 怎麼設，closure 都照樣 302／410）。
+     * 這是安全／維運相關的陳述：`AGENTS.md`、`README.md`、`.env.example`、部署 runbook
+     * 長期告訴維運者「設 `LEGACY_PAGE_RETIREMENT=false` 就能叫回 Blade 頁」。
+     * 那個變數現在連讀都沒人讀了，而 migration flag 從來就不影響這件事。
      *
-     * 取而代之的是這一條：把「**兩個開關都已經沒有作用**」直接寫死。
-     * 這是安全相關的陳述——`AGENTS.md` 與部署 runbook 長期告訴維運者
-     * 「設 `LEGACY_PAGE_RETIREMENT=false` 就能叫回 Blade 頁」，現在那句話已經不成立。
+     * 測法：把 flag 全部翻成 `old`（遞迴，並把 `default` 釘成相反的 `'new'` 讓 fallback
+     * 無法冒充成功），再打 7 條顯示頁與 5 條寫入端——全部必須維持 302／410。
      */
     #[Test]
-    public function neither_the_kill_switch_nor_migration_flags_bring_legacy_pages_back(): void {
+    public function migration_flags_cannot_bring_legacy_pages_back(): void {
         $user = $this->superAdmin();
 
-        // 兩個開關同時打到「最有可能叫回 Blade」的位置。
-        config(['legacy_page_retirement.enabled' => false]);
         $flipToOld = static function (array $pages) use (&$flipToOld): array {
             return array_map(
                 static fn ($value) => is_array($value) ? $flipToOld($value) : 'old',
@@ -420,6 +455,7 @@ class LegacyBladePageRetirementTest extends TestCase {
             'migration_flags.default' => 'new',
             'migration_flags.pages' => $flipToOld((array) config('migration_flags.pages', [])),
         ]);
+
         // 覆寫真的生效了（否則整條測試是空轉）。
         //
         // ⚠️ **`migration_flags.default` 刻意釘成 'new'（與覆寫值相反）**：若釘成 'old'，
@@ -433,7 +469,6 @@ class LegacyBladePageRetirementTest extends TestCase {
         // 反面對照：沒被覆寫的未知 key 才會拿到 default，證明上面兩條不是 fallback。
         $this->assertSame('new', migration_flag('a-key-that-does-not-exist'));
 
-        // 顯示頁：仍 302，且導向的是 React 版。
         foreach ([
             '/codes' => '/app/codes',
             '/manage' => '/app/manage',
@@ -444,11 +479,10 @@ class LegacyBladePageRetirementTest extends TestCase {
             '/admin/unidirectional-relationship-repair' => '/app/admin/unidirectional-relationship-repair',
         ] as $from => $to) {
             $this->actingAs($user)->get($from)
-                ->assertStatus(302, "{$from} 不該因為任何開關而回到 Blade")
+                ->assertStatus(302, "{$from} 不該因為翻 flag 而回到 Blade")
                 ->assertRedirect($to);
         }
 
-        // 寫入端：仍 410。
         foreach ([
             ['post', '/codes/ADDR_CODES'],
             ['put', '/manage/1'],
@@ -457,33 +491,33 @@ class LegacyBladePageRetirementTest extends TestCase {
             ['post', '/admin/batch-load-book-titles'],
         ] as [$method, $uri]) {
             $this->actingAs($user)->{$method}($uri, [])
-                ->assertStatus(410, "{$method} {$uri} 不該因為任何開關而復活");
+                ->assertStatus(410, "{$method} {$uri} 不該因為翻 flag 而復活");
         }
     }
 
     /**
      * 🔴 環節 4b-4a：codes 全套 Blade（5 個視圖 + 10 個 controller 方法）**已實體刪除**，
-     * 所以那 12 條 legacy 路由改成 closure、**不再受 kill switch 控制**。
+     * 那 12 條 legacy 路由只剩 closure。這條把「12 條的狀態碼」逐條寫死。
      *
-     * 與 4a-3 的 9 條唯讀頁同一個理由：**光看 302／410 的狀態碼分辨不出來**。
+     * ⚠️ **這條測試的鑑別力邊界**：把 `abort(410)` 改成 `abort(404)` 會紅；但**把
+     * `legacy.page` 寫回路由抓不到**（環節 4b-4c 之後那會在請求期 500，不是狀態碼差異）。
+     * 抓得到那件事的是 `no_route_declares_the_removed_legacy_page_middleware()`。
+     * **兩條缺一不可。**
      *
-     * ⚠️ **這條測試的鑑別力邊界**（review 實測）：把 `abort(410)` 改成 `abort(404)` 會紅；
-     * 但**把路由重新掛回 `legacy.page:gone` 卻照綠**——kill switch 關閉時那個 middleware
-     * 會 fail-open 落到 closure，狀態碼一模一樣。抓得到「掛回 middleware」的只有
-     * `exactly_the_manifested_routes_are_gated()` 的身分清單。兩條缺一不可。
-     * 若日後有人照舊 runbook 設 `LEGACY_PAGE_RETIREMENT=false` 想叫回 codes 編輯頁，
-     * 這條測試是唯一寫死「不能」的地方。
+     * 📌 原本這裡還會先 `config(['legacy_page_retirement.enabled' => false])` 再驗一次
+     *「關掉 kill switch 也叫不回來」。環節 4b-4c 把那個 config 整個刪掉之後，那一段變成
+     * **對一個沒有讀取者的幻影 key 賦值**——與前半段完全等價的重複斷言（review 指出），
+     * 已移除。
      */
     #[Test]
-    public function legacy_codes_endpoints_stay_retired_without_the_kill_switch(): void {
-        config(['legacy_page_retirement.enabled' => false]);
+    public function legacy_codes_endpoints_stay_retired(): void {
         $user = $this->superAdmin();
 
         // 顯示頁：仍 302（不會回到 Blade）。
         foreach (['/codes', '/codes/ADDR_CODES', '/codes/ADDR_CODES/create',
             '/codes/ADDR_CODES/1/edit', '/codes/ADDR_CODES/proposals/1/edit'] as $uri) {
             $this->actingAs($user)->get($uri)
-                ->assertStatus(302, "kill switch 關閉不應讓 {$uri} 回到 Blade");
+                ->assertStatus(302, "{$uri} 的 Blade 頁已刪除，不該回到 Blade");
         }
 
         // 寫入端：仍 410。
@@ -492,7 +526,7 @@ class LegacyBladePageRetirementTest extends TestCase {
             ['post', '/codes/ADDR_CODES/1/proposal'], ['patch', '/codes/ADDR_CODES/proposals/1'],
             ['delete', '/codes/ADDR_CODES/proposals/1']] as [$method, $uri]) {
             $this->actingAs($user)->{$method}($uri, [])
-                ->assertStatus(410, "kill switch 關閉不應讓 {$method} {$uri} 復活");
+                ->assertStatus(410, "{$method} {$uri} 已下架，不該復活");
         }
     }
 
@@ -523,31 +557,24 @@ class LegacyBladePageRetirementTest extends TestCase {
     }
 
     /**
-     * 🔴 環節 4a-3 的核心行為變化：這 9 條唯讀頁的 Blade 視圖與 controller 方法**已實體刪除**，
-     *（4b-4a 起 provider 裡另有 codes 的 5 條，合計 14 條；下面這條測試同時吃它們。）
-     * 所以它們改成純 redirect closure、**不再受 kill switch 控制**。
-     *
-     * 為什麼值得一條專屬測試：其餘 21 條封路的賣點是「`LEGACY_PAGE_RETIREMENT=false` 就能
-     * 即時叫回 Blade 頁」。這 9 條沒有那個能力了——而**光看 302 的狀態碼分辨不出來**。
-     * 若日後有人誤以為 kill switch 能救回它們（例如照著舊 runbook 操作），
-     * 這條測試是唯一寫死「不能」的地方。
+     * 🔴 這 14 條顯示頁的 Blade 視圖與 controller 方法**已實體刪除**
+     *（環節 4a-3 的 9 條唯讀頁 + 4b-4a 的 5 條 codes 頁），只剩 redirect closure。
      *
      * 它同時接手了被刪掉的 `InertiaViewTableTest::test_kill_switch_restores_the_legacy_view_page`
      * ——那條原本證明「關掉封路後 Blade 頁真的渲染」，而該能力現在確實不存在。
+     *
+     * 📌 原本這條會先驗一次預設行為、再 `config(['legacy_page_retirement.enabled' => false])`
+     * 驗一次「關掉 kill switch 也叫不回來」。環節 4b-4c 把那個 config 整個刪掉之後，
+     * 第二段變成**對一個沒有讀取者的幻影 key 賦值**——與第一段完全等價（review 指出），
+     * 已移除。「叫不回來」現在由
+     * `the_retirement_middleware_and_its_kill_switch_no_longer_exist()` 從機制面守住。
      */
     #[Test]
     #[DataProvider('deletedLegacyPageProvider')]
-    public function legacy_readonly_pages_redirect_without_the_kill_switch(string $from, string $to): void {
-        $user = $this->superAdmin();
-
-        // 預設（封路開啟）：302
-        $this->actingAs($user)->get($from)->assertStatus(302)->assertRedirect($to);
-
-        // 關掉 kill switch：**照樣** 302——頁面已經不存在，叫不回來。
-        config(['legacy_page_retirement.enabled' => false]);
-        $this->actingAs($user)
+    public function deleted_legacy_pages_redirect_to_the_react_equivalent(string $from, string $to): void {
+        $this->actingAs($this->superAdmin())
             ->get($from)
-            ->assertStatus(302, "{$from} 的 Blade 頁已實體刪除，kill switch 不該（也無法）把它叫回來")
+            ->assertStatus(302, "{$from} 的 Blade 頁已實體刪除，只該 302 到 React 版")
             ->assertRedirect($to);
     }
 }

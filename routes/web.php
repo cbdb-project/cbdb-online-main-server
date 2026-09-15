@@ -228,7 +228,8 @@ Route::get('basicinformation/{id}/Duplicate_Collateral_Info', 'BasicInformationC
 //  1. **編碼**：手拼會讓 `Location` 吐出裸 UTF-8／裸空白，而代碼表**已支援文本主鍵**
 //     （`ADDR_CODES` 之外還有 `ALTNAME_DATA.c_alt_name_chn` 這類），所以 `$id = '慎'`
 //     不是假想。更糟的是 `a%2Fb` 會被解成真的路徑分隔。`route()` 會做 rawurlencode
-//     並只放行 `/ ? & # %`——那正是舊 `RetireLegacyBladePage` 的行為。
+//     並只放行 `/ ? & # %`——那正是舊 `RetireLegacyBladePage` 的行為（該 middleware 已於
+//     環節 4b-4c 移除，這裡指的是它被刪之前的實作）。
 //  2. **query string**：五條裡有一條漏拼（`proposals/{operation}/edit`），而舊 middleware
 //     對所有導向型一律保留 QS。書籤／從 operations 頁帶參數過來都會受影響。
 //
@@ -239,7 +240,7 @@ Route::get('basicinformation/{id}/Duplicate_Collateral_Info', 'BasicInformationC
 // `operations.resource_id` 對複合主鍵存的就是 `c_personid=1&c_x=2` 這種**帶 `=` 與 `&`** 的
 // 格式。先編碼會把那個形狀改寫成 `%3D`／`%26`——那是單方面改掉一個出現在 operations
 // payload 裡的 URL。這裡的目標是與被移除的 middleware **一字不差的 parity**
-// （`RetireLegacyBladePage:80-81` 就是這兩行）。取捨與理由釘在
+// （已刪除的 `RetireLegacyBladePage` 第 80-81 行就是這兩行）。取捨與理由釘在
 // `LegacyBladePageRetirementTest::codes_redirects_preserve_the_query_string_and_encode_the_id()`。
 if (!function_exists('cbdb_legacy_page_redirect')) {
     /**

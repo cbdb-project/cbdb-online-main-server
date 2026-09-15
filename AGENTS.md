@@ -5,7 +5,7 @@
 ## 專案現況
 - 技術棧：Laravel 12、PHP 8.2+、MariaDB 10.11（prod 實測 10.11.14；相容性下限仍按 10.3 撰寫）、SQLite（測試）、Vite、Vue 3、Inertia/React。
 - 全站主要互動頁面已遷移至 **React/Inertia 並翻 flag 上線**（`config/migration_flags.php` 頁面 flag 多為 `new`）：人物列表/檢視/詳情中樞、13 個 React 編輯器（basic-info + 12 個複合主鍵子資源）、Codes CRUD、operations/manage/crowdsourcing、admin 工具、認證頁、Query Playground（`/app/query-playground`）等。
-- **舊版 Blade 視圖與 AdminLTE 3 + Bootstrap 4 仍實體保留，但已全面封路**（見 [docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)）：
+- **所有 legacy Blade 頁面已實體刪除**（見 [docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)）。**AdminLTE 3 + Bootstrap 4 的資產與 layout 檔仍在**（環節 5 待做），但已經沒有任何頁面 `@extends` 它們：
   - **人物編輯全套（`basicinformation.*`）已於環節 2 實體刪除**——視圖、12 組子資源路由與 controller、
     `LegacyBladeFormGate`、以及那 15 個 `MIGRATION_FLAG_BASICINFO_*` flag 全部不存在了。
     舊 URI 只剩 302 導向（顯示頁）／410（寫入端）。**把 flag 塞回 config 不會復活它們**（有護欄測試鎖住）。
@@ -33,13 +33,15 @@
     同一個方法**，只刪了 legacy 那邊的路由接線。
   - 🔴🔴 **回退鍵已經不存在了（2026-09-15，環節 4b-4b）**：
     - 翻 `MIGRATION_FLAG_*=old` **沒有效果**（封路 middleware 從來不讀 flag）。
-    - **設 `LEGACY_PAGE_RETIREMENT=false` 現在也沒有效果**——所有 legacy 頁面都已改成
-      redirect／`abort(410)` 的 closure，**`legacy.page` 一條路由都沒掛**（護欄：
-      `LegacyBladePageRetirementTest::no_route_is_gated_by_the_retirement_middleware_any_more()`
-      與 `neither_the_kill_switch_nor_migration_flags_bring_legacy_pages_back()`）。
+    - **`LEGACY_PAGE_RETIREMENT` 這個開關已經不存在了**（環節 4b-4c）：middleware
+      （`RetireLegacyBladePage`）、`config/legacy_page_retirement.php`、Kernel 的 `legacy.page`
+      別名、`.env` 變數、`TestCase::useLegacyBladePages()` 全部移除。
       **舊 runbook 裡「翻 kill switch 即可回退」那一步已作廢**；要回到 Blade 只能 git revert
-      並重新部署。`RetireLegacyBladePage` 與 `config/legacy_page_retirement.php` 目前是死碼，
-      待專屬環節移除。
+      並重新部署。護欄：
+      `LegacyBladePageRetirementTest::the_retirement_middleware_and_its_kill_switch_no_longer_exist()`
+      與 `migration_flags_cannot_bring_legacy_pages_back()`。
+      ⚠️ **不要把那個 middleware 加回來**：它有兩條 fail-open 路徑，而 Blade 視圖全都刪了，
+      落下去只會得到 500。要封路請直接寫 closure。
     - migration flag 現在只影響**連結指向**（側邊欄、payload 裡的 URL）；
       **`auth.*`／`welcome` 例外**（flag 分支在 controller 內部、未封路），它們的 flag
       仍然決定渲染 Blade 或 React（見 `tests/Feature/AuthPagesInertiaTest.php`）。

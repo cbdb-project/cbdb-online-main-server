@@ -68,7 +68,10 @@ interface DateGroup {
 export default function BasicInfoEditor({
     personId, initialFields, initialLabels = {},
     canEdit, canPropose, mutateEndpoint, deleteEndpoint, pinyinEndpoint = '/api/select/search/pinyin',
-    indexUrl = '/basicinformation', duplicateCollateralUrl, saveasUrl, t, onSaved,
+    // indexUrl 的預設值：所有呼叫端都會顯式傳入，這只是保險絲。
+    // 2026-09-15（環節 6b）：原本是 `/basicinformation`——那條 legacy URI 現在只剩 302 closure，
+    // 真的走到預設值時會多繞一跳。改指 React 版。
+    indexUrl = '/app/basicinformation', duplicateCollateralUrl, saveasUrl, t, onSaved,
     onEditorStateChange, onRegisterSaveHandler,
 }: Props) {
     // useTranslation 在缺 key 時回傳 key 本身；故須在 t(k)===k（未翻譯）時退回中文 fallback，

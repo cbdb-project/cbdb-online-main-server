@@ -101,7 +101,11 @@
 - **M2｜接線 React/Inertia 路徑**：`appShow()` 接上 gate，補 Feature 測試（測試計劃 1-5）。
 - **M3｜迴歸驗證**（已完成）：`./vendor/bin/phpunit --filter Codes`（141 個測試）僅 3 個失敗，皆為 `OfficeCodesExportTest`（`/codes/{table}/export` 節流狀態在同進程內互相污染，`export()` 未被本輪改動）。用 `git stash` 切回乾淨 `develop` 重跑同一指令，失敗**同樣只出現在 `OfficeCodesExportTest.php`**，但失敗數不是精確的 3 個（因為本分支多了兩個新測試檔，改變了 PHPUnit 依字母序探索/執行的順序，連帶改變多少既有請求先耗掉同一個 throttle 快取視窗）——不是「完全一致」，但兩邊指向同一個既有缺陷（節流狀態未在測試間重置），且單獨跑 `OfficeCodesExportTest.php` 這一個檔案時，兩邊（改動前後）失敗數與案例名稱**確實逐一相同**（9/11，見下方獨立驗證）。屬既有缺陷、跟本輪無關，不在本輪修。`tests/Feature/CodesControllerTest.php`（Blade 版 `show()`／`store()`／`update()` 等，61 個測試）單獨跑全過，確認 Blade 版行為零變化。（`tests/Feature/CodesShowInertiaTest.php` 在 M2 已因新 gate 補上 `actingAs`，屬 M2 範圍內的必要修正，非 M3 新增。）
 - **M4｜前端 UX 提示（可選加分項）**：React 側加提示文案／disabled 狀態，i18n 雙語同步，若有前端測試補上。
-- **M5｜文件收尾**：更新 `CHANGELOG.md`（本輪變更摘要），視需要在 `AGENTS.md`「高風險區域備忘」補一筆（`app/codes/{table}` sort/filter 現在需要登入；Blade 版 `codes/{table}` 未同步處理）。✅ 已補；並於環節 6a 更新條件——**重新暴露的鑰匙是 `LEGACY_PAGE_RETIREMENT=false`，不是 flag**（見第 7 節）。
+- **M5｜文件收尾**：更新 `CHANGELOG.md`（本輪變更摘要），視需要在 `AGENTS.md`「高風險區域備忘」補一筆（`app/codes/{table}` sort/filter 現在需要登入；Blade 版 `codes/{table}` 未同步處理）。✅ 已補。
+  ~~並於環節 6a 更新條件——重新暴露的鑰匙是 `LEGACY_PAGE_RETIREMENT=false`，不是 flag~~
+  🔴 **2026-09-15 再更新：那把鑰匙也不存在了**——`LEGACY_PAGE_RETIREMENT` 連同封路 middleware、
+  config、Kernel 別名於環節 4b-4c 整組移除，而無門檻的 Blade `show()` 本身於 4b-4a 實體刪除。
+  **現在沒有任何開關能重新暴露它。**（見第 7 節；這一行是里程碑紀錄、位置在前，所以在這裡也標一次。）
 
 ## 7. 風險與回退
 

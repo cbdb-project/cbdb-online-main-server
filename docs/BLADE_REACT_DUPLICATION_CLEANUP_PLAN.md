@@ -1,6 +1,15 @@
 # Blade / React 重複實作清查與下架計畫
 
-> 建立日期：2026-09-14　·　狀態：**計畫（尚未執行）**
+> 建立日期：2026-09-14　·　狀態：✅ **全部執行完畢（2026-09-15）**
+>
+> 環節 1–7 皆已完成並合併（逐環節的執行紀錄寫在各自的段落裡，含當時踩到的坑）。
+> 最終狀態：`resources/views/` 只剩 4 個非 legacy 檔、AdminLTE 與 jQuery/Bootstrap/DataTables/Select2/Vue
+> 整套移除（含 npm 相依）、migration flag 與 kill switch 兩套回退機制都不存在了。
+> 🔴 **全站沒有任何 runtime 回退鍵**——要回到 Blade 只能 `git revert` 並重新部署。
+> 部署者要做的最後一件事：照 `CHANGELOG.md` 的清單刪掉各機器 `.env` 裡那 **39** 個失效變數
+>（38 個 `MIGRATION_FLAG_*` ＋ `LEGACY_PAGE_RETIREMENT`）。
+> ⚠️ **兩件刻意沒做的事**，見 §六 驗收標準最後兩條：**① 手動 smoke 是人類關卡**；
+> **② 舊 URL 的 302 → 301 升級是人類決策**（301 會被永久快取，升上去收不回來）。
 >
 > 本文件回答三件事：
 > 1. **哪些功能目前是 Blade 與 React 兩套並存的重複實作**（可清除）；
@@ -14,8 +23,12 @@
 
 ## 〇、TL;DR
 
-- 全站 `config/migration_flags.php` 的頁面 flag **已全部為 `new`**，React/Inertia 是線上預設，已穩定運行一段時間。
-- `resources/views/` 仍有 **105 個 blade 檔、約 16,809 行**；其中 **94 檔 / ~14,650 行**屬「與 React 重複」或「死碼」，可下架（**91 檔 A 類 + 3 檔 B 類死碼**，與 §七 統計表一致）。
+> ✅ **以下是 2026-09-14 撰寫當時的盤點，保留原文以便對帳；括號內是 2026-09-15 完成後的實況。**
+
+- ~~全站 `config/migration_flags.php` 的頁面 flag 已全部為 `new`~~（**該 config 與整個 flag 機制已於環節 4d-1 移除**）。
+- ~~`resources/views/` 仍有 **105 個 blade 檔、約 16,809 行**；其中 **94 檔 / ~14,650 行**屬「與 React 重複」或「死碼」，可下架~~
+  （**已全部下架**：`resources/views/` 現在只剩 4 個非 legacy 檔——`inertia.blade.php`、`maps/index.blade.php`、
+  `cbdbapi/person.blade.php`、`partials/chgis-map-assets.blade.php`）。
 - **但只有「人物編輯」那一段真的被閘門擋住**（`LegacyBladeFormGate`）。`codes`、`operations`、`manage`、`view`、`dashboard`、`profile`、`crowdsourcing`、`admin/*`、`merge-preview`、`auth/*`、`welcome` 的**舊 Blade 路由目前仍可直接用 URL 打到並正常渲染**——它們是真正「雙份維護中」的重複實作，也是本計畫的主體。
 - 仍**只有 Blade、沒有 React 版**的只有 3 類：`maps/index`（歷史地圖殼）、`cbdbapi/person`（v1 API 回應樣板）、`inertia.blade.php` + `biogmains/_chgis_map_assets`（React 根模板與它 `@include` 的 partial）。另有 `saveas`／`Duplicate_Collateral_Info` 兩條 legacy 路由——**它們不是「React 缺的功能」，而是 React 現在正在呼叫的端點**（見 D-5a）。
 - 🔴 **八個最容易踩的雷**（review agent × 2 ＋ codex，皆實測確認，細節見 §五）：
@@ -1196,7 +1209,7 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
   - **為什麼與 4d-2 合併**：4d-2 刪的是「只有 Blade sidebar 在讀的欄位」，而那個 sidebar 就是 5a
     刪的檔案之一。分成兩個 PR 的話，前一個 PR 會留下一個「讀 `active` 但欄位已不存在」的 Blade 檔
     （或反過來），中間狀態是壞的。**依賴方向決定切分，不是依賴環節編號。**
-  - 📌 剩下的 **5b**（前端資產與 package 相依）仍未執行，見下節。
+  - 📌 剩下的 **5b**（前端資產與 package 相依）✅ **已於 2026-09-15 完成**，見下節。
 
   **review 關卡抓到的四件事（都已修，記在這裡免得下一輪重犯）**：
   1. **同類殘留漏了一處**：`config/entity_aggregates.php` 的 `nav.pattern`（3 筆）唯一讀取者就是
@@ -1303,10 +1316,43 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
 
 ✅ **後續（2026-09-15，環節 4c）**：那 5 個 Blade 視圖與 flag 分支都刪掉了，**那句全站級斷言現在成立**——並由 `AuthPagesInertiaTest::flipping_the_flags_no_longer_changes_what_gets_rendered()` 釘住（把四個 flag 全翻 `old`，五頁仍渲染 Inertia component）。這正是環節 4d 拆除整個 flag 機制的前提。
 
-#### 6b — 其餘收尾（依賴環節 4／5）
-- 更新 `AGENTS.md`、`README.md`、`CHANGELOG.md`、`docs/REACT_INERTIA_MIGRATION_PLAN.md`、`docs/REACT_MIGRATION_BACKLOG.md`、`docs/VIEWS.md`、`docs/CODES_SORT_FILTER_AUTH_GATE.md`。
-- `.env.example` 加入 §三第 11 欄的註解段落。
-- `CHANGELOG.md` 完整列出 §三之四 的 `.env` 清理清單（部署者依此在各機器手動清除）並註明需 `config:clear && config:cache`。
+#### 6b — 其餘收尾（依賴環節 4／5）✅ **已完成（2026-09-15）**
+- ✅ `AGENTS.md`、`README.md`、`CHANGELOG.md`、`docs/REACT_INERTIA_MIGRATION_PLAN.md`、
+  `docs/REACT_MIGRATION_BACKLOG.md`、`docs/ADMINLTE.md`、`docs/ADMINLTE4_UPGRADE_FEASIBILITY.md`、
+  `docs/API_AUTHENTICATION.md` 都已隨各環節同步。
+  📌 `docs/VIEWS.md` 與 `docs/CODES_SORT_FILTER_AUTH_GATE.md` **實查後不需再改**：前者只是
+  `/view/{key}` 的資料目錄、零 flag／回退陳述；後者已於 6a／4b-4a 更新完畢（風險段落已標明
+  「這個取捨已經消失」）。
+- ✅ `.env.example` 的註解段落已加（環節 4b-4c／4d 各補一次）。
+- ✅ `CHANGELOG.md` 已完整列出 **39 條：38 個 `MIGRATION_FLAG_*` ＋ `LEGACY_PAGE_RETIREMENT`** 的清理清單（依「何時變成孤兒」分四批）。
+  ⚠️ **措辭比原計畫精確**：刪這些變數**不需要** `config:clear && config:cache`（程式碼裡已無 `env()`
+  讀取端，Laravel 直接忽略）；需要那兩道指令的是**部署本身**——舊機器的 `bootstrap/cache/config.php`
+  可能是在 `config/migration_flags.php` 還存在時建的。原計畫把兩件事混成一句。
+- ✅ **全庫殘留掃描**：`MIGRATION_FLAG`／`LEGACY_PAGE_RETIREMENT` 在 `app`／`config`／`routes`／
+  `resources` 已無任何**讀取端**，只剩說明性註解與護欄測試的斷言文字。
+
+**review 關卡抓到的五件事（都已修）**：
+1. 🔴 **`.env` 清單漏列 5 個變數**：我照**本機這一台**的 `.env` 產清單（33 條），但這段的標題是
+   「**各機器** `.env` 可刪除的變數清單」。從 `git show ca963e93^:config/migration_flags.php` 比對，
+   4d-1 刪除前還有 `MIGRATION_FLAG_DEFAULT`／`AUTH_LOGIN`／`AUTH_REGISTER`／`AUTH_PASSWORDS`／`WELCOME`
+   五個 env 綁定，本機剛好沒設。正確總數是 **38 + 1 = 39**。
+   ⇒ **對外清單要從「機制曾經定義過什麼」產，不是從「我這台機器現在有什麼」產。**
+2. 🔴 **頁首宣告「全部執行完畢」，§六驗收清單卻 12 格全空、其中兩條照字面是 false**。已逐條實測並
+   重述——**不是把勾打上去了事**：「`grep migration_flag` 零命中」那條達不到也不該達到（57 命中全是
+   註解與斷言文字），正確的驗收方式是斷言 `function_exists()` 為 false；「只剩 `/home` 與 D-5 三條」
+   實測是 6 條，其中 `BasicInfoEditor.tsx` 的 `indexUrl` 預設值指向 legacy URI，已改成 `/app/basicinformation`。
+3. 🟠 **302 → 301 升級被「全部執行完畢」蓋掉**：計畫五處寫「觀察期一律 302，永久下架後才升 301」，
+   實測 `routes/web.php` 全部仍是 302。已在頁首與 §六明確標為**刻意未執行的人類決策**（301 會被
+   瀏覽器與中間層永久快取，升上去收不回來）。⇒ **宣告完成時要把「刻意沒做的」一起講，否則它會消失。**
+4. 🟠 **`docs/CODES_SORT_FILTER_AUTH_GATE.md:104` 仍以現在式說「重新暴露的鑰匙是
+   `LEGACY_PAGE_RETIREMENT=false`」**——那是計畫自己點名的「安全陳述型誤導文字」，而該開關已不存在。
+   我原本判定這份文件「不需再改」，只看了第 7 節（已更正）、沒看前面的里程碑行。已補刪除線。
+5. 🟡 **`.claude/skills/pre-commit-checks.md` 沒進掃描範圍**（我只掃了 `app`／`config`／`routes`／
+   `resources`），裡面三句全是 AdminLTE 時代的話（Vue/SCSS、`public/js/app.js` 要一起提交、
+   AdminLTE 用 CDN）。**那份技能是 AI 代理每次提交前會讀的，過時成本高於一般文檔。** 已改寫。
+   連帶修掉 `REACT_MIGRATION_BACKLOG.md`／`REACT_INERTIA_MIGRATION_PLAN.md` 頂部橫幅仍說
+   「Phase 7 待做」（表格裡早已 `retired`）、`BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md:276` 的
+   「現在 kill switch 能叫回…」、兩份設計文件裡 `@extends('layouts.dashboard-v3')` 的範例碼。
 - ~~`docs/migration-specs/**` 22 份加「歷史存檔」抬頭~~ ✅ 已於 6a 完成。
 
 ### 環節 7（獨立，不阻塞前六個環節）— D 類缺口評估 ✅ **已完成（2026-09-14）**
@@ -1393,17 +1439,43 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
 
 ## 六、驗收標準（全部環節完成後）
 
-- [ ] `find resources/views -name '*.blade.php' | wc -l` ≈ **4**（`inertia`、`cbdbapi/person`、`maps/index`、`_chgis_map_assets`——`_place_link` 隨 A-20 刪除，不在保留之列）。React/Inertia **不消費任何 blade component**，`components/` 應可清空
-- [ ] `grep -rn "migration_flag" app/ config/ routes/ resources/ tests/` 零命中
-- [ ] `config/migration_flags.php` 不存在；`.env.example` 已加說明註解
-- [ ] `package.json` 已無 `admin-lte`／`jquery`／`vue`／`datatables.net*`／Select2 主題
-- [ ] `./vendor/bin/phpunit` 全綠（含 `--filter VariantReplaceHookCoverage`）、`npm run build` 綠、`npx vitest run` 綠
-- [ ] **CI 實際跑的是 `npm run prod`（= `vite build`）與 `npm run test`（= `vitest run`）**——環節 5 動過 `vite.config.js` 後要確認這兩條路徑也綠
-- [ ] `npm ls select2` 確認 `select2` 已隨 `admin-lte` 一起移除；`@fortawesome/fontawesome-free` **仍在**（`inertia.css:23` 需要）
-- [ ] `grep -rnE "['\"\`]/(basicinformation|codes|operations|manage|view|dashboard|profile|crowdsourcing|admin|welcome)" resources/js/inertia | grep -v '/app/'` 只剩 `/home` 與 D-5 三條
-- [ ] `./vendor/bin/php-cs-fixer fix --dry-run --diff --config=.php-cs-fixer.dist.php` clean（**先清 cache**）
+> ✅ **2026-09-15 逐條實測結果**（review 指出「頁首宣告完成、驗收清單一格未勾」是自相矛盾，
+> 而且其中兩條照字面就是 false——已逐條重述成**實際成立的條件**，不是把勾打上去了事）。
+
+- [x] `find resources/views -name '*.blade.php' | wc -l` = **4**（`inertia`、`cbdbapi/person`、`maps/index`、`partials/chgis-map-assets`）。`resources/views/components/` 實查不存在
+- [x] ~~`grep -rn "migration_flag" app/ config/ routes/ resources/ tests/` 零命中~~
+      🔴 **這條原本的寫法達不到，也不該達到**。⚠️ **數字隨指令寫法而變，所以指令要寫死**：
+      `grep -rn "migration_flag" app/ config/ routes/ resources/ tests/` → **57** 行，**沒有一個是呼叫端**——
+      全是說明性註解（`app/helpers.php:47` 的墓碑、5 個 Auth/Welcome controller 的歷史註記
+      「這裡原本是 `migration_flag_is_new(<auth.login>)`…」）與護欄測試的斷言文字。
+      ⚠️ **連收窄成 `grep -rnE "(^|[^a-z_])migration_flag(_is_new)?\s*\(" app/ config/ routes/ resources/`
+      （不含 `tests/`）也仍有 **6** 行——同樣全在 `//` 註解裡（第一版重述寫成「零命中」，實跑才發現不成立）。
+      📌 codex 用不同的收窄寫法得到 56／3，與這裡的 57／6 不同——**這正是「驗收條件要連指令一起寫死」的理由**，
+      不然下一個人重跑會以為紀錄造假。兩種寫法的結論一致：**呼叫端數為 0**。
+      **正確的驗收方式不是 grep，是斷言機制本身不存在**：
+      `LegacyBladePageRetirementTest::the_migration_flag_mechanism_no_longer_exists()` 驗
+      `function_exists('migration_flag')`／`migration_flag_is_new` 皆為 false、
+      `config_path('migration_flags.php')` 不存在、`config('migration_flags.pages')` 為 null（含 config:cache）。
+      ⇒ ✅ 實測成立。**留著那些註解是刻意的**：它們記錄了「這裡曾經有一個分支」，
+      比乾淨的空白更有用（也是為什麼當初把註解裡的 key 寫成 `<auth.login>` 而非 `'auth.login'`——
+      避免污染這類 grep）。
+- [x] `config/migration_flags.php` 不存在；`.env.example` 已加說明註解
+- [x] `package.json` 已無 `admin-lte`／`jquery`／`vue`／`datatables.net*`／Select2 主題（5b 另刪了 `@vue/compiler-sfc`／`@vitejs/plugin-vue`／`axios`／`lodash`／`sass`）
+- [x] `./vendor/bin/phpunit` 全綠（3,250 tests）、`npm run build` 綠、`npx vitest run` 綠（128 tests）
+- [x] **CI 實際跑的是 `npm run prod` 與 `npm run test`**——5b 的 PR（#1325）CI 全綠，含 `feature-tests`／`cs-check`
+- [x] `npm ls select2` → `(empty)`；`@fortawesome/fontawesome-free` **仍在**（`inertia.css` 需要）
+- [x] ~~`grep -rnE "['\"`]/(basicinformation|codes|...)" resources/js/inertia | grep -v '/app/'` 只剩 `/home` 與 D-5 三條~~
+      **實測是 6 條**：D-5 三條（`TabContentLoader.tsx:233,234`、`BasicInfoView.tsx:328`——都是**刻意保留**的
+      legacy 端點，見 D-5a／D-5b）＋ 兩處測試字串裡的註解 ＋ `BasicInfoEditor.tsx` 的 `indexUrl` 預設值。
+      **最後那個已於本環節改成 `/app/basicinformation`**（所有呼叫端都顯式傳值，它只是保險絲，
+      但走到時會多繞一次 302）。⇒ 重述為「只剩 D-5 三條 + 測試註解」，✅ 成立
+- [x] `./vendor/bin/php-cs-fixer fix --dry-run --diff --config=.php-cs-fixer.dist.php` clean
 - [ ] 手動 smoke：`/`、`/login`、`/app/dashboard`、`/app/codes`、`/app/basicinformation/{id}` 各分頁與 13 個編輯器、`/app/operations`、`/app/manage`、`/app/query-playground`、`/app/maps`、CHGIS 浮出地圖
-- [ ] 舊 URL 導向落點正確（抽查 10 條，含 query string）；觀察期內應為 **302**，永久下架後才是 301
+      ⚠️ **這條是人類關卡，agent 沒有做**——自動化測試涵蓋的是後端與元件，不是「真的用瀏覽器點過一輪」
+- [ ] 🔴 **舊 URL 由 302 升為 301：刻意未執行，是人類決策**。計畫五處（§一、環節 4a-3、§六…）都寫
+      「觀察期一律 302／307，確定永久下架後才在環節 4 升 301」。實測 `routes/web.php` 的 legacy closure
+      **全部仍是 302**。301 會被瀏覽器與中間層永久快取，**升上去就收不回來**——這正是它該由人拍板的理由。
+      抽查導向落點正確（含 query string）的部分 ✅ 由 `LegacyBladePageRetirementTest` 覆蓋
 - [ ] `AGENTS.md` 不再宣稱「翻回 `old` 即可回退」；`docs/CODES_SORT_FILTER_AUTH_GATE.md` 結論已更新
 
 ---

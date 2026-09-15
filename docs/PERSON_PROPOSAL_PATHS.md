@@ -162,7 +162,7 @@ backfill、刪除 `$force=true` 廣集孤兒）都實作在 legacy 側、十餘�
 ## 6. 建議順序
 
 1. ~~`BIOG_MAIN` 收斂到 A~~ ✅（§4.6）
-2. ~~封死 legacy 提交入口~~ ✅（§4.7；實體移除待 Phase 7）
+2. ~~封死 legacy 提交入口~~ ✅（§4.7）；~~實體移除待 Phase 7~~ ✅ **已於 2026-09-14 實體刪除**（Blade 下架計畫環節 2，見 §155-159）
 3. **先裁定 §7 是否立項**——它決定 kinship／assoc 的收斂形狀與「比較」重構
    （[OPERATIONS_COMPARE_CONSOLIDATION_PLAN.md](./OPERATIONS_COMPARE_CONSOLIDATION_PLAN.md)）
    騎在哪個模型上做。若立項：kinship／assoc 直接以新原語重做（跳過「先收斂到 A 再遷」的重工）；

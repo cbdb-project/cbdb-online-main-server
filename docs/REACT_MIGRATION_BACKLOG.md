@@ -3,12 +3,14 @@
 > 本檔是遷移執行的**單一真實來源**：列舉全部待遷移頁面與狀態。策略與規則見 [REACT_INERTIA_MIGRATION_PLAN.md](./REACT_INERTIA_MIGRATION_PLAN.md)（recipe、保真度原則、自主執行協定）。
 > **本檔可頻繁更新**（每完成一頁就改狀態）；設計文件保持穩定。
 
-> ✅ **2026-06-26 全頁翻 new 上線**：Phase 1–6 所有可遷移頁（含 basicinformation 全套、view/index）已 `live`（flag `new`，使用者人工逐頁驗收通過）。仍為 `todo` 的只剩 **Phase 7（P7-1/2/3，AdminLTE 實體下架）** 與 **P6-C1/C2（死碼清理）**。🔴 **2026-09 更新**：「舊視圖/路由保留供回退」已不準確——人物編輯全套已**實體刪除**，其餘 legacy 頁面已**全部實體刪除**（環節 4a／4b-4）——🔴 **沒有任何回退鍵**：migration flag 無效，`LEGACY_PAGE_RETIREMENT=false` 也無效。見 [Blade 下架計畫](./BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)。
+> ✅ **2026-06-26 全頁翻 new 上線**：Phase 1–6 所有可遷移頁（含 basicinformation 全套、view/index）已 `live`（flag `new`，使用者人工逐頁驗收通過）。~~仍為 `todo` 的只剩 **Phase 7（P7-1/2/3，AdminLTE 實體下架）** 與 **P6-C1/C2（死碼清理）**。~~ ✅ **那些也全部完成了**：P6-C1/C2/C3 於 2026-09-14 環節 1、P7-1/2/3 於 2026-09-15 環節 5a／5b（見下方表格的 `retired` 標記）。🔴 **2026-09 更新**：「舊視圖/路由保留供回退」已不準確——人物編輯全套已**實體刪除**，其餘 legacy 頁面已**全部實體刪除**（環節 4a／4b-4）——🔴 **沒有任何回退鍵**：migration flag 無效，`LEGACY_PAGE_RETIREMENT=false` 也無效。見 [Blade 下架計畫](./BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)。
 
 ## 狀態圖例
 - `todo` 未開始　·　`in-progress` 進行中　·　`in-review` 已實作、走 gate 中　·　`done` 已合併（flag 仍指舊頁，待人切換）　·　`live` 已切換上線　·　`blocked` 卡住待人決定　·　`retired` 舊頁已退役刪除
 
-> 📌 **2026-06-26 對帳（重要）**：下方各 phase 表中標 `done`（多附「flag old」）的列，**均已於 2026-06-26 翻 `new`＝實質 `live`**（使用者逐頁驗收通過）；表內 `done`/`flag old`/未來式上線指令為**當時合併狀態的歷史紀錄，未逐列回填**。**實際 flag 狀態一律以 `config/migration_flags.php` 為準**（已列頁面多為 `new`）。仍未做的只有 **Phase 7（AdminLTE/Blade 實體下架，P7-1/2/3）** 與 **P6-C1/C2（死碼清理）**，且翻 flag 與實體下架皆為**人類關卡，agent 不可自行執行**。
+> 📌 **2026-06-26 對帳（重要）**：下方各 phase 表中標 `done`（多附「flag old」）的列，**均已於 2026-06-26 翻 `new`＝實質 `live`**（使用者逐頁驗收通過）；表內 `done`/`flag old`/未來式上線指令為**當時合併狀態的歷史紀錄，未逐列回填**。~~實際 flag 狀態一律以 `config/migration_flags.php` 為準~~ 🔴 **該檔與整個 flag 機制已於 Blade 下架環節 4d-1 移除**，全站一律 React。
+~~仍未做的只有 Phase 7 與 P6-C1/C2~~ ✅ **全部完成**（環節 1／5a／5b）。
+⚠️ 「實體下架為**人類關卡**」這條規則**仍然有效**：那幾個環節是使用者逐段明確授權才執行的，不是 agent 自行認定可刪。
 
 **認領慣例（並發安全）**：標 `in-progress` 時寫成 `in-progress (iter-id, 起 ISO8601)`。同一時間只有一個 executor、序列執行。開機先 **`git fetch --prune origin`**（失敗即 infra 故障停機）再對帳（見設計文件附錄 C 步驟 0）：孤兒 `in-progress`（無對應 PR 且逾時）標回 `todo`/`blocked`；**帳本與（已刷新的）git/PR 不一致時以 git 為準**。
 **挑選順序**：依賴就緒 → phase 編號 → **同 phase 內由上而下嚴格表序**。無可挑（全 `blocked`/`done`）→ 停機回報。
@@ -216,7 +218,7 @@
 ## 已具 React 版、僅待切換 + 退役（非重寫）
 | 頁面 | React 路由 | 狀態 | 備註 |
 |---|---|---|---|
-| view/index、view/list | `app.view.index`/`app.view.show` | live | flag `view`=new 已上線；Blade `view.index`/`view.show` 實體退役待 Phase 7 |
+| view/index、view/list | `app.view.index`/`app.view.show` | **retired** | Blade `view.index`／`view.show` 已於環節 4a-3 實體刪除，舊 URI 只剩 302 closure；flag 機制本身於 4d-1 移除 |
 | Query Playground UI | `/app/query-playground` | live | 已是 React（含 nl-query-logs，flag `query-playground.nl-query-logs`=new）；主頁無 flag、`/query-playground` 硬導向 React |
 | Person Browser | `/app/*` | live | 已是 React（唯讀） |
 | Search-by-Entry | `/app/*` | live | 已是 React |

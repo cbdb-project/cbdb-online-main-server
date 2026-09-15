@@ -653,6 +653,9 @@ class BasicInformationAltnamesController extends Controller {
 
 更新 `resources/views/biogmains/altname/index.blade.php`：
 
+> 📌 **2026-09-15**：下面這段是**歷史範例**——`layouts/dashboard-v3` 與整套 Blade 頁面已於
+> Blade 下架計畫環節 5a／4b 刪除。**新功能不要照這個寫**，請做在 `resources/js/inertia/**`。
+
 ```blade
 @php
 use App\Support\CompositePrimaryKey;

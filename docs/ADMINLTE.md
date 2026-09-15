@@ -1,44 +1,48 @@
-# AdminLTE 在 CBDB Online 項目中的現況與指引
+# AdminLTE 在 CBDB Online 的歷史與下架紀錄
 
-本文件記錄專案前端技術棧現況。專案已完成從 AdminLTE 2 / Bower / Laravel Mix 到 AdminLTE 3 / Vite 的完整遷移。
+🔴 **AdminLTE 已於 2026-09-15 完整下架，本文件自此為歷史文件，不是操作指引。**
 
-## 現況總覽（v3.2 + Vite）
-- 全站已切換至 AdminLTE v3.2（Bootstrap 4、Font Awesome 5），所有使用 dashboard 佈局的頁面都走 `layouts/dashboard-v3.blade.php`，專案中不存在 `layouts/dashboard.blade.php`。
-- 前端資產以 **Vite** 打包，輸出在 `public/build`。入口：`resources/js/app.js`（主要 UI + jQuery/Bootstrap/AdminLTE/Select2）、`resources/js/datatables.js`（DataTables）。
-- `resources/js/jquery-global.js` 會先將 jQuery 掛到 `window`，再載入 Bootstrap 4 bundle（含 Popper）、AdminLTE 3、Select2（Bootstrap 4 主題）與共用的 modal 焦點修復、`initPersonSelect`。
-- 版型套用 Font Awesome 5 CDN，其餘 AdminLTE/Bootstrap/Datatables/Select2 皆由 Vite bundle 提供，無外部 JS CDN 依賴。
-- 佈局中的客製樣式集中於 `layouts/dashboard-v3.blade.php` 內的 `<style>`（scroll/表格寬度/Select2 高度修正等）；文檔先前列出的 pagination/brand-logo 類 CSS 已被移除，程式碼中無對應片段。
+專案曾經歷 AdminLTE 2 / Bower / Laravel Mix → AdminLTE 3 / Vite 的完整遷移，最後在 React/Inertia
+遷移完成後整套移除。下架的執行紀錄見
+[docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md) 環節 5。
 
-## 已覆蓋的頁面（全部走 v3）
-- 模組：codes 全套、operations、modified、view、manage、crowdsourcing、profile、admin 工具全套、basicinformation（含地址/別名/文本/任官/社會關係/入仕/事件/親屬/身份/財產/社會機構/來源）、dashboard。
-- 登入/註冊等 Auth 頁面也改用 Vite 入口與 Bootstrap 4 表單樣式，不再載入 AdminLTE 2 資產。
-- `resources/views/layouts/app.blade.php`（Auth 用）與 `resources/views/layouts/dashboard-v3.blade.php`（主站）均透過 `@vite(['resources/js/app.js'])`。
+## 現在長什麼樣
 
-## 遺留檔案清理狀態
-Laravel Mix 時期的 `resources/assets/` 目錄及相關檔案**已完全移除**：
-- ~~`resources/assets/js/bootstrap.js`~~、~~`resources/assets/sass/app.scss`~~ - 原 Mix 入口
-- ~~`resources/assets/css/styles.css`~~ - 舊版樣式檔
-- 相關的 Mix 配置檔案（`webpack.mix.js`）也已移除
+- 主站互動頁面都是 **React/Inertia**（`resources/js/inertia/**`），樣式走 **Tailwind v4**
+  （唯一含 `@import 'tailwindcss'` 的檔是 `resources/css/inertia.css`）＋ shadcn/ui 慣例元件。
+- `resources/views/` 只剩 4 個 Blade 檔，都不是 AdminLTE 頁：
+  `inertia.blade.php`（React 根模板）、`maps/index.blade.php`（獨立全螢幕 Leaflet 地圖殼）、
+  `cbdbapi/person.blade.php`（v1 API 回應樣板）、`partials/chgis-map-assets.blade.php`。
+  ⚠️ `maps/index.blade.php` **是仍在服役的互動頁**（Leaflet 全螢幕地圖，掛在 `/app/maps`），
+  不是 legacy 殘留——它只是沒有 React 化，且自帶 CDN Leaflet、不套任何殼。
+- Vite 入口只剩 3 個：`resources/js/inertia/app.tsx`、`resources/js/historical-maps/app.js`、
+  `resources/js/chgis-map/app.js`。
+- 圖示仍用 Font Awesome（`@fortawesome/fontawesome-free`，由 `resources/css/inertia.css` 引入）——
+  React 側邊欄與各頁的 `fas fa-*` class 名沿用自 AdminLTE 時期，**這是刻意保留的**。
 
-所有前端資源現由 **Vite** 統一管理，入口位於 `resources/js/` 目錄。
+## 已移除的東西（環節 5，2026-09-15）
 
-## 類名對照（歷史備查）
-升版時常用的 v2 → v3 對照，供查漏用：
-- 容器：`box`/`panel` → `card`，`box-header`/`panel-heading` → `card-header`，`box-body`/`panel-body` → `card-body`，`box-footer`/`panel-footer` → `card-footer`，`box-tools` → `card-tools`
-- 表格：`table-condensed` → `table-sm`
-- 工具類：`pull-right` → `float-right`，`pull-left` → `float-left`，`hidden-xs` → `d-none d-sm-block`，`hidden-sm` → `d-none d-md-block`，`hidden-md` → `d-none d-lg-block`，`visible-xs` → `d-block d-sm-none`
-- 導航：`sidebar-menu` → `nav nav-pills nav-sidebar flex-column`；`<li class="header">` → `<li class="nav-header">`；`treeview-menu` → `nav nav-treeview`
-- Data attributes：`data-widget="collapse"` → `data-card-widget="collapse"`，`data-widget="remove"` → `data-card-widget="remove"`
-- 圖標：Font Awesome 4 `fa fa-dashboard` → Font Awesome 5 `fas fa-tachometer-alt`，`fa fa-minus` → `fas fa-minus`，`fa fa-plus` → `fas fa-plus`
+**5a**：6 個 layout Blade 檔（`layouts/{app,dashboard-v3,header-v3,footer,sidebar-v3,partials/sidebar-node}`）
+與 `AppServiceProvider` 的 `View::composer('layouts.dashboard-v3', …)`。
 
-## 測試/驗證建議
-- 必要頁面 smoke：`/codes`、`/operations`、`/view`、`/manage`、`/basicinformation/...`、`/crowdsourcing`、`/admin/*`、`/home`。
-- 確認導航收合、模態框、Select2、DataTables、響應式（桌機/行動）與 Bootstrap 4 表單驗證樣式。
-- 若有前端改動，使用 `npm run dev`（或 `npm run build`）重建 `public/build`。
+**5b**：
+- JS／CSS：`resources/js/{app.js,jquery-global.js,datatables.js,components/Select.vue,utils/datetime.js}`、
+  `resources/css/{select2-overrides,mobile-responsive,ai-autofill}.css`。
+- `vite.config.js`：`app.js`／`datatables.js` 兩個入口、`vue()` plugin、`vue` 別名。
+- `package.json`：`admin-lte`、`jquery`、`datatables.net`、`datatables.net-bs4`、
+  `@ttskch/select2-bootstrap4-theme`、`vue`、`@vue/compiler-sfc`、`@vitejs/plugin-vue`、
+  `axios`、`lodash`、`sass`。
 
-## 後續工作方向
-- **AdminLTE 4 升級準備**（Bootstrap 5）：
-  - Data attributes：`data-toggle` → `data-bs-toggle`
-  - 工具類：`float-*` → `d-flex` / Flexbox utilities
-  - 圖標：Font Awesome 5 → Font Awesome 6
-  - 測試重點：Vite 構建產物、響應式佈局、JavaScript 插件兼容性
+⚠️ **刻意保留**（不要跟著刪）：`resources/js/utils/{disableNumberInputWheel,sqlFormatter}.js`
+（被 `inertia/app.tsx` 與 `QueryPlayground/SqlEditorPanel.tsx` import）、`resources/js/chgis-map/`、
+`resources/js/historical-maps/`、`leaflet`、`@fortawesome/fontawesome-free`。
+
+## 對後續工作的意義
+
+- **不要重新引入 jQuery、Bootstrap、DataTables、Select2 或 Vue**（AGENTS.md §4 已列為硬規則）。
+  React 端的對應做法：modal 用 `components/ui/Modal.tsx`、表格用 `@tanstack/react-table`、
+  可搜尋選單用既有的 autocomplete 元件。
+- [docs/ADMINLTE4_UPGRADE_FEASIBILITY.md](./ADMINLTE4_UPGRADE_FEASIBILITY.md) 評估的是
+  「AdminLTE 3 → 4（Bootstrap 5）」，**該路線已被 React/Inertia 遷移取代**，僅供歷史查閱。
+- 舊版的 v2 → v3 class 名對照表已無用途，隨本次改寫移除；需要時從 git 歷史取回
+  （本檔 2026-09-15 之前的版本）。

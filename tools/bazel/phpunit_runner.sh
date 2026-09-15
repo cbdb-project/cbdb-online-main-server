@@ -59,22 +59,21 @@ rm -f bootstrap/cache/packages.php bootstrap/cache/services.php
 php artisan package:discover --ansi
 
 mkdir -p public/build
+# 沒有真 build 時給一份假 manifest，讓 @vite() 不會拋例外。
+# ⚠️ 這份清單必須與 vite.config.js 的 input 完全一致——少一個 entry，任何 @vite 到它的
+# Blade（含 partials/chgis-map-assets）都會在請求時拋 manifest 例外。
+# 2026-09-15（環節 5b）：移除已刪的 app.js／datatables.js，並補上一直漏掉的 chgis-map/app.js。
 if [[ ! -f public/build/manifest.json ]]; then
     cat > public/build/manifest.json <<'JSON'
 {
-  "resources/js/app.js": {
-    "file": "assets/app.js",
-    "src": "resources/js/app.js",
-    "isEntry": true
-  },
-  "resources/js/datatables.js": {
-    "file": "assets/datatables.js",
-    "src": "resources/js/datatables.js",
-    "isEntry": true
-  },
   "resources/js/historical-maps/app.js": {
     "file": "assets/historical-maps.js",
     "src": "resources/js/historical-maps/app.js",
+    "isEntry": true
+  },
+  "resources/js/chgis-map/app.js": {
+    "file": "assets/chgis-map.js",
+    "src": "resources/js/chgis-map/app.js",
     "isEntry": true
   },
   "resources/js/inertia/app.tsx": {

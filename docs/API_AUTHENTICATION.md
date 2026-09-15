@@ -26,22 +26,29 @@ CBDB API 支持兩種認證方式：
 
 ### 使用方式
 
+> 📌 **2026-09-15**：以下範例原本用 `axios`／`window.axios`。本站已不再提供 `window.axios`
+> 全域（AdminLTE 資產於 Blade 下架環節 5b 移除），範例改用瀏覽器內建 `fetch`。
+> 自己的應用要用 axios 當然可以，但要**自行安裝並 import**，別依賴本站提供的全域。
+
 1. **用戶登錄**
    ```javascript
    // 使用標準的 Laravel Auth 登錄表單
-   await axios.post('/login', {
-     email: 'user@example.com',
-     password: 'password'
+   await fetch('/login', {
+     method: 'POST',
+     credentials: 'same-origin',
+     headers: {
+       'Content-Type': 'application/json',
+       'X-CSRF-TOKEN': document.head.querySelector('meta[name="csrf-token"]').content,
+     },
+     body: JSON.stringify({ email: 'user@example.com', password: 'password' }),
    });
    ```
 
 2. **調用 API**
    ```javascript
-   // 配置 Axios 以自動發送 Cookie
-   window.axios.defaults.withCredentials = true;
-
-   // 直接調用 API，Session 會自動處理認證
-   const response = await axios.get('/api/select/search/addr');
+   // 同源請求帶上 credentials，Session 會自動處理認證
+   const response = await fetch('/api/select/search/addr', { credentials: 'same-origin' });
+   const data = await response.json();
    ```
 
 3. **CSRF 保護**
@@ -52,24 +59,26 @@ CBDB API 支持兩種認證方式：
    ```
 
    ```javascript
-   const token = document.head.querySelector('meta[name="csrf-token"]');
-   axios.defaults.headers.common['X-CSRF-TOKEN'] = token.content;
+   const token = document.head.querySelector('meta[name="csrf-token"]').content;
+   await fetch('/api/...', {
+     method: 'POST',
+     credentials: 'same-origin',
+     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token },
+     body: JSON.stringify(payload),
+   });
    ```
 
 ### 前端配置
 
-在 `resources/js/app.js` 中已配置：
+🔴 **2026-09-15 更新**：本節原本寫「在 `resources/js/app.js` 中已配置 `window.axios.defaults...`」。
+**那個檔與 `window.axios` 都已不存在**（Blade 下架環節 5b 刪除 AdminLTE 資產，`axios` 也不再是直接相依）。
 
-```javascript
-// 啟用 Cookie 認證
-window.axios.defaults.withCredentials = true;
+站內的 React/Inertia 頁面**不需要任何前端配置**：Inertia 的請求走 `@inertiajs/react`，
+CSRF token 由 Laravel 的 `XSRF-TOKEN` cookie 自動帶上。自行 `fetch()` 時同源請求帶上
+`credentials: 'same-origin'` 即可；需要 `X-CSRF-TOKEN` 標頭時從頁面的
+`<meta name="csrf-token">` 取值。
 
-// 自動附加 CSRF Token
-const token = document.head.querySelector('meta[name="csrf-token"]');
-if (token) {
-    window.axios.defaults.headers.common['X-CSRF-TOKEN'] = token.content;
-}
-```
+站外應用請走下一節的 **Personal Access Token 認證**，不要依賴 Cookie／CSRF。
 
 ## 2. Personal Access Token 認證（用於外部應用）
 

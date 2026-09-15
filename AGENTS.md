@@ -3,9 +3,9 @@
 本文件提供 AI 代理在此專案工作的最小必要背景。目標是快速上手、降低踩坑，不再保留已失效的歷史操作細節。
 
 ## 專案現況
-- 技術棧：Laravel 12、PHP 8.2+、MariaDB 10.11（prod 實測 10.11.14；相容性下限仍按 10.3 撰寫）、SQLite（測試）、Vite、Vue 3、Inertia/React。
+- 技術棧：Laravel 12、PHP 8.2+、MariaDB 10.11（prod 實測 10.11.14；相容性下限仍按 10.3 撰寫）、SQLite（測試）、Vite、Inertia/React、Tailwind v4。（**Vue 已於 Blade 下架環節 5b 整套移除**，連 npm 相依都沒有了。）
 - 全站主要互動頁面均為 **React/Inertia**（遷移期的 `config/migration_flags.php` 已於 Blade 下架環節 4d-1 移除）：人物列表/檢視/詳情中樞、13 個 React 編輯器（basic-info + 12 個複合主鍵子資源）、Codes CRUD、operations/manage/crowdsourcing、admin 工具、認證頁、Query Playground（`/app/query-playground`）等。
-- **所有 legacy Blade 頁面已實體刪除**（見 [docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)）。**AdminLTE 的 6 個 layout Blade 檔也已於環節 5a 刪除**；`resources/views/` 只剩 4 個非 legacy 檔（`inertia.blade.php`、`maps/index`、`cbdbapi/person`、`partials/chgis-map-assets`）。**AdminLTE 的前端資產（`resources/js/app.js` 等、3 支 legacy CSS、package 相依）仍在**（環節 5b 待做）：
+- **所有 legacy Blade 頁面已實體刪除**（見 [docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)）。**AdminLTE 的 6 個 layout Blade 檔也已於環節 5a 刪除**；`resources/views/` 只剩 4 個非 legacy 檔（`inertia.blade.php`、`maps/index`、`cbdbapi/person`、`partials/chgis-map-assets`）。**AdminLTE 的前端資產也已於環節 5b 刪除**（`app.js`／`jquery-global.js`／`datatables.js`／`Select.vue`／`utils/datetime.js`、3 支 legacy CSS、`vue()` plugin 與 11 個 npm 相依）：
   - **人物編輯全套（`basicinformation.*`）已於環節 2 實體刪除**——視圖、12 組子資源路由與 controller、
     `LegacyBladeFormGate`、以及那 15 個 `MIGRATION_FLAG_BASICINFO_*` flag 全部不存在了。
     舊 URI 只剩 302 導向（顯示頁）／410（寫入端）。**把 flag 塞回 config 不會復活它們**（有護欄測試鎖住）。
@@ -50,10 +50,12 @@
       `NavigationSchemaTest::test_every_sidebar_href_points_at_the_react_app()`。
   - 少數頁面本就無 flag：Query Playground 主頁 `/query-playground` 硬導向 `/app/query-playground`；
     外部資料庫引用瀏覽器 `/external-db-link` 硬導向 `/app/external-db-link`（Blade 版已刪）。
-  - **AdminLTE layout 已於環節 5a 實體刪除**（`layouts/{app,dashboard-v3,header-v3,footer,sidebar-v3,partials/sidebar-node}`），
-    連帶 `AppServiceProvider` 的 `View::composer('layouts.dashboard-v3', …)`。
-    **前端資產下架（環節 5b）尚未執行**：`resources/js/{app.js,jquery-global.js,datatables.js,components/Select.vue}`、
-    3 支 legacy CSS、`vite.config.js` 的對應 input／`vue()` plugin／`vue` alias、`package.json` 相依。
+  - **AdminLTE 已完整下架**（環節 5a layout 6 檔 + 5b 前端資產）。Vite 入口只剩 3 個：
+    `resources/js/inertia/app.tsx`、`historical-maps/app.js`、`chgis-map/app.js`。
+    🔴 **不要重新引入 jQuery／Bootstrap／DataTables／Select2／Vue**（AGENTS §4 的既有規則，現在連 npm 相依都沒有了）。
+    ⚠️ **刻意保留**：`resources/js/utils/{disableNumberInputWheel,sqlFormatter}.js`（inertia 端 import）、
+    `chgis-map/`、`historical-maps/`、`leaflet`、`@fortawesome/fontawesome-free`（React 仍用 `fas fa-*` class）。
+    現況與清單見 [docs/ADMINLTE.md](./docs/ADMINLTE.md)。
   - **`Navigation` 的節點不再帶 `active.pages`／`active.patterns`**（環節 4d-2）：那組欄位只服務
     Blade sidebar 的 `$page_title` 字串比對與 `request()->routeIs()`，隨 5a 一併移除。
     React 的 active 判定一向在 `SidebarNode.tsx` 依 href 路徑 + 顯著 query 簽章做。
@@ -221,18 +223,30 @@
 - 與 SQL allowlist、CTE、SSE、NL 工具調用有關的修改，必須補回歸測試。
 
 ### 4. 前端
-- 所有頁面透過 `@vite` 載入資源。
-- 不要重新引入外部 CDN 的 jQuery、Bootstrap、DataTables。
+- 主站頁面一律透過 `@vite` 載入資源（入口只有 3 個：`resources/js/inertia/app.tsx`、
+  `historical-maps/app.js`、`chgis-map/app.js`）。例外是上面那三個自帶 CDN 資產的獨立頁。
+- 🔴 **不要重新引入 jQuery、Bootstrap、DataTables、Select2、Vue**——不分 CDN 或 npm。
+  整套已於 Blade 下架環節 5b 移除（連 `package.json` 相依都沒有了），對應的 React 做法：
+  modal → `components/ui/Modal.tsx`、表格 → `@tanstack/react-table`、可搜尋選單 → 既有 autocomplete 元件。
+  ⚠️ **規則管的是主站路徑（`resources/js/inertia/**` 與 `package.json`）**，不涵蓋下列
+  **自給自足的獨立頁**——它們不繼承任何殼、不走 Vite，自帶 CDN 資產，**不算違規、不要「順手修掉」**：
+  `resources/views/cbdbapi/person.blade.php`（v1 API 回應樣板，CDN Bootstrap 5.3）、
+  `public/cbdbapi/index.html`（靜態 API 說明頁，同樣 CDN Bootstrap 5.3）、
+  `resources/views/maps/index.blade.php`（全螢幕地圖，CDN Leaflet）。
 - 修改 `resources/js/**` 後，提交前需重新編譯前端。
 - React 列表不要使用 index 當 key；若資料有複合主鍵，請使用穩定 `pk`。
 - **必填欄位 create／update 一致**：若某欄位在新增（create）為必填，編輯（update）也必須維持必填——驗證邏輯與 UI 必填標記兩邊都要有，不可只擋 create。否則使用者在 update 時清空該欄仍能儲存，導致原本填好的資料被靜默清空。（驗證放在 `save()` 進入 create／update 分支之前，即可同時涵蓋兩者與 direct／proposal 四條路徑。）
-- 頁面級內聯腳本若要對 `#app` 內的伺服器渲染節點綁定事件（`addEventListener`），必須包在 `onViteReady(function(){ ... })` 內。`app.js` 會在 DOM ready 時 `createApp(...).mount('#app')`，把整個 `#app`（layout 的 `<div class="wrapper" id="app">`）重新編譯並重建所有節點，掛載前直接綁定的監聽器會隨舊節點被丟棄而失效。`onViteReady` 的回呼在 mount 之後才執行，可確保綁在最終節點上。委託到 `document`/`window` 的監聽器與內聯 `onclick` 屬性不受影響。
+- ~~頁面級內聯腳本要用 `onViteReady()` 包住 `#app` 內的事件綁定~~ **此規則已失效（環節 5b）**：
+  提供 `onViteReady` 的 `resources/js/app.js`（連同它的 `createApp(...).mount('#app')`）已刪除，
+  全站沒有 Vue 執行期，也沒有會被重建的伺服器渲染 `#app`。React 頁面直接用元件的事件處理器即可。
 
 ### 6. i18n（繁體中文 / 英文切換）
 - 系統預設語言為繁體中文（`zh-TW`），使用者可透過 navbar 切換至英文（`en`）。
 - Blade 字串一律使用 `__('group.key')` 翻譯 helper；禁止在 Blade 中硬編碼中文字串。
 - 翻譯檔：`resources/lang/zh-TW/*.php` 與 `resources/lang/en/*.php`；兩者必須同步。
-- JS 字串透過 `{!! Js::from(__('group.key')) !!}` 注入；React/Inertia 元件從 `usePage().props.locale` 讀取 locale。
+- React/Inertia 元件從 `usePage().props.locale` 讀取 locale；後端要送到前端的翻譯字串由 controller／`HandleInertiaRequests` 以 props 傳遞。
+  （原本這裡寫「JS 字串透過 `{!! Js::from(__('group.key')) !!}` 注入」——那是 Blade 頁的做法，
+  全庫**只剩 `partials/chgis-map-assets.blade.php` 一個檔**在用；`cbdbapi/person.blade.php` 用的是 `@json()`。）
 - Locale 切換由 `SetLocaleMiddleware`（`web` middleware group）處理，優先順序：session → cookie → Accept-Language。
 - 測試環境中 Symfony 預設 `Accept-Language: en-us,en;q=0.5`；`TestCase::setUp()` 已覆蓋為 `zh-TW`，保持測試一致性。若個別測試需要英文語境，請用 `withSession(['locale' => 'en'])`。
 

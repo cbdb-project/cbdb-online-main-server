@@ -2,8 +2,10 @@
  * Inertia/React 專用樣式入口（Phase 0 F1）
  *
  * 僅由 resources/js/inertia/app.tsx 載入，因此 Tailwind 的 preflight reset
- * 只作用於 inertia.blade.php 根模板下的 React 頁面，不會污染仍走
- * layouts/dashboard-v3（AdminLTE 3 + Bootstrap 4）的 Blade 頁面。
+ * 只作用於 inertia.blade.php 根模板下的 React 頁面。
+ *（原本這裡寫「不會污染仍走 layouts/dashboard-v3（AdminLTE 3 + Bootstrap 4）的 Blade 頁面」——
+ *  那個 layout 已於 Blade 下架環節 5a 刪除，AdminLTE 整套於 5b 移除，現在沒有可污染的對象；
+ *  唯二的非 React 頁 cbdbapi/person 與 maps/index 都不載入這支 CSS。）
  *
  * 設計 token 取自既有 AdminLTE 3 / CBDB 主視覺（resources/js/inertia/theme.ts
  * 的 APP_THEME 與 AdminLTE 預設色），作為「像素級復刻」的保真錨點。

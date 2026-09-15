@@ -181,7 +181,7 @@
 | 13c | **React 端硬編碼的 legacy URL** | 每個環節開始前重跑：<br>`grep -rnE "['\"\`]/(basicinformation\|codes\|operations\|manage\|view\|dashboard\|profile\|crowdsourcing\|admin\|welcome)" resources/js/inertia \| grep -v '/app/'` | 已知命中：`PersonEditorShared/PersonBanner.tsx:88` 的 `?? '/admin/audit-logs'` fallback（環節 4a 後失效）；`TabContentLoader.tsx:260-261` 的 `saveas`／`Duplicate_Collateral_Info`（**必須保留**，見 D-5）；`AuthLayout.tsx:29`、`Pages/Profile/Edit.tsx:121` 的 `/home`（安全，`/home` 路由不刪） |
 | 14 | `package.json` + lockfile | 移除 `admin-lte`、`jquery`、`@ttskch/select2-bootstrap4-theme`、`datatables.net`、`datatables.net-bs4`、`@vitejs/plugin-vue`、`@vue/compiler-sfc`、`vue`，並視 grep 結果評估 `lodash`、`sass`。`npm install` 後提交 lockfile | 每個套件刪除前先 `grep -rn "<pkg>" resources/js` 確認 inertia 端零 import。⚠️ ① `app.js:22` `import select2 from 'select2'`，但 **`select2` 不在 `package.json`**（靠 `admin-lte` 的依賴樹解析）——刪完跑 `npm ls select2` 確認走乾淨；② **`@fortawesome/fontawesome-free` 不可刪**，`resources/css/inertia.css:23` 直接 `@import` 它 |
 | 15 | `tests/**` | 刪除純 legacy 的 Feature 測試；含新舊對照者移除 legacy 斷言；移除 **`TestCase::useLegacyPersonForms()`**（`tests/TestCase.php:35-43`，把 `basicinformation.*` flag 壓成 `old`）——注意它**不在 `setUp()` 裡，是各 legacy 測試自行呼叫的 opt-in helper**，移除時要一併處理所有呼叫端 | ✅ **環節 1.5 已完成分流**：14 個 `useLegacyPersonForms()` 呼叫端全部標上 `#[Group('legacy-parity')]`，`./vendor/bin/phpunit --group legacy-parity` 可一鍵列出全部 199 個測試（即環節 2 的刪除清單）；兩個 needs-v2-first 的缺口已補齊 v2 等價覆蓋。<br>⚠️ 直接依賴 flag 的還有 `LegacyBladeFormGateTest`、`FlagAwareUrlHelpersTest`、`NavigationSchemaTest`、`AuthPagesInertiaTest`、`CodesIndexInertiaTest`、`CodesPersonPickerTest`、`InertiaSharedPropsTest`、`OperationsIndexLinksTest`、`OperationsProposalResourceLinkTest`、`CompositePrimaryKeyTest`，全部要改。<br>⚠️ ② **`useLegacyPersonForms()` 有 14 個呼叫端**（環節 1.5 實測；已全部標 `#[Group('legacy-parity')]`）（`BasicInformation{Addresses,Altnames,Sources,Texts}ControllerTest`、`BasicInformationPagesLoadTest`、`BasicInformationProposalTest`、`BiogMainBasicInfoNameMergeTest`、`BiogMainProposalTest`、`EventStatusWriteActionsTest`、`FormUrlEncodingTest`、`NameSearchIndexAutoSyncTest`、`OfficeStoreRedirectTest`、`ProposalNormalizationTest`、`UnknownPersonKinshipAssocBlockTest` …），直接刪 helper ⇒ 14 檔 `Call to undefined method`。<br>⚠️ ③ **`tests/Unit/VariantReplaceHookCoverageTest.php` 必定會紅**，見下方專節 |
-| 16 | 文檔 | `AGENTS.md`（「舊版 Blade 仍實體保留／翻回 `old` 即回退」整段改寫）、~~`README.md`（`:64`／`:114` 的對外承諾「flag 改回 old 即可回退」）~~ ✅ **已於環節 3 改為 `LEGACY_PAGE_RETIREMENT=false`**，不需再動；`:65-66` 的入口清單（含 `app.js`／`jquery-global.js`）留到環節 5、`CHANGELOG.md`、`docs/ADMINLTE.md`（改為「已下架」歷史文件）、`docs/ADMINLTE4_UPGRADE_FEASIBILITY.md`（標註已被取代）、`docs/REACT_INERTIA_MIGRATION_PLAN.md`（§五雙殼／§五之二回退保證／附錄 C 禁止清單全部失效）——✅ 回退保證那組（開頭里程碑、§五之二兩條、§八）已於環節 6a 加上限縮前言；雙殼與附錄 C 留到環節 5、`docs/REACT_MIGRATION_BACKLOG.md`（P6-C1/C2、P7-1..3 → `retired`）、~~`docs/VIEWS.md`~~（實查：只是 `/view/{key}` 資料目錄，零 flag／回退陳述，**不需改**）、~~`docs/migration-specs/*.md`（22 份 fidelity spec 加「歷史存檔」抬頭）~~ ✅ **已於環節 6a 全數加上** | ✅ **`docs/CODES_SORT_FILTER_AUTH_GATE.md` 已於環節 6a 改寫**（連帶 `AGENTS.md` 高風險備忘、`CHANGELOG.md` 的歷史條目加註、`docs/REACT_INERTIA_MIGRATION_PLAN.md` 的回退保證）。原文記載「把 `codes` flag 切回 `old` 會重新暴露無門檻的深分頁排序查詢」——**環節 3 之後已不成立**（封路 middleware 不讀 flag），真正的條件變成 `LEGACY_PAGE_RETIREMENT=false`。環節 4 實體刪除 Blade 版 `show()` 後此風險才**消失**，屆時要再更新一次。📌 `docs/VIEWS.md` 實查後**不需改**：它只是 `/view/{key}` 的資料目錄，無任何回退／flag 陳述 |
+| 16 | 文檔 | `AGENTS.md`（「舊版 Blade 仍實體保留／翻回 `old` 即回退」整段改寫）、~~`README.md`（`:64`／`:114` 的對外承諾「flag 改回 old 即可回退」）~~ ✅ **已於環節 3 改為 `LEGACY_PAGE_RETIREMENT=false`**，不需再動；`:65-66` 的入口清單（含 `app.js`／`jquery-global.js`）留到環節 5、`CHANGELOG.md`、`docs/ADMINLTE.md`（改為「已下架」歷史文件）、`docs/ADMINLTE4_UPGRADE_FEASIBILITY.md`（標註已被取代）、`docs/REACT_INERTIA_MIGRATION_PLAN.md`（§五雙殼／§五之二回退保證／附錄 C 禁止清單全部失效）——✅ 回退保證那組（開頭里程碑、§五之二兩條、§八）已於環節 6a 加上限縮前言；~~雙殼與附錄 C 留到環節 5~~ ✅ **已於環節 5b 完成**（§五雙殼加歷史抬頭、Phase 7 與退場條件標完成、附錄 C 加狀態註記——flag 條目全失效，「刪除必由人」那條改寫為「已逐段授權執行完畢，但日後刪服役中的東西仍須授權」）、`docs/REACT_MIGRATION_BACKLOG.md`（P6-C1/C2、P7-1..3 → `retired`）、~~`docs/VIEWS.md`~~（實查：只是 `/view/{key}` 資料目錄，零 flag／回退陳述，**不需改**）、~~`docs/migration-specs/*.md`（22 份 fidelity spec 加「歷史存檔」抬頭）~~ ✅ **已於環節 6a 全數加上** | ✅ **`docs/CODES_SORT_FILTER_AUTH_GATE.md` 已於環節 6a 改寫**（連帶 `AGENTS.md` 高風險備忘、`CHANGELOG.md` 的歷史條目加註、`docs/REACT_INERTIA_MIGRATION_PLAN.md` 的回退保證）。原文記載「把 `codes` flag 切回 `old` 會重新暴露無門檻的深分頁排序查詢」——**環節 3 之後已不成立**（封路 middleware 不讀 flag），真正的條件變成 `LEGACY_PAGE_RETIREMENT=false`。環節 4 實體刪除 Blade 版 `show()` 後此風險才**消失**，屆時要再更新一次。📌 `docs/VIEWS.md` 實查後**不需改**：它只是 `/view/{key}` 的資料目錄，無任何回退／flag 陳述 |
 | 17 | `API.md` / `docs/openapi/openapi.yaml` | **本計畫預設不動任何 API 路由／欄位／授權／錯誤碼**，故無需更新。**若某個環節實際動到了對外端點語義（例如把 legacy 端點改成導向／410），必須在同一 commit 同步 `API.md`**（AGENTS.md 文檔維護原則） | ✅ **實查結果：環節 3 無需更新 `API.md`**。`API.md` 收錄的是 v1／v2 的 API 端點，唯一與本次相關的是 `GET /codes/{table_name}/export`（`API.md:1686`）——而那條**沒有被封路**（React 匯出鈕正在用），敘述仍然正確。legacy web 表單端點從不在 `API.md` 範圍內。環節 4 實體刪除時再複查一次 |
 
 | 18 | `app/Providers/AppServiceProvider.php` | ✅ **`View::composer('layouts.dashboard-v3', …)` 已於環節 5a 移除**。⏳ `Paginator::useBootstrap()` **留給 5b**（已寫進 5b 清單）——`resources/views/**` 已無 `->links()`，但 `app/Http/Controllers/ApiController.php` 還有 30+ 個 `->links()` 呼叫（回傳值被丟棄），刪之前要先確認那些呼叫本身的去留 | 🔴 **本列原本寫「該 composer 是 `shouldRetainQueryDetails()` 的唯一消費者」——那是錯的**（環節 5a 實查、review 覆核）：真正的消費者是同檔 `boot()` 裡的 `DB::listen`（`app(QueryProfile::class)->add($query, $this->shouldRetainQueryDetails())`），composer 從來沒呼叫過它。⇒ 「必須明確決定：廢除還是改接 React」的答案是**廢除 composer、`shouldRetainQueryDetails()` 原封不動**，它不是死碼。React 端由 `HandleInertiaRequests` 的 `query_profile` prop 取用 `QueryProfile` |
@@ -1218,7 +1218,58 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
 
 **5a ✅ 已完成（2026-09-15）**：`resources/views/layouts/**`（6 檔）與 `AppServiceProvider` 的
 `dashboard-v3` composer 已刪，執行紀錄見上節 4d-2／5a。`resources/views/components/**` 實查不存在。
-**以下是 5b 的範圍。**
+
+**5b ✅ 已完成（2026-09-15）**：
+- 刪 `resources/js/{app.js,jquery-global.js,datatables.js,components/Select.vue,utils/datetime.js}`
+  與 `resources/css/{select2-overrides,mobile-responsive,ai-autofill}.css`。
+- `vite.config.js`：入口減為 3 個（inertia／historical-maps／chgis-map）、移除 `vue()` plugin 與 `vue` 別名。
+- `package.json` 移除 11 個相依（清單見 CHANGELOG）。`npm install` + `npm run build` 通過。
+- 文檔：`docs/ADMINLTE.md` 改寫為歷史文件、`ADMINLTE4_UPGRADE_FEASIBILITY.md` 加上「已被取代」抬頭、
+  `REACT_MIGRATION_BACKLOG.md` 的 P7-1／2／3 → `retired`、`README.md`／`AGENTS.md` 現況段同步。
+
+**驗證方式**：
+- 消費端掃描——surviving 的 4 個 Blade 檔只 `@vite` 那 3 個入口；被刪的 8 個檔在全庫的引用只剩
+  它們**彼此之間**的 import 與 `tests/storage/views/*`（gitignored 編譯快取）。
+- **CSS 不是只看有沒有人 import，還要看 class 名**：`ai-autofill.css` 的 `.ai-field-label`／
+  `.ai-matched`／`.ai-suggested` 在 `resources/js/inertia/**` 零命中（React 用 Tailwind），
+  `mobile-responsive.css` 全是 Bootstrap `.pagination` 的行動版修正，同樣無 React 消費者。
+  ⚠️ **這一步不能省**：CSS 的消費是靠 class 名而非 import，只掃 import 會把還在生效的樣式刪掉。
+- `axios`／`lodash`／`sass` 三個相依在刪掉 `app.js`／`Select.vue` 後全庫零引用（`sass` 連 `.scss` 檔都沒有），
+  一併移除。
+
+**review 關卡抓到的六件事（都已修）**：
+1. `docs/API_AUTHENTICATION.md` 教外部使用者設定 `window.axios.defaults`，並指名「在
+   `resources/js/app.js` 中已配置」——那個檔與那個全域都被本輪刪了。**對外文檔照做會壞**。
+   ⇒ **刪一個提供全域的檔時，要連「教別人用那個全域」的文檔一起掃**（`grep -rn "resources/js/app.js" docs/`）。
+2. `docs/REACT_INERTIA_MIGRATION_PLAN.md` 的 §五雙殼／Phase 7／退場條件／風險表仍是未來式——
+   而**本計畫 §三第 16 欄自己就寫著「雙殼與附錄 C 留到環節 5」**。⇒ 自己排給自己的文檔工作也要照做，
+   不能只做「這輪動到的檔」。
+3. `AGENTS.md` 第一行技術棧仍列 **Vue 3**，與同檔新寫的「全站沒有 Vue 執行期」直接打架。
+   ⇒ **改一份文件的細節時，回頭看它最上面的摘要行**——那是下一個 agent 最先讀到的。
+4. 我新寫的 `Js::from` 註記舉證錯了一個檔（`cbdbapi/person.blade.php` 用的是 `@json()`）。
+   ⇒ 寫「只剩 X 和 Y 在用」之前要真的 grep，不要憑印象列。
+5. 新升級的硬規則「不分 CDN 或 npm 不要引入 Bootstrap」與 `cbdbapi/person.blade.php`（CDN Bootstrap 5.3）
+   和 `maps/index.blade.php`（CDN Leaflet）衝突。⇒ **立一條硬規則時要先掃現有代碼有沒有違反它**，
+   否則下一個 agent 會把合法的既有例外當成待修的違規。已加例外註記。
+6. `resources/css/inertia.css` 的註解仍說「不會污染仍走 layouts/dashboard-v3 的 Blade 頁面」（5a 遺留）。
+
+**codex 關卡再抓到的四件事（都已修）**：
+7. 🔴 **`tools/bazel/phpunit_runner.sh:62-86` 的假 Vite manifest**：它在沒有真 build 時寫一份
+   manifest 讓 `@vite()` 不拋例外。那份清單仍列著本輪刪掉的 `app.js`／`datatables.js`，
+   **而且一直漏掉 `chgis-map/app.js`**（不是本輪造成的，是既有 bug）。
+   ⇒ **改 `vite.config.js` 的 input 時要同時改這支**——它是 vite 設定的第二份真相，
+   而且只在 bazel 路徑下才會踩到，本機與 CI 的 `npm run build` 都遮蔽了它。已補註解點名這件事。
+8. `docs/API_AUTHENTICATION.md` 我只改了「前端配置」那一節，**同一份文件前面三個範例仍在用
+   `axios`／`window.axios`**——變成前段教你用、後段說它不存在。已全部改為 `fetch`。
+   ⇒ 改文件時要掃**整份**，不能只改被指名的那一段。
+9. 新規則的例外清單漏了 `public/cbdbapi/index.html`（同樣 CDN Bootstrap 5.3）。
+   ⇒ 立規則要掃的範圍包含 `public/` 下的靜態檔，不是只有 `resources/`。
+   順帶把規則的適用範圍寫明是「主站路徑（`resources/js/inertia/**` 與 `package.json`）」。
+10. 「全站互動頁面都是 React/Inertia」「所有頁面透過 `@vite`」兩句過度概括——`maps/index.blade.php`
+   是**仍在服役的互動頁**（Leaflet 全螢幕，掛 `/app/maps`），只是沒 React 化；`cbdbapi/person.blade.php`
+   與 `public/cbdbapi/index.html` 也不走 Vite。已改為「主站」並列出例外。
+
+**以下是原始的 5b 清單（保留以便對帳）。**
 
 - ~~刪 `resources/views/layouts/**`（6 檔）與 `resources/views/components/**` 中的 legacy 元件~~ ✅ 5a
 - 刪 `resources/js/{app.js,jquery-global.js,datatables.js,components/Select.vue}` + 3 支 legacy CSS；**保留 `resources/js/utils/*`、`chgis-map/`、`historical-maps/`**。

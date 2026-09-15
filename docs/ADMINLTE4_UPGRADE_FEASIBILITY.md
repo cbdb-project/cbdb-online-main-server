@@ -1,3 +1,10 @@
+> 🔴 **本文件已被取代，僅供歷史查閱（2026-09-15 標註）。**
+>
+> 它評估的是「AdminLTE 3 → AdminLTE 4（Bootstrap 5）」升級路線。專案實際走的是
+> **React/Inertia 遷移**，而 AdminLTE 整套已於 Blade 下架計畫環節 5（5a layout／5b 前端資產）
+> 實體移除——升級的對象不存在了。現況與下架清單見 [docs/ADMINLTE.md](./ADMINLTE.md)，
+> 執行紀錄見 [docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)。
+
 # AdminLTE 4 升級可行性分析報告
 
 ## 執行摘要

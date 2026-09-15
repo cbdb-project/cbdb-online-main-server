@@ -7,6 +7,9 @@
 > （顯示頁 302／寫入端 410，封路 middleware **不讀 migration flag**，回退鍵是
 > `LEGACY_PAGE_RETIREMENT=false`）。現況請看
 > [BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](../BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)。
+> 🔴 **本頁的 Blade 版已實體刪除**（視圖與 controller 方法都不存在了），所以它**沒有任何
+> 回退鍵**——而且 `LEGACY_PAGE_RETIREMENT` 這個開關本身也已於環節 4b-4c 連同封路 middleware
+> 一併移除。舊 URI 只剩 302 導向 `/app` 對應頁（寫入端 410）。
 
 > 舊頁 = `codes.show`（Blade）；新頁 = `app.codes.show`（Inertia）。flag = `codes`（群組共用，預設 old）。
 > public 路由（與舊頁同）。

@@ -933,10 +933,65 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
     5 條寫入端仍 410）。
 
     📌 **`RetireLegacyBladePage`、`config/legacy_page_retirement.php`、
-    `TestCase::useLegacyBladePages()`（自 4b-3 起零呼叫點）自此都是死碼**。
-    刪除它們會連帶影響 `.env` 與部署 runbook，值得**單獨一輪**（4b-4c），不混進本環節。
-    三處都已加上 🔴 檔頭註記——特別是 middleware：**不要把 `legacy.page` 掛回任何路由**，
-    它的兩條 fail-open 路徑在視圖已刪的世界裡只會產生 500。
+    `TestCase::useLegacyBladePages()`（自 4b-3 起零呼叫點）自此都是死碼**——已於 4b-4c 移除。
+
+  - **4b-4c ✅ 已完成（2026-09-15）——封路機制整組移除**：
+    刪除 `app/Http/Middleware/RetireLegacyBladePage.php`、`config/legacy_page_retirement.php`、
+    Kernel 的 `legacy.page` 別名、`TestCase::useLegacyBladePages()`，以及 `.env.example` 的
+    `LEGACY_PAGE_RETIREMENT`（改成一段「這個變數已移除、既有部署可安全刪掉那一行」的說明）。
+
+    🔴 **這是一次不可逆的能力移除**：回退鍵自此**不存在**。4b-4b 只是讓它失去作用對象，
+    這一輪把機制本身也拿掉了。
+
+    **護欄也跟著換**：4b-4b 留下的「沒有任何路由掛 `legacy.page`」在機制刪除後會變成**恆真**
+    （沒有那個別名，誰也掛不上），所以改成守**更上游**的事實——
+    `the_retirement_middleware_and_its_kill_switch_no_longer_exist()`：class 不存在、
+    config 檔不存在、config 鍵讀出來是 null、opt-out helper 不存在。
+    另一條改名為 `migration_flags_cannot_bring_legacy_pages_back()`（原本的名字提到 kill switch，
+    而那個東西已經沒了），內容維持「flag 全翻 old ⇒ 7 條顯示頁仍 302、5 條寫入端仍 410」。
+
+    ⚠️ **測試訊息裡寫明「要封路請直接寫 closure」**：那個 middleware 有兩條 fail-open 路徑，
+    而 Blade 視圖全都刪了——日後有人「為了暫時封一下某頁」把它加回來，只會得到 500。
+    這是那條測試存在的全部理由。
+
+    🔴 **review 抓到我把一條還有用的護欄刪掉了，而且理由是錯的。**
+    我寫「機制刪掉之後，沒有那個別名、誰也掛不上，所以『沒有路由掛 `legacy.page`』那條變恆真」
+    ——**實測推翻**：Laravel 在路由註冊期**不驗證 alias 是否存在**。把
+    `->middleware('legacy.page:…')` 寫回某條路由，`gatherMiddleware()` 照樣回傳那個字串、
+    `route:cache` 照樣成功，**只有請求期才炸**（`BindingResolutionException` ⇒ 500）。
+    也就是說「有人為了暫時封一下某頁把它寫回路由」——**文件裡反覆警告的那個情境、也是最現實的
+    重犯路徑**——只有那條掃描抓得到，而新的「class/config 不存在」測試抓不到（除非對方連
+    middleware 檔也一起還原）。
+    ⇒ 已補回為 `no_route_declares_the_removed_legacy_page_middleware()`，與存在性測試並存，
+    兩條的 docblock 互相指名「缺一不可」，訊息裡寫明替代做法（直接寫 closure）。
+    **教訓：刪測試前要先證明它真的變恆真，不要用「推論」代替量測。**
+
+    ⚠️ **另外兩條測試變成真正的空轉**（review 指出）：它們還在
+    `config(['legacy_page_retirement.enabled' => false])`——那個 key 已經沒有任何讀取者，
+    所以「關掉 kill switch 後仍 302／410」與前半段完全等價，是純重複斷言；更糟的是它們會把
+    幻影 key 塞回 config repository，日後若有人把新護欄的 `assertNull(config(...))` 合進同一條
+    就會假紅。已移除那兩段並改名（`legacy_codes_endpoints_stay_retired()`／
+    `deleted_legacy_pages_redirect_to_the_react_equivalent()`）。
+
+    📌 各處的 `RetireLegacyBladePage` 引用**刻意保留為歷史敘述**（例如 routes 裡「`route()` 的
+    編碼行為正是舊 middleware 的行為」那段、`InactiveAccountAccessTest` 裡的 middleware 順序
+    教訓）——那些句子講的是「它被刪之前做了什麼」，本來就是歷史，留著有價值。
+    只有**會被當成檔案指標**的那兩處（`routes/web.php` 的路徑與行號引用）改成明說「已刪除」。
+    ⚠️ 上一版我在這裡寫「三處都已加上 🔴 檔頭註記」——那是**4b-4b 的事**（當時三個檔還在），
+    被我插進 4b-4c 段落後變成自相矛盾（檔案這一輪已刪）；另外也宣稱改了
+    `InactiveAccountAccessTest`，實際沒有（review 兩點都抓到）。已改成準確敘述。
+
+    🔴 **文件同步這次補齊了上一輪漏掉的那一類**（review 逐字掃出來的）：
+    `README.md` ×3（含一句**自相矛盾**的「Blade 仍實體保留」vs「已全部刪除」）、
+    `AGENTS.md` 的**整段主題句**（讀者第一眼看到的那句仍寫「仍實體保留，但已全面封路」）、
+    `CHANGELOG.md`（**這一輪原本完全沒有條目**，違反 AGENTS.md 的文檔維護原則——已補一則
+    含「既有部署的 .env 可以安全刪掉那一行、不需 config:clear」的部署者段落）、
+    manifest 的**權威來源指標**（指向這一輪剛刪掉的測試）與**被空行截斷的表格**
+    （4b-4b／4b-4c 兩列渲染到表格外）、manifest「實作方式」三個 caveat 仍用現在式描述
+    middleware（其中第 1 點的結論在 4b-4b 已被量測推翻，已就地標註刪除線）、
+    `.env.example` 的說明缺段落標題（夾在 MCP 區塊後面像它的註腳）、
+    以及 `docs/migration-specs/` **15 份**缺「本頁 Blade 版已刪除、沒有回退鍵」的第二段。
+    **教訓（第二次）：改一句安全陳述要 grep 關鍵字全庫掃，而且要包含 README 與 CHANGELOG。**
 
     🔴 **review 抓到我漏改了 9 處「翻 kill switch 可以回退」的陳述**，其中最嚴重的是
     `docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md` 的 kill switch 那一節——它是**可執行的

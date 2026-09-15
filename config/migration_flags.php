@@ -15,9 +15,10 @@
 |   - 🔴 **「改回 'old' 即時回退」只對「未被封路」的頁面成立**（2026-09 起）：
 |     Blade 下架計畫環節 3 之後，多數 legacy 頁面由 `legacy.page` middleware 封路
 |     （顯示頁 302／寫入端 410），**該 middleware 不讀本檔任何 flag**。那批頁面的回退鍵是
-|     LEGACY_PAGE_RETIREMENT=false（見 config/legacy_page_retirement.php）——
-|     🔴 **但那個開關自 2026-09-15（環節 4b-4b）起也沒有作用了**：所有 legacy 頁面
-|     都已改成 closure，沒有任何路由掛封路 middleware。要回到 Blade 只能 git revert。本檔的 flag
+|     LEGACY_PAGE_RETIREMENT=false——🔴 **那個開關自 2026-09-15 起先是沒了作用對象
+|     （環節 4b-4b：legacy 頁面全數實體刪除），接著整個機制也被移除（環節 4b-4c：
+|     middleware、config、Kernel 別名、env 變數都不存在了）。回退鍵已不存在，
+|     要回到 Blade 只能 git revert 並重新部署。** 本檔的 flag
 |     對它們只影響**連結／URL payload 的指向**（Navigation 側邊欄、code_table_edit_url()、
 |     CodesController 的 URL payload、HandleInertiaRequests::profileUrl()、audit-log URL 等），
 |     **不影響 legacy 頁面是否可開啟或其渲染**。仍由 flag 決定渲染的只剩 'auth' 與 'welcome'

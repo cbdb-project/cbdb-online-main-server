@@ -75,9 +75,6 @@ class Kernel extends HttpKernel {
         'auth.basic' => \Illuminate\Auth\Middleware\AuthenticateWithBasicAuth::class,
         'auth.optional' => \App\Http\Middleware\OptionalAuthentication::class,
         'superadmin' => \App\Http\Middleware\RequireSuperAdmin::class,
-        // Legacy Blade 頁面封路（Blade 下架計畫環節 3）：GET 顯示頁 302 導向 /app 對應頁、
-        // legacy 寫入端 410。逐條掛，見 docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md。
-        'legacy.page' => \App\Http\Middleware\RetireLegacyBladePage::class,
         'mcp.ability' => \App\Http\Middleware\EnsureMcpAbility::class,
         'bindings' => \Illuminate\Routing\Middleware\SubstituteBindings::class,
         'can' => \Illuminate\Auth\Middleware\Authorize::class,

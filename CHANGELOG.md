@@ -4,6 +4,44 @@
 
 ## 2026-09
 
+### Blade 下架環節 4b：legacy 表單／寫入頁全部實體刪除，封路機制移除
+
+計畫：[docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)
+
+🔴🔴 **部署者必看：回退鍵已經不存在了。**
+
+- `LEGACY_PAGE_RETIREMENT` 這個環境變數、`config/legacy_page_retirement.php`、
+  `App\Http\Middleware\RetireLegacyBladePage` 與 Kernel 的 `legacy.page` 別名**全部移除**。
+  舊 runbook 裡「翻 kill switch 即可叫回 Blade 頁」那一步**已作廢**——要回到 Blade
+  只能 `git revert` 並重新部署。
+- **既有部署的 `.env` 可以安全地刪掉 `LEGACY_PAGE_RETIREMENT=` 那一行**（留著也無害，
+  Laravel 會忽略沒有 `env()` 呼叫的鍵）。不需要 `config:clear`。
+- 翻 `MIGRATION_FLAG_*=old` 同樣**不會**讓任何已刪除的頁面回來，只會改變連結指向。
+  仍由 flag 決定渲染的只剩 `MIGRATION_FLAG_AUTH_*` 與 `MIGRATION_FLAG_WELCOME`。
+
+**對使用者的影響**：所有舊 URL 的**書籤仍然可用**——顯示頁 302 導向 `/app` 對應頁並保留
+query string，legacy 寫入端回 410。
+
+**刪除內容**（分三個 commit）：
+
+- **4b-4a**：`codes` 全套——5 個 Blade 視圖（1017 行）+ `CodesController` 的 10 個 legacy 方法。
+  ✅ 順帶關掉一個安全缺口：`docs/CODES_SORT_FILTER_AUTH_GATE.md` 記錄的「Blade `show()` 沒有
+  sort/filter 登入門檻、kill switch 會把無門檻的深分頁排序查詢重新暴露」——那個取捨隨
+  `show()` 一起消失了。
+- **4b-4b**：`manage`／`profile`／`admin.explainsql`／3 個 batch-load／
+  `admin.cbdb-table-maintenance`／`admin.unidirectional-relationship-repair`——10 個 Blade 視圖
+  （`resources/views/{manage,profile,admin}` 三個目錄自此不存在）+ 16 個 legacy controller 方法。
+- **4b-4c**：封路機制本身。
+
+**刻意保留**（它們**沒有 `app.` 雙胞胎**，React 頁面直接呼叫）：
+`admin/cbdb-table-maintenance/{rebuild,progress}`、
+`admin/unidirectional-relationship-repair/{kinship,assoc}`；
+3 個 batch-load 的 `store()`／`undo()`／`updatePinyin()` 是 legacy 與 app 共用的同一個方法；
+`codes.export`；`CodesController::proposalUpdateExisting()`／`proposalCancel()`。
+**所有 route name 也都保留**，書籤與既有 `route()` 呼叫端不受影響。
+
+**測試**：`--group legacy-parity` 由 223 → **0**（環節 4b-2a…4b-3 逐檔改打 React 端）。
+
 ### Blade 下架環節 4a：legacy 唯讀頁實體刪除（Blade 與 controller 共刪約 3.8k 行，整個 commit 淨 −3697）
 
 計畫：[docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)
@@ -16,6 +54,8 @@
   （已改成 redirect closure、不掛封路 middleware）。要回到 Blade 只能 `git revert` 並重新部署。
   仍可用 kill switch 叫回的只剩**表單／寫入頁**（codes 全套／manage／profile／admin.explainsql／
   3 個 batch-load／cbdb-table-maintenance／unidirectional-repair），那批屬環節 4b、尚未執行。
+  - 📌 **後續（2026-09-15，環節 4b-4）**：那批也全部實體刪除了，**kill switch 機制本身已移除**
+    ——見本檔上方的「Blade 下架環節 4b」條目。
 - **刪除內容**：16 個 Blade 檔（9 個視圖 + `components/{diff-table,posted-to-addr-diff,
   key-value-table,ai-fill-diff-table}` + 環節 2 遺留的 3 個孤兒元件）與 9 個 Blade controller 方法。
   共用的取資料 helper（`buildOperationsListing()` 等）全部保留給 React 版。

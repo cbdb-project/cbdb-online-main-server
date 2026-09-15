@@ -376,9 +376,10 @@ Route::delete('operations/{operation}/cancel', 'OperationsProposalController@can
 //
 // **route name 一律保留**，但兩個呼叫端的風險程度不同（review 指正，第一版寫得太一概）：
 //  - `ManagementController::appIndex()` 的 `edit_template` 是**沒有守衛**的
-//    `route('manage.edit', …)`——不過只有 `migration_flag('manage') === 'old'` 時才走到。
-//  - `HandleInertiaRequests::profileUrl()` 的 `route('profile.edit')` **被
-//    `Route::has()` 包著**，刪掉只會回 null，不會拋例外。
+//    `route('manage.edit', …)`——環節 4d 移除 flag 分支後那個 fallback 已不存在，
+//    但 route name 本身仍被 302 closure 佔著，保留它仍是對的（書籤／外部連結）。
+//  - `HandleInertiaRequests::profileUrl()` 仍以 `route('profile.edit')` 作為
+//    **新路由不存在時的 fallback**（被 `Route::has()` 包著，刪掉不會拋例外）。
 // 兩者都屬環節 4d 的 flag 收斂範圍。⚠️ **目前沒有任何測試守著「route name 必須存在」**
 //（實測把 `->name('manage.edit')` 改名，Manage／Navigation／封路三組共 100 條測試全綠）。
 // 🔴 **這 7 條必須自己掛 `auth`**（codex 查出，實測確認）：原本的 `auth` 來自

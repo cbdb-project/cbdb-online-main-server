@@ -60,7 +60,7 @@
 - **Node.js**: 22.x（建議搭配 npm 10）
 
 ### 前端構建現況
-- 主要互動頁面已遷移至 **React/Inertia 並翻 flag 上線**（人物列表/檢視/詳情中樞、13 個編輯器、Codes、營運管理工具、認證頁、Query Playground 等），React 元件在 `resources/js/inertia/**`，feature flag 見 `config/migration_flags.php`（多為 `new`）。
+- 主要互動頁面均為 **React/Inertia**（人物列表/檢視/詳情中樞、13 個編輯器、Codes、營運管理工具、認證頁、Query Playground 等），React 元件在 `resources/js/inertia/**`。📌 遷移期的 feature flag（`config/migration_flags.php`、`migration_flag()`）已於 Blade 下架環節 4d-1 **整組移除**——沒有任何 runtime 回退鍵。
 - **所有 legacy Blade 頁面已實體刪除**（環節 4a／4b-4）：舊 URL 只剩 302 導向 `/app` 對應頁、legacy 寫入端回 410 的 closure。**AdminLTE 3 (Bootstrap 4) 的資產與 layout 檔仍在**（環節 5 待做），但已經沒有任何頁面 `@extends` 它們。🔴 **這批頁面已經沒有回退鍵了**：翻 migration flag 沒有效果，而 **`LEGACY_PAGE_RETIREMENT` 這個開關本身已於環節 4b-4c 移除**（middleware、config、Kernel 別名、env 變數全部刪除）。要回到 Blade 只能 git revert 並重新部署。**認證頁與首頁（`auth.*`／`welcome`）也已於環節 4c 實體刪除** —— 它們原本是最後一批「翻 flag 真的會渲染 Blade」的頁面，現在翻 `MIGRATION_FLAG_AUTH_*`／`MIGRATION_FLAG_WELCOME` 也**不再改變任何渲染**。人物編輯全套（`basicinformation.*`）與**唯讀頁**（`operations`／`dashboard`／`view`／`merge-preview`／`crowdsourcing`／`nl-query-logs`／`admin.audit-logs`／`admin.ai-fill-logs`）已**實體刪除**、無法回退（舊 URI 只剩 302 導向）。**表單／寫入頁（`codes` 全套／`manage`／`profile`／`admin.explainsql`／3 個 batch-load／`admin.cbdb-table-maintenance`／`admin.unidirectional-relationship-repair`）也已於環節 4b-4a／4b-4b 實體刪除**，同樣無法回退。逐條清單見 [docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md](docs/BLADE_RETIREMENT_STAGE3_ROUTE_MANIFEST.md)。AdminLTE 實體下架未執行。新功能一律只做在 React/Inertia 路徑。
 - 構建系統為 **Vite**；主要入口：`resources/js/app.js`（AdminLTE/jQuery UI 組件）、`resources/js/datatables.js`、`resources/js/inertia/**`（React/Inertia）。
 - `resources/js/jquery-global.js` 將 jQuery 暴露到全局（供保留中的 Blade 頁使用）。

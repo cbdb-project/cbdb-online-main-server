@@ -4,6 +4,31 @@
 
 ## 2026-09
 
+### Blade 下架環節 4d-1：migration flag 機制整組移除——全站再無 runtime 回退鍵
+
+計畫：[docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)
+
+🔴🔴 **部署者必看**：
+
+- `config/migration_flags.php` 與 `migration_flag()`／`migration_flag_is_new()` **全部移除**。
+- **舊 `.env` 裡任何 `MIGRATION_FLAG_*` 都可以安全刪除**（留著也無害——Laravel 會忽略沒有
+  `env()` 呼叫的鍵，**不需要 `config:clear`**）。
+- ⇒ 連同環節 4b-4c 移除的 `LEGACY_PAGE_RETIREMENT`，**全站已經沒有任何 runtime 回退鍵**。
+  要回到 Blade 只能 `git revert` 並重新部署。
+
+**對使用者的影響**：無。連結一律指 React 版，那本來就是所有 flag 的現行值。
+
+**改動內容**：最後 10 個「連結指向」的 flag 分支收斂——`Navigation::url()`（19 個呼叫點，
+簽名從 `url($flagKey, $old, $new, $params)` 改成 `url($new, $old, $params)`）、
+`Navigation::codeItem()`／`viewItem()`、`CodesController` 的四個 URL helper、
+`code_table_edit_url()`、`audit_logs_base`、`profileUrl()`、`edit_template`。
+`Route::has()` 的保護與舊 route name fallback **刻意留著**：那些舊 route name 仍是 302／410
+的 closure，新路由萬一被改名時仍能產出一個會 302 到正確位置的連結。
+
+**護欄**：`LegacyBladePageRetirementTest::the_migration_flag_mechanism_no_longer_exists()`、
+`NavigationSchemaTest::test_every_sidebar_href_points_at_the_react_app()`（表驅動：遞迴收集
+整棵側邊欄樹，每條 href 都必須在 `/app/` 底下，對日後新增節點自動生效）。
+
 ### Blade 下架環節 4c：認證頁與首頁的 Blade 版刪除——migration flag 自此不影響任何渲染
 
 計畫：[docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)

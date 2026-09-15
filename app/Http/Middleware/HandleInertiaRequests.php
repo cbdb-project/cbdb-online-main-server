@@ -110,18 +110,25 @@ class HandleInertiaRequests extends Middleware {
     }
 
     /**
-     * 個人資料連結（依 migration flag 指向 Blade 或 React 版；皆不存在時 null）。
+     * 個人資料連結（路由不存在時 null）。
+     *
+     * ── 2026-09-15（Blade 下架環節 4d）─────────────────────────────
+     * 原本依 profile flag 在 React／Blade 之間二選一。legacy 那頁已於環節 4b-4b 實體刪除，
+     * 分支移除。
+     *
+     * 保留 `profile.edit` 的 fallback **與 `Navigation::url()` 同一個理由**（review 指出
+     * 第一版只留 `Route::has()` + null，與那邊的說法相反）：`profile.edit` 仍然存在
+     *（是 302 closure），新路由萬一被改名時產出一個會 302 到正確位置的連結，
+     * 好過讓 shell 的個人資料入口整個消失。兩邊都不存在才回 null。
      */
     protected function profileUrl(): ?string {
         $route = \Illuminate\Support\Facades\Route::class;
-        if (migration_flag_is_new('profile') && $route::has('app.profile.edit')) {
+
+        if ($route::has('app.profile.edit')) {
             return route('app.profile.edit', [], false);
         }
-        if ($route::has('profile.edit')) {
-            return route('profile.edit', [], false);
-        }
 
-        return null;
+        return $route::has('profile.edit') ? route('profile.edit', [], false) : null;
     }
 
     /**

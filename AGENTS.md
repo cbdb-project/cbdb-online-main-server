@@ -4,7 +4,7 @@
 
 ## 專案現況
 - 技術棧：Laravel 12、PHP 8.2+、MariaDB 10.11（prod 實測 10.11.14；相容性下限仍按 10.3 撰寫）、SQLite（測試）、Vite、Vue 3、Inertia/React。
-- 全站主要互動頁面已遷移至 **React/Inertia 並翻 flag 上線**（`config/migration_flags.php` 頁面 flag 多為 `new`）：人物列表/檢視/詳情中樞、13 個 React 編輯器（basic-info + 12 個複合主鍵子資源）、Codes CRUD、operations/manage/crowdsourcing、admin 工具、認證頁、Query Playground（`/app/query-playground`）等。
+- 全站主要互動頁面均為 **React/Inertia**（遷移期的 `config/migration_flags.php` 已於 Blade 下架環節 4d-1 移除）：人物列表/檢視/詳情中樞、13 個 React 編輯器（basic-info + 12 個複合主鍵子資源）、Codes CRUD、operations/manage/crowdsourcing、admin 工具、認證頁、Query Playground（`/app/query-playground`）等。
 - **所有 legacy Blade 頁面已實體刪除**（見 [docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)）。**AdminLTE 3 + Bootstrap 4 的資產與 layout 檔仍在**（環節 5 待做），但已經沒有任何頁面 `@extends` 它們：
   - **人物編輯全套（`basicinformation.*`）已於環節 2 實體刪除**——視圖、12 組子資源路由與 controller、
     `LegacyBladeFormGate`、以及那 15 個 `MIGRATION_FLAG_BASICINFO_*` flag 全部不存在了。
@@ -39,14 +39,15 @@
       **舊 runbook 裡「翻 kill switch 即可回退」那一步已作廢**；要回到 Blade 只能 git revert
       並重新部署。護欄：
       `LegacyBladePageRetirementTest::the_retirement_middleware_and_its_kill_switch_no_longer_exist()`
-      與 `migration_flags_cannot_bring_legacy_pages_back()`。
+      與 `the_migration_flag_mechanism_no_longer_exists()`。
       ⚠️ **不要把那個 middleware 加回來**：它有兩條 fail-open 路徑，而 Blade 視圖全都刪了，
       落下去只會得到 500。要封路請直接寫 closure。
-    - 🔴 **migration flag 自環節 4c 起只影響「連結指向」，沒有任何例外**（側邊欄、payload
-      裡的 URL）。`auth.*`／`welcome` 原本是最後一批「翻 flag 真的會渲染 Blade」的頁面
-      （分支在 controller 內部、路由未封路），4c 把那 5 個 Blade 視圖與分支一併刪除。
-      護欄：`AuthPagesInertiaTest::flipping_the_flags_no_longer_changes_what_gets_rendered()`。
-      ⇒ 整個 flag 機制已無渲染作用，拆除它是環節 4d。
+    - 🔴 **migration flag 機制已於環節 4d-1 整組移除**：`config/migration_flags.php`、
+      `migration_flag()`／`migration_flag_is_new()` 都不存在了，連結一律指 React 版。
+      （4c 先刪掉最後一批「翻 flag 真的會渲染 Blade」的頁面——`auth.*`／`welcome`，
+      它們的分支寫在 controller 內部、路由未封路——4d-1 才拆得掉機制。）
+      護欄：`LegacyBladePageRetirementTest::the_migration_flag_mechanism_no_longer_exists()`、
+      `NavigationSchemaTest::test_every_sidebar_href_points_at_the_react_app()`。
   - 少數頁面本就無 flag：Query Playground 主頁 `/query-playground` 硬導向 `/app/query-playground`；
     外部資料庫引用瀏覽器 `/external-db-link` 硬導向 `/app/external-db-link`（Blade 版已刪）。
   - AdminLTE 實體下架（環節 5）尚未執行。

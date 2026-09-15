@@ -54,6 +54,22 @@ class InertiaSharedPropsTest extends TestCase {
         $this->assertSame('/app/basicinformation', $this->shareFor(null)['shell']['home_url']);
     }
 
+    /**
+     * ── 2026-09-15（Blade 下架環節 4d-1，review 實測後補）─────────────
+     * `profileUrl()` 原本依 `profile` flag 在 React／Blade 之間二選一，4d-1 收斂成一律指
+     * React。**review 實測：把它改回指 legacy `/profile`，全 suite 完全綠**——那個收斂
+     * 一條測試都沒守。這條補上。
+     */
+    public function test_profile_url_always_points_at_the_react_page(): void {
+        $user = User::factory()->create(['is_active' => User::STATUS_ACTIVE]);
+
+        $this->assertSame('/app/profile', $this->shareFor($user)['shell']['profile_url']);
+
+        // 即使有人把已移除的 flag key 塞回 config，也不得指回 legacy。
+        config(['migration_flags.pages.profile' => 'old']);
+        $this->assertSame('/app/profile', $this->shareFor($user)['shell']['profile_url']);
+    }
+
     public function test_share_exposes_app_name_and_version(): void {
         config(['app.name' => 'CBDB Online']);
 

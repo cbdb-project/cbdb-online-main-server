@@ -11,13 +11,16 @@ use Tests\TestCase;
  */
 class CodesIndexInertiaTest extends TestCase {
     #[Test]
-    public function it_renders_codes_index_with_flag_aware_urls(): void {
+    public function it_renders_codes_index_with_react_urls_regardless_of_flags(): void {
         // 確定性表清單。
         config(['codes.tables' => [
             'OFFICE_CODES' => '官職代碼',
             'ADDR_CODES' => '地址代碼',
         ]]);
         config(['codes.ui_hidden' => []]);
+        // ── 2026-09-15（環節 4d）：原本翻 codes flag=old 來驗「url 指回 legacy」。
+        // flag 分支已移除（一律指 React 版），所以這裡改成**翻了也不該有影響**——
+        // 保留這一行正是為了證明那件事。
         config(['migration_flags.pages.codes' => 'old']);
 
         // 說明欄現在改由 codes.table_desc.<表名> 翻譯驅動（見 CodesTableDescription），
@@ -36,16 +39,16 @@ class CodesIndexInertiaTest extends TestCase {
                 ->has('tables.0', fn (Assert $row) => $row
                     ->where('name', 'OFFICE_CODES')
                     ->where('description', '官職代碼')
-                    ->where('url', '/codes/OFFICE_CODES')));
+                    ->where('url', route('app.codes.show', ['table_name' => 'OFFICE_CODES'], false))));
     }
 
     #[Test]
-    public function show_url_follows_new_flag_when_show_route_exists(): void {
+    public function show_url_points_at_the_react_table_page(): void {
         config(['codes.tables' => ['OFFICE_CODES' => '官職代碼']]);
         config(['codes.ui_hidden' => []]);
-        config(['migration_flags.pages.codes' => 'new']);
-
-        // app.codes.show 已建立（P2-2），flag=new 時連結指向 React 單表頁。
+        // 📌 原名 `show_url_follows_new_flag_when_show_route_exists`，body 還設過
+        // `migration_flags.pages.codes => 'new'`。環節 4d-1 把 flag 機制整組移除之後，
+        // 那個設定是對幽靈 key 賦值、名字也不再描述任何事（同檔兄弟測試已改，這條漏了）。
         $this->get(route('app.codes.index'))
             ->assertInertia(fn (Assert $page) => $page
                 ->where('tables.0.url', '/app/codes/OFFICE_CODES'));

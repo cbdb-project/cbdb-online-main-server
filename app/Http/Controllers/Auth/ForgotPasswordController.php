@@ -39,17 +39,16 @@ class ForgotPasswordController extends Controller {
 
     /**
      * 顯示「寄出重設連結」表單。
-     * flag=new → Inertia React 版；否則維持 trait 預設的 auth.passwords.email Blade。
+     * 一律 Inertia React 版（環節 4c 起 Blade 版已刪、flag 分支已移除）。
      *
-     * @return \Illuminate\Contracts\View\View|\Inertia\Response
+     * @return \Inertia\Response
      */
     public function showLinkRequestForm(Request $request) {
-        if (migration_flag_is_new('auth.passwords')) {
-            return Inertia::render('Auth/ForgotPassword', [
-                'status' => session('status'),
-            ]);
-        }
-
-        return view('auth.passwords.email');
+        // ── 2026-09-15（Blade 下架環節 4c）─────────────────────────────
+        // 這裡原本是 `if (migration_flag_is_new(<auth.passwords>)) { … } return view('auth.passwords.email');`。
+        // Blade 版已實體刪除，flag 分支一併移除——**這一頁自此與 migration flag 無關**。
+        return Inertia::render('Auth/ForgotPassword', [
+            'status' => session('status'),
+        ]);
     }
 }

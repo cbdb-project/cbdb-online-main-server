@@ -727,9 +727,14 @@ Blade 頁面透過 `__()` 直接呼叫，不需額外傳遞；但如果 Blade �
 **注意：** `auth/` 部分字串（`__('auth.failed')` 等）已透過 `lang/zh-TW/auth.php` 翻譯；需補齊 Blade 模板中直接硬編碼的中文（表單 label、提示文字）。
 
 **步驟：**
-- [ ] 6B-1：翻譯 `auth/` 四個檔案（login、register、passwords、email）
-- [ ] 6B-2：翻譯 `profile/`（含令牌管理的 JS confirm 對話框字串）
-- [ ] 6B-3：翻譯 `home.blade.php`、`welcome.blade.php`、`dashboard/`
+- [x] ~~6B-1：翻譯 `auth/` 四個檔案（login、register、passwords、email）~~
+      🔴 **已作廢（2026-09-15，Blade 下架環節 4c）**：那四個 Blade 檔已實體刪除，
+      認證頁改由 `resources/js/inertia/Pages/Auth/*` 渲染、走 React 的翻譯機制。
+- [x] ~~6B-2：翻譯 `profile/`（含令牌管理的 JS confirm 對話框字串）~~
+      🔴 **已作廢（環節 4b-4b）**：`resources/views/profile/edit.blade.php` 已實體刪除。
+- [x] ~~6B-3：翻譯 `home.blade.php`、`welcome.blade.php`、`dashboard/`~~
+      🔴 **已作廢**：`home.blade.php` 於環節 1、`dashboard/` 於環節 4a-3、`welcome.blade.php`
+      於環節 4c 實體刪除。
 
 ---
 

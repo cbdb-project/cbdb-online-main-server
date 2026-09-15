@@ -42,9 +42,11 @@
       與 `migration_flags_cannot_bring_legacy_pages_back()`。
       ⚠️ **不要把那個 middleware 加回來**：它有兩條 fail-open 路徑，而 Blade 視圖全都刪了，
       落下去只會得到 500。要封路請直接寫 closure。
-    - migration flag 現在只影響**連結指向**（側邊欄、payload 裡的 URL）；
-      **`auth.*`／`welcome` 例外**（flag 分支在 controller 內部、未封路），它們的 flag
-      仍然決定渲染 Blade 或 React（見 `tests/Feature/AuthPagesInertiaTest.php`）。
+    - 🔴 **migration flag 自環節 4c 起只影響「連結指向」，沒有任何例外**（側邊欄、payload
+      裡的 URL）。`auth.*`／`welcome` 原本是最後一批「翻 flag 真的會渲染 Blade」的頁面
+      （分支在 controller 內部、路由未封路），4c 把那 5 個 Blade 視圖與分支一併刪除。
+      護欄：`AuthPagesInertiaTest::flipping_the_flags_no_longer_changes_what_gets_rendered()`。
+      ⇒ 整個 flag 機制已無渲染作用，拆除它是環節 4d。
   - 少數頁面本就無 flag：Query Playground 主頁 `/query-playground` 硬導向 `/app/query-playground`；
     外部資料庫引用瀏覽器 `/external-db-link` 硬導向 `/app/external-db-link`（Blade 版已刪）。
   - AdminLTE 實體下架（環節 5）尚未執行。

@@ -27,7 +27,8 @@ use Illuminate\Support\Facades\Schema;
  *    所以把 flag 翻回 'old' 只會讓本類產出指向一個已被封路的舊 URL——**多繞一跳（302 回 /app）、
  *    不會真的回到 Blade**。🔴 **2026-09-15 起連回退鍵本身都不存在了**——legacy 頁面全數
  *    實體刪除（環節 4b-4a／4b-4b），封路機制與 LEGACY_PAGE_RETIREMENT 也已移除（環節 4b-4c）。
- *    ⚠️ 例外：auth.* 與 welcome 未封路，其 flag 仍決定渲染 Blade 或 React；
+ *    🔴 **自環節 4c 起沒有例外**：auth 四頁與 welcome 的 Blade 版也已實體刪除、flag 分支
+ *    一併移除，全站沒有任何頁面的渲染受 flag 影響；
  *    basicinformation.* 的 flag 已隨環節 2 刪除，相關節點恆指 /app。
  *
  * 節點結構：

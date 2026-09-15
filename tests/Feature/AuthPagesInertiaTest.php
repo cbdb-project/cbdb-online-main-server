@@ -7,12 +7,18 @@ use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * Phase 6 — 認證頁與入口頁 React/Inertia 變體測試。
+ * 認證頁與入口頁的 Inertia 渲染測試。
  *
- * flag=new 時各頁 render 對應 Inertia component + props；
- * flag=old（預設）時維持原 Blade（HTML 回應，無 Inertia component）。
+ * ── 2026-09-15（Blade 下架環節 4c）─────────────────────────────
+ * 原本的敘述是「flag=new 時 render Inertia，flag=old（預設）時維持原 Blade」——**兩個部分
+ * 現在都不對**：Blade 版已實體刪除、flag 分支已移除，而且 `old` 從來就不是預設
+ *（`config/migration_flags.php` 裡這幾個 key 的預設值一直是 `new`）。
  *
- * 不觸及 POST 流程（沿用既有 laravel/ui 測試），純驗證 show* 的條件 render。
+ * 📌 底下 6 條 `*_when_flag_new()` 與 `flagNew()` helper 自此**名實不符**（設不設 flag 結果
+ * 一樣），刻意不改名：環節 4d 會把整個 flag 機制拆掉，屆時它們會一起收斂，現在改名只是
+ * 製造一次無謂的 diff。它們仍有價值——驗的是各頁的 component 與 props。
+ *
+ * 不觸及 POST 流程（沿用既有 laravel/ui 測試），純驗證 show* 的 render 結果。
  */
 class AuthPagesInertiaTest extends TestCase {
     protected function setUp(): void {
@@ -113,50 +119,47 @@ class AuthPagesInertiaTest extends TestCase {
                 ->where('urls.person_index', '/app/basicinformation'));
     }
 
-    // ---- flag=old（預設）：維持 Blade，無 Inertia component ----
+    // ── 2026-09-15（Blade 下架環節 4c）─────────────────────────────
+    //
+    // 這裡原本有 5 條 `*_renders_blade_when_flag_old()`：auth 四頁與 welcome 是全站**最後**
+    // 一批「翻 migration flag 真的會渲染 Blade」的頁面（flag 分支寫在 controller 內部、
+    // 路由未封路）。環節 6a 特地**沒有**宣稱「flag 已全面失效」，就是因為這 5 條釘著反例。
+    //
+    // 環節 4c 把那 5 個 Blade 視圖實體刪除、flag 分支一併移除 ⇒ 那 5 條測試的前提消失。
+    // 取而代之的是下面這一條：**把「翻 flag 不再改變任何渲染」寫死**。
+    //
+    // 🔴 它同時是一句**站台級**的陳述：自此全站沒有任何頁面的渲染受 migration flag 影響，
+    // flag 只剩「連結指向」一個作用（側邊欄、payload 裡的 URL）。那正是環節 4d 要拆掉
+    // 整個 flag 機制的前提——在它成立之前，4d 做不得。
 
     #[Test]
-    public function login_renders_blade_when_flag_old(): void {
-        config(['migration_flags.pages.auth.login' => 'old']);
+    public function flipping_the_flags_no_longer_changes_what_gets_rendered(): void {
+        // 五頁的 flag 全部翻成 old——它們在環節 4c 之前會因此渲染 Blade。
+        config([
+            'migration_flags.pages.auth.login' => 'old',
+            'migration_flags.pages.auth.register' => 'old',
+            'migration_flags.pages.auth.passwords' => 'old',
+            'migration_flags.pages.welcome' => 'old',
+        ]);
 
-        $response = $this->get('/login')->assertOk();
-        $this->assertStringNotContainsString('data-page', $response->getContent());
-        $response->assertSee(__('common.welcome_back'));
-    }
+        // 覆寫真的生效了（否則整條測試是空轉）——**四個都要驗**。
+        // `config/migration_flags.php` 自己記著「含點號的 key 必須寫成巢狀陣列，否則一律
+        // 回退 default」那個坑，而 `auth.*` 這三個正是含點號的；只驗兩個等於放過那個坑
+        //（review 指出）。
+        foreach (['auth.login', 'auth.register', 'auth.passwords', 'welcome'] as $flag) {
+            $this->assertSame('old', migration_flag($flag), "{$flag} 的覆寫沒有生效，這條測試會變成空轉");
+        }
 
-    #[Test]
-    public function register_renders_blade_when_flag_old(): void {
-        config(['migration_flags.pages.auth.register' => 'old']);
-
-        $response = $this->get('/register')->assertOk();
-        $this->assertStringNotContainsString('data-page', $response->getContent());
-        $response->assertSee(__('common.join_us'));
-    }
-
-    #[Test]
-    public function forgot_password_renders_blade_when_flag_old(): void {
-        config(['migration_flags.pages.auth.passwords' => 'old']);
-
-        $response = $this->get('/password/reset')->assertOk();
-        $this->assertStringNotContainsString('data-page', $response->getContent());
-        $response->assertSee(__('common.send_reset_link_title'));
-    }
-
-    #[Test]
-    public function reset_password_renders_blade_when_flag_old(): void {
-        config(['migration_flags.pages.auth.passwords' => 'old']);
-
-        $response = $this->get('/password/reset/the-token')->assertOk();
-        $this->assertStringNotContainsString('data-page', $response->getContent());
-        $response->assertSee(__('common.update_password_title'));
-    }
-
-    #[Test]
-    public function welcome_renders_blade_when_flag_old(): void {
-        config(['migration_flags.pages.welcome' => 'old']);
-
-        $response = $this->get('/')->assertOk();
-        $this->assertStringNotContainsString('data-page', $response->getContent());
-        $response->assertSee(__('nav.welcome_system_title'));
+        foreach ([
+            '/login' => 'Auth/Login',
+            '/register' => 'Auth/Register',
+            '/password/reset' => 'Auth/ForgotPassword',
+            '/password/reset/the-token' => 'Auth/ResetPassword',
+            '/' => 'Welcome',
+        ] as $uri => $component) {
+            $this->get($uri)
+                ->assertOk("{$uri} 應該仍然 200（Blade 版已刪，翻 flag 不該改變任何事）")
+                ->assertInertia(fn (Assert $page) => $page->component($component));
+        }
     }
 }

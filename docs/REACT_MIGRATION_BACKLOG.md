@@ -179,11 +179,11 @@
 ## Phase 6 — 認證頁與入口（建議最後；依賴：F*）
 | # | 頁面 | 路由（舊） | 狀態 | 備註 |
 |---|---|---|---|---|
-| P6-1 | auth/login | `Auth::routes()` | **done**（2026-06-22，flag auth.login old）：show* flag→Inertia 否則 Blade；POST/節流/guest 未動；review+codex 過 |
-| P6-2 | auth/register | `Auth::routes()` | **done**（2026-06-22，flag auth.register old） |
-| P6-3 | auth/passwords/email | `Auth::routes()` | **done**（2026-06-22，flag auth.passwords old，忘記密碼） |
-| P6-4 | auth/passwords/reset | `Auth::routes()` | **done**（2026-06-22，flag auth.passwords old，重設密碼，token/email 透傳） |
-| P6-5 | welcome | `/`（WelcomeController） | **done**（2026-06-22，flag welcome old，landing） |
+| P6-1 | auth/login | `Auth::routes()` | **retired**（2026-09-15，環節 4c）：Blade 版與 flag 分支都已實體刪除，一律 Inertia。原 done 紀錄：2026-06-22，show* flag→Inertia 否則 Blade；POST/節流/guest 未動 |
+| P6-2 | auth/register | `Auth::routes()` | **retired**（2026-09-15，環節 4c）；原 done：2026-06-22 |
+| P6-3 | auth/passwords/email | `Auth::routes()` | **retired**（2026-09-15，環節 4c）；原 done：2026-06-22（忘記密碼） |
+| P6-4 | auth/passwords/reset | `Auth::routes()` | **retired**（2026-09-15，環節 4c）；原 done：2026-06-22（重設密碼，token/email 透傳） |
+| P6-5 | welcome | `/`（WelcomeController） | **retired**（2026-09-15，環節 4c）；原 done：2026-06-22（landing） |
 | P6-C1 | 刪除死碼 home.blade.php | — | **retired**（2026-09-14，環節 1） | **僅刪 view**；`/home` route/redirect 仍活躍、未動（`RedirectIfAuthenticated` 與 **三個** Auth controller——Login／Register／ResetPassword——的 `$redirectTo` 都硬寫 `/home`，React 端 AuthLayout／Profile Edit 也連到它） |
 | P6-C2 | 刪除死碼 auth/register2.blade.php | — | **retired**（2026-09-14，環節 1） | 已確認無引用 |
 | P6-C3 | 刪除死碼 biogmains/basicinformation/show.blade.php | — | **retired**（2026-09-14，環節 1） | `view('biogmains.basicinformation.show')` 全庫零呼叫；本列為環節 1 新增（原不在帳本） |

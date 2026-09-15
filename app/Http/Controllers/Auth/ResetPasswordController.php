@@ -50,24 +50,21 @@ class ResetPasswordController extends Controller {
 
     /**
      * 顯示重設密碼表單。token/email 比照 trait 從 route/query 取得。
-     * flag=new → Inertia React 版（帶 token/email props）；否則維持原 auth.passwords.reset Blade。
+     * 一律 Inertia React 版（帶 token/email props；環節 4c 起 Blade 版已刪、flag 分支已移除）。
      *
-     * @return \Illuminate\Contracts\View\View|\Inertia\Response
+     * @return \Inertia\Response
      */
     public function showResetForm(Request $request) {
         $token = $request->route()->parameter('token');
 
-        if (migration_flag_is_new('auth.passwords')) {
-            return Inertia::render('Auth/ResetPassword', [
-                'token' => $token,
-                'email' => $request->email,
-                'status' => session('status'),
-            ]);
-        }
-
-        return view('auth.passwords.reset')->with(
-            ['token' => $token, 'email' => $request->email]
-        );
+        // ── 2026-09-15（Blade 下架環節 4c）─────────────────────────────
+        // 這裡原本是 `if (migration_flag_is_new(<auth.passwords>)) { … } return view('auth.passwords.reset');`。
+        // Blade 版已實體刪除，flag 分支一併移除——**這一頁自此與 migration flag 無關**。
+        return Inertia::render('Auth/ResetPassword', [
+            'token' => $token,
+            'email' => $request->email,
+            'status' => session('status'),
+        ]);
     }
 
     /**

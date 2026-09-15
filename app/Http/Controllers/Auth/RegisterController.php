@@ -51,17 +51,18 @@ class RegisterController extends Controller {
     /**
      * Show the application registration form.
      *
-     * @return \Illuminate\Http\Response
+     * 一律 Inertia React 版（環節 4c 起 Blade 版已刪、flag 分支已移除）。
+     *
+     * @return \Inertia\Response
      */
     public function showRegistrationForm() {
         //        return '内测阶段，暂不开放注册';
-        if (migration_flag_is_new('auth.register')) {
-            return Inertia::render('Auth/Register', [
-                'status' => session('status'),
-            ]);
-        }
-
-        return view('auth.register');
+        // ── 2026-09-15（Blade 下架環節 4c）─────────────────────────────
+        // 這裡原本是 `if (migration_flag_is_new(<auth.register>)) { … } return view('auth.register');`。
+        // Blade 版已實體刪除，flag 分支一併移除——**這一頁自此與 migration flag 無關**。
+        return Inertia::render('Auth/Register', [
+            'status' => session('status'),
+        ]);
     }
 
     /**

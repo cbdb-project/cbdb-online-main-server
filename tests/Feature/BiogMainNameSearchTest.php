@@ -801,6 +801,12 @@ class BiogMainNameSearchTest extends TestCase {
         $this->assertSame([6006], $this->pinyinIdsFor('Li_'));
         // "%" 未跳脫等於全表；跳脫後不命中任何人。
         $this->assertSame([], $this->pinyinIdsFor('Jia%'));
+
+        // 中文欄的子字串條件（c_name_chn LIKE '%q%'）同樣要跳脫：q 只打 "%" 不得撈全表，
+        // q 只打 "_" 只能命中 c_name_chn 字面含底線的 6006（v1 /api/name 未認證可達，此處是唯一防線）。
+        $this->assertSame([], $this->pinyinIdsFor('%'));
+        $this->assertSame([6006], $this->pinyinIdsFor('_'));
+        $this->assertSame(0, (int) BiogMainRepository::dynastyFacetsByQuery('%')->sum('count'), '朝代分面同樣不得被 % 撈全表');
     }
 
     #[Test]

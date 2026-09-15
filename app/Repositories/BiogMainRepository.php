@@ -633,7 +633,7 @@ class BiogMainRepository {
         // 不再加 orWhere('BIOG_MAIN.c_personid', $request->q)——否則 MySQL/MariaDB 會把非數字字串
         // 寬鬆轉型成 0，誤中 c_personid=0（「未詳」占位列）。
         $names = $names->where(function ($query) use ($request, $qForms) {
-            $query->where('BIOG_MAIN.c_name_chn', 'like', '%'.$request->q.'%');
+            $query->whereRaw("BIOG_MAIN.c_name_chn LIKE ? ESCAPE '|'", ['%'.self::escapeLike($request->q).'%']);
             self::applyPinyinNameMatch($query, $qForms);
         });
 
@@ -683,13 +683,24 @@ class BiogMainRepository {
      *  - 這是**過渡方案**。根治是把括號內容從姓名欄移到獨立語義欄位（見 issue 討論），屆時此處
      *    可退回精確比對。
      *
-     * LIKE 萬用字元：改成前綴比對後 %／_ 從無害變有害（"Li_" 會當單字元萬用），故一律跳脫。
-     * 跳脫字元用 | 並顯式寫 ESCAPE 子句：MariaDB 預設 escape 是反斜線，但 SQLite 沒有預設值，
-     * 而 '\\' 這個字面在兩邊的長度又不同（MariaDB 是一個字元、SQLite 是兩個），用反斜線做不到可攜。
+     * LIKE 萬用字元：改成前綴比對後 %／_ 從無害變有害（"Li_" 會當單字元萬用），故一律經
+     * escapeLike() 跳脫；呼叫端的 c_name_chn 子字串條件也必須同樣跳脫（否則 q="%" 仍撈全表）。
      *
      * @param  \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder  $query
      * @param  array<int, string>  $qForms  PinyinSearchNormalizer::expand() 的 v／ü 展開集
      */
+    /**
+     * 使用者輸入進 LIKE 前的跳脫：|／%／_ 一律當字面。
+     *
+     * 跳脫字元用 | 並要求呼叫端顯式寫 ESCAPE '|'：MariaDB 預設 escape 是反斜線，但 SQLite 沒有
+     * 預設值，而 '\\' 這個字面在兩邊的長度又不同（MariaDB 是一個字元、SQLite 是兩個），
+     * 用反斜線做不到可攜。namesByQuery／dynastyFacetsByQuery 的每一條 LIKE 都要經過這裡——
+     * 漏一條就等於留一個「q 只打 % 便撈全表」的入口（v1 /api/name 未認證可達）。
+     */
+    private static function escapeLike(?string $value): string {
+        return str_replace(['|', '%', '_'], ['||', '|%', '|_'], (string) $value);
+    }
+
     private static function applyPinyinNameMatch($query, array $qForms): void {
         #20230626增加[外文全名]與[外文羅馬字轉寫姓名]可查得
         $prefixCols = [
@@ -700,7 +711,7 @@ class BiogMainRepository {
         $exactCols = ['c_surname', 'c_surname_proper', 'c_surname_rm'];
 
         foreach ($qForms as $form) {
-            $escaped = str_replace(['|', '%', '_'], ['||', '|%', '|_'], $form);
+            $escaped = self::escapeLike($form);
             foreach ($prefixCols as $col) {
                 $query->orWhereRaw("BIOG_MAIN.{$col} LIKE ? ESCAPE '|'", [$escaped]);
                 $query->orWhereRaw("BIOG_MAIN.{$col} LIKE ? ESCAPE '|'", [$escaped.' %']);
@@ -774,7 +785,7 @@ class BiogMainRepository {
         $fallbackBaseQuery = DB::table('BIOG_MAIN')
             ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
             ->where(function ($query) use ($q, $qForms) {
-                $query->where('BIOG_MAIN.c_name_chn', 'like', '%' . $q . '%');
+                $query->whereRaw("BIOG_MAIN.c_name_chn LIKE ? ESCAPE '|'", ['%'.self::escapeLike($q).'%']);
                 self::applyPinyinNameMatch($query, $qForms);
             });
 

@@ -150,7 +150,7 @@
 | D-1 | `maps/index.blade.php`（103 行） | `GET app/maps` → `HistoricalMapsController@index`。**掛在 `/app/*` 但其實是 Blade**；為 `resources/js/historical-maps/app.js`（Leaflet 全螢幕）的宿主殼，**不套 AdminLTE、不依賴 jQuery/Bootstrap** | 高 | **低（S）** | ✅ **環節 7 結論：移出本計畫**（詳見 §環節 7「D 類結論」）。它不是 legacy 頁，而是 `app/maps` 現在服役的頁面；獨立 HTML、不套 AdminLTE，環節 5 不會波及。若要 React 化：改成 Inertia 頁並沿用同一支 JS 即可。注意它引用 Leaflet 的 CDN CSS |
 | D-2 | `cbdbapi/person.blade.php` | v1 API 回應樣板 | — | — | **明確排除**，永久保留（改為純 Response 組裝屬另一議題） |
 | D-3 | `biogmains/_chgis_map_assets`（**僅此一檔**） | 被 `inertia.blade.php:36` `@include`，React 根模板依賴 | 高 | **中**（非「低」） | 搬離 `biogmains/` 命名空間（→ `resources/views/partials/chgis-map-assets.blade.php`），避免刪 `biogmains/**` 時誤刪。這是環節 2 的第一步。<br>⚠️ **`_place_link.blade.php` 不屬於本列**——它只被兩個 legacy Blade `@include`，隨 A-20 刪除（見 §二 C）。<br>⚠️ 難度是**中**不是低：它含 `route('basicinformation.index')`、`@push`／`@stack` 配對、`ChgisMapManager` 容器解析、`@vite` 入口；而且 `chgis-map/app.js:494-495` **目前只接受 base URL**（`${base}/${id}/map-points`），改用 `basicinformation.map-points` 需**同時改 JS 讓它接受完整 URL template**，不是只換一個 route 名 |
-| D-4 | `layouts/{app,dashboard-v3,header-v3,footer,sidebar-v3,partials/sidebar-node}`（837 行） | AdminLTE 殼 | 高 | **低**（A 全清後自動成孤兒） | 隨環節 5（Phase 7）一併刪。<br>📌 **`layouts/app.blade.php` 自環節 1 起已無任何消費端**（原唯一消費者 `biogmains/basicinformation/show.blade.php` 已刪）——但**仍不在環節 1/2 範圍**，維持排在環節 5 一併清，以免零散更動 layout |
+| D-4 | `layouts/{app,dashboard-v3,header-v3,footer,sidebar-v3,partials/sidebar-node}`（837 行） | AdminLTE 殼 | 高 | **低**（A 全清後自動成孤兒） | ✅ **已於環節 5a 實體刪除（6 檔）**。<br>📌 **`layouts/app.blade.php` 自環節 1 起已無任何消費端**（原唯一消費者 `biogmains/basicinformation/show.blade.php` 已刪）——但**仍不在環節 1/2 範圍**，維持排在環節 5 一併清，以免零散更動 layout |
 | D-5a | `basicinformation/{id}/saveas`、`basicinformation/{id}/Duplicate_Collateral_Info` | 🔴 **React 正在主動呼叫**：`TabContentLoader.tsx` 與 `BasicInformationController@appEditV2` 的 payload 各有一組硬編碼 URL，餵給 `BasicInfoEditor` 的按鈕（`<a href>` 直接導航）。兩條路由**完全無 middleware** | — | **中（M）** | ⚠️ **任何環節都不得刪除或 redirect**。正確描述是「React 依賴的 legacy 端點」，**不是**「React 缺的功能」。<br>✅ **環節 7 結論：保留、移出本計畫**（詳見 §環節 7「D 類結論」）——它們是「沒有 React 版的活功能」而非重複的 Blade 頁，搬家是真的功能移植（GET→POST + 新端點 + 帶走兩個資料完整性守衛），另開任務 |
 | D-5b | `Route::resource('basicinformation')` 的 `destroy` | 環節 2 刻意保留（`LegacyBladeFormGate` 已隨該環節刪除，這條現在是無 middleware 的裸路由）。**但 React 的刪除走的是 API v2**（`api.v2.delete.web`，見 `PersonBrowserController.php:33`、`BasicInformationController.php:1611`）——全庫查無 React 對 `basicinformation.destroy` 的呼叫 | 高 | **低—中** | 與 D-5a **不同性質**：它是「未被閘門擋下的 legacy route」，不是 React 依賴。**不要因為 D-5a 而順便永久保留它**。<br>**執行時機明確定為**：環節 2 **先保留**（步驟 3 不動它），盤點列入**環節 7**。<br>✅ **環節 7 結論：確認零呼叫者、可下架，排入環節 4b**（詳見 §環節 7「D 類結論」）。⚠️ 下架前要確認 v2 軟刪除涵蓋**眾包分支**——這條 legacy 方法對眾包用戶另走 `operations` op_type 4 |
 | D-6 | `components/forms/{audit-fields,person-id-display}`、`components/{inline-time-fields,diff-table,posted-to-addr-diff,key-value-table,ai-fill-diff-table}`（7 檔 / 559 行） | legacy 表單／日誌頁元件 | — | 低 | ⚠️ **消費者跨多個環節**：`audit-fields`／`person-id-display`／`inline-time-fields` 只服務 A-20（環節 2 可刪）；`diff-table` → `posted-to-addr-diff` 鏈被 A-4／A-7／A-9 三頁使用（**環節 4a 才能刪**）；`key-value-table`／`ai-fill-diff-table` 屬 A-9／A-10（環節 4a）。**逐一 grep 確認零引用後才刪** |
@@ -169,7 +169,7 @@
 | 3b | **flag 派生的 Inertia props**（`PersonBrowserController.php:39-61` 的 12 個 `*EditorIsNew`、`ManagementController.php:59` 的 `$editIsNew`） | 在**刪 flag key 的同一 commit** 內：後端改成無條件 `true`（或移除該 prop），前端 `Pages/PersonBrowser/TabContentLoader.tsx:88-100` 的 `= false` 預設與 13 個 `tabs/*.tsx` 的 `xxxEditorIsNew &&` 條件一併移除 | 🔴 **漏掉這一欄的後果是「靜默功能消失」而非 500**：flag key 不存在 → `migration_flag()` 回退 `default='old'` → prop 全 `false` → React 編輯器退回唯讀分支。**驗收必須是人工開頁確認 13 個編輯器還在**，不能只看測試綠 |
 | 4 | `app/Http/Middleware/LegacyBladeFormGate.php` + `app/Http/Kernel.php` | A-20 刪除後此 middleware 成孤兒 → 刪檔 **並**從 `$routeMiddleware` 移除 `legacy.form` 別名 | ⚠️ **必須與 A-20 同一個 commit**——路由若仍引用已不存在的 middleware 別名，整站 500 |
 | 5 | `app/helpers.php` | `person_index_url`（`:82`）／`person_show_base_url`（`:93`）／`person_index_base_url`（`:102`）／`person_page_url`（`:117`）／`person_create_url`（`:141`）／`code_table_edit_url`（`:150`）共 **6 個** helper 的 flag 分歧**收斂成只回 `/app/*`**；`migration_flag()`／`migration_flag_is_new()` 待 flag 機制整體移除時刪除 | 這些 helper 被多處呼叫：**先收斂函式內部、保留簽名**，最後再評估是否移除函式本身 |
-| 6 | `app/Support/Navigation.php` | `url($flagKey, $oldRoute, $newRoute)` 收斂為單一路由；移除 `codes`／`view` 節點的 flag 分支；**`active.pages` 與 `active.patterns` 兩者皆可移除** | ⚠️ 兩個 active 欄位**都只有 Blade 側邊欄在用**——React 端靠 href pathname 比對（見 `SidebarNode.tsx` 註解），對 `pages`／`patterns` 皆零消費。改動後跑 `tests/Feature/NavigationSchemaTest.php` |
+| 6 | `app/Support/Navigation.php` | `url($flagKey, $oldRoute, $newRoute)` 收斂為單一路由；移除 `codes`／`view` 節點的 flag 分支；**`active.pages` 與 `active.patterns` 兩者皆可移除** | ⚠️ 兩個 active 欄位**都只有 Blade 側邊欄在用**——React 端靠 href pathname 比對（見 `SidebarNode.tsx` 註解），對 `pages`／`patterns` 皆零消費。改動後跑 `tests/Feature/NavigationSchemaTest.php` |<br>✅ **已完成**：flag 收斂於 4d-1、`active.pages`／`active.patterns`（含 `config/entity_aggregates.php` 的 `nav.pattern` 與 `viewItem()` 的 `$pageTitle`）於 4d-2。
 | 7 | `app/Http/Middleware/HandleInertiaRequests.php` | `profileUrl()` 的 flag 分支收斂 | 跑 `tests/Feature/InertiaSharedPropsTest.php` |
 | 8 | `app/Support/CompositePrimaryKey.php` | `APP_EDIT_ROUTE_MAP` 的 `migration_flag_is_new()` 判斷收斂為無條件使用 `/app` 路由 | ⚠️ 這條影響 operations 的「查閱」連結；跑 `tests/Unit/CompositePrimaryKeyTest.php`、`tests/Feature/OperationsProposalResourceLinkTest.php` |
 | 9 | `config/migration_flags.php` | 逐項移除已下架頁面的 flag key；**全部下架後整檔刪除** | ⚠️ **刪 key 前必須確認沒有任何 `migration_flag_is_new('…')` 還在讀它**——否則會靜默回退到 `default`（`old`），接著 `route('已刪除的舊路由名')` 拋 `RouteNotFoundException` → **500** |
@@ -184,7 +184,7 @@
 | 16 | 文檔 | `AGENTS.md`（「舊版 Blade 仍實體保留／翻回 `old` 即回退」整段改寫）、~~`README.md`（`:64`／`:114` 的對外承諾「flag 改回 old 即可回退」）~~ ✅ **已於環節 3 改為 `LEGACY_PAGE_RETIREMENT=false`**，不需再動；`:65-66` 的入口清單（含 `app.js`／`jquery-global.js`）留到環節 5、`CHANGELOG.md`、`docs/ADMINLTE.md`（改為「已下架」歷史文件）、`docs/ADMINLTE4_UPGRADE_FEASIBILITY.md`（標註已被取代）、`docs/REACT_INERTIA_MIGRATION_PLAN.md`（§五雙殼／§五之二回退保證／附錄 C 禁止清單全部失效）——✅ 回退保證那組（開頭里程碑、§五之二兩條、§八）已於環節 6a 加上限縮前言；雙殼與附錄 C 留到環節 5、`docs/REACT_MIGRATION_BACKLOG.md`（P6-C1/C2、P7-1..3 → `retired`）、~~`docs/VIEWS.md`~~（實查：只是 `/view/{key}` 資料目錄，零 flag／回退陳述，**不需改**）、~~`docs/migration-specs/*.md`（22 份 fidelity spec 加「歷史存檔」抬頭）~~ ✅ **已於環節 6a 全數加上** | ✅ **`docs/CODES_SORT_FILTER_AUTH_GATE.md` 已於環節 6a 改寫**（連帶 `AGENTS.md` 高風險備忘、`CHANGELOG.md` 的歷史條目加註、`docs/REACT_INERTIA_MIGRATION_PLAN.md` 的回退保證）。原文記載「把 `codes` flag 切回 `old` 會重新暴露無門檻的深分頁排序查詢」——**環節 3 之後已不成立**（封路 middleware 不讀 flag），真正的條件變成 `LEGACY_PAGE_RETIREMENT=false`。環節 4 實體刪除 Blade 版 `show()` 後此風險才**消失**，屆時要再更新一次。📌 `docs/VIEWS.md` 實查後**不需改**：它只是 `/view/{key}` 的資料目錄，無任何回退／flag 陳述 |
 | 17 | `API.md` / `docs/openapi/openapi.yaml` | **本計畫預設不動任何 API 路由／欄位／授權／錯誤碼**，故無需更新。**若某個環節實際動到了對外端點語義（例如把 legacy 端點改成導向／410），必須在同一 commit 同步 `API.md`**（AGENTS.md 文檔維護原則） | ✅ **實查結果：環節 3 無需更新 `API.md`**。`API.md` 收錄的是 v1／v2 的 API 端點，唯一與本次相關的是 `GET /codes/{table_name}/export`（`API.md:1686`）——而那條**沒有被封路**（React 匯出鈕正在用），敘述仍然正確。legacy web 表單端點從不在 `API.md` 範圍內。環節 4 實體刪除時再複查一次 |
 
-| 18 | `app/Providers/AppServiceProvider.php` | 環節 5 移除 `View::composer('layouts.dashboard-v3', …)`（`:81`）與 `Paginator::useBootstrap()`（`:53`） | ⚠️ 該 composer 是 `shouldRetainQueryDetails()`（`:113-160`，QueryProfile 明細保留機制）的**唯一消費者**。刪 layout 後它不會 500、只是永遠不觸發 ⇒ 一整段帶安全註解的邏輯變成看不見的死碼。**必須明確決定：廢除，還是改接 React（`HandleInertiaRequests` 目前沒有分享它）** |
+| 18 | `app/Providers/AppServiceProvider.php` | ✅ **`View::composer('layouts.dashboard-v3', …)` 已於環節 5a 移除**。⏳ `Paginator::useBootstrap()` **留給 5b**（已寫進 5b 清單）——`resources/views/**` 已無 `->links()`，但 `app/Http/Controllers/ApiController.php` 還有 30+ 個 `->links()` 呼叫（回傳值被丟棄），刪之前要先確認那些呼叫本身的去留 | 🔴 **本列原本寫「該 composer 是 `shouldRetainQueryDetails()` 的唯一消費者」——那是錯的**（環節 5a 實查、review 覆核）：真正的消費者是同檔 `boot()` 裡的 `DB::listen`（`app(QueryProfile::class)->add($query, $this->shouldRetainQueryDetails())`），composer 從來沒呼叫過它。⇒ 「必須明確決定：廢除還是改接 React」的答案是**廢除 composer、`shouldRetainQueryDetails()` 原封不動**，它不是死碼。React 端由 `HandleInertiaRequests` 的 `query_profile` prop 取用 `QueryProfile` |
 | 19 | `composer.json` | **本計畫不移除任何 composer 套件** | ⚠️ 兩個看似 Blade 遺物的套件**不可刪**：`laravel/ui`（`Auth::routes()` macro 的唯一來源）、`laracasts/flash`（雖然 `@include('flash::message')` 只在兩個待刪 layout 裡，但 `HandleInertiaRequests.php:80,192` 把它橋接成 React toast，**仍在服役**） |
 
 ### 三之二、🔴 由 **PHP controller 動態產生**、React 直接消費的 legacy URL（grep `resources/js` 抓不到）
@@ -1147,22 +1147,90 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
   （`MIGRATION_FLAG_*` 可從 `.env` 刪除），正是該記的那類。已補。
   **把 CHANGELOG 加進「刪東西時必掃的清單」，不要再靠記憶。**
 
-- **4d-2 待做**：`Navigation` 的 `active.pages`／`active.patterns` 移除。
-  兩者**都已是死資料**：`pages` 是給 Blade 的 `$page_title` 比對用、`patterns` 是給
-  `request()->routeIs()` 用，而 React 端**兩個都不讀**（`SidebarNode.tsx` 以
-  href 路徑 + 顯著 query 判定 active，該檔註解已明載「`active.patterns` 僅供 Blade 使用」）。
-  範圍：約 50 個節點定義的第三個參數、`resources/js/inertia/types/page.ts` 的型別、
-  以及 `NavigationSchemaTest` 的 `test_active_pages_union_covers_legacy_sidebar_open_set()`
-  等兩條測試。**刻意與 4d-1 分開**：那是純減法但 diff 很寬，混在 flag 機制移除裡不好 review。
-  ⚠️ **刪 config 前先掃「未知 key fallback」**：`config/migration_flags.php:37-104` 的每個已知頁面都有明文預設 `new`，所以 CI（`cp .env.example .env`，`.env.example` 無 `MIGRATION_FLAG_*`）**跑的就是 new 路徑**——`'default' => 'old'` 只影響**不在 config 裡的 key**。真正要找的是「`migration_flag_is_new('某個 config 沒列的 key')` 因而永遠回 false」的呼叫點：`grep -roE "migration_flag(_is_new)?\('[^']+'\)" app/ resources/` 取出所有 key，逐一比對 `config/migration_flags.php` 是否列出，對不上的先處理。
+- **4d-2 ✅ 已完成（2026-09-15）——`active.pages`／`active.patterns` 移除**（與 **5a** 同一個 PR，
+  理由見下）：
+  - `app/Support/Navigation.php`：`item()` 少一個 `array $active` 參數、節點少一個 `'active'` 鍵；
+    `tree_()` 少 `array $activePages`；24 個獨立實參 + 2 個內嵌實參移除；
+    `nodeActive()`／`treeOpen()` 刪除（換成說明註解）。
+  - 🔎 **順手發現、一併刪掉的第三個殘留**：`viewItem()` 的第四個參數 `$pageTitle`（中文標題，
+    18 個呼叫端各傳一個）在 `active.pages` 消失後**變成沒有任何讀取者的參數**。靜態分析不會報
+    「未使用的參數」，所以它會靜靜留下來——**收斂一個機制時要回頭看「只為餵它而存在的輸入」**，
+    不是只刪它的輸出。
+  - `resources/js/inertia/types/page.ts`：`NavActive` 介面與 `NavNode.active` 移除。
+  - 測試：`NavigationSchemaTest` 刪 3 條（`test_node_active_matches_page_title_and_route_pattern`、
+    `test_tree_open_when_descendant_active`、`test_active_pages_union_covers_legacy_sidebar_open_set`）
+    ＋ `collectActivePages()` helper。
+    ⚠️ **另有三條測試是跑完全套才發現的**：`{Office,SocialInstitution,Text}EntityIndexTest`
+    的 `testSidebar…NodePointsToEntityPage()` 各斷言了 `$node['active']['pages']`／`['patterns']`
+    ——它們**不在** `NavigationSchemaTest` 裡，按檔名搜尋 nav 相關測試找不到。
+    改寫為驗 `suffix`（「這個節點仍然宣告它聚合哪張裸表」是那兩行真正在守的事；實測會紅）。
+    ⚠️ 初稿還加了一條「href 不得退回裸表 codes 頁」的反面斷言，**已移除**——它永遠不會紅，
+    理由見下面 review 關卡第 2 點。
+    📌 **教訓：移除一個資料欄位時，`grep "'active'"` 要掃整個 `tests/`，不能只掃「看起來相關」的檔。**
+  - 護欄：`test_every_sidebar_href_points_at_the_react_app()`（PHP 樹）與
+    `tests/e2e/interact-nav-integrity.mjs`（瀏覽器實際渲染的 `<a href>`）驗 **href 指向**；
+    **active／展開**由本輪新增的 `resources/js/inertia/components/shell/sidebarActive.test.ts`
+    （11 條）驗。
+    ⚠️ **初稿在三個檔都寫了「只是換了層級、覆蓋沒少」——那是錯的**（review 與 codex 各自抓到）：
+    React 的 active 判定當時**一條測試都沒有**（`resources/js/**` 的 7 支 vitest 沒一支碰
+    `components/shell/**`，e2e 那支也不驗 active）。⇒ 本輪把 `SidebarNode.tsx` 的純函式抽成
+    `shell/sidebarActive.ts`（行為零改動，元件 re-export 舊符號以免動到 `Sidebar.tsx`）並補測，
+    把這個**自 React 上線以來就存在的缺口**一併補掉。
+    測試本身以兩次變異驗證過會紅：把精確比對改成前綴比對 → 1 紅；把 query 簽章比對改成恆真 → 2 紅。
+
+- **5a ✅ 已完成（2026-09-15，與 4d-2 同一個 PR）——AdminLTE layout 實體刪除**：
+  - 刪 `resources/views/layouts/{app,dashboard-v3,header-v3,footer,sidebar-v3,partials/sidebar-node}.blade.php`（6 檔）。
+  - 刪 `AppServiceProvider` 的 `View::composer('layouts.dashboard-v3', …)` 與不再使用的 `use …Facades\View;`。
+    §三第 18 欄要求「必須明確決定：廢除，還是改接 React」——**決定是廢除該 composer**；
+    `shouldRetainQueryDetails()` 本身**不動**，它另有 `QueryProfile` 的 `DB::listen` 消費者
+    （`HandleInertiaRequests::queryProfile()`），不是死碼。
+  - **零可達性的證明方式**（措辭已依 codex 指正收緊）：掃的是**對這 6 個 layout 的視圖名稱引用**
+    ——`@extends('layouts.*')`／`@include('layouts.*')`／`view('layouts.*')`／`View::make('layouts.*')`
+    ——在 `resources/views`、`app`、`routes` 全部**零命中**（僅剩說明性註解）。
+    ⚠️ **不要寫成「`@extends|@include|layouts\.` 的唯一命中是編譯快取」**：那個較寬的 grep 還會命中
+    `inertia.blade.php` 對 `partials.chgis-map-assets` 的**有效** `@include`，結論對但證明不成立。
+    存活的 `@include` 只有那一條；`tests/storage/views/*` 的命中是 gitignored 的編譯快取產物，不是來源。
+  - **為什麼與 4d-2 合併**：4d-2 刪的是「只有 Blade sidebar 在讀的欄位」，而那個 sidebar 就是 5a
+    刪的檔案之一。分成兩個 PR 的話，前一個 PR 會留下一個「讀 `active` 但欄位已不存在」的 Blade 檔
+    （或反過來），中間狀態是壞的。**依賴方向決定切分，不是依賴環節編號。**
+  - 📌 剩下的 **5b**（前端資產與 package 相依）仍未執行，見下節。
+
+  **review 關卡抓到的四件事（都已修，記在這裡免得下一輪重犯）**：
+  1. **同類殘留漏了一處**：`config/entity_aggregates.php` 的 `nav.pattern`（3 筆）唯一讀取者就是
+     `entityNavItem()` 填進 `active.patterns` 的那一行。我自己已經意識到「只為餵這個機制而存在的輸入
+     也要刪」（`viewItem($pageTitle)` 就是這樣抓到的），卻只往**函式簽名**找，沒往 **config** 找。
+     ⇒ **收斂一個機制時，「輸入端」要同時掃 code 與 config。**
+  2. **寫了一條永遠不會紅的斷言**：三個 Entity*IndexTest 裡新加的
+     `assertNotSame(route('app.codes.show', …), $node['href'])` 之前一行就是
+     `assertSame(route('app.<entity>.index'), $node['href'])`——href 退回裸表時必然先在那裡紅。
+     已移除。**加斷言前要問「它在什麼情況下會紅、那個情況是不是已經被上一行涵蓋」。**
+  3. **「並沒有失去覆蓋、只是換了層級」是錯的陳述**，而且同一句話被抄進三個檔（測試註解、CHANGELOG、
+     本文件）。實情：React 的 `SidebarNode.tsx::isSelfActive()` 從來沒有測試。已全部改成如實陳述。
+     ⇒ **刪測試時，「替代覆蓋」要實際去確認存在，不能從「理應有」推出來**；一句錯的安心話抄三份，
+     比沒有那句話更糟。
+  4. **文件內部打架**：§三第 18 列仍寫「composer 是 `shouldRetainQueryDetails()` 的唯一消費者」，
+     而 5a 的紀錄寫「另有 `DB::listen` 消費者」。已修第 18 列（原陳述本來就是錯的）。
+     ⇒ **改了結論要回頭修上游那一列，不能只在新章節寫對。**
+
 - 每個子環節都要同步做 §三 的第 12、15、16 欄（翻譯 key、測試、文檔）。
 
 ### 環節 5 — AdminLTE 實體下架（Phase 7）
-- 刪 `resources/views/layouts/**`（6 檔）與 `resources/views/components/**` 中的 legacy 元件（逐一確認零引用）。
+
+**5a ✅ 已完成（2026-09-15）**：`resources/views/layouts/**`（6 檔）與 `AppServiceProvider` 的
+`dashboard-v3` composer 已刪，執行紀錄見上節 4d-2／5a。`resources/views/components/**` 實查不存在。
+**以下是 5b 的範圍。**
+
+- ~~刪 `resources/views/layouts/**`（6 檔）與 `resources/views/components/**` 中的 legacy 元件~~ ✅ 5a
 - 刪 `resources/js/{app.js,jquery-global.js,datatables.js,components/Select.vue}` + 3 支 legacy CSS；**保留 `resources/js/utils/*`、`chgis-map/`、`historical-maps/`**。
 - `vite.config.js` 移除對應 input、`vue()` plugin、`vue` alias。
 - `package.json` 移除 §三第 14 欄套件，`npm install` + `npm run build`。
-- 改寫 `docs/ADMINLTE.md`、標註 `docs/ADMINLTE4_UPGRADE_FEASIBILITY.md` 已被取代。
+- 改寫 `docs/ADMINLTE.md`（`:6`／`:10`／`:15` 仍寫「所有 dashboard 頁面走 `layouts/dashboard-v3.blade.php`」——該檔已刪）、
+  標註 `docs/ADMINLTE4_UPGRADE_FEASIBILITY.md` 已被取代、`docs/REACT_INERTIA_MIGRATION_PLAN.md:70`／`:332`
+  與 `docs/REACT_MIGRATION_BACKLOG.md:213`（P7-2 仍 `todo`）同步。
+- **`AppServiceProvider::boot()` 的 `Paginator::useBootstrap()`**（環節 5a 沒刪，刻意留到這裡）：
+  ⚠️ **不要只看 `resources/views/**`**（那裡確實已無 `->links()`）——`app/Http/Controllers/ApiController.php`
+  還有 30+ 個 `$data->appends(...)->links()`，**回傳值被丟棄**但呼叫仍會渲染分頁視圖。
+  先判斷那些呼叫本身的去留（看起來是歷史殘留），再決定 `useBootstrap()`。
 
 ### 環節 6 — 文檔與 env 收尾
 

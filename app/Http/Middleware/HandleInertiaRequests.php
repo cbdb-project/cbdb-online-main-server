@@ -56,9 +56,10 @@ class HandleInertiaRequests extends Middleware {
             ],
             'locale' => app()->getLocale(),
             'locale_url' => route('locale.switch', [], false),
-            // 導覽單一來源（與 Blade sidebar 共用 App\Support\Navigation）：
-            // 已套用角色閘門、已依 feature flag 解析連結。React AppShell 側邊欄
-            // 依目前路由（active.patterns）自行判定 active，不靠中文字串比對。
+            // 導覽單一來源（App\Support\Navigation）：已套用角色閘門，連結一律指 React 版。
+            // active 狀態**不在後端決定**——`shell/SidebarNode.tsx` 依 href 路徑 + 顯著 query
+            // 簽章自行判定。（原本這裡寫「與 Blade sidebar 共用」「依 feature flag 解析連結」
+            // 「依 active.patterns 判定」——三者分別隨環節 5a／4d-1／4d-2 失效。）
             'nav' => Navigation::tree($user),
             // 殼所需的固定連結（導覽列首頁/個人資料/登入登出等），由後端解析路由
             // 為相對 URL，React DashboardLayout 直接使用，避免前端硬編碼路徑。

@@ -10,7 +10,6 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider {
@@ -73,14 +72,15 @@ class AppServiceProvider extends ServiceProvider {
             app(QueryProfile::class)->add($query, $this->shouldRetainQueryDetails());
         });
 
-        // 只掛在真正使用這個變數的 layout 上（全庫僅 layouts/dashboard-v3.blade.php 引用）。
-        // 先前掛 '*'：summary() 會把保留的每一筆 bindings json_encode 一次，而一個 Blade 頁面
-        // 可能渲染數十個 partial，等於同一份資料重複編碼數十遍、其中絕大多數 view 從不使用它。
-        // 不能改成傳 closure 延後求值——Blade 端是 `$queryProfileSummary['count']` 這樣直接
-        // 陣列取值，傳 closure 會直接壞掉。
-        View::composer('layouts.dashboard-v3', function ($view) {
-            $view->with('queryProfileSummary', app(QueryProfile::class)->summary());
-        });
+        // ── 2026-09-15（Blade 下架環節 5a）─────────────────────────────
+        // 這裡原本有 `View::composer('layouts.dashboard-v3', …)`，把查詢剖析摘要塞給那個
+        // AdminLTE layout。該 layout 自環節 4b-4b 起零可達（沒有任何頁面 @extends 它）、
+        // 於 5a 實體刪除 ⇒ 這個 composer 已是**永遠不會觸發**的死碼，一併移除。
+        //
+        // 📌 查詢剖析本身**沒有停用**，`shouldRetainQueryDetails()` 也**不是死碼**：
+        // 真正的消費者是上面那個 `DB::listen`（本方法內，這段註解的**上方**），
+        // 它每一筆查詢都呼叫一次；React 端再由 `HandleInertiaRequests` 的
+        // `query_profile` prop 取用 `QueryProfile`。composer 從來沒呼叫過它。
     }
 
     /**

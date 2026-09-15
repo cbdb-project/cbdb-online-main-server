@@ -59,10 +59,10 @@ export interface NavBadge {
     show: boolean;
 }
 
-export interface NavActive {
-    pages: string[];
-    patterns: string[];
-}
+// 2026-09-15（Blade 下架環節 4d-2）：`NavActive`（pages／patterns）已移除。
+// 那兩個欄位只服務 Blade sidebar 的 active 判定，唯一讀取者
+//（layouts/sidebar-v3.blade.php、layouts/partials/sidebar-node.blade.php）已於 5a 刪除。
+// React 的 active 判定一向在 SidebarNode.tsx 依 href 路徑 + query 簽章做，從不讀它們。
 
 export interface NavNode {
     key: string;
@@ -71,7 +71,6 @@ export interface NavNode {
     href: string | null;
     suffix: string | null;
     badge: NavBadge | null;
-    active: NavActive;
     children: NavNode[];
 }
 

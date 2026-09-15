@@ -375,7 +375,7 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
 5b. 🔴 **同步改 `AiFillLogController.php:152-158`**：`prepareLog()` 的 `$personRoute` 仍指向 `basicinformation.{assoc,statuses,offices}.index`，改成 `/app` 對應頁（`app.basicinformation.show` + `tab`）。它有 `Route::has()` 保護 ⇒ 不會 500，但 `person_url` 會**靜默變 null、連結消失**（`Pages/Admin/AiFillLogs/Index.tsx:188`）——又一個測試抓不到的無聲退化。
 6. `config/migration_flags.php` 移除 `basicinformation.*` 全部 **15 個 key**（`index`／`show`／`editor` ＋ 12 個子資源；`config/migration_flags.php:45-63` 與 `tests/TestCase.php:36-41` 都列得出完整清單——**用清單比對，不要人工數**）。**同一 commit 內**一併收斂：`app/helpers.php` 的 6 個 helper、`CompositePrimaryKey.php:731-733`、**`Navigation.php:71-74` 的人物節點**（`self::url('basicinformation.index', …)`——若留到環節 4d 才改，側邊欄「人物編輯」會在環節 2 之後指向已被 **302** 導向的 legacy URL，每次點擊多一跳且 active-state 對不上）、以及 `PersonBrowserController` 的 12 個 props。
 7. 移除 `TestCase::useLegacyPersonForms()` 與環節 1.5 判定為「純 legacy」的測試檔；**同步下調 `VariantReplaceHookCoverageTest` 的清冊**（見 §三之三，兩處必紅）。
-8. ~~清理 `biogmains.*` 前綴的翻譯 key~~ → **改列為獨立項目 7-T1，本環節不做**。
+8. ~~清理 `biogmains.*` 前綴的翻譯 key~~ → **改列為獨立項目 7-T1**；🔴 **7-T1 已於 2026-09-15 結案為「不刪」**——下面第三個 bullet（動態組鍵抓不到）經量化後是**阻斷條件**，不是可繞過的瑕疵。詳見 §環節 7 的 7-T1。
 
    實測結果：`resources/lang/zh-TW/biogmains.php` 共 **414 個 key**，以最寬鬆的比對（`biogmains.x` 字面 ＋ `t('x')`／`tb('x')`／`tBio('x')` 任一變數名）仍有 **301 個查無引用**。但這個數字**不能直接當刪除清單**：
    - 「最寬鬆」意味著它把 `t('notes')` 這種**其他群組**的同名 key 也算成有引用，所以真正的孤兒數只會**更多**——方向是安全的；
@@ -503,9 +503,12 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
       `page_translations` 傳下去（`common`／`nav`／`person`／`query`／`biogmains` 另由
       `HandleInertiaRequests` 全站共享），**沒有群組變孤兒**，所以不會壞、也不違反 §6 的
       zh-TW／en 同步。
-      📌 **但個別孤兒鍵已實數過：252 個**（`admin` 109、`operations` 61、`query` 41、
-      `common` 20、`biogmains` 18、`person` 3）。留給環節 5 之後整批處理（理由同 7-T1：
-      動態組鍵 grep 不到，逐鍵猜的收益為零）。
+      📌 ~~個別孤兒鍵已實數過：252 個（`admin` 109、`operations` 61、`query` 41、
+      `common` 20、`biogmains` 18、`person` 3）。留給環節 5 之後整批處理。~~
+      🔴 **2026-09-15 結案：不刪**。重做偵測器後確認「可信的孤兒清單」在這個 codebase
+      做不出來：動態組鍵（`'codes.table_desc.'.$table` 等）與 `tr(k, fb)` 別名包裝讓
+      靜態掃描看不到真正的呼叫點，單一群組實測誤報率約 80%。
+      完整實測紀錄與替代方案（`TranslationKeyParityTest`）見 §環節 7 的 **7-T1**。
     - 📌 **環節 5 的清理清單新增兩筆**（4a-3 之後才確定成為死碼）：
       ① `resources/js/app.js:387-530` 整段 jQuery 邏輯以 `.person-id-display-component`
       為錨，該元件已於本環節刪除；② `app/Support/Navigation.php` 各節點的
@@ -1327,7 +1330,11 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
 | # | 項目 | 結論 |
 |---|---|---|
 | 7-O1 | `BiogMainRepository` 的別名方法成為孤兒 | ✅ **刪除**。實查 `altnameById`／`altnameStoreById`／`altnameUpdateById`／`altnameDeleteById` 零非測試呼叫者（無動態派發；ALTNAME_DATA 的提案核准走 mutation handler，`applyProposal()` 只有 KIN_DATA／ASSOC_DATA 兩條特例分支）。連帶刪除只被這四個方法呼叫的 `parseAltnameId()`。`VariantReplaceHookCoverageTest` 的 `BiogMainRepository` 記數 **8 → 6**（三處）。<br>**計畫原文的筆誤**：`altnameDestroyById` 實名為 `altnameDeleteById`。<br>順帶清掉 `FormUrlEncodingTest`／`NameSearchIndexAutoSyncTest` 裡已成為死重的 `char_variant_map` fixture——它們的註解指名的消費者（`BasicInformationAltnamesController` 與這批 repository 方法）都已不存在，且經驗證移除後兩檔仍全綠 |
-| 7-T1 | `biogmains` 翻譯群組孤兒 key | 🟡 **維持延後**。約 301／414 個查無引用，但**動態組鍵 grep 不到**，逐 key 人工確認成本高、收益為零（孤兒 key 無執行期影響）。**改為留到環節 5 之後**：AdminLTE 實體下架完成、`biogmains` 群組確定沒有任何消費者時**一次整組刪除**（zh-TW／en 同步），而不是現在逐 key 猜 |
+| 7-T1 | 翻譯群組孤兒 key | 🔴 **結案：不刪，改立對稱性護欄**（2026-09-15，環節 5 之後實測）。<br>**原文的分析是對的，而且它自己就寫出了決定性的那一條**——「抓不到動態組出來的 key（字串拼接、以變數當 key），那才是刪錯會出事的部分」（見 §環節 2 第 8 點的實測紀錄）。本輪做的是把那句話從「已知風險」升級為**已量化的阻斷條件**：它不是可以靠更好的偵測器繞過的瑕疵，而是這個 codebase 裡**原則上做不出可信孤兒清單**的理由。<br>⚠️ **先更正我自己在初稿寫錯的兩句**（review 抓到）：① 原文**不是**「只用 `'biogmains.xxx'` 字面量 grep」——它明寫比對了 `t('x')`／`tb('x')`／`tBio('x')` 的裸 leaf 名（字面量-only 實跑是 408/414，不是 301，數字本身就對不上）；② 原文**從未**主張該群組「無消費者」，它寫的是「28 個元件綁 `tb`、6 個綁 `t`、2 個綁 `tBio`，不是整體死掉的群組」，延後的條件句是「**若**確定沒消費者才整組刪」。**把別人正確的分析描述成錯的，比不寫更糟。**<br>**量化的阻斷條件**（偵測器定義寫在這裡，數字才可複現——codex 指出初稿的「最嚴格判準」描述與數字對不上，那個描述是錯的：leaf 名若只要「在全庫出現過子字串」就算活的，`table_desc.*` 的 leaf 是表名，到處都有，根本不會被標出來）：<br>　判準 D＝一個 key 算孤兒，當且僅當 ① 全庫找不到 `'group.key'`／`"group.key"` 字面量，**且** ② 它的 leaf 名沒有作為 `t`／`tr`／`tb`／`tBio`／`__`／`trans`／`lang` 任一函式的單一字串引數出現過（掃 `.php`／`.blade.php`／`.ts`／`.tsx`／`.js`／`.mjs`，排除 `resources/lang` 自身與 vendor／node_modules）。<br>　實測 `codes` 群組：170 個 key 標出 **106** 個孤兒，其中 **89 個可證明存活**——`table_desc.*` 80 個（唯一入口是 `app/Support/CodesTableDescription.php:17` 的 `'codes.table_desc.'.$table`，被 `/app/codes` 列表與 Query Playground 的表清單共用）、`filter_err_*` 9 個（入口是 `resources/js/inertia/Pages/Codes/Show.tsx:244` 的 `` `filter_err_${code}` ``）。**單一群組誤報率 84%**，而且剩下那 17 個仍需逐一人工確認。另有 `app/Http/Controllers/BasicInformationController.php:266` 的 `__('person.tab_'.$tab)`，以及 **18 個檔**用 `const tr = (k, fb) => t(k)` 這類別名包裝——靜態掃描看不到真正的呼叫點。<br>消費者實數（可複現）：**36 個檔直接 `useTranslation('biogmains')`**（另 1 個命中在註解裡），PHP 端 2 處常駐 share（`HandleInertiaRequests.php:108`、`BasicInformationController.php:154`），13 個 `*Editor.tsx` 再經 prop 收 `t`。<br>⇒ **收益為零（孤兒 key 無執行期影響）、風險為真（誤刪＝畫面出現原始鍵名，且只有切到該語系才看得見、測試抓不到）。不執行。**<br>✅ **改做真正有價值的那件事**：`AGENTS.md` §6 要求 zh-TW／en 兩份必須同步，但**在此之前沒有任何機械化把關**。新增 `tests/Unit/TranslationKeyParityTest.php`（3 條）把現況釘住——實測兩邊完全一致（19 組、2,181 鍵），另含防空轉下限與「值不得為空／不得是非字串」。已用變異驗證會紅：en 少一鍵、任一側多一個群組檔、
+值改 `''`／ASCII 純空白／`null`／**全形空格 U+3000**／**空陣列** 全部紅。
+📌 後三種是 review 與 codex 各自實測出來的漏接：`assertNotSame('', is_string($v) ? trim($v) : $v)` 讓 `null` 永遠通過、
+`trim()` 剝不掉 U+3000、攤平遞迴會讓 `'x' => []` 整個消失。**「宣稱擋什麼」與「實際擋什麼」要逐項打靶，不能只測最典型那一種。**
+（唯一允許的空陣列是 `validation.attributes`——Laravel 自己的慣例，已具名放行。） |
 
 #### D 類結論
 

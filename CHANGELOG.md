@@ -4,6 +4,23 @@
 
 ## 2026-09
 
+### 翻譯鍵：孤兒清理結案為「不刪」，改立 zh-TW／en 對稱性護欄
+
+計畫：[docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md) §環節 7 的 7-T1
+
+Blade 下架計畫長期掛著一項「環節 5 之後整批刪除孤兒翻譯鍵」。實測後**結案為不執行**：
+在這個 codebase **原則上做不出可信的孤兒清單**。key 會被動態組出來
+（`'codes.table_desc.'.$table`、`` `filter_err_${code}` ``、`__('person.tab_'.$tab)`），
+前端又普遍經 `tr(k, fallback)` 這類別名包裝呼叫（18 個檔），靜態掃描看不到真正的呼叫點。
+量化：`codes` 群組 170 個 key 標出 106 個孤兒，其中 **89 個可證明存活**
+（`table_desc.*` 80 個 + `filter_err_*` 9 個，都只從動態組出來的 key 進入）——**誤報率 84%**。
+偵測器的精確定義寫在計畫的 7-T1 那一列，數字可複現。
+孤兒鍵無執行期影響，誤刪卻會讓畫面出現原始鍵名，而且只有切到該語系才看得見。
+
+✅ **改做有價值的那件事**：`AGENTS.md` §6 要求 zh-TW／en 兩份翻譯檔必須同步，但一直沒有機械化把關。
+新增 **`tests/Unit/TranslationKeyParityTest.php`**（3 條）：群組檔對稱、逐群組鍵集合相同（含防空轉下限）、
+值不得為空字串。實測現況兩邊完全一致（19 組、2,181 鍵），這條測試是把現況釘住而非修既有偏差。
+
 ### Blade 下架環節 5b：AdminLTE 前端資產與 npm 相依完整移除
 
 計畫：[docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)

@@ -268,7 +268,19 @@ class OfficeEntityIndexTest extends TestCase {
         $node = collect($codes['children'])->firstWhere('key', 'office-codes');
 
         $this->assertSame(route('app.office.index'), $node['href']);
-        $this->assertContains('OFFICE_CODES', $node['active']['pages']);
-        $this->assertContains('app.office.*', $node['active']['patterns']);
+        // ── 2026-09-15（Blade 下架環節 4d-2）───────────────────────────
+        // 這一行原本是 `assertContains('OFFICE_CODES', $node['active']['pages'])` ＋
+        // `assertContains('app.office.*', $node['active']['patterns'])`。`active` 這個節點欄位
+        // 只服務 Blade sidebar，已隨 sidebar partial（環節 5a）一併移除；
+        // `entity_aggregates.php` 裡只為餵 `patterns` 而存在的 `nav.pattern` 也一併刪了。
+        //
+        // 它們真正在守的是「這個節點仍然宣告它聚合的是 OFFICE_CODES 這張裸表」——那個資訊
+        // 現在只剩 suffix 帶著，所以改驗 suffix（實測會紅：把 entityNavItem() 的
+        // $node['suffix'] 拿掉，這條就失敗）。
+        //
+        // 📌 **不需要再補「href 沒退回裸表 codes 頁」的反面斷言**：上面那條
+        // `assertSame(route('app.office.index'), $node['href'])` 已經涵蓋——config 查找落空時
+        // `entityNavItem()` 退回 `codeItem()`，href 就不會等於實體入口，先在那裡紅。
+        $this->assertSame('(OFFICE_CODES)', $node['suffix']);
     }
 }

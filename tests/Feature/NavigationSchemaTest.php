@@ -8,7 +8,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * 導覽單一來源（App\Support\Navigation）測試：角色閘門、flag 連結解析、active 判定。
+ * 導覽單一來源（App\Support\Navigation）測試：角色閘門、節點結構、每條 href 都指 React 版。
+ *
+ * （原本還涵蓋「flag 連結解析」與「active 判定」——前者的機制於環節 4d-1 移除、
+ *   後者的欄位於 4d-2 移除。）
  */
 class NavigationSchemaTest extends TestCase {
     use RefreshDatabase;
@@ -128,16 +131,26 @@ class NavigationSchemaTest extends TestCase {
 
         return null;
     }
-
-    public function test_node_active_matches_page_title_and_route_pattern(): void {
-        $node = [
-            'active' => ['pages' => ['系統總覽'], 'patterns' => []],
-            'children' => [],
-        ];
-
-        $this->assertTrue(Navigation::nodeActive($node, '系統總覽'));
-        $this->assertFalse(Navigation::nodeActive($node, '其他頁'));
-    }
+    // ── 2026-09-15（Blade 下架環節 4d-2）─────────────────────────────
+    //
+    // 這裡原本有三條測試：`test_node_active_matches_page_title_and_route_pattern()`、
+    // `test_tree_open_when_descendant_active()`、
+    // `test_active_pages_union_covers_legacy_sidebar_open_set()`（後者是與舊 sidebar-v3
+    // 的 $page_title 集合做 parity 的護欄），外加 `collectActivePages()` helper。
+    //
+    // 它們驗的是 `Navigation::nodeActive()`／`treeOpen()` 與節點的 `active.pages`／
+    // `active.patterns`——那整組**只服務 Blade sidebar**，而唯一的呼叫端
+    //（`layouts/sidebar-v3.blade.php`、`layouts/partials/sidebar-node.blade.php`）
+    // 已於環節 5a 實體刪除。React 端以 href 路徑 + 顯著 query 簽章判定 active。
+    //
+    // 📌 **「哪個節點在哪一頁要亮起來」的覆蓋改在前端**：
+    // `resources/js/inertia/components/shell/sidebarActive.test.ts`（11 條，本輪新增）。
+    //
+    // ⚠️ 不要把這句讀成「刪三條、前端補三條，一比一換過去」——不是。這三條守的是 Blade 的
+    // 判定（`$page_title` 字串／route glob），那個機制已經不存在；而 React 那側的判定
+    // （`sidebarActive.ts`，現在是唯一來源）**在本輪之前一條測試都沒有**，是 review 與 codex
+    // 各自指出「換了層級所以還有覆蓋」是錯的陳述之後才補的。
+    // 本檔仍守的是結構與連結指向：見 test_every_sidebar_href_points_at_the_react_app()。
 
     /**
      * 🔴 **側邊欄的每一條 href 都必須指向 React 版。**
@@ -197,59 +210,5 @@ class NavigationSchemaTest extends TestCase {
         }
 
         return $out;
-    }
-
-    /** 收集樹中所有節點的 active.pages（含子孫）。 */
-    private function collectActivePages(array $nodes): array {
-        $pages = [];
-        foreach ($nodes as $node) {
-            $pages = array_merge($pages, $node['active']['pages'] ?? []);
-            if (!empty($node['children'])) {
-                $pages = array_merge($pages, $this->collectActivePages($node['children']));
-            }
-        }
-
-        return $pages;
-    }
-
-    public function test_active_pages_union_covers_legacy_sidebar_open_set(): void {
-        // 舊 sidebar-v3 用來判定選單展開/高亮的全部 $page_title 字串集合。
-        // 此測試保證重構後沒有遺漏任何一個（parity）。
-        $legacy = [
-            // 頂層
-            '系統總覽', 'Basicinformation', 'NewUpdate', 'OperationsProposals',
-            // codes
-            'Codes', '全部表格', 'ADDRESSES', 'ALTNAME_CODES', 'APPOINTMENT_CODES',
-            'TEXT_CODES', 'ADDR_CODES', 'OFFICE_CODES', 'SOCIAL_INSTITUTION_CODES',
-            'ADDR_BELONGS_DATA', 'TEXT_INSTANCE_DATA',
-            // views
-            '檢視表總覽', '地址層級檢視', '別名資料檢視', '社會關係資料檢視', '人物地址資料檢視',
-            '人物/社會機構/地址資料檢視', '人物社會機構資料檢視', '人物來源資料檢視', '人物著作資料檢視',
-            '人物入仕資料檢視', '人物事件地址檢視', '人物事件資料檢視', '人物親屬資料檢視', '人物基本資料檢視',
-            '人物索引地址檢視', '人物財產地址檢視', '人物財產資料檢視', '任官地址資料檢視', '任官職務資料檢視',
-            '人物身份資料檢視',
-            // expert / not-public
-            'Query Playground', 'Crowdsourcing', '人物瀏覽', '按入仕查詢', '歷史地圖',
-            // admin
-            '用戶管理', 'NL Query Logs', 'AI 填充日誌', '審計日誌', 'SQL 執行計畫',
-            '批次匯入書稿資料', '批次匯入官職', '批次匯入社會機構', 'Wiki 對照資料維護',
-            'CBDB 內部表維護', '單向關係修復', 'MergePreview',
-        ];
-
-        $user = User::factory()->create(['is_active' => User::STATUS_ACTIVE, 'is_admin' => User::ROLE_SUPER_ADMIN]);
-        $union = $this->collectActivePages(Navigation::tree($user));
-
-        foreach ($legacy as $pageTitle) {
-            $this->assertContains($pageTitle, $union, "舊 sidebar 的 \$page_title '$pageTitle' 必須仍在某節點 active.pages 中");
-        }
-    }
-
-    public function test_tree_open_when_descendant_active(): void {
-        $tree = Navigation::tree(null);
-        $codes = collect($tree)->firstWhere('key', 'codes');
-
-        // codes 子表 ADDRESSES 對應 $page_title 'ADDRESSES'
-        $this->assertTrue(Navigation::treeOpen($codes, 'ADDRESSES'));
-        $this->assertFalse(Navigation::treeOpen($codes, '不存在的頁'));
     }
 }

@@ -66,8 +66,8 @@
 
 `resources/views/**` 原有 **105 個 `.blade.php`**（本節撰寫時的基線；2026-09-14 環節 1 刪除 3 個死碼後為 **102**，後續數量以 [Blade 下架計畫](./BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md) 為準）。三套渲染世界並存：
 
-1. **AdminLTE 3 / Blade**（約 95%）：全部 `@extends('layouts.dashboard-v3')`。
-2. **舊版 Bootstrap 3 Blade**：`layouts/app.blade.php`。原本**僅** `biogmains/basicinformation/show.blade.php` 在用，該死碼已於 2026-09-14（[Blade 下架計畫](./BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md) 環節 1）刪除，故此 layout **現已零消費端**；實體刪除排在該計畫環節 5（Phase 7）與 AdminLTE 一併執行。
+1. ~~**AdminLTE 3 / Blade**（約 95%）：全部 `@extends('layouts.dashboard-v3')`。~~ ✅ **這些頁面與 `layouts/dashboard-v3.blade.php` 本身都已實體刪除**（Blade 下架計畫環節 2／4a／4b／4c／5a，2026-09）。
+2. **舊版 Bootstrap 3 Blade**：`layouts/app.blade.php`。原本**僅** `biogmains/basicinformation/show.blade.php` 在用，該死碼已於 2026-09-14（[Blade 下架計畫](./BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md) 環節 1）刪除，故此 layout **已零消費端**；✅ **已於該計畫環節 5a（2026-09-15）連同其餘 5 個 layout 檔一併實體刪除**。
 3. **React / Inertia（已上線）**：Query Playground、Person Browser、Search-by-Entry、View Tables，皆走 `/app/*` 路由。
 
 後端渲染比：`Inertia::render` 5 處（React，精確）對 `view()` 約 90 餘處（Blade，概估）。
@@ -85,7 +85,13 @@
 > 因此這些元件只加速 **Phase 3 的瀏覽/唯讀面**；**Phase 4 的 12 個編輯表單是全新（greenfield）開發，不是「接線」**。這是本計畫風險與工作量的最大來源，務必照此認知排程。
 
 ### 1.2 必須由 React 重建的「殼」職責
-目前的殼能力散在 `layouts/dashboard-v3`、`header-v3`、`sidebar-v3`、`footer`：
+
+📌 **本節為歷史盤點**（撰寫於遷移前）。下列四個 layout 檔**已於 Blade 下架計畫環節 5a（2026-09-15）
+實體刪除**，殼能力全部由 React（`DashboardLayout` / `Navbar` / `Sidebar` / `SidebarNode`）承擔；
+其中 active-state **不再靠中文標籤字串比對**（後端的 `active.pages`／`active.patterns` 於 4d-2 移除，
+改由 `shell/sidebarActive.ts` 依 href 路徑 + 顯著 query 簽章判定，覆蓋見 `sidebarActive.test.ts`）。
+
+當時的殼能力散在 `layouts/dashboard-v3`、`header-v3`、`sidebar-v3`、`footer`：
 - 側邊欄導覽樹 + **角色閘門**（always-on / `isActive()` / `isSuperAdmin()`）+ active-state（目前靠中文標籤字串比對）+ 待審提案 badge（內嵌即時 `Operation` 查詢）。
 - 導覽列：pushmenu、breadcrumbs、**深色模式切換**（`localStorage['darkMode']`）、**語言切換表單**（含未存變更 dirty 檢查）、訪客登入/註冊、登入者下拉/登出。
 - 內容區：flash 訊息（`laracasts/flash`，目前為伺服器端 Blade partial）、`$page_title` / `$page_description` 內容標頭、管理員 SQL profiler 模態框。
@@ -329,7 +335,7 @@
 | 2026-06-18 | F5「導覽單一來源」採「真正單一來源」：Blade sidebar 與 React 共用 App\Support\Navigation；Blade 改以遞迴 partial 渲染 schema | 降低雙殼期側邊欄漂移（§五緩解）；active-state 仍沿用既有 $page_title 字串以相容未遷移頁面，僅 React 端改用 route pattern | 使用者（/goal 授權自走） |
 | 2026-06-18 | F2：正式殼建為**新元件 DashboardLayout**，不改既有精簡 AppShell（5 個已上線頁續用） | 避免對線上工具造成非預期版面變動；新遷移頁改用 DashboardLayout，舊頁日後折入 | 使用者（/goal 授權自走） |
 | 2026-06-18 | nav 的 label 由 Navigation 於後端以 __() 解析為顯示字串（Blade 與 React 直接輸出，不再前端翻譯） | codes/views/admin 翻譯群組未在 shared translations；伺服器解析最簡且 locale 正確（切換為伺服器往返） | 使用者（/goal 授權自走） |
-| 2026-06-18 | React 側邊欄 active 改以 **href 路徑比對**（精確+祖先前綴），非 route 名稱 glob | React 無 Laravel route 名稱對照表，無法評估 active.patterns；patterns 仍供 Blade routeIs 使用 | 使用者（/goal 授權自走） |
+| 2026-06-18 | React 側邊欄 active 改以 **href 路徑比對**（精確+祖先前綴），非 route 名稱 glob | React 無 Laravel route 名稱對照表，無法評估 active.patterns；patterns 當時仍供 Blade routeIs 使用（📌 **2026-09-15 補記**：`active.pages`／`active.patterns` 與 `config/entity_aggregates.php` 的 `nav.pattern` 已於 Blade 下架環節 4d-2 移除，Blade sidebar 本身於 5a 刪除 ⇒ href 比對現在是**唯一**的 active 來源，實作在 `resources/js/inertia/components/shell/sidebarActive.ts`，覆蓋見同目錄的 `sidebarActive.test.ts`（11 條，4d-2 補上——在那之前這條決策的實作一直沒有測試）） | 使用者（/goal 授權自走） |
 | 2026-06-18 | F6：assertInertia 範式沿用既有（已 5 檔使用）；新增 share() 契約測試守護 roles/can/flash/nav/shell。**Playwright E2E 延後**至 Phase 3/4（首個複雜互動流＝人物編輯器）再導入 | Phase 0–2 為唯讀/簡單 CRUD，後端 assertInertia + parity review 已足；先不增 E2E 基礎設施負擔 | 使用者（/goal 授權自走） |
 | 2026-06-18 | P5-12 maps/index 列為 shell 遷移範圍外 | 獨立全螢幕 Leaflet 地圖應用（自有 entry），非 AdminLTE dashboard 頁；包進 DashboardLayout 破壞 UX。已在 /app/maps、superadmin。 | 使用者（/goal 授權自走） |
 | 2026-06-19 | **撤回 D.1（F2）「5 個已上線頁續用精簡 AppShell」之決策**：PersonBrowser / QueryPlayground / SearchByEntry / ViewTables(List+Show) 改套 DashboardLayout（帶側邊欄），與遷移頁一致。DashboardLayout 新增 `disableContentPadding` prop（預設 off，遷移頁不受影響），舊工具沿用自身內距、不雙重 padding；不傳 title 故無雙標頭。AppShell.tsx 已刪除（語言切換／dirty-guard 行為由 Navbar 提供）。PersonBrowser 工作台高度由 `calc(100vh-100px)` 調為 `calc(100vh-106px)`，對齊新 chrome（Navbar 57px + 頁尾 49px）。 | 使用者明確要求「現在做」 | 使用者 |

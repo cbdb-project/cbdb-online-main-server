@@ -4,6 +4,34 @@
 
 ## 2026-09
 
+### Blade 下架環節 4d-2 + 5a：AdminLTE layout 實體刪除、導覽節點的 Blade 專用欄位移除
+
+計畫：[docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)
+
+**對使用者的影響**：無。兩者刪的都是「只有 Blade 在讀」的東西，React 端從來不讀。
+
+- **5a**：刪除 `resources/views/layouts/**` 6 個 AdminLTE layout／partial 檔，
+  與 `AppServiceProvider` 的 `View::composer('layouts.dashboard-v3', …)`。
+  `resources/views/` 自此只剩 4 個非 legacy 檔：`inertia.blade.php`（React 根模板）、
+  `maps/index.blade.php`（歷史地圖殼）、`cbdbapi/person.blade.php`（v1 API 樣板）、
+  `partials/chgis-map-assets.blade.php`。
+  ⚠️ `shouldRetainQueryDetails()` **未移除**——它另有 `QueryProfile` 的 `DB::listen` 消費者。
+- **4d-2**：`App\Support\Navigation` 的節點不再帶 `active.pages`／`active.patterns`
+  （前端型別 `NavActive` 同步移除），`nodeActive()`／`treeOpen()` 與 `viewItem()` 的
+  `$pageTitle` 參數一併刪除。那整組只服務 5a 刪掉的 Blade sidebar；React 的 active 判定
+  一向在 `SidebarNode.tsx` 依 href 路徑 + 顯著 query 簽章做。
+
+🔴 **AdminLTE 的前端資產（`resources/js/app.js` 等、3 支 legacy CSS、`package.json` 相依、
+`vite.config.js` 的 `vue()` plugin）仍在**，屬環節 5b，尚未執行。
+
+**護欄**：`NavigationSchemaTest::test_every_sidebar_href_points_at_the_react_app()`（PHP 側）
+與 `tests/e2e/interact-nav-integrity.mjs`（瀏覽器實際渲染的 `<a href>`）驗 **href 指向**；
+**active／展開狀態**改由新增的 `resources/js/inertia/components/shell/sidebarActive.test.ts`（11 條）守。
+
+📌 順帶補上一個**既有缺口**：active 判定自 React 上線以來就沒有測試（`components/shell/**` 不在
+vitest 覆蓋內），本輪把 `SidebarNode.tsx` 的純函式抽成 `sidebarActive.ts` 才得以補測——
+`buildActiveContext()` / `isSelfActive()` / `isBranchActive()` 的行為完全沒改。
+
 ### Blade 下架環節 4d-1：migration flag 機制整組移除——全站再無 runtime 回退鍵
 
 計畫：[docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)

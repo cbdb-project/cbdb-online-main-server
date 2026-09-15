@@ -44,13 +44,16 @@ return [
             'tables' => ['OFFICE_CODES', 'OFFICE_CODE_TYPE_REL'],
             'closed_code_tables' => ['OFFICE_CODES'],
             // nav 是**列表頁**節點設定（側欄），與上面的 edit_route 各司其職。
+            // 📌 2026-09-15（環節 4d-2）：這裡原本還有 `'pattern' => 'app.office.*'`，
+            //    唯一讀取者是 `Navigation::entityNavItem()` 填進節點的 `active.patterns`，
+            //    而那整組欄位只服務已刪除的 Blade sidebar ⇒ 三個實體的 `pattern` 一併移除。
+            //    **新增實體聚合時不要再加回來**：React 的 active 判定看 href，不看 route glob。
             'nav' => [
                 'key' => 'office-codes',
                 'label' => 'codes.office_codes',
                 'icon' => 'fas fa-id-badge',
                 'route' => 'app.office.index',
                 'table' => 'OFFICE_CODES',
-                'pattern' => 'app.office.*',
             ],
         ],
         [
@@ -69,7 +72,6 @@ return [
                 'icon' => 'fas fa-university',
                 'route' => 'app.social-institution.index',
                 'table' => 'SOCIAL_INSTITUTION_CODES',
-                'pattern' => 'app.social-institution.*',
             ],
         ],
         [
@@ -98,7 +100,6 @@ return [
                 'icon' => 'fas fa-book',
                 'route' => 'app.text.index',
                 'table' => 'TEXT_CODES',
-                'pattern' => 'app.text.*',
             ],
         ],
     ],

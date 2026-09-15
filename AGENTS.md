@@ -5,7 +5,7 @@
 ## 專案現況
 - 技術棧：Laravel 12、PHP 8.2+、MariaDB 10.11（prod 實測 10.11.14；相容性下限仍按 10.3 撰寫）、SQLite（測試）、Vite、Vue 3、Inertia/React。
 - 全站主要互動頁面均為 **React/Inertia**（遷移期的 `config/migration_flags.php` 已於 Blade 下架環節 4d-1 移除）：人物列表/檢視/詳情中樞、13 個 React 編輯器（basic-info + 12 個複合主鍵子資源）、Codes CRUD、operations/manage/crowdsourcing、admin 工具、認證頁、Query Playground（`/app/query-playground`）等。
-- **所有 legacy Blade 頁面已實體刪除**（見 [docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)）。**AdminLTE 3 + Bootstrap 4 的資產與 layout 檔仍在**（環節 5 待做），但已經沒有任何頁面 `@extends` 它們：
+- **所有 legacy Blade 頁面已實體刪除**（見 [docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)）。**AdminLTE 的 6 個 layout Blade 檔也已於環節 5a 刪除**；`resources/views/` 只剩 4 個非 legacy 檔（`inertia.blade.php`、`maps/index`、`cbdbapi/person`、`partials/chgis-map-assets`）。**AdminLTE 的前端資產（`resources/js/app.js` 等、3 支 legacy CSS、package 相依）仍在**（環節 5b 待做）：
   - **人物編輯全套（`basicinformation.*`）已於環節 2 實體刪除**——視圖、12 組子資源路由與 controller、
     `LegacyBladeFormGate`、以及那 15 個 `MIGRATION_FLAG_BASICINFO_*` flag 全部不存在了。
     舊 URI 只剩 302 導向（顯示頁）／410（寫入端）。**把 flag 塞回 config 不會復活它們**（有護欄測試鎖住）。
@@ -50,7 +50,13 @@
       `NavigationSchemaTest::test_every_sidebar_href_points_at_the_react_app()`。
   - 少數頁面本就無 flag：Query Playground 主頁 `/query-playground` 硬導向 `/app/query-playground`；
     外部資料庫引用瀏覽器 `/external-db-link` 硬導向 `/app/external-db-link`（Blade 版已刪）。
-  - AdminLTE 實體下架（環節 5）尚未執行。
+  - **AdminLTE layout 已於環節 5a 實體刪除**（`layouts/{app,dashboard-v3,header-v3,footer,sidebar-v3,partials/sidebar-node}`），
+    連帶 `AppServiceProvider` 的 `View::composer('layouts.dashboard-v3', …)`。
+    **前端資產下架（環節 5b）尚未執行**：`resources/js/{app.js,jquery-global.js,datatables.js,components/Select.vue}`、
+    3 支 legacy CSS、`vite.config.js` 的對應 input／`vue()` plugin／`vue` alias、`package.json` 相依。
+  - **`Navigation` 的節點不再帶 `active.pages`／`active.patterns`**（環節 4d-2）：那組欄位只服務
+    Blade sidebar 的 `$page_title` 字串比對與 `request()->routeIs()`，隨 5a 一併移除。
+    React 的 active 判定一向在 `SidebarNode.tsx` 依 href 路徑 + 顯著 query 簽章做。
   - **新功能一律只做在 React/Inertia 路徑（`resources/js/inertia/**`），不要再改舊 Blade。**
 - 前端資源由 Vite 載入；React/Inertia 元件在 `resources/js/inertia/`。
 - 使用者介面支援繁體中文／英文切換（預設 zh-TW），文件與 commit message 一律使用繁體中文。

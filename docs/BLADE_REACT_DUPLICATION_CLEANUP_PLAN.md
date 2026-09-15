@@ -1037,7 +1037,54 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
     `appUpdate()`）；410 訊息語言從 middleware 的中文變成 closure 的英文——與 4a／4b-4a 的
     closure 一致，非退化，但是一個對外可觀測的改變。
 **每刪一條 route 前，用三個方向各掃一次** `app/`、`resources/js/`、`tests/`：① **route name**（`route('x')`）、② **URI prefix**（`url('crowdsourcing/…')`、字串拼接——`CrowdsourcingController.php:183-184` 就是這型，route name grep 抓不到）、③ **controller action**。並把結果列進該 commit 的刪除清單。另外 `grep -rn "RouteName\|routeName" app/Http/Controllers` 找 `listRouteName()` 這類**回傳路由名字串**的分支
-- **4c 認證與入口**：auth 4 頁、welcome（同時移除 4 個 Auth controller 與 `WelcomeController` 的 flag 分支）
+- **4c ✅ 已完成（2026-09-15）——認證與入口**：刪除 5 個 Blade 視圖
+  （`auth/{login,register}`、`auth/passwords/{email,reset}`、`welcome`，`resources/views/auth`
+  目錄自此不存在）與 4 個 Auth controller ＋ `WelcomeController` 的 flag 分支。
+
+  🔴 **這是「migration flag 還會影響渲染」的最後一批**。其餘 legacy 頁面的 flag 早在環節 3
+  就只剩「連結指向」的作用（封路 middleware 不讀 flag），只有 auth 四頁與 welcome 的分支寫在
+  **controller 內部**、路由**未**封路——所以環節 6a 特地**沒有**宣稱「flag 已全面失效」，
+  並被 review 用 `AuthPagesInertiaTest` 的四個綠測證偽過一次。
+
+  ⇒ 那 5 條 `*_renders_blade_when_flag_old()` 的前提隨本環節消失，換成一條把**相反的事實**
+  寫死的測試：`flipping_the_flags_no_longer_changes_what_gets_rendered()`——把四個 flag 全翻
+  `old`（並先斷言覆寫真的生效，否則是空轉），再驗五頁仍渲染各自的 Inertia component。
+
+  ✅ **環節 4d 的前提到此成立**：全站沒有任何頁面的渲染受 migration flag 影響。
+  `config/migration_flags.php` 裡 `auth.login`／`auth.register`／`auth.passwords`／`welcome`
+  四個 key 自此**零讀取者**（已就地標註）。
+
+  🔴 **review 抓到我又漏改了 6 處**「auth/welcome 的 flag 仍決定渲染」的陳述，其中**兩處在
+  生產碼的檔頭註解**（`config/migration_flags.php`、`app/Support/Navigation.php`），
+  一處在 `CHANGELOG.md` 的**部署者必看**段落裡（而且就在我這一輪剛寫的 4b 條目中，
+  等於自己打自己臉），另外 `CHANGELOG.md` **完全沒有 4c 條目**。已全部補齊：
+  上述兩個檔頭、`CHANGELOG` ×2 ＋ 新條目、`docs/REACT_INERTIA_MIGRATION_PLAN.md` ×2、
+  三個 controller 的 docblock 與四個 `@return`（`View|Response` → `Response`）、
+  測試的 class docblock（原文「flag=old（**預設**）時維持原 Blade」——**兩個部分都不對**，
+  `old` 從來不是預設）。
+  **教訓（第三次）：這類「全站級陳述」的同步，必須用關鍵字全庫 grep，而且要包含 CHANGELOG。**
+
+  🔴 **一個給 4d 挖的坑，已填**：計畫的「4d flag 機制收尾」**明文要求執行者跑**
+  `grep -roE "migration_flag(_is_new)?\('[^']+'\)" app/ resources/` 來盤點呼叫點。
+  我在五個 controller 的註解裡**逐字保留**了 `migration_flag_is_new('auth.login')` 這種字串，
+  於是那條 grep 會回五個**幽靈命中**。已改成 `migration_flag_is_new(<auth.login>)` 之類
+  不會被該 regex 命中的寫法——現在那條 grep 回的 10 筆全是真的呼叫點。
+
+  📌 **測試強化**：新測試原本只斷言 `auth.login` 與 `welcome` 的覆寫生效，但
+  `config/migration_flags.php` 自己記著「含點號的 key 必須寫成巢狀陣列，否則一律回退 default」
+  那個坑，而 `auth.*` 三個正是含點號的 ⇒ 改成四個都驗。
+
+  文件同步：`AGENTS.md`、`README.md` ×2、`.env.example`、6a 那段 caveat（加 ✅ 後續）、
+  以及上面那批。順帶修掉兩個 layout 註解指向已刪 `auth/login.blade.php` 的斷鏈
+  （那兩個 layout 本身屬環節 5）。
+
+  📌 **codex 再抓出三處**（同一類「待辦／狀態表沒跟著改」）：
+  `docs/REACT_MIGRATION_BACKLOG.md` 的 P6-1…P6-5 仍標 `done（flag … old）：show* flag→Inertia
+  否則 Blade` ⇒ 改成 `retired（環節 4c）`；`docs/i18n-work-plan.md` 的 6B-1／6B-2／6B-3 仍要求
+  「翻譯 `auth/` 四個 Blade、`profile/`、`home.blade.php`／`welcome.blade.php`／`dashboard/`」
+  ——**那些檔案全都不存在了**，會讓後續執行者白做 ⇒ 逐條劃掉並註明是哪個環節刪的；
+  以及 `RegisterController` 漏改的 `@return`（其餘四個已改）。
+  **教訓：刪一批檔案時，除了「誰引用它」，還要掃「誰的待辦清單上有它」。**
 - **4d flag 機制收尾**：刪 `config/migration_flags.php`、`migration_flag()`／`migration_flag_is_new()`、`Navigation::url()` 的 flag 參數與 `active.pages`／`active.patterns`、`HandleInertiaRequests::profileUrl()` 分支；改寫 §三第 15 欄列出的全部測試。
   ⚠️ **刪 config 前先掃「未知 key fallback」**：`config/migration_flags.php:37-104` 的每個已知頁面都有明文預設 `new`，所以 CI（`cp .env.example .env`，`.env.example` 無 `MIGRATION_FLAG_*`）**跑的就是 new 路徑**——`'default' => 'old'` 只影響**不在 config 裡的 key**。真正要找的是「`migration_flag_is_new('某個 config 沒列的 key')` 因而永遠回 false」的呼叫點：`grep -roE "migration_flag(_is_new)?\('[^']+'\)" app/ resources/` 取出所有 key，逐一比對 `config/migration_flags.php` 是否列出，對不上的先處理。
 - 每個子環節都要同步做 §三 的第 12、15、16 欄（翻譯 key、測試、文檔）。
@@ -1063,6 +1110,8 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
 - 測試護欄 `LegacyBladePageRetirementTest::migration_flags_no_longer_reopen_gated_legacy_pages()`：把 flag 遞迴翻成 `old`，斷言 7 條顯示頁仍 302、2 條寫入端仍 410，並以 `assertViewIs()` 證明kill switch 才是真的鑰匙。**否則那些文檔只是另一句會再過時的話。**
 
 ⚠️ **刻意沒有一併宣稱「flag 已全面失效」**：`auth.*` 與 `welcome` 的 flag 分支在 controller 內部、路由**未**封路，翻 flag 仍然會渲染 Blade（`tests/Feature/AuthPagesInertiaTest.php` 有四個綠測釘住）。第一版的措辭寫成全站級斷言，被 review 用那幾個測試證偽。
+
+✅ **後續（2026-09-15，環節 4c）**：那 5 個 Blade 視圖與 flag 分支都刪掉了，**那句全站級斷言現在成立**——並由 `AuthPagesInertiaTest::flipping_the_flags_no_longer_changes_what_gets_rendered()` 釘住（把四個 flag 全翻 `old`，五頁仍渲染 Inertia component）。這正是環節 4d 拆除整個 flag 機制的前提。
 
 #### 6b — 其餘收尾（依賴環節 4／5）
 - 更新 `AGENTS.md`、`README.md`、`CHANGELOG.md`、`docs/REACT_INERTIA_MIGRATION_PLAN.md`、`docs/REACT_MIGRATION_BACKLOG.md`、`docs/VIEWS.md`、`docs/CODES_SORT_FILTER_AUTH_GATE.md`。

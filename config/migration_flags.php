@@ -21,8 +21,11 @@
 |     要回到 Blade 只能 git revert 並重新部署。** 本檔的 flag
 |     對它們只影響**連結／URL payload 的指向**（Navigation 側邊欄、code_table_edit_url()、
 |     CodesController 的 URL payload、HandleInertiaRequests::profileUrl()、audit-log URL 等），
-|     **不影響 legacy 頁面是否可開啟或其渲染**。仍由 flag 決定渲染的只剩 'auth' 與 'welcome'
-|     （分支在 controller 內部、路由未封路）。
+|     **不影響 legacy 頁面是否可開啟或其渲染**。
+|     🔴 **自 2026-09-15（環節 4c）起沒有任何例外**：'auth' 四頁與 'welcome' 的 Blade 版
+|     （全站最後一批「翻 flag 真的會渲染 Blade」的頁面）也實體刪除了，flag 分支一併移除。
+|     ⇒ **本檔的 flag 現在只影響連結指向，對渲染完全沒有作用**；整個機制的拆除是環節 4d。
+|     護欄：AuthPagesInertiaTest::flipping_the_flags_no_longer_changes_what_gets_rendered()。
 |   - 🔴 **已實體刪除、連 kill switch 都救不回的**：人物編輯 basicinformation.*（環節 2），
 |     以及環節 4a-3 的 9 條唯讀頁——operations／dashboard／view／view/{key}／merge-preview／
 |     crowdsourcing／nl-query-logs／admin.audit-logs／admin.ai-fill-logs。它們已改成 redirect
@@ -99,6 +102,8 @@ return [
         // 維持上線（new）。Inertia 重導 bug 已修（Login/Register/ResetPassword 改用 Inertia::location）。
         // Task 27 須補做認證頁逐項內容對比（label/提示/連結/欄位），缺漏即補齊。
         'auth' => [
+            // 🔴 自環節 4c 起這三個 key **零讀取者**（Blade 版已刪、分支已移除），
+            // 連同下面的 'welcome' 一起，留到環節 4d 隨整個機制刪除。
             'login' => env('MIGRATION_FLAG_AUTH_LOGIN', 'new'),
             'register' => env('MIGRATION_FLAG_AUTH_REGISTER', 'new'),
             'passwords' => env('MIGRATION_FLAG_AUTH_PASSWORDS', 'new'),

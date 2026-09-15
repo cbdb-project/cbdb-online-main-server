@@ -45,14 +45,15 @@ class LoginController extends Controller {
     public function showLoginForm(Request $request) {
         $this->storeIntendedRedirect($request);
 
-        if (migration_flag_is_new('auth.login')) {
-            return Inertia::render('Auth/Login', [
-                'status' => session('status'),
-                'intended' => $request->input('redirect', session('url.intended')),
-            ]);
-        }
-
-        return view('auth.login');
+        // ── 2026-09-15（Blade 下架環節 4c）─────────────────────────────
+        // 這裡原本是 `if (migration_flag_is_new(<auth.login>)) { … } return view('auth.login');`。
+        // Blade 版已實體刪除，flag 分支一併移除——**這一頁自此與 migration flag 無關**。
+        // 環節 4b 之前它是全站最後一批「翻 flag 真的會渲染 Blade」的頁面
+        //（其餘 legacy 頁面的 flag 早就只影響連結指向）。
+        return Inertia::render('Auth/Login', [
+            'status' => session('status'),
+            'intended' => $request->input('redirect', session('url.intended')),
+        ]);
     }
 
     public function login(Request $request) {

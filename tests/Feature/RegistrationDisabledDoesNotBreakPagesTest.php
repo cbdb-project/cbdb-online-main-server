@@ -14,7 +14,7 @@ use Tests\TestCase;
  * 無保護的 `route('register')` 都會拋 RouteNotFoundException。先前關註冊就是因此讓
  * `/login` 變成 500——使用者連登入都做不到。
  *
- * 受影響的引用點比原始清單列的兩處多得多：4 個 Blade（其中兩個是**版面**，會讓每個用到
+ * 受影響的引用點比原始清單列的兩處多得多：4 個 Blade（📌 其中 `auth/login` 與 `welcome` 已於環節 4c 刪除，現在只剩兩個版面檔；掃描邏輯本身不受影響）（其中兩個是**版面**，會讓每個用到
  * 它的頁面一起 500）、`HandleInertiaRequests` 的 `shell.register_url`（**每一頁**都求值的
  * 共享 prop）、以及 `WelcomeController`（**站台首頁**）。
  *

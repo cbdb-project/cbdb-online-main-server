@@ -4,6 +4,22 @@
 
 ## 2026-09
 
+### Blade 下架環節 4c：認證頁與首頁的 Blade 版刪除——migration flag 自此不影響任何渲染
+
+計畫：[docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)
+
+- 刪除 5 個 Blade 視圖（`auth/{login,register}`、`auth/passwords/{email,reset}`、`welcome`；
+  `resources/views/auth` 目錄自此不存在）與 4 個 Auth controller ＋ `WelcomeController`
+  的 flag 分支。
+- 🔴 **這是全站最後一批「翻 migration flag 真的會渲染 Blade」的頁面**：其餘 legacy 頁面的
+  flag 早在環節 3 就只剩「連結指向」的作用（封路 middleware 不讀 flag），只有這 5 頁的分支
+  寫在 **controller 內部**、路由未封路。
+- ⇒ **翻 `MIGRATION_FLAG_AUTH_*`／`MIGRATION_FLAG_WELCOME` 不再改變任何渲染**。
+  `config/migration_flags.php` 裡 `auth.login`／`auth.register`／`auth.passwords`／`welcome`
+  四個 key 自此**零讀取者**，待環節 4d 隨整個機制刪除。
+- 護欄：`AuthPagesInertiaTest::flipping_the_flags_no_longer_changes_what_gets_rendered()`
+  （把四個 flag 全翻 `old`，五頁仍渲染各自的 Inertia component）。
+
 ### Blade 下架環節 4b：legacy 表單／寫入頁全部實體刪除，封路機制移除
 
 計畫：[docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)
@@ -17,7 +33,8 @@
 - **既有部署的 `.env` 可以安全地刪掉 `LEGACY_PAGE_RETIREMENT=` 那一行**（留著也無害，
   Laravel 會忽略沒有 `env()` 呼叫的鍵）。不需要 `config:clear`。
 - 翻 `MIGRATION_FLAG_*=old` 同樣**不會**讓任何已刪除的頁面回來，只會改變連結指向。
-  仍由 flag 決定渲染的只剩 `MIGRATION_FLAG_AUTH_*` 與 `MIGRATION_FLAG_WELCOME`。
+  （原本這裡寫「仍由 flag 決定渲染的只剩 `MIGRATION_FLAG_AUTH_*` 與 `MIGRATION_FLAG_WELCOME`」
+  ——**環節 4c 之後那也不成立了**，見下一則。）
 
 **對使用者的影響**：所有舊 URL 的**書籤仍然可用**——顯示頁 302 導向 `/app` 對應頁並保留
 query string，legacy 寫入端回 410。
@@ -569,7 +586,8 @@ query string，legacy 寫入端回 410。
 - 上線採 **gate-before-flip**：每頁先做新舊機器逐項對比（內容/欄位/說明文字/字體/導流/視覺）+ review agent + codex 雙閘，差異清單清空且使用者人工逐頁驗收後，才翻 `new`（見 [docs/REACT_MIGRATION_SIMULATION_TEST_PLAN.md](docs/REACT_MIGRATION_SIMULATION_TEST_PLAN.md) §0）。
 - 人物詳情中樞（`/app/basicinformation/{id}`）改用 legacy 風格 PersonBanner + 子資源分頁；重建年號轉換 React 元件（EraTimeField）、CHGIS place-link；補齊版面/互動/必填/改鍵 parity，子資源存檔後導向新記錄 edit 頁供複查（#120）。
 - **回退保證**：舊 Blade 視圖與路由**未刪除**，flag-gated 頁面回退只需把對應 flag 改回 `old`（可逆、不需改碼）。
-  - 📌 **後續（2026-09，Blade 下架計畫）**：此保證已失效。人物編輯全套（`basicinformation.*`）已**實體刪除**；其餘 legacy 頁面已**封路**（顯示頁 302／寫入端 410），封路 middleware 不讀 flag，回退鍵改為 `LEGACY_PAGE_RETIREMENT=false`。仍由 flag 決定渲染的只剩 `auth.*` 與 `welcome`。例外：Query Playground 無主頁 flag、`/query-playground` 硬導向 React 版，不走 flag 回退。AdminLTE 實體下架（Phase 7）尚未執行，故本階段「下線」指**下線為線上預設、舊版保留供回退**，非移除。
+  - 📌 **後續（2026-09，Blade 下架計畫）**：此保證已失效。人物編輯全套（`basicinformation.*`）已**實體刪除**；其餘 legacy 頁面已**封路**（顯示頁 302／寫入端 410），封路 middleware 不讀 flag，回退鍵改為 `LEGACY_PAGE_RETIREMENT=false`。仍由 flag 決定渲染的只剩 `auth.*` 與 `welcome`。📌 **後續（2026-09-15，環節 4c）**：那 5 頁的
+Blade 版也刪了，**flag 自此不影響任何渲染**。例外：Query Playground 無主頁 flag、`/query-playground` 硬導向 React 版，不走 flag 回退。AdminLTE 實體下架（Phase 7）尚未執行，故本階段「下線」指**下線為線上預設、舊版保留供回退**，非移除。
 - 清理 legacy-parity 臨時測試組（#68，刪 18 個耦合舊路徑的 M 寫入等價測試）。
 
 ### 親屬／社會關係雙向鏡像「行內化」（編輯器內確認閘）

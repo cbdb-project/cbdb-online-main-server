@@ -168,7 +168,7 @@
 - 含**輪詢/非同步**頁面：改用 React 狀態 + Inertia partial reload 或既有 SSE/輪詢端點。
 
 ### Phase 6 — 認證頁與入口（**S**）
-- `auth/{login,register,passwords/email,passwords/reset}`、`welcome`。死碼 `home.blade.php`、`auth/register2.blade.php` ✅ **已於 2026-09-14 刪除**（[Blade 下架計畫](./BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md) 環節 1／Backlog P6-C1、P6-C2）。
+- ~~`auth/{login,register,passwords/email,passwords/reset}`、`welcome`~~ ✅ **已於 2026-09-15 的環節 4c 實體刪除**（連同 controller 內的 flag 分支）。死碼 `home.blade.php`、`auth/register2.blade.php` ✅ **已於 2026-09-14 刪除**（[Blade 下架計畫](./BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md) 環節 1／Backlog P6-C1、P6-C2）。
 
 ### Phase 7 — 下架 AdminLTE（**M**）
 - 移除 `admin-lte`/`jquery`/`bootstrap`/`datatables.net-bs4`/Select2 主題、`layouts/dashboard-v3` 全套、`resources/js/app.js` 的 Vue 掛載與相關 jQuery 程式。
@@ -193,7 +193,7 @@
 
 新舊頁**完全隔離**，可長期並存（現成證明：`ViewTables` 的 Blade 版 `view.index`/`view.show` 與 React 版 `app.view.index`/`app.view.show` 此刻同時上線）。
 
-> 🔴 **2026-09-14 起，下面「切換 = 導覽指向」與「回退保證」兩條只適用於「還沒被封路」的頁面**（Blade 下架計畫環節 3）。已封路的那批翻 flag **沒有效果**——`legacy.page` middleware 不讀 flag。🔴 **而且要分兩層**：`operations`／`dashboard`／`view`／`merge-preview`／`crowdsourcing`／`nl-query-logs`／`admin.audit-logs`／`admin.ai-fill-logs` 已於**環節 4a-3 實體刪除**，連 `LEGACY_PAGE_RETIREMENT=false` 都救不回來（舊 URI 只剩 302 導向）；〔原文：回退鍵仍有效的只剩**表單／寫入頁**（`codes` 全套／`manage`／`profile`／`admin.explainsql`／3 個 batch-load／`cbdb-table-maintenance`／`unidirectional-repair`），即環節 4b 的範圍。〕🔴 **後續（2026-09-15，環節 4b-4a／4b-4b）：這句話已失效**——表單／寫入頁也全部實體刪除了，`legacy.page` 一條路由都沒掛，`LEGACY_PAGE_RETIREMENT=false` **沒有任何作用**。要回到 Blade 只能 git revert 並重新部署。人物編輯全套（`basicinformation.*`）已**實體刪除**、完全無法回退。仍由 flag 決定渲染的只剩 `auth.*` 與 `welcome`。
+> 🔴 **2026-09-14 起，下面「切換 = 導覽指向」與「回退保證」兩條只適用於「還沒被封路」的頁面**（Blade 下架計畫環節 3）。已封路的那批翻 flag **沒有效果**——`legacy.page` middleware 不讀 flag。🔴 **而且要分兩層**：`operations`／`dashboard`／`view`／`merge-preview`／`crowdsourcing`／`nl-query-logs`／`admin.audit-logs`／`admin.ai-fill-logs` 已於**環節 4a-3 實體刪除**，連 `LEGACY_PAGE_RETIREMENT=false` 都救不回來（舊 URI 只剩 302 導向）；〔原文：回退鍵仍有效的只剩**表單／寫入頁**（`codes` 全套／`manage`／`profile`／`admin.explainsql`／3 個 batch-load／`cbdb-table-maintenance`／`unidirectional-repair`），即環節 4b 的範圍。〕🔴 **後續（2026-09-15，環節 4b-4a／4b-4b）：這句話已失效**——表單／寫入頁也全部實體刪除了，`legacy.page` 一條路由都沒掛，`LEGACY_PAGE_RETIREMENT=false` **沒有任何作用**。要回到 Blade 只能 git revert 並重新部署。人物編輯全套（`basicinformation.*`）已**實體刪除**、完全無法回退。仍由 flag 決定渲染的只剩 `auth.*` 與 `welcome`。🔴 **後續（2026-09-15，環節 4c）：那 5 頁的 Blade 版也已實體刪除，flag 自此不影響任何渲染。**
 
 - **路由慣例**：新 React 頁建在平行路由（既有慣例 `/app/*`，加 `->middleware('inertia')`），**不動舊路由**。新舊不同根模板（`inertia.blade.php` vs `dashboard-v3`）、不同 DOM，無掛載衝突。
 - **切換 = 導覽指向**：以**每頁 feature flag**（`config/migration_flags.php` 或 DB 設定）決定側邊欄/連結指向新或舊頁。flip 一個值即上線新頁，改回即回退，**不需改碼、不需重新部署**（若用 config 快取，回退僅需 `config:cache`）。

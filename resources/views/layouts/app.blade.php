@@ -62,7 +62,7 @@
                             <!-- Authentication Links -->
                             @if (Auth::guest())
                                 <li><a href="{{ route('login', ['redirect' => request()->getRequestUri()]) }}">Login</a></li>
-                                {{-- 見 auth/login.blade.php 的說明：關閉註冊時未加保護會讓
+                                {{-- 見 WelcomeController::index() 的 urls.register 註解（原本指向 auth/login.blade.php，該檔已於環節 4c 刪除）：關閉註冊時未加保護會讓
                                      **每個用到本版面的頁面**都 500，不只登入頁。 --}}
                                 @if (Route::has('register'))
                                     <li><a href="{{ route('register') }}">Register</a></li>

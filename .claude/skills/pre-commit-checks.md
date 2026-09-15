@@ -56,7 +56,12 @@ description: Git 提交前的必要檢查流程，包含代碼格式化（PHP-CS
 
 ### 3. 前端資源編譯（如適用）
 
-如果修改了 Vue/JS 或 SCSS 文件：
+如果修改了前端資源（`resources/js/**`、`resources/css/**`）：
+
+> 🔴 **2026-09-15 更新**：本節原本寫「Vue/JS 或 SCSS」「`public/js/app.js` 和 `public/css/app.css`
+> 需要一同提交」「AdminLTE v3 頁面使用 CDN，不受此影響」——**三句都已失效**：
+> Vue、AdminLTE、jQuery 整套於 Blade 下架環節 5b 移除（含 npm 相依），全庫沒有 `.scss`，
+> Vite 產物在 **`public/build/`（已 gitignore，不提交）**，`resources/js/app.js` 也不存在了。
 
 ```bash
 # 生產環境編譯
@@ -67,8 +72,12 @@ npm run dev
 ```
 
 **注意：**
-- `public/js/app.js` 和 `public/css/app.css` 需要一同提交
-- AdminLTE v3 頁面使用 CDN，不受此影響
+- **建置產物不提交**：`public/build/` 在 `.gitignore` 裡。
+  📌 **CI 實際跑的是 `npm install` 與 `npm run prod`**（`.github/workflows/phpunit.yml:67-68`）；
+  `npm run prod` 與 `npm run build` 都是 `vite build`，指令名不同而已。
+- Vite 入口只有 3 個：`resources/js/inertia/app.tsx`（React/Inertia，全站互動頁）、
+  `resources/js/historical-maps/app.js`、`resources/js/chgis-map/app.js`。
+- 改了 `resources/js/**` 要跑 `npm run build` 確認建置通過；有對應 `*.test.ts(x)` 的話也跑 `npx vitest run`。
 
 ## 完整的提交前工作流程
 

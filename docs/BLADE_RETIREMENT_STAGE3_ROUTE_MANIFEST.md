@@ -273,7 +273,7 @@ php artisan config:clear && php artisan config:cache
 
 legacy 頁**立刻復活**——不需重新部署、不需 `git revert`。
 
-🔴 **但這只適用於「碼還在」的那批**：環節 4a-3 已實體刪除 9 條唯讀頁的視圖與 controller 方法，本開關對它們**無作用**（它們已不掛封路 middleware，改成純 redirect closure）。現在 kill switch 能叫回的只剩**表單／寫入頁**（`codes` 全套／`manage`／`profile`／`admin.explainsql`／3 個 batch-load／`cbdb-table-maintenance`／`unidirectional-repair`），也就是環節 4b 的範圍。
+🔴 **這整段已經沒有適用對象了（2026-09-15）**：`LEGACY_PAGE_RETIREMENT` 這個開關本身於環節 4b-4c 移除，所有 legacy 頁面於環節 2／4a／4b／4c 實體刪除。以下保留當時的敘述以便對帳——當時的說法是「這只適用於『碼還在』的那批」：環節 4a-3 已實體刪除 9 條唯讀頁的視圖與 controller 方法，本開關對它們**無作用**（它們已不掛封路 middleware，改成純 redirect closure）。現在 kill switch 能叫回的只剩**表單／寫入頁**（`codes` 全套／`manage`／`profile`／`admin.explainsql`／3 個 batch-load／`cbdb-table-maintenance`／`unidirectional-repair`），也就是環節 4b 的範圍。
 
 這個能力本身有測試守著：`LegacyBladePageRetirementTest::the_kill_switch_restores_the_legacy_pages()` 用 `/admin/explainsql` 斷言 `assertOk()`（該頁在精簡 schema 下也能真的渲染），`migration_flags_no_longer_reopen_gated_legacy_pages()` 末尾再以 `assertViewIs('admin.explain_sql')` 證明回到的是 **Blade 版**；反面則由 `legacy_readonly_pages_redirect_without_the_kill_switch()` 釘住「那 9 條叫不回來」。
 

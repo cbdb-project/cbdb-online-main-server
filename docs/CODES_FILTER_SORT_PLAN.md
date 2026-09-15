@@ -1,5 +1,10 @@
 # All Tables 欄位過濾與排序功能 — 工作計劃
 
+> 📌 **2026-09-15 狀態**：本計畫已完成，且其中的 **Blade 部分已不存在**——`/codes` 全套 Blade
+> 視圖與 `layouts/dashboard-v3` 已於 Blade 下架計畫環節 4b-4a／5a 實體刪除。功能現在活在
+> React 版（`resources/js/inertia/Pages/Codes/**`，`/app/codes/{table}`）。
+> 下文的 Blade 程式碼片段僅供歷史對照，**不要照著新增 Blade 檔**。
+
 **分支：** `feature/codes-table-filter-sort`  
 **建立日期：** 2026-06-08  
 **目標：**  

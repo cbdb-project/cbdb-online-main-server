@@ -3,7 +3,7 @@
 > 狀態：**Phase 0–6 全部完成並已翻 flag 上線（2026-06-26）**　·　方向：**漸進式 strangler，逐頁取代，非一次性重寫**
 > 本文件只描述「做什麼、為何、依何順序」，不含實作程式碼。每個階段落地時請遵循專案的「小環節 → review → codex → 推進」節奏。
 
-> ✅ **2026-06-26 上線里程碑**：全站可遷移頁面 feature flag 已全翻 `new`（使用者人工逐頁驗收通過），React/Inertia 為線上預設。**剩餘人類待辦**：Phase 7（AdminLTE/Blade 實體下架）、P6-C1/C2 死碼清理。🔴 **2026-09 更新**：「舊視圖/路由仍保留供回退」已不準確——見 [Blade 下架計畫](./BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)。人物編輯全套已**實體刪除**；其餘多數 legacy 頁面雖然碼還在，但已**封路**，回退鍵是 `LEGACY_PAGE_RETIREMENT=false` 而非 flag。🔴 **後續（2026-09-15，環節 4b-4a／4b-4b）：這句話已失效**——表單／寫入頁也全部實體刪除了，`legacy.page` 一條路由都沒掛，`LEGACY_PAGE_RETIREMENT=false` **沒有任何作用**。要回到 Blade 只能 git revert 並重新部署。
+> ✅ **2026-06-26 上線里程碑**：全站可遷移頁面 feature flag 已全翻 `new`（使用者人工逐頁驗收通過），React/Inertia 為線上預設。~~**剩餘人類待辦**：Phase 7（AdminLTE/Blade 實體下架）、P6-C1/C2 死碼清理。🔴 **2026-09 更新**：「舊視圖/路由仍保留供回退」已不準確——見 [Blade 下架計畫](./BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)。人物編輯全套已**實體刪除**；其餘多數 legacy 頁面雖然碼還在，但已**封路**，回退鍵是 `LEGACY_PAGE_RETIREMENT=false` 而非 flag。🔴 **後續（2026-09-15，環節 4b-4a／4b-4b）：這句話已失效**——表單／寫入頁也全部實體刪除了，`legacy.page` 一條路由都沒掛，`LEGACY_PAGE_RETIREMENT=false` **沒有任何作用**。要回到 Blade 只能 git revert 並重新部署。~~ ✅ **2026-09-15 全部完成**：Phase 7（AdminLTE/Blade 實體下架）於 Blade 下架計畫環節 5a／5b、P6-C1/C2 於環節 1。詳見 [Blade 下架計畫](./BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md)。
 
 > 📍 **狀態與接手指引（活頁，每次迭代更新）** —— 接手的 AI 從這裡開始：
 > - **目前進度**：**Phase 0（F1–F6）、Phase 1（P1-1…P1-6）、Phase 2（P2-1…P2-5）全部完成**；Phase 3 **P3-1 完成、P3-2 blocked**（需人決策）；**Phase 5 全部可遷移頁完成（P5-1…P5-11，P5-12 排除）**。全部 commit 於 `feat/phase0-f1-tailwind-tokens`，逐項過 review agent + codex gate（按：當時 flag 預設 old；**已於 2026-06-26 全翻 new 上線**，見頂部里程碑）。write-path（codes/manage 的 store/update/destroy/proposal，operations restore/proposal、crowdsourcing confirm/reject、wiki/table-maintenance rebuild/import、unidirectional repair）一律未改或採 perform*/listRouteName 單一來源抽取，舊 Blade byte-equivalent。全測試 1533 綠。
@@ -13,7 +13,7 @@
 >   - **P4-0**：人物主檔獨立 React 編輯頁（Edit/Show/Create + appEdit/appCreate/appShow 路由 + BiogMainCreate/DeleteHandler 軟刪除），解 P3-2。
 >   - **P4-P**：提案流程補齊——後端 proposal DELETE（提交+審核，含 offices/possession 副表）、offices/possession proposal CREATE、12 編輯器加提案模式 UI（眾包 mode:proposal；後端 authorizeDirect/authorizeProposal 強制無權限升級）。
 >   - 期間 codex/review 抓出並修多個既有 latent 生產 bug：EVENTS/ENTRY/POSSESSION/BIOG_INST handler allowedFields 假欄名（正式庫會 Unknown column）、offices/entries 隱藏 PK 編輯漂移、assoc 哨兵 update 漂移、possession surrogate id 併發競態與單位 clobber。
-> - **下一步（剩餘）**：~~各頁 flag 待切換~~ **已於 2026-06-26 全翻 new 上線（使用者逐頁驗收通過）**；~~Phase 6 決策~~ **已完成（認證頁/入口 React 化）**；剩死碼清理（P6-C1/C2）／ view Blade 實體退役 ／ Phase 7 下架 AdminLTE 為 **agent 禁止項（必由人）**。
+> - **下一步（剩餘）**：~~各頁 flag 待切換~~ **已於 2026-06-26 全翻 new 上線（使用者逐頁驗收通過）**；~~Phase 6 決策~~ **已完成（認證頁/入口 React 化）**；~~剩死碼清理（P6-C1/C2）／ view Blade 實體退役 ／ Phase 7 下架 AdminLTE~~ ✅ **2026-09-15 全部完成**（Blade 下架計畫環節 1／4a-3／5a／5b）。⚠️ 「**實體下架為 agent 禁止項、必由人**」這條規則**仍然有效**——那些環節是使用者逐段明確授權才執行的。
 > - **執行順序**：F1→F4→F5→F2→F3→F6（依賴調整，見附錄 D.1）。
 > - **最近心得/坑**：見附錄 D。
 > - **執行規則**：見附錄 C（自主執行協定）。

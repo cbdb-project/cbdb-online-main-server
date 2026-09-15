@@ -4,6 +4,56 @@
 
 ## 2026-09
 
+### 🔧 Blade 下架收尾：各機器 `.env` 可刪除的變數清單（部署者請照此清理）
+
+Blade 下架計畫（環節 1–7）已全部完成。下列環境變數的**讀取端都已從程式碼移除**，
+留在 `.env` 裡不會有任何作用，只會誤導下一個維護者。`.env` 不在版控，**必須逐台機器手動刪除**。
+
+**共 39 條：38 個 `MIGRATION_FLAG_*` ＋ `LEGACY_PAGE_RETIREMENT`**，依「何時變成孤兒」分四批（都可以一起刪，分批只是為了讓
+看舊 runbook 的人知道自己那台機器上的變數是什麼時候失效的）：
+
+```text
+# ① 環節 4d-1 移除機制時還在 config 裡的 22 個
+MIGRATION_FLAG_DEFAULT              MIGRATION_FLAG_BATCH_BOOKS
+MIGRATION_FLAG_DASHBOARD            MIGRATION_FLAG_BATCH_OFFICES
+MIGRATION_FLAG_CODES                MIGRATION_FLAG_BATCH_SOCIAL
+MIGRATION_FLAG_MANAGE               MIGRATION_FLAG_TABLE_MAINTENANCE
+MIGRATION_FLAG_PROFILE              MIGRATION_FLAG_UNIDIRECTIONAL_REPAIR
+MIGRATION_FLAG_VIEW                 MIGRATION_FLAG_ADMIN_AUDIT_LOGS
+MIGRATION_FLAG_OPERATIONS           MIGRATION_FLAG_ADMIN_AI_FILL_LOGS
+MIGRATION_FLAG_MERGE_PREVIEW        MIGRATION_FLAG_ADMIN_EXPLAIN_SQL
+MIGRATION_FLAG_CROWDSOURCING        MIGRATION_FLAG_NL_QUERY_LOGS
+MIGRATION_FLAG_AUTH_LOGIN           MIGRATION_FLAG_AUTH_REGISTER
+MIGRATION_FLAG_AUTH_PASSWORDS       MIGRATION_FLAG_WELCOME
+
+# ② 環節 2-3 就已從 config 移除的 15 個（人物編輯全套）
+MIGRATION_FLAG_BASICINFO_INDEX      MIGRATION_FLAG_BASICINFO_OFFICES
+MIGRATION_FLAG_BASICINFO_SHOW       MIGRATION_FLAG_BASICINFO_EVENTS
+MIGRATION_FLAG_BASICINFO_EDITOR     MIGRATION_FLAG_BASICINFO_ENTRIES
+MIGRATION_FLAG_BASICINFO_KINSHIP    MIGRATION_FLAG_BASICINFO_STATUSES
+MIGRATION_FLAG_BASICINFO_ASSOC      MIGRATION_FLAG_BASICINFO_POSSESSION
+MIGRATION_FLAG_BASICINFO_ADDRESSES  MIGRATION_FLAG_BASICINFO_SOCIALINST
+MIGRATION_FLAG_BASICINFO_ALTNAME    MIGRATION_FLAG_BASICINFO_TEXTS
+MIGRATION_FLAG_BASICINFO_SOURCES
+
+# ③ 更早就是孤兒的 1 個（隨一個無關的 external-db-link 變更被移除）
+MIGRATION_FLAG_WIKI_MAINTENANCE
+
+# ④ 第 39 條：kill switch 本身（環節 4b-4c 連同 middleware／config／Kernel 別名一起移除）
+LEGACY_PAGE_RETIREMENT
+```
+
+📌 **①裡的 `MIGRATION_FLAG_DEFAULT`／`AUTH_*`／`WELCOME` 這 5 個，本機 `.env` 剛好沒設**
+（本機只有 33 條），但它們**曾經是有效的 env 綁定**，debug 時最可能被人手動加進 `.env`——
+`MIGRATION_FLAG_DEFAULT` 尤其，它控制的是「config 沒列到的 key」的 fallback。
+**請照這份清單掃，不要照某一台機器的現況掃。**
+
+- **刪這些變數不需要任何 artisan 指令**：程式碼裡已經沒有 `env()` 呼叫讀它們，Laravel 直接忽略。
+- ⚠️ **但部署本身照常需要 `php artisan config:clear && php artisan config:cache`**——
+  舊機器上的 `bootstrap/cache/config.php` 可能是在 `config/migration_flags.php` 還存在時建的。
+- 🔴 **刪掉之後沒有任何回退鍵**（本來也已經沒有了）：所有 legacy Blade 頁面都已實體刪除，
+  舊 URI 只剩 302 導向／410 的 closure。要回到 Blade 只能 `git revert` 並重新部署。
+
 ### 翻譯鍵：孤兒清理結案為「不刪」，改立 zh-TW／en 對稱性護欄
 
 計畫：[docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md](./docs/BLADE_REACT_DUPLICATION_CLEANUP_PLAN.md) §環節 7 的 7-T1

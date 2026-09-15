@@ -432,42 +432,30 @@ class LegacyBladePageRetirementTest extends TestCase {
     }
 
     /**
-     * 🔴 **兩把舊鑰匙都打不開了**（環節 4b-4c）。
+     * 🔴 **兩把舊鑰匙都不存在了**（kill switch 於環節 4b-4c 移除、migration flag 於 4d 移除）。
      *
      * 這是安全／維運相關的陳述：`AGENTS.md`、`README.md`、`.env.example`、部署 runbook
-     * 長期告訴維運者「設 `LEGACY_PAGE_RETIREMENT=false` 就能叫回 Blade 頁」。
-     * 那個變數現在連讀都沒人讀了，而 migration flag 從來就不影響這件事。
+     * 長期告訴維運者「設 `LEGACY_PAGE_RETIREMENT=false` 就能叫回 Blade 頁」，而更早的版本
+     * 則說「翻 `MIGRATION_FLAG_*=old`」。**兩者現在都連機制本身都沒有了。**
      *
-     * 測法：把 flag 全部翻成 `old`（遞迴，並把 `default` 釘成相反的 `'new'` 讓 fallback
-     * 無法冒充成功），再打 7 條顯示頁與 5 條寫入端——全部必須維持 302／410。
+     * 測法：先斷言機制不存在（函式、config 檔、config 鍵），再打 7 條顯示頁與 5 條寫入端
+     * ——全部必須維持 302／410。
      */
     #[Test]
-    public function migration_flags_cannot_bring_legacy_pages_back(): void {
+    public function the_migration_flag_mechanism_no_longer_exists(): void {
         $user = $this->superAdmin();
 
-        $flipToOld = static function (array $pages) use (&$flipToOld): array {
-            return array_map(
-                static fn ($value) => is_array($value) ? $flipToOld($value) : 'old',
-                $pages
-            );
-        };
-        config([
-            'migration_flags.default' => 'new',
-            'migration_flags.pages' => $flipToOld((array) config('migration_flags.pages', [])),
-        ]);
-
-        // 覆寫真的生效了（否則整條測試是空轉）。
-        //
-        // ⚠️ **`migration_flags.default` 刻意釘成 'new'（與覆寫值相反）**：若釘成 'old'，
-        // 下面兩條 `assertSame('old', ...)` 就分不出「遞迴覆寫成功」與「解析失敗後 fallback
-        // 到 default」——兩者都會回 'old'，斷言照綠。
-        //（`pages` 含 `admin`／`auth`／`query-playground` 三個巢狀群組，非遞迴的 array_map
-        // 會把 `pages.admin` 從陣列壓成字串，於是 `migration_flag('admin.explain-sql')` 的
-        // Arr::get 中途撞到字串回 null、落到 default——所以 flipToOld 必須遞迴。）
-        $this->assertSame('old', migration_flag('codes'), '扁平 key 的覆寫必須生效');
-        $this->assertSame('old', migration_flag('admin.explain-sql'), '巢狀群組的覆寫必須也生效');
-        // 反面對照：沒被覆寫的未知 key 才會拿到 default，證明上面兩條不是 fallback。
-        $this->assertSame('new', migration_flag('a-key-that-does-not-exist'));
+        // ⚠️ **環節 4d 之後不再嘗試「翻 flag」**：`migration_flag()` 與
+        // `config/migration_flags.php` 都已刪除。原本這裡會遞迴把整份 `pages` 翻成 'old'、
+        // 並把 `default` 釘成相反的 'new' 以排除 fallback 冒充成功——那整套現在沒有對象。
+        // 取而代之：直接斷言**機制不存在**，再驗頁面行為。
+        $this->assertFalse(
+            function_exists('migration_flag'),
+            'migration flag 機制已於環節 4d 移除；要回到 Blade 只能 git revert'
+        );
+        $this->assertFalse(function_exists('migration_flag_is_new'));
+        $this->assertFalse(file_exists(config_path('migration_flags.php')));
+        $this->assertNull(config('migration_flags.pages'), 'config 鍵不該再存在（含 config:cache）');
 
         foreach ([
             '/codes' => '/app/codes',

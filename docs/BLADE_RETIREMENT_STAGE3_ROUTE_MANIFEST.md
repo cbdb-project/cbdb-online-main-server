@@ -35,7 +35,7 @@ php artisan route:list --json
 現況的權威來源是 `tests/Feature/LegacyBladePageRetirementTest.php`——**那份會紅，本文件不會**。
 其中三條最該先看：`the_retirement_middleware_and_its_kill_switch_no_longer_exist()`（機制不存在）、
 `no_route_declares_the_removed_legacy_page_middleware()`（沒有路由宣告它）、
-`migration_flags_cannot_bring_legacy_pages_back()`（翻 flag 也叫不回來）。
+`the_migration_flag_mechanism_no_longer_exists()`（翻 flag 也叫不回來）。
 
 🔴 **封路機制已於環節 4b-4c 整組移除**：`RetireLegacyBladePage`、
 `config/legacy_page_retirement.php`、Kernel 的 `legacy.page` 別名、`.env` 的
@@ -252,7 +252,7 @@ legacy 寫入端，且 React 有各自的對應端點（`app/*` 或 `/api/v2/*`�
 >
 > 護欄：`LegacyBladePageRetirementTest::the_retirement_middleware_and_its_kill_switch_no_longer_exist()`、
 > `no_route_declares_the_removed_legacy_page_middleware()` 與
-> `migration_flags_cannot_bring_legacy_pages_back()`。
+> `the_migration_flag_mechanism_no_longer_exists()`。
 >
 > **本節保留的唯一理由**是：舊的部署 runbook 可能還抄著這幾行，讀到這裡的人需要知道它為什麼
 > 不再有效。以下內容一律視為歷史。

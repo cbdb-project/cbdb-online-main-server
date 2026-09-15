@@ -70,38 +70,46 @@ class NavigationSchemaTest extends TestCase {
         }
     }
 
-    public function test_flag_resolves_href_to_old_route_by_default(): void {
-        // 預設 flag = old：dashboard 連結應指向舊 dashboard 路由。
-        config(['migration_flags.pages.dashboard' => 'old']);
-        $tree = Navigation::tree(null);
-        $dashboard = collect($tree)->firstWhere('key', 'dashboard');
-
-        $this->assertSame(route('dashboard'), $dashboard['href']);
-    }
-
-    public function test_view_subtree_is_flag_aware(): void {
-        // 檢視表（views）父節點與每個子檢視 href 應隨 view flag 在舊 Blade / 新 React 間切換，
-        // 與 codes 子樹對齊（show 與 appShow 共用同一 key 解析）。
-        config(['migration_flags.pages.view' => 'old']);
-        $old = Navigation::tree(null);
-        $this->assertSame(route('view.index'), $this->findHref($old, 'views'));
-        $this->assertSame(route('view.show', 'altname-data'), $this->findHref($old, 'altname-data'));
-
-        config(['migration_flags.pages.view' => 'new']);
-        $new = Navigation::tree(null);
-        $this->assertSame(route('app.view.index'), $this->findHref($new, 'views'));
-        $this->assertSame(route('app.view.show', 'altname-data'), $this->findHref($new, 'altname-data'));
-    }
-
-    public function test_admin_tree_parent_is_flag_aware(): void {
-        // 管理工具樹的父節點（header 連結）應隨 manage flag 切換，與其子項 manage 一致。
+    /**
+     * ── 2026-09-15（Blade 下架環節 4d）─────────────────────────────
+     *
+     * 這裡原本有三條 `*_is_flag_aware()`：它們把 flag 翻成 `old`，斷言側邊欄連結指回
+     * legacy route。環節 4d 把 `Navigation::url()` 的 flag 參數整個拿掉（**一律指 React 版**），
+     * 那三條的前提因此消失。
+     *
+     * 取而代之的是這一條：把**相反的事實**寫死——翻 flag 不再改變任何 href。
+     * 三個代表各挑一種解析路徑：`dashboard`（`url()` 直呼）、`views`／`altname-data`
+     *（`viewItem()`）、`admin`（樹狀父節點）。
+     */
+    public function test_flipping_flags_no_longer_changes_any_href(): void {
         $admin = User::factory()->create(['is_active' => User::STATUS_ACTIVE, 'is_admin' => User::ROLE_SUPER_ADMIN]);
 
-        config(['migration_flags.pages.manage' => 'old']);
-        $this->assertSame(route('manage.index'), $this->findHref(Navigation::tree($admin), 'admin'));
+        // 先取一份「沒動 flag」的基準。
+        $before = [
+            'dashboard' => $this->findHref(Navigation::tree(null), 'dashboard'),
+            'views' => $this->findHref(Navigation::tree(null), 'views'),
+            'altname-data' => $this->findHref(Navigation::tree(null), 'altname-data'),
+            'admin' => $this->findHref(Navigation::tree($admin), 'admin'),
+        ];
 
-        config(['migration_flags.pages.manage' => 'new']);
-        $this->assertSame(route('app.manage.index'), $this->findHref(Navigation::tree($admin), 'admin'));
+        // 這些 href 必須是 React 版（否則下面的比較就算相等也沒意義）。
+        $this->assertSame(route('app.dashboard'), $before['dashboard']);
+        $this->assertSame(route('app.view.index'), $before['views']);
+        $this->assertSame(route('app.view.show', 'altname-data'), $before['altname-data']);
+        $this->assertSame(route('app.manage.index'), $before['admin']);
+
+        // 把相關 flag 全部翻成 old——環節 4d 之前這會讓上面四個 href 指回 legacy route。
+        config([
+            'migration_flags.pages.dashboard' => 'old',
+            'migration_flags.pages.view' => 'old',
+            'migration_flags.pages.manage' => 'old',
+            'migration_flags.pages.codes' => 'old',
+        ]);
+
+        $this->assertSame($before['dashboard'], $this->findHref(Navigation::tree(null), 'dashboard'));
+        $this->assertSame($before['views'], $this->findHref(Navigation::tree(null), 'views'));
+        $this->assertSame($before['altname-data'], $this->findHref(Navigation::tree(null), 'altname-data'));
+        $this->assertSame($before['admin'], $this->findHref(Navigation::tree($admin), 'admin'));
     }
 
     /** 遞迴尋找指定 key 節點的 href。 */
@@ -129,6 +137,66 @@ class NavigationSchemaTest extends TestCase {
 
         $this->assertTrue(Navigation::nodeActive($node, '系統總覽'));
         $this->assertFalse(Navigation::nodeActive($node, '其他頁'));
+    }
+
+    /**
+     * 🔴 **側邊欄的每一條 href 都必須指向 React 版。**
+     *
+     * ── 2026-09-15（Blade 下架環節 4d-1，review 實測後補）─────────────
+     * `Navigation::url()` 的簽名從 `url($flagKey, $old, $new, $params)` 改成
+     * `url($new, $old, $params)`——**新舊順序對調**。review 實測：把 19 個呼叫點全部寫反，
+     * 全 suite **只紅 1 條**；只寫反其中四條（operations／codes／merge-preview／audit-logs），
+     * 全 suite **完全綠**、assertion 數一模一樣。也就是說 19 條裡只有 3 條被守著。
+     *
+     * 這條測試用**表驅動**補上那個缺口：遞迴收集整棵樹的 href，斷言每一條都在 `/app/` 底下。
+     * 比逐條列便宜，而且**對日後新增的節點自動生效**。
+     *
+     * ⚠️ `$allowlist` 目前是空的，而且**應該保持空的**。要加進去之前先想清楚：
+     * 一條不在 `/app/` 底下的側邊欄連結，意味著它指向一個只剩 302／410 closure 的舊 URI。
+     */
+    public function test_every_sidebar_href_points_at_the_react_app(): void {
+        $allowlist = [];
+
+        $admin = User::factory()->create([
+            'is_active' => User::STATUS_ACTIVE,
+            'is_admin' => User::ROLE_SUPER_ADMIN,
+        ]);
+
+        $hrefs = $this->collectHrefs(Navigation::tree($admin));
+        $this->assertNotEmpty($hrefs, '側邊欄一條連結都沒有——這條測試會變成空轉');
+
+        foreach ($hrefs as $key => $href) {
+            if (in_array($href, $allowlist, true)) {
+                continue;
+            }
+            $path = parse_url($href, PHP_URL_PATH) ?? $href;
+            $this->assertStringStartsWith(
+                '/app/',
+                $path,
+                "側邊欄節點 '{$key}' 指向 {$href}——那不是 React 版。"
+                .'環節 4d-1 把 Navigation 的 flag 分支收斂成「一律指 /app」，'
+                .'新舊參數順序寫反時這裡會紅。'
+            );
+        }
+    }
+
+    /**
+     * 收集樹中所有節點的 href（含子孫），以 key 索引。
+     *
+     * @return array<string, string>
+     */
+    private function collectHrefs(array $nodes): array {
+        $out = [];
+        foreach ($nodes as $node) {
+            if (!empty($node['href']) && $node['href'] !== '#') {
+                $out[$node['key'] ?? count($out)] = $node['href'];
+            }
+            if (!empty($node['children'])) {
+                $out = array_merge($out, $this->collectHrefs($node['children']));
+            }
+        }
+
+        return $out;
     }
 
     /** 收集樹中所有節點的 active.pages（含子孫）。 */

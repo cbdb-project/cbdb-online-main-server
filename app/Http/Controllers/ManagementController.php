@@ -40,7 +40,6 @@ class ManagementController extends Controller {
             'role_name' => $u->getRoleName(),
         ];
 
-        $editIsNew = migration_flag_is_new('manage') && \Illuminate\Support\Facades\Route::has('app.manage.edit');
 
         return Inertia::render('Admin/Manage/Index', [
             'data' => [
@@ -61,9 +60,8 @@ class ManagementController extends Controller {
                 'sort_order' => strtolower((string) $request->get('sort_order', 'asc')) === 'desc' ? 'desc' : 'asc',
                 'per_page' => (int) $request->get('per_page', 50),
             ],
-            'edit_template' => $editIsNew
-                ? route('app.manage.edit', ['manage' => '__ID__'], false)
-                : route('manage.edit', ['manage' => '__ID__'], false),
+            // 環節 4d 之前依 manage flag 二選一；legacy 編輯頁已於環節 4b-4b 實體刪除，分支移除。
+            'edit_template' => route('app.manage.edit', ['manage' => '__ID__'], false),
             'page_translations' => [
                 'admin' => is_array($t = trans('admin')) ? $t : [],
             ],

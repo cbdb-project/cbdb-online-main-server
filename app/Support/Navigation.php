@@ -19,17 +19,13 @@ use Illuminate\Support\Facades\Schema;
  *  - active-state 不再靠中文標籤字串比對：每個節點帶 active.patterns（route 名稱
  *    glob，供 React 以目前路由 / Blade 以 request()->routeIs() 判定），同時保留
  *    active.pages（既有 $page_title 字串）以相容尚未遷移的 Blade 頁面。
- *  - 連結指向受 feature flag 控制（config/migration_flags.php）：flag='new' 且新
- *    路由存在時指向新頁，否則指向舊頁。只能由人 flip。
- *  - 🔴 **現況（2026-09）**：config 裡每個已知頁面都明設 'new'，`'default' => 'old'` 只影響
- *    **config 沒列到的 key**。而且所有 legacy 頁面都已實體刪除（原本是被 `legacy.page`
- *    middleware 封路，那個 middleware 已於環節 4b-4c 移除），
- *    所以把 flag 翻回 'old' 只會讓本類產出指向一個已被封路的舊 URL——**多繞一跳（302 回 /app）、
- *    不會真的回到 Blade**。🔴 **2026-09-15 起連回退鍵本身都不存在了**——legacy 頁面全數
- *    實體刪除（環節 4b-4a／4b-4b），封路機制與 LEGACY_PAGE_RETIREMENT 也已移除（環節 4b-4c）。
- *    🔴 **自環節 4c 起沒有例外**：auth 四頁與 welcome 的 Blade 版也已實體刪除、flag 分支
- *    一併移除，全站沒有任何頁面的渲染受 flag 影響；
- *    basicinformation.* 的 flag 已隨環節 2 刪除，相關節點恆指 /app。
+ *  - 🔴 **連結一律指 React 版（環節 4d 起）**：本類原本依 feature flag
+ *    （`config/migration_flags.php`）在新舊路由之間二選一。整個 Blade 下架完成之後
+ *    ——legacy 頁面全數實體刪除（環節 2／4a／4b-4／4c）、封路機制與 `LEGACY_PAGE_RETIREMENT`
+ *    移除（4b-4c）、flag 機制本身移除（4d）——**沒有任何回退鍵**，要回到 Blade 只能
+ *    git revert 並重新部署。
+ *    `url()`／`codeItem()`／`viewItem()` 仍保留「新路由不存在時退回舊 route name」那一層，
+ *    理由見 `url()` 的 docblock（那些舊 route name 是 302 closure，比讓側邊欄項目消失好）。
  *
  * 節點結構：
  *  [
@@ -70,7 +66,7 @@ class Navigation {
                 'dashboard',
                 'nav.dashboard',
                 'fas fa-tachometer-alt',
-                self::url('dashboard', 'dashboard', 'app.dashboard'),
+                self::url('app.dashboard', 'dashboard'),
                 ['pages' => ['系統總覽'], 'patterns' => ['dashboard', 'app.dashboard']]
             ),
 
@@ -87,7 +83,7 @@ class Navigation {
                 'operations',
                 'nav.recent_operations',
                 'fas fa-clipboard-list',
-                self::url('operations', 'operations.index', 'app.operations.index'),
+                self::url('app.operations.index', 'operations.index'),
                 ['pages' => ['NewUpdate'], 'patterns' => []]
             ),
 
@@ -95,17 +91,17 @@ class Navigation {
                 'proposals',
                 'nav.recent_proposals',
                 'fas fa-clipboard-check',
-                self::url('operations', 'operations.index', 'app.operations.index', ['proposals_only' => 1]),
+                self::url('app.operations.index', 'operations.index', ['proposals_only' => 1]),
                 ['pages' => ['OperationsProposals'], 'patterns' => []],
                 self::pendingProposalsBadge($user)
             ),
 
             // 全部表格（Codes）
-            self::tree_('codes', 'nav.all_tables', 'fa fa-database', self::codesChildren(), self::url('codes', 'codes.index', 'app.codes.index')),
+            self::tree_('codes', 'nav.all_tables', 'fa fa-database', self::codesChildren(), self::url('app.codes.index', 'codes.index')),
 
             // 檢視表（Views）。'地址層級檢視' 為舊 $viewPages 殘留（無對應子連結，
             // 目前無頁面設定此 $page_title），保留以維持選單展開的完全一致。
-            self::tree_('views', 'nav.views', 'fa fa-th-list', self::viewsChildren(), self::url('view', 'view.index', 'app.view.index'), null, ['地址層級檢視']),
+            self::tree_('views', 'nav.views', 'fa fa-th-list', self::viewsChildren(), self::url('app.view.index', 'view.index'), null, ['地址層級檢視']),
 
             // 專家工具（需活躍）
             self::tree_('expert', 'nav.expert_tools', 'fas fa-flask', [
@@ -133,7 +129,7 @@ class Navigation {
                     'crowdsourcing',
                     'nav.crowdsourcing_records',
                     'fas fa-users-cog',
-                    self::url('crowdsourcing', 'crowdsourcing.index', 'app.crowdsourcing.index'),
+                    self::url('app.crowdsourcing.index', 'crowdsourcing.index'),
                     ['pages' => ['Crowdsourcing'], 'patterns' => ['crowdsourcing.*']]
                 ),
                 self::item(
@@ -163,7 +159,7 @@ class Navigation {
                     'unidirectional-repair',
                     'admin.unidirectional_repair_superseded',
                     'fas fa-exchange-alt',
-                    self::url('admin.unidirectional-relationship-repair', 'admin.unidirectional-relationship-repair', 'app.admin.unidirectional-relationship-repair'),
+                    self::url('app.admin.unidirectional-relationship-repair', 'admin.unidirectional-relationship-repair'),
                     ['pages' => ['單向關係修復'], 'patterns' => []]
                 ),
             ], null, fn () => $isSuperAdmin),
@@ -174,73 +170,73 @@ class Navigation {
                     'manage',
                     'nav.user_management',
                     'fas fa-user-cog',
-                    self::url('manage', 'manage.index', 'app.manage.index'),
+                    self::url('app.manage.index', 'manage.index'),
                     ['pages' => ['用戶管理'], 'patterns' => ['manage.index', 'app.manage.index']]
                 ),
                 self::item(
                     'nl-query-logs',
                     'admin.nl_query_logs',
                     'fas fa-comments',
-                    self::url('query-playground.nl-query-logs', 'query-playground.nl-query-logs', 'app.query-playground.nl-query-logs'),
+                    self::url('app.query-playground.nl-query-logs', 'query-playground.nl-query-logs'),
                     ['pages' => ['NL Query Logs'], 'patterns' => ['app.query-playground.nl-query-logs']]
                 ),
                 self::item(
                     'ai-fill-logs',
                     'admin.ai_fill_logs',
                     'fas fa-robot',
-                    self::url('admin.ai-fill-logs', 'admin.ai-fill-logs', 'app.admin.ai-fill-logs'),
+                    self::url('app.admin.ai-fill-logs', 'admin.ai-fill-logs'),
                     ['pages' => ['AI 填充日誌'], 'patterns' => ['app.admin.ai-fill-logs']]
                 ),
                 self::item(
                     'audit-logs',
                     'admin.audit_logs',
                     'fas fa-clipboard-check',
-                    self::url('admin.audit-logs', 'admin.audit-logs', 'app.admin.audit-logs'),
+                    self::url('app.admin.audit-logs', 'admin.audit-logs'),
                     ['pages' => ['審計日誌'], 'patterns' => ['app.admin.audit-logs']]
                 ),
                 self::item(
                     'explain-sql',
                     'admin.sql_explain',
                     'fa fa-search',
-                    self::url('admin.explain-sql', 'admin.explainsql', 'app.admin.explainsql'),
+                    self::url('app.admin.explainsql', 'admin.explainsql'),
                     ['pages' => ['SQL 執行計畫'], 'patterns' => ['app.admin.explainsql']]
                 ),
                 self::item(
                     'batch-books',
                     'admin.batch_load_books',
                     'fa fa-upload',
-                    self::url('admin.batch-load-book-titles', 'admin.batch-load-book-titles', 'app.admin.batch-load-book-titles'),
+                    self::url('app.admin.batch-load-book-titles', 'admin.batch-load-book-titles'),
                     ['pages' => ['批次匯入書稿資料'], 'patterns' => ['app.admin.batch-load-book-titles']]
                 ),
                 self::item(
                     'batch-offices',
                     'admin.batch_load_offices',
                     'fa fa-briefcase',
-                    self::url('admin.batch-load-offices', 'admin.batch-load-offices', 'app.admin.batch-load-offices'),
+                    self::url('app.admin.batch-load-offices', 'admin.batch-load-offices'),
                     ['pages' => ['批次匯入官職'], 'patterns' => ['app.admin.batch-load-offices']]
                 ),
                 self::item(
                     'batch-social',
                     'admin.batch_load_social_institutes',
                     'fa fa-university',
-                    self::url('admin.batch-load-social-institutes', 'admin.batch-load-social-institutes', 'app.admin.batch-load-social-institutes'),
+                    self::url('app.admin.batch-load-social-institutes', 'admin.batch-load-social-institutes'),
                     ['pages' => ['批次匯入社會機構'], 'patterns' => ['app.admin.batch-load-social-institutes']]
                 ),
                 self::item(
                     'table-maintenance',
                     'admin.table_maintenance',
                     'fa fa-database',
-                    self::url('admin.cbdb-table-maintenance', 'admin.cbdb-table-maintenance', 'app.admin.cbdb-table-maintenance'),
+                    self::url('app.admin.cbdb-table-maintenance', 'admin.cbdb-table-maintenance'),
                     ['pages' => ['CBDB 內部表維護'], 'patterns' => []]
                 ),
                 self::item(
                     'merge-preview',
                     'admin.merge_records',
                     'fas fa-shuffle',
-                    self::url('merge-preview', 'merge-preview.index', 'app.merge-preview.index'),
+                    self::url('app.merge-preview.index', 'merge-preview.index'),
                     ['pages' => ['MergePreview'], 'patterns' => []]
                 ),
-            ], self::url('manage', 'manage.index', 'app.manage.index'), fn () => $isSuperAdmin),
+            ], self::url('app.manage.index', 'manage.index'), fn () => $isSuperAdmin),
         ];
     }
 
@@ -255,7 +251,7 @@ class Navigation {
                 'codes-home',
                 'nav.all_tables_home',
                 'fas fa-th-list',
-                self::url('codes', 'codes.index', 'app.codes.index'),
+                self::url('app.codes.index', 'codes.index'),
                 ['pages' => ['Codes', '全部表格'], 'patterns' => ['app.codes.index']]
             ),
             self::codeItem('addr-belongs', 'codes.addr_belongs_data', 'fas fa-sitemap', 'ADDR_BELONGS_DATA'),
@@ -399,10 +395,10 @@ class Navigation {
      * @return array<string, mixed>
      */
     protected static function codeItem(string $key, string $label, string $icon, string $table): array {
-        // href 依 codes flag 解析：flag=new 且 app.codes.show 存在時指向 React 單表頁。
-        $href = (migration_flag_is_new('codes') && Route::has('app.codes.show'))
-            ? self::routeUrl('app.codes.show', ['table_name' => $table])
-            : '/codes/' . $table;
+        // ── 2026-09-15（環節 4d）：原本依 codes flag 二選一，現在一律指 React 單表頁。
+        // fallback 的 `/codes/{table}` 字串留著（那條路由仍在，是 302 closure），
+        // 只在 `app.codes.show` 不存在時才會用到——理由同 `url()` 的 docblock。
+        $href = self::routeUrl('app.codes.show', ['table_name' => $table]) ?? '/codes/' . $table;
         $node = self::item($key, $label, $icon, $href, ['pages' => [$table], 'patterns' => []]);
         $node['suffix'] = '(' . $table . ')';
 
@@ -415,11 +411,9 @@ class Navigation {
      * @return array<string, mixed>
      */
     protected static function viewItem(string $slug, string $label, string $icon, string $pageTitle): array {
-        // href 依 view flag 解析：flag=new 且 app.view.show 存在時指向 React 單檢視頁
-        // （與 codeItem 對齊；show 與 appShow 共用同一 key 解析 buildViewData）。
-        $href = (migration_flag_is_new('view') && Route::has('app.view.show'))
-            ? self::routeUrl('app.view.show', $slug)
-            : self::routeUrl('view.show', $slug);
+        // ── 2026-09-15（環節 4d）：原本依 view flag 二選一，現在一律指 React 單檢視頁
+        // （show 與 appShow 共用同一 key 解析 buildViewData）。
+        $href = self::routeUrl('app.view.show', $slug) ?? self::routeUrl('view.show', $slug);
 
         return self::item(
             $slug,
@@ -431,18 +425,19 @@ class Navigation {
     }
 
     /**
-     * 依 feature flag 解析連結：flag='new' 且新路由存在時指向新頁，否則舊頁。
+     * 解析導覽連結：**一律指 React 版**，該路由不存在時才退回舊 route name。
      *
-     * 🔴 **現況（2026-09）**：已知頁面的 flag 都明設 'new'，`'default' => 'old'` 只作用於
-     * config 沒列到的 key。翻回 'old' 只會讓連結指向一個已被封路（302）的舊 URL，
-     * 不會真的回到 Blade——詳見類別 docblock。
+     * ── 2026-09-15（Blade 下架環節 4d）─────────────────────────────
+     * 原簽名是 `url($flagKey, $oldRoute, $newRoute, $params)`，依 migration flag 二選一。
+     * 所有 legacy Blade 頁面都已實體刪除（環節 4a／4b-4／4c），flag 對渲染完全沒有作用，
+     * 所以第一個參數整個拿掉，順序也調成「新在前」——讀起來就是這個方法現在做的事。
+     *
+     * ⚠️ **`$oldRoute` 的 fallback 刻意留著**：那些舊 route name 仍然存在（是 302／410 的
+     * closure），而 `routeUrl()` 對不存在的路由回 `null`——留著這一層可以在「新路由被改名」
+     * 時仍然產出一個會 302 到正確位置的連結，而不是讓側邊欄的項目整個消失。
      */
-    protected static function url(string $flagKey, string $oldRoute, ?string $newRoute = null, array $params = []): ?string {
-        if (migration_flag_is_new($flagKey) && $newRoute !== null && Route::has($newRoute)) {
-            return self::routeUrl($newRoute, $params);
-        }
-
-        return self::routeUrl($oldRoute, $params);
+    protected static function url(string $newRoute, string $oldRoute, array $params = []): ?string {
+        return self::routeUrl($newRoute, $params) ?? self::routeUrl($oldRoute, $params);
     }
 
     /**

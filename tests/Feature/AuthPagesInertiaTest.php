@@ -142,13 +142,12 @@ class AuthPagesInertiaTest extends TestCase {
             'migration_flags.pages.welcome' => 'old',
         ]);
 
-        // 覆寫真的生效了（否則整條測試是空轉）——**四個都要驗**。
-        // `config/migration_flags.php` 自己記著「含點號的 key 必須寫成巢狀陣列，否則一律
-        // 回退 default」那個坑，而 `auth.*` 這三個正是含點號的；只驗兩個等於放過那個坑
-        //（review 指出）。
-        foreach (['auth.login', 'auth.register', 'auth.passwords', 'welcome'] as $flag) {
-            $this->assertSame('old', migration_flag($flag), "{$flag} 的覆寫沒有生效，這條測試會變成空轉");
-        }
+        // ⚠️ **環節 4d 之後不能再斷言「覆寫生效」**：`migration_flag()` 與
+        // `config/migration_flags.php` 都已刪除，那些 config key 沒有任何讀取者。
+        // 這條測試的意義因此從「翻 flag 也叫不回 Blade」變成「**連 flag 這個東西都不存在了，
+        // 上面那幾行 config() 是對幽靈 key 賦值，五頁照樣渲染 React**」。
+        // 機制不存在本身由 LegacyBladePageRetirementTest::the_migration_flag_mechanism_no_longer_exists()
+        // 守；這裡留著那幾行 config() 是刻意的——它們示範了「就算有人把 key 塞回來也沒用」。
 
         foreach ([
             '/login' => 'Auth/Login',

@@ -406,14 +406,17 @@ class CodesController extends Controller {
     }
 
     /**
-     * 代碼表 show 連結：依 codes flag 指向新 React 或舊 Blade（相對 URL）。
+     * 代碼表 show 連結（相對 URL）。
+     *
+     * ── 2026-09-15（Blade 下架環節 4d）：原本依 codes flag 二選一。legacy 頁面已於
+     * 環節 4b-4a 實體刪除，flag 對渲染完全沒有作用 ⇒ 分支移除。`Route::has()` 的
+     * 保護與字串 fallback 留著——那些舊 URI 仍在（是 302 closure），新路由萬一被改名時
+     * 產出一個會 302 到正確位置的連結，好過吐一個 null 給前端。
      */
     protected function codesShowUrl(string $tableName): string {
-        if (migration_flag_is_new('codes') && Route::has('app.codes.show')) {
-            return route('app.codes.show', ['table_name' => $tableName], false);
-        }
-
-        return '/codes/' . $tableName;
+        return Route::has('app.codes.show')
+            ? route('app.codes.show', ['table_name' => $tableName], false)
+            : '/codes/' . $tableName;
     }
 
     /**
@@ -519,33 +522,32 @@ class CodesController extends Controller {
     }
 
     /**
-     * 帶 __ID__ 佔位的 edit/destroy 連結模板（flag-aware）。
-     * 新版路由存在且 flag=new 時用 app 路由，否則回退舊 Blade 路徑。
+     * 帶 __ID__ 佔位的 edit/destroy 連結模板。
+     *
+     * ── 2026-09-15（Blade 下架環節 4d）：原本依 codes flag 二選一。legacy 頁面已於
+     * 環節 4b-4a 實體刪除，flag 對渲染完全沒有作用 ⇒ 分支移除。`Route::has()` 的
+     * 保護與字串 fallback 留著——那些舊 URI 仍在（是 302 closure），新路由萬一被改名時
+     * 產出一個會 302 到正確位置的連結，好過吐一個 null 給前端。
      */
     protected function codesIdTemplate(string $appRoute, ?string $suffix, string $table): string {
-        if (migration_flag_is_new('codes') && Route::has($appRoute)) {
-            return route($appRoute, ['table_name' => $table, 'id' => '__ID__'], false);
-        }
-
-        return '/codes/' . $table . '/__ID__' . ($suffix ? '/' . $suffix : '');
+        return Route::has($appRoute)
+            ? route($appRoute, ['table_name' => $table, 'id' => '__ID__'], false)
+            : '/codes/' . $table . '/__ID__' . ($suffix ? '/' . $suffix : '');
     }
 
-    /** 代碼表總覽 URL（flag-aware）。 */
+    /** 代碼表總覽 URL（環節 4d 起一律指 React 版；理由見 codesShowUrl()）。 */
     protected function codesIndexUrl(): string {
-        if (migration_flag_is_new('codes') && Route::has('app.codes.index')) {
-            return route('app.codes.index', [], false);
-        }
-
-        return '/codes';
+        return Route::has('app.codes.index') ? route('app.codes.index', [], false) : '/codes';
     }
 
-    /** 代碼表 create 連結 base（flag-aware；edit/destroy 由前端帶 id 組合）。 */
+    /** 代碼表 create 連結 base（edit/destroy 由前端帶 id 組合）。 */
     protected function codesActionUrl(string $action, string $table): string {
-        if ($action === 'create' && migration_flag_is_new('codes') && Route::has('app.codes.create')) {
+        if ($action === 'create' && Route::has('app.codes.create')) {
             return route('app.codes.create', ['table_name' => $table], false);
         }
 
-        // 其餘（edit/destroy，P2-4）就緒前一律回退舊 Blade 路徑。
+        // 其餘（edit/destroy）由 codesIdTemplate() 產模板，不走這裡；
+        // 這個 fallback 只在 `app.codes.create` 不存在時才會用到（理由見 codesShowUrl()）。
         return '/codes/' . $table . '/' . $action;
     }
 

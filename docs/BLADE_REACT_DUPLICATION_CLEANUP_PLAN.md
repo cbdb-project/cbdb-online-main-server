@@ -1085,7 +1085,75 @@ MIGRATION_FLAG_WIKI_MAINTENANCE
   ——**那些檔案全都不存在了**，會讓後續執行者白做 ⇒ 逐條劃掉並註明是哪個環節刪的；
   以及 `RegisterController` 漏改的 `@return`（其餘四個已改）。
   **教訓：刪一批檔案時，除了「誰引用它」，還要掃「誰的待辦清單上有它」。**
-- **4d flag 機制收尾**：刪 `config/migration_flags.php`、`migration_flag()`／`migration_flag_is_new()`、`Navigation::url()` 的 flag 參數與 `active.pages`／`active.patterns`、`HandleInertiaRequests::profileUrl()` 分支；改寫 §三第 15 欄列出的全部測試。
+- **4d-1 ✅ 已完成（2026-09-15）——flag 機制移除**：
+  刪除 `config/migration_flags.php` 與 `migration_flag()`／`migration_flag_is_new()`，
+  並把最後 10 個「連結指向」的 flag 分支收斂掉：
+  `Navigation::url()`（**19 個呼叫點**：`url($flagKey, $old, $new, $params)` →
+  `url($new, $old, $params)`，順序改成「新在前」）、`Navigation::codeItem()`／`viewItem()`、
+  `CodesController` 的 `codesShowUrl()`／`codesIdTemplate()`／`codesIndexUrl()`／`codesActionUrl()`、
+  `code_table_edit_url()`、`BasicInformationController` 的 `audit_logs_base`、
+  `HandleInertiaRequests::profileUrl()`、`ManagementController` 的 `edit_template`。
+
+  📌 **`Route::has()` 的保護與字串 fallback 刻意留著**：那些舊 route name 仍然存在
+  （是 302／410 的 closure），`routeUrl()` 對不存在的路由回 `null`——留著這一層可以在
+  「新路由被改名」時仍然產出一個會 302 到正確位置的連結，而不是讓側邊欄項目整個消失。
+
+  🔴 **全站自此沒有任何 runtime 回退鍵**：kill switch 於 4b-4c 移除、flag 於 4d-1 移除。
+  要回到 Blade 只能 git revert 並重新部署。
+
+  **測試改寫**：`NavigationSchemaTest` 的三條 `*_is_flag_aware()`、`CodesIndexInertiaTest`
+  的 `*_with_flag_aware_urls`、`OperationsIndexLinksTest` 的
+  `*_falls_back_to_blade_when_codes_flag_is_old` 前提都消失 ⇒ 改成把**相反的事實**寫死
+  （翻 flag 不再改變任何 href／URL）。`LegacyBladePageRetirementTest` 與 `AuthPagesInertiaTest`
+  裡呼叫 `migration_flag()` 的斷言改成「**機制不存在**」（函式、config 檔、config 鍵）。
+
+  ⚠️ **過程中踩到一次**：用行區間刪 `helpers.php` 的兩個函式時，結束錨點挑成了
+  `code_table_edit_url`，把中間的 `person_index_url()`／`person_show_base_url()` 一起吃掉，
+  整站 500。**刪函式一樣要用「上一個函式的結尾」而不是「某個更遠的錨點」當邊界**——
+  與環節 4b-1 的跨行 regex 教訓同型。（`git checkout` 重做時又把已改好的
+  `code_table_edit_url()` 一起還原，得重做一次。）
+
+  🔴 **review 實測揭露一個我完全沒想到的覆蓋盲點**：`url()` 的參數順序對調是這一輪最容易
+  寫錯的地方，而**19 條裡只有 3 條被守著**。實測把 19 個呼叫點**全部**寫反 ⇒ 全 suite
+  **只紅 1 條**；只把其中四條（operations／codes／merge-preview／audit-logs）寫反 ⇒
+  全 suite **完全綠、assertion 數一模一樣**。另外 5 個收斂點（`codesIndexUrl()`／
+  `codesActionUrl()`／`profileUrl()`／`edit_template`／`audit_logs_base`）改回指 legacy
+  也**全綠**。
+  ⇒ 補 `NavigationSchemaTest::test_every_sidebar_href_points_at_the_react_app()`：**表驅動**
+  ——遞迴收集整棵樹的 href，斷言每一條都在 `/app/` 底下（allowlist 目前空的，且應保持空的）。
+  比逐條列便宜，而且**對日後新增的節點自動生效**。實測單點寫反 ⇒ 紅並指名是哪個節點。
+  另補 `InertiaSharedPropsTest::test_profile_url_always_points_at_the_react_page()`。
+  **教訓：做「參數順序對調」這種改動時，要先問「寫反了會不會有測試紅」，答案通常是不會。**
+
+  ⚠️ **另外三處 review 抓到的不一致**：
+  - `profileUrl()` 我只留了 `Route::has()` + null，理由寫成「側邊欄少一個連結好過整頁 500」
+    ——**與同一輪 `url()` docblock 的理由正好相反**（那邊說「讓項目整個消失」是要避免的）。
+    已補回 `profile.edit` 的 fallback，兩邊理由一致。
+  - `tests/e2e/interact-nav-integrity.mjs` **整支是 flag 驅動的**（讀
+    `storage/app/test-artifacts/nav-flags.json`，而產那份 json 的「php flag dump」已不可能存在）
+    ⇒ 它會在啟動時 `exit 2`，變成**永遠跑不起來的死腳本**。而它正好是上面那個盲點的天然守衛
+    ⇒ 改成驗「側邊欄每條連結都必須是 `/app/*`」，並補上「一條都沒收集到＝失敗」的防空轉。
+    ⚠️ **但這個修正不會隨本 PR 交付**（codex 指出）：`tests/e2e/` 在本 clone 由
+    `.git/info/exclude` 排除、**未納入版控**（`git ls-files tests/e2e` 為空）。
+    那是 repo 擁有者的本機決定，不是我該逕自反轉的——所以檔案只在本機改好，
+    其他 clone／CI 取不到。**若那支 e2e 應該是交付物，需要先由人決定是否納入版控。**
+    PHPUnit 側的等價守衛（`test_every_sidebar_href_points_at_the_react_app()`）**有**進版控，
+    覆蓋的是 PHP 產出的樹；e2e 那支驗的是瀏覽器實際渲染的 `<a href>`。
+  - `AGENTS.md`／manifest ×2 引用的護欄名稱是**這個 diff 自己改掉的舊名**；
+    `CodesIndexInertiaTest` 的兄弟測試改了名、這條漏了；`README.md` 開頭「並翻 flag 上線」
+    與緊接的「flag 已整組移除」自相矛盾。
+
+  🔴 **`CHANGELOG.md` 又漏了（連續第三輪）**——這一輪是不可逆的能力移除 ＋ 部署者行為改變
+  （`MIGRATION_FLAG_*` 可從 `.env` 刪除），正是該記的那類。已補。
+  **把 CHANGELOG 加進「刪東西時必掃的清單」，不要再靠記憶。**
+
+- **4d-2 待做**：`Navigation` 的 `active.pages`／`active.patterns` 移除。
+  兩者**都已是死資料**：`pages` 是給 Blade 的 `$page_title` 比對用、`patterns` 是給
+  `request()->routeIs()` 用，而 React 端**兩個都不讀**（`SidebarNode.tsx` 以
+  href 路徑 + 顯著 query 判定 active，該檔註解已明載「`active.patterns` 僅供 Blade 使用」）。
+  範圍：約 50 個節點定義的第三個參數、`resources/js/inertia/types/page.ts` 的型別、
+  以及 `NavigationSchemaTest` 的 `test_active_pages_union_covers_legacy_sidebar_open_set()`
+  等兩條測試。**刻意與 4d-1 分開**：那是純減法但 diff 很寬，混在 flag 機制移除裡不好 review。
   ⚠️ **刪 config 前先掃「未知 key fallback」**：`config/migration_flags.php:37-104` 的每個已知頁面都有明文預設 `new`，所以 CI（`cp .env.example .env`，`.env.example` 無 `MIGRATION_FLAG_*`）**跑的就是 new 路徑**——`'default' => 'old'` 只影響**不在 config 裡的 key**。真正要找的是「`migration_flag_is_new('某個 config 沒列的 key')` 因而永遠回 false」的呼叫點：`grep -roE "migration_flag(_is_new)?\('[^']+'\)" app/ resources/` 取出所有 key，逐一比對 `config/migration_flags.php` 是否列出，對不上的先處理。
 - 每個子環節都要同步做 §三 的第 12、15、16 欄（翻譯 key、測試、文檔）。
 

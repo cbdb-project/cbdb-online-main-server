@@ -270,17 +270,16 @@ class OperationsIndexLinksTest extends TestCase {
             '樣本表被封寫了：這條測試會再次替一條死連結背書，請換一張未封寫的表'
         );
 
-        config(['migration_flags.pages.codes' => 'new']);
-        $this->assertEquals(
-            '/app/codes/ADDR_CODES/803819/edit',
-            code_table_edit_url($resource, $resourceId)
-        );
-
-        config(['migration_flags.pages.codes' => 'old']);
-        $this->assertEquals(
-            '/codes/ADDR_CODES/803819/edit',
-            code_table_edit_url($resource, $resourceId)
-        );
+        // ── 2026-09-15（環節 4d）：`code_table_edit_url()` 原本依 codes flag 二選一，
+        // 現在一律指 React 版。**兩種 flag 值都驗**——翻 flag 不該改變結果。
+        foreach (['new', 'old'] as $flag) {
+            config(['migration_flags.pages.codes' => $flag]);
+            $this->assertEquals(
+                '/app/codes/ADDR_CODES/803819/edit',
+                code_table_edit_url($resource, $resourceId),
+                "codes flag = {$flag} 不該影響查閱連結"
+            );
+        }
     }
 
     #[Test]
@@ -393,11 +392,12 @@ class OperationsIndexLinksTest extends TestCase {
     }
 
     #[Test]
-    public function test_code_resource_view_link_falls_back_to_blade_when_codes_flag_is_old(): void {
-        // codes flag 翻回 old 時，查閱連結要跟著回到 Blade 編輯頁。
-        // 📌 本測試驗的是**連結指向**，不是「Blade 頁還能開」——環節 3 之後那個 Blade
-        // 編輯頁會被 302 掉（見 LegacyBladePageRetirementTest）。這條斷言仍然有效
-        // （flag 確實還控制連結指向），但理由不再是「否則回退不完整」。
+    public function test_code_resource_view_link_ignores_the_codes_flag(): void {
+        // ── 2026-09-15（環節 4d）─────────────────────────────────────
+        // 原本叫 `..._falls_back_to_blade_when_codes_flag_is_old()`：翻 flag=old 時查閱連結
+        // 會指回 Blade 編輯頁。環節 4d 把 `code_table_edit_url()` 的 flag 分支拿掉之後，
+        // 這條改成驗**相反的事**——翻 flag 不再改變連結指向。
+        // 刻意保留那一行 config：它正是這條測試的自變數。
         config(['migration_flags.pages.codes' => 'old']);
 
         $user = User::forceCreate([
@@ -433,10 +433,10 @@ class OperationsIndexLinksTest extends TestCase {
             });
 
         $this->assertSame(
-            '/codes/MERGED_PERSON_DATA/c_personid=108625&c_merged_from_personid=404794/edit',
-            $link
+            '/app/codes/MERGED_PERSON_DATA/c_personid=108625&c_merged_from_personid=404794/edit',
+            $link,
+            'codes flag = old 不該讓查閱連結指回已刪除的 Blade 編輯頁'
         );
-
     }
 
     /**

@@ -634,18 +634,7 @@ class BiogMainRepository {
         // 寬鬆轉型成 0，誤中 c_personid=0（「未詳」占位列）。
         $names = $names->where(function ($query) use ($request, $qForms) {
             $query->where('BIOG_MAIN.c_name_chn', 'like', '%'.$request->q.'%');
-            // §D-8：拼音／羅馬字欄位以展開集 OR 同查 v／ü 形（單一形輸入時 $qForms 僅一元、行為不變）。
-            #20230626增加[外文全名]與[外文羅馬字轉寫姓名]可查得
-            $pinyinCols = [
-                'c_name', 'c_surname', 'c_mingzi',
-                'c_name_proper', 'c_name_rm', 'c_mingzi_proper',
-                'c_surname_proper', 'c_mingzi_rm', 'c_surname_rm',
-            ];
-            foreach ($pinyinCols as $col) {
-                foreach ($qForms as $form) {
-                    $query->orWhere("BIOG_MAIN.{$col}", 'like', $form);
-                }
-            }
+            self::applyPinyinNameMatch($query, $qForms);
         });
 
         // 朝代篩選
@@ -675,6 +664,51 @@ class BiogMainRepository {
         $names->appends(['q' => $request->q])->links();
 
         return $names;
+    }
+
+    /**
+     * 拼音／羅馬字欄位的比對條件（namesByQuery 與 dynastyFacetsByQuery 共用，兩處必須同口徑，
+     * 否則側欄朝代分面的總數會與人物列表對不上）。
+     *
+     * 語義是「詞邊界前綴」：欄位等於 q，或以「q + 一個半角空格」開頭。
+     *  - #154（2021）把拼音改成整值精確比對，是為了讓 "hao yi" 撈不到 "Hao Yixing"、"Li" 撈不到
+     *    "Liu"／"Lin"。這一點保留：q 之後必須是字串結尾或空格，"Hao Yixing" 對 "hao yi" 仍不命中。
+     *  - 但精確比對連帶擋掉了所有帶括號尾巴的名字——prod 上 c_name 帶 " (n)" 消歧後綴的約 5,185 人、
+     *    帶 "(Wife of …)" 之類說明的約 49,900 人——搜 "Jia Gongyan" 找不到 "Jia Gongyan (2)"，
+     *    搜 "Guo Shi" 找不到 "Guo Shi (Wife of Zhao Zhen )"。
+     *  - 這裡刻意**不認識括號**：不是「q 後接 (」的特例，而是一條通用的詞邊界規則，換成 [2]、", 2nd"
+     *    或其他尾巴同樣命中。BracketNormalizer 在寫入端保證拼音欄的括號前有一個半角空格，
+     *    所以「q 後接空格」這個邊界在新資料上是穩定的。
+     *  - c_surname 維持精確比對：姓氏不會帶尾巴，改前綴只會多雜訊（"Li" 會撈到 "Li Mou" 之類的複姓）。
+     *  - 這是**過渡方案**。根治是把括號內容從姓名欄移到獨立語義欄位（見 issue 討論），屆時此處
+     *    可退回精確比對。
+     *
+     * LIKE 萬用字元：改成前綴比對後 %／_ 從無害變有害（"Li_" 會當單字元萬用），故一律跳脫。
+     * 跳脫字元用 | 並顯式寫 ESCAPE 子句：MariaDB 預設 escape 是反斜線，但 SQLite 沒有預設值，
+     * 而 '\\' 這個字面在兩邊的長度又不同（MariaDB 是一個字元、SQLite 是兩個），用反斜線做不到可攜。
+     *
+     * @param  \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder  $query
+     * @param  array<int, string>  $qForms  PinyinSearchNormalizer::expand() 的 v／ü 展開集
+     */
+    private static function applyPinyinNameMatch($query, array $qForms): void {
+        #20230626增加[外文全名]與[外文羅馬字轉寫姓名]可查得
+        $prefixCols = [
+            'c_name', 'c_mingzi',
+            'c_name_proper', 'c_name_rm', 'c_mingzi_proper',
+            'c_mingzi_rm',
+        ];
+        $exactCols = ['c_surname', 'c_surname_proper', 'c_surname_rm'];
+
+        foreach ($qForms as $form) {
+            $escaped = str_replace(['|', '%', '_'], ['||', '|%', '|_'], $form);
+            foreach ($prefixCols as $col) {
+                $query->orWhereRaw("BIOG_MAIN.{$col} LIKE ? ESCAPE '|'", [$escaped]);
+                $query->orWhereRaw("BIOG_MAIN.{$col} LIKE ? ESCAPE '|'", [$escaped.' %']);
+            }
+            foreach ($exactCols as $col) {
+                $query->orWhereRaw("BIOG_MAIN.{$col} LIKE ? ESCAPE '|'", [$escaped]);
+            }
+        }
     }
 
     /**
@@ -741,17 +775,7 @@ class BiogMainRepository {
             ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
             ->where(function ($query) use ($q, $qForms) {
                 $query->where('BIOG_MAIN.c_name_chn', 'like', '%' . $q . '%');
-                // §D-8：與 namesByQuery 一致，拼音／羅馬字欄位以展開集 OR 同查 v／ü 形。
-                $pinyinCols = [
-                    'c_name', 'c_surname', 'c_mingzi',
-                    'c_name_proper', 'c_name_rm', 'c_mingzi_proper',
-                    'c_surname_proper', 'c_mingzi_rm', 'c_surname_rm',
-                ];
-                foreach ($pinyinCols as $col) {
-                    foreach ($qForms as $form) {
-                        $query->orWhere("BIOG_MAIN.{$col}", 'like', $form);
-                    }
-                }
+                self::applyPinyinNameMatch($query, $qForms);
             });
 
         $validDynasties = (clone $fallbackBaseQuery)

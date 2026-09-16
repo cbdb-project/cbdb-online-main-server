@@ -634,18 +634,7 @@ class BiogMainRepository {
         // 寬鬆轉型成 0，誤中 c_personid=0（「未詳」占位列）。
         $names = $names->where(function ($query) use ($request, $qForms) {
             $query->where('BIOG_MAIN.c_name_chn', 'like', '%'.$request->q.'%');
-            // §D-8：拼音／羅馬字欄位以展開集 OR 同查 v／ü 形（單一形輸入時 $qForms 僅一元、行為不變）。
-            #20230626增加[外文全名]與[外文羅馬字轉寫姓名]可查得
-            $pinyinCols = [
-                'c_name', 'c_surname', 'c_mingzi',
-                'c_name_proper', 'c_name_rm', 'c_mingzi_proper',
-                'c_surname_proper', 'c_mingzi_rm', 'c_surname_rm',
-            ];
-            foreach ($pinyinCols as $col) {
-                foreach ($qForms as $form) {
-                    $query->orWhere("BIOG_MAIN.{$col}", 'like', $form);
-                }
-            }
+            self::applyPinyinNameMatch($query, $qForms);
         });
 
         // 朝代篩選
@@ -675,6 +664,51 @@ class BiogMainRepository {
         $names->appends(['q' => $request->q])->links();
 
         return $names;
+    }
+
+    /**
+     * 拼音／羅馬字欄位的比對條件（namesByQuery 與 dynastyFacetsByQuery 共用，兩處必須同口徑，
+     * 否則側欄朝代分面的總數會與人物列表對不上）。
+     *
+     * 語義是「詞邊界前綴」：欄位等於 q，或以「q + 半角空格」或「q + 半角左括號」開頭。
+     *  - 兩種邊界都要：Access 主檔的寫法是 "Jia Gongyan(2)"（括號前**沒有**空格，dev 有 51,797 列、
+     *    其中數字後綴 5,196 列）；prod 曾整批補過空格成 "Jia Gongyan (2)"，但上游每次重灌都會回到
+     *    無空格形，而 BracketNormalizer 只管新寫入。只認空格的話，重灌後又會找不到。
+     *  - #154（2021）把拼音改成整值精確比對，是為了讓 "hao yi" 撈不到 "Hao Yixing"、"Li" 撈不到
+     *    "Liu"／"Lin"。這一點保留：q 之後必須是字串結尾或空格，"Hao Yixing" 對 "hao yi" 仍不命中。
+     *  - 但精確比對連帶擋掉了所有帶括號尾巴的名字——prod 上 c_name 帶 " (n)" 消歧後綴的約 5,185 人、
+     *    帶 "(Wife of …)" 之類說明的約 49,900 人——搜 "Jia Gongyan" 找不到 "Jia Gongyan (2)"，
+     *    搜 "Guo Shi" 找不到 "Guo Shi (Wife of Zhao Zhen )"。本方法只修這一點。
+     *  - 「q 後接 (」是**邊界**而不是「(n) 後綴」的特例：括號後面是什麼不管，"(2)"、"(Wife of …)"、
+     *    "(zi)" 一視同仁。它認的是 CBDB 資料裡實際存在的兩種尾巴接法，不是猜後綴的格式。
+     *  - c_surname 三欄維持精確比對：姓氏不會帶尾巴，改前綴只會多雜訊。
+     *  - 使用者輸入中的 LIKE 萬用字元（%／_）**維持既有行為、不跳脫**：#154 以來拼音欄一直是未跳脫的
+     *    LIKE，這不是本次改動引入的，而且 v1 /api/name 的 num 已夾在 [1, 100]。要不要收緊是另一件事。
+     *  - 這是**過渡方案**。根治是把括號內容從姓名欄移到獨立語義欄位（見 PR #1328 討論），屆時此處
+     *    可退回精確比對。
+     *
+     * @param  \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder  $query
+     * @param  array<int, string>  $qForms  PinyinSearchNormalizer::expand() 的 v／ü 展開集
+     */
+    private static function applyPinyinNameMatch($query, array $qForms): void {
+        #20230626增加[外文全名]與[外文羅馬字轉寫姓名]可查得
+        $prefixCols = [
+            'c_name', 'c_mingzi',
+            'c_name_proper', 'c_name_rm', 'c_mingzi_proper',
+            'c_mingzi_rm',
+        ];
+        $exactCols = ['c_surname', 'c_surname_proper', 'c_surname_rm'];
+
+        foreach ($qForms as $form) {
+            foreach ($prefixCols as $col) {
+                $query->orWhere("BIOG_MAIN.{$col}", 'like', $form);
+                $query->orWhere("BIOG_MAIN.{$col}", 'like', $form.' %');
+                $query->orWhere("BIOG_MAIN.{$col}", 'like', $form.'(%');
+            }
+            foreach ($exactCols as $col) {
+                $query->orWhere("BIOG_MAIN.{$col}", 'like', $form);
+            }
+        }
     }
 
     /**
@@ -741,17 +775,7 @@ class BiogMainRepository {
             ->leftJoin('DYNASTIES', 'DYNASTIES.c_dy', '=', 'BIOG_MAIN.c_dy')
             ->where(function ($query) use ($q, $qForms) {
                 $query->where('BIOG_MAIN.c_name_chn', 'like', '%' . $q . '%');
-                // §D-8：與 namesByQuery 一致，拼音／羅馬字欄位以展開集 OR 同查 v／ü 形。
-                $pinyinCols = [
-                    'c_name', 'c_surname', 'c_mingzi',
-                    'c_name_proper', 'c_name_rm', 'c_mingzi_proper',
-                    'c_surname_proper', 'c_mingzi_rm', 'c_surname_rm',
-                ];
-                foreach ($pinyinCols as $col) {
-                    foreach ($qForms as $form) {
-                        $query->orWhere("BIOG_MAIN.{$col}", 'like', $form);
-                    }
-                }
+                self::applyPinyinNameMatch($query, $qForms);
             });
 
         $validDynasties = (clone $fallbackBaseQuery)

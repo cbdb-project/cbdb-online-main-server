@@ -4,6 +4,74 @@
 
 ## 2026-09
 
+### 🧹 刪除 `BIOG_MAIN` 姓名欄的數字消歧後綴（`Jia Gongyan (2)` → `Jia Gongyan`）
+
+CBDB 用 `(n)` 區分同名者。這個序號只表達「他是第 n 個叫這個名字的人」，不承載任何人物資訊，
+卻長在姓名欄裡，於是每個消費端都得自己想辦法繞過它——最近一例是拼音搜尋：#154（2021）為了讓
+"hao yi" 撈不到 "Hao Yixing" 把拼音欄改成整值精確比對，連帶讓搜 "Jia Gongyan" 找不到
+"Jia Gongyan (2)"，直到 ca76dc88 才用「詞邊界前綴比對」繞開。本次把後綴從資料裡拿掉，是那個
+註解裡說的根治方向。
+
+一支一次性 data migration
+（`2026_09_22_000000_strip_numeric_disambiguation_suffix_from_biog_main_names`），
+處理 `c_name`、`c_mingzi`、`c_name_chn`、`c_mingzi_chn` 四欄**尾端**的後綴，連同它前面的空格。
+dev 實測更新 5,189 列（`c_name` 5,185、`c_mingzi` 5,138、兩個中文欄各 2）。
+
+**刻意不碰的四類**（判準是「括號內全為數字」＋「位於字串尾端」，不是「有括號」）：
+
+- **說明性括號**——`Guo Shi (Wife of Zhao Zhen)`、`Li Bai (zi)`，dev 上約 54,500 列。括號裡是
+  內容而非序號。也因為這批還在，ca76dc88 的「詞邊界前綴比對」**不能**跟著回退。
+- **字串中段的括號**——已知 4 列 `c_mingzi` 長成 `Fan (1) Baizhi`（personid 23881／24163／
+  26374／35836）。那裡的 `(n)` 是 `pinyin` 表的**同音姓氏序號**（樊/范 都是 Fan、文/聞 都是
+  Wen），4 列全部符合 `c_mingzi = c_surname + " (n) " + 真正的 mingzi`，真正的病是姓氏誤植進了
+  「不含姓氏的名」欄位。只刪括號會留下 `Fan Baizhi`，仍然是錯的，所以這 4 列由維護者直接在
+  系統裡逐列修正，不走這支 migration。
+- **`c_surname*`／`*_proper`／`*_rm`**——全庫 0 列帶這個後綴（已實測）。
+- **`ALTNAME_DATA`**——沒有這個樣式（已實測）。
+- **後綴後面還跟著別的括號時整格不動**——`Wang Wu (2) (zi)` 的 `(2)` 不會被清掉。這是「只認
+  字串尾端」的必然結果，比誤刪安全。實測 0 列。
+- **3 位以上的數字括號**——**純防禦，不涉及任何現有資料**：實測四欄任何位置都是 0 列
+  （消歧序號最大值是 33）。加限制只因為這支 migration 不可逆，而 3 位數在姓名欄裡更可能是
+  年份之類的內容；真的出現時 `up()` 會逐列 echo 請人判斷。「整格只有一個後綴」（刪掉就沒名字了）
+  同樣是逐列 echo 後跳過。
+  （**真實存在**的「括號帶數字」另有一類：`Zhao Shi (Zhao ji d33)`＝趙佶第 33 女，c_name 37 列／
+  c_mingzi 43 列。那類含字母，`[0-9]+` 本來就不命中。）
+
+**序號不保留。** 刪掉後 `c_name` 的 5,185 列裡有 5,168 列會與既有人物同名，這是預期的：
+`BIOG_MAIN` 四個姓名欄上本來就沒有任何索引或唯一約束，消歧靠 `c_personid`。前端各處（人物列表、
+搜尋結果、挑人下拉、鏡像候選）本來就都顯示 `c_personid`，沒有任何地方靠 `(n)` 辨識同名人物。
+
+**`CBDB__NAME_FTS` 由 migration 就地重建**（只有中文名會進 FTS，所以只涉及那 2 列，
+拼音那 5,185／5,138 列與 FTS 無關）。這一步是必要的：`NameSearchIndexService::normalizeName()`
+只剝括號**符號**、**保留內容**，所以 `許瑤(2)` 在索引裡是 `許瑤2`——用 `LIKE '%(%'` 去掃當然是
+0 列，但數字其實還黏在名字上。可搜性不會壞（查詢端是前綴 LIKE），壞的是 `full_name` 會原樣回進
+MCP `search_person_by_name` 的 `matched_terms`，以及 `ORDER BY LENGTH(search_term)` 的排序。
+而它不會自己好——migration 走 Query Builder、不觸發 model event，`BiogMainObserver::updated()`
+不會被呼叫。
+重建與該列的 `UPDATE` 包在**同一個交易**裡（每列一個）。Laravel 只在 grammar 支援 schema
+transaction 時才替 migration 包交易，MariaDB 不支援，所以預設是逐列各自提交——若讓 `UPDATE`
+先提交、重建才失敗（FTS schema 不符、連線中斷、insert 失敗），重跑時名字已不含 `(`、不再是候選，
+那筆索引就會永久留著舊值而且沒有任何提示。包起來之後，重建失敗會連姓名一起回滾，重跑仍處理得到。
+⚠️ 要另外補做時**不要**用 `php artisan cbdb:rebuild-name-search --id-from/--id-to`：那支只在
+`--truncate`（清整張表）時才刪舊列，ranged 模式是**新增**，會留下 `許瑤2` + `許瑤` 兩套。
+
+**外部可見的行為變化**：用**帶後綴的字串**查詢的舊連結／書籤會從 1 命中變 0 命中
+（v1 `/api/name` 的精確分支與 `%LIKE%` 回退兩層都落空）。請改用 `c_personid`。
+反之搜乾淨的名字會多命中——這正是本次要修的。
+`app/Repositories/BiogMainRepository.php` 的 `applyPinyinNameMatch()` 的 docblock 已同步更新，
+把「消歧後綴那 5,185 列」從它存在的理由裡拿掉（那批資料已不存在），並註明**仍不能**退回
+#154 的整值精確比對。
+
+**刻意不寫 `operations`／`audit_log`、不蓋 `c_modified_*`**，比照
+`2026_09_14_000000_normalize_zero_coordinates_in_addr_codes`：這是資料清理而非五千次編輯行為，
+逐列寫稽核會用一批無資訊的列淹掉 operations 頁，而把最後修改者改成執行 migration 的人會抹掉
+「這列上次真的被誰改過」這個更有價值的事實（AGENTS.md §1.2）。`down()` 是 no-op——序號已經沒了，
+而且沒有記錄哪些列被改過，無法區分「本來就沒有後綴」與「被這支 migration 刪掉後綴」。
+
+**不配 artisan 指令**（與座標清理不同）：座標會隨上游 Access 重灌一再回來，姓名後綴不會——
+本系統就是資料端的最上游，清一次就是永久的。
+
+
 ### 🔧 Blade 下架收尾：各機器 `.env` 可刪除的變數清單（部署者請照此清理）
 
 Blade 下架計畫（環節 1–7）已全部完成。下列環境變數的**讀取端都已從程式碼移除**，

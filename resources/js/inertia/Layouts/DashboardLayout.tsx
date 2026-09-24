@@ -92,14 +92,14 @@ export default function DashboardLayout({ children, title, description, breadcru
                             >
                                 Chinese Biographical Database Project (CBDB)
                             </a>
-                            . Content licensed under{' '}
+                            . Except where otherwise noted, content on this site is licensed under a{' '}
                             <a
-                                href="https://creativecommons.org/licenses/by-nc-sa/4.0/"
+                                href="https://cbdb.hsites.harvard.edu/cbdb-data-licensing-terms"
                                 target="_blank"
                                 rel="noreferrer"
                                 className="text-primary hover:underline"
                             >
-                                CC BY-NC-SA 4.0 International
+                                CBDB License
                             </a>
                             .
                         </div>

@@ -4,6 +4,28 @@
 
 ## 2026-09
 
+### 📄 授權聲明對齊 CBDB 資料授權條款：頁尾改為 CBDB License，源代碼／數據分開表述
+
+React 頁尾原寫「Content licensed under CC BY-NC-SA 4.0 International」，兩個 cbdbapi 頁尾
+原連至 Creative Commons 授權，與專案官網（[cbdb.hsites.harvard.edu](https://cbdb.hsites.harvard.edu/)）
+現行頁尾不一致。三處頁尾
+（React `DashboardLayout`、v1 API 人物頁 `cbdbapi/person.blade.php`、靜態 API 說明頁
+`public/cbdbapi/index.html`）統一改為「Except where otherwise noted, content on this site is
+licensed under a CBDB License」，連結指向
+[CBDB Data Licensing Terms](https://cbdb.hsites.harvard.edu/cbdb-data-licensing-terms)。
+
+靜態 API 說明頁正文原本宣稱「API 資料一律採 CC BY-NC-SA 4.0」，已不符 2026-08-20 起生效的
+授權條款（單機版範圍內仍為 CC BY-NC-SA 4.0；超出範圍者適用 CBDB 自訂條款：禁止演繹、禁止再分發
+與公開資料存取服務），故「最佳實踐」一條與「授權與使用條款」段落改為兩層條款的中英摘要，並註明
+以官網條款頁為準。
+
+`LICENSE.md`／`README.md` 原寫「源代碼和數據採 CC BY-NC-SA 4.0」，改為分開表述：源代碼仍採
+CC BY-NC-SA 4.0，CBDB 數據適用 CBDB 資料授權條款（OpenCC 第三方例外不變）；引用說明補上
+「註明所用數據版本」。`composer.json` 的 `license` 原為 Laravel 樣板遺留的 `MIT`，與實際授權不符，
+改為 `CC-BY-NC-SA-4.0`。
+
+`tests/Unit/SiteFooterLicenseTest.php` 鎖住三處頁尾的連結與措辭，避免日後被改回舊授權。
+
 ### 🧹 刪除 `BIOG_MAIN` 姓名欄的數字消歧後綴（`Jia Gongyan (2)` → `Jia Gongyan`）
 
 CBDB 用 `(n)` 區分同名者。這個序號只表達「他是第 n 個叫這個名字的人」，不承載任何人物資訊，

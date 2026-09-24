@@ -329,7 +329,7 @@
 
     <!-- Footer Section -->
     <div class="footer-section">
-        © China Biographical Database. Except where otherwise noted, content on this site is licensed under a <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener noreferrer">Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International license</a>.
+        © China Biographical Database. Except where otherwise noted, content on this site is licensed under a <a href="https://cbdb.hsites.harvard.edu/cbdb-data-licensing-terms" target="_blank" rel="noopener noreferrer">CBDB License</a>.
     </div>
 </div>
 

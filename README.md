@@ -2,7 +2,7 @@
 
 [中國歷代人物傳在線記录入系统](https://input.cbdb.fas.harvard.edu/)原始碼。
 
-**授權 / License:** [CC BY-NC-SA 4.0 International](https://creativecommons.org/licenses/by-nc-sa/4.0/) (主要授權，詳見 [LICENSE.md](./LICENSE.md))
+**授權 / License:** 源代碼採 [CC BY-NC-SA 4.0 International](https://creativecommons.org/licenses/by-nc-sa/4.0/)；CBDB 數據適用 [CBDB 資料授權條款 / CBDB Data Licensing Terms](https://cbdb.hsites.harvard.edu/cbdb-data-licensing-terms)（詳見 [LICENSE.md](./LICENSE.md)）
 
 ## 文件導覽（2026 更新）
 

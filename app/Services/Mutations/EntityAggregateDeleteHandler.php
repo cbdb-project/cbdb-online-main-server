@@ -3,6 +3,7 @@
 namespace App\Services\Mutations;
 
 use App\Services\Mutations\EntityAggregate\AbstractEntityAggregateHandler;
+use App\Services\Mutations\EntityAggregate\AggregateWriteConflictException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -53,6 +54,9 @@ class EntityAggregateDeleteHandler extends AbstractEntityAggregateHandler {
                 [],
                 $definition->service()->delete($id, $personId)
             ));
+        } catch (AggregateWriteConflictException $e) {
+            // 交易已整筆回滾；資料狀態不容許安全寫入（見該例外類註）。
+            return $this->errorResponse($e->getMessage(), 409, $e->errors());
         } catch (QueryException $e) {
             // 詞表入邊外鍵已陸續翻成 ON DELETE RESTRICT（去級聯 Phase 1，OFFICE_CODES 在批次 3）：
             // definition::guardWrite 的引用護欄若有漏網引用（如 POSTED_TO_ADDR_DATA 殘留列），

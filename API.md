@@ -113,7 +113,7 @@ Token 有效期：建立時可指定 `expires_in`（1～3650 天），未指定�
 | `mode=proposal`（任何資源） | 只寫一筆提案 `operations`；不動資料表、不寫 `audit_log`、不寫鏡像列 | 可用較大批次，仍建議 ≤ 150 |
 | `mode=direct`，一般子資源（別名、地址、著述、事件…） | 目標列的讀寫 ＋ 一筆 `operations` ＋ 一筆 `audit_log` | 50～150 |
 | `mode=direct`，親屬／社會關係 | 上述再加對面的鏡像列與其 `audit_log`（可能還要查代碼表） | 20～50 |
-| `mode=direct`，複合實體聚合（office／social-institution） | 主表 ＋ **下層資料列的增刪會逐列各記一筆 `operations` ＋ `audit_log`**（官職的類型關聯、社會機構的地址增刪；筆數隨關聯列數增加。少數欄位是整批更新、不逐列記） | 20～50 |
+| `mode=direct`，複合實體聚合（office／social-institution） | 主表 ＋ **下層資料列的增刪會逐列各記一筆 `operations` ＋ `audit_log`**（官職的類型關聯、社會機構的地址增刪與別名增刪改——別名連改名同步名碼也逐列記；筆數隨關聯列數增加。少數欄位是整批更新、不逐列記） | 20～50 |
 
 上表的筆數是**保守的起始值，不是壓測結論**——請以自己的資料實測後再調整，遇到逾時或明顯變慢就往下調。
 
@@ -153,7 +153,7 @@ Token 有效期：建立時可指定 `expires_in`（1～3650 天），未指定�
 }
 ```
 
-寫入在伺服器做過**異體字替換**或**經緯度歸零**（見 13.1）時，會多一個頂層 `notices` 陣列說明改寫內容。涵蓋範圍：人物主檔與所有人物子資源、代碼表 create／update、官職與社會機構聚合。**失敗回應也可能帶 `notices`**——最典型的是 409（替換後撞既有主鍵）與 422（替換後與現值相同、「未偵測到任何修改內容」）：那些訊息若不附上替換說明會顯得毫無道理。注意其他靜默改寫（**Unicode NFC 正規化**、拼音 `v→ü`、括號正規化、哨兵值正規化）**不會**產生 `notices`，只能從回應的 `result.pk` / `result.row` 看出來。
+寫入在伺服器做過**異體字替換**或**經緯度歸零**（見 13.1）時，會多一個頂層 `notices` 陣列說明改寫內容；社會機構名稱／別名被併入既有的另一個字形時，也會在這裡說明。涵蓋範圍：人物主檔與所有人物子資源、代碼表 create／update、官職與社會機構聚合。**失敗回應也可能帶 `notices`**——最典型的是 409（替換後撞既有主鍵）與 422（替換後與現值相同、「未偵測到任何修改內容」）：那些訊息若不附上替換說明會顯得毫無道理。注意其他靜默改寫（**Unicode NFC 正規化**、拼音 `v→ü`、括號正規化、哨兵值正規化）**不會**產生 `notices`，只能從回應的 `result.pk` / `result.row` 看出來。
 
 由控制器／handler 判定的失敗（多數 4xx 與 5xx）：
 
@@ -1247,10 +1247,11 @@ Authorization: Bearer <token>
 3. 新舊提案互相回鏈：舊提案記 `superseded_by`，新提案記 `resubmit_of`。
 4. **任何一步失敗即整筆回滾**（舊提案回到原狀態），並把 handler 的欄位級錯誤原樣回傳。若新提案的資料表與舊提案不一致，也會整筆回滾並回 422（此回應只有 `message`、沒有 `errors`）。
 
-兩個契約保證：
+三個契約保證：
 
 - 重發**新增**提案時，payload 不會帶稽核欄（`c_created_by`／`c_created_date`／`c_modified_by`／`c_modified_date`）——舊介面曾整包回寫 payload 而把系統欄位灌成 null，這條就是治本點。重發**修改**提案時，payload 是「原資料列 merge 你的 `changes`」，因此仍會含原列的稽核欄；那是審計快照，核准落庫前會由系統重新蓋章，不會原樣回寫。
 - 新提案的 `comment` 取**本次** `meta.comment`，不繼承舊提案的說明。
+- 社會機構聚合提案（13.4）若舊提案帶了 `alt_names`、本次重發**沒帶**，會**沿用舊提案的 `alt_names`**——站內編輯頁沒有別名欄位，表單重送不會帶它，而它的語義是「沒帶＝不動」，不沿用就會在撤回舊提案時把別名變更靜默丟掉。重發明示帶了 `alt_names`（含 `[]`）則以本次為準；因此重發無法退回「不動別名」，只能給清單或 `[]`。
 
 成功時的回應就是重發那筆提案的回應（形狀同第六／七章的 proposal 回應）。回鏈只在 handler 有回傳 `result.operation_id` 時建立。
 
@@ -1486,7 +1487,7 @@ Authorization: Bearer <token>
 
 ### 13.4 複合實體聚合：office、social-institution 與 text-entity
 
-這三個「實體」各自跨多張表（官職涵蓋 `OFFICE_CODES` + `OFFICE_CODE_TYPE_REL`；社會機構涵蓋 `SOCIAL_INSTITUTION_CODES` + `SOCIAL_INSTITUTION_NAME_CODES` + `SOCIAL_INSTITUTION_ADDR`；文獻涵蓋 `TEXT_CODES` + `TEXT_INSTANCE_DATA` 版本列），由聚合服務統一寫入。**新增、刪除，以及會牽動多表一致性的結構性欄位，一律要走這裡的聚合資源**，不要自己拼底層表。（13.1 開放的那幾個底層代碼表欄位——例如 `OFFICE_CODES.c_office_pinyin`、`SOCIAL_INSTITUTION_NAME_CODES.c_inst_name_py`——是單欄拼音修正，走 13.1 的 `update` 是可以的。）
+這三個「實體」各自跨多張表（官職涵蓋 `OFFICE_CODES` + `OFFICE_CODE_TYPE_REL`；社會機構涵蓋 `SOCIAL_INSTITUTION_CODES` + `SOCIAL_INSTITUTION_NAME_CODES` + `SOCIAL_INSTITUTION_ADDR` + 別名 `SOCIAL_INSTITUTION_ALTNAME_DATA`；文獻涵蓋 `TEXT_CODES` + `TEXT_INSTANCE_DATA` 版本列），由聚合服務統一寫入。**新增、刪除，以及會牽動多表一致性的結構性欄位，一律要走這裡的聚合資源**，不要自己拼底層表。（13.1 開放的那幾個底層代碼表欄位——例如 `OFFICE_CODES.c_office_pinyin`、`SOCIAL_INSTITUTION_NAME_CODES.c_inst_name_py`——是單欄拼音修正，走 13.1 的 `update` 是可以的。）
 
 | resource | 別名 | 主鍵欄 | 支援操作 |
 | ------ | ------ | ------ | ------ |
@@ -1503,9 +1504,21 @@ Authorization: Bearer <token>
   - 官職（create／update 共用）**必填**：`name`（或 `c_office_chn`）、`type_ids`（陣列；也接受 `type_id`／`c_office_tree_id` 單值）、`source_id`（或 `c_source`，須存在於 `TEXT_CODES`）、`dynasty_code`（或 `c_dy`；也可送 `dynasty_label` 由後端查碼）。選填：`translation`、`name_alt`、`translation_alt`、`pinyin`、`pinyin_alt`、`pages`、`notes`。未給 `pinyin` 時會依名稱自動派生。
   - 社會機構 **create** 必填：`name`（或 `c_inst_name_hz`）、`type_code`（或 `c_inst_type_code`／`type_label`）、`dynasty_code`（或 `c_inst_begin_dy`／`dynasty_label`）、`addr_id`（或 `c_inst_addr_id`）、`source_id`（或 `c_source`）。
   - 社會機構 **update** 的地址改用 **`addresses` 陣列**（不是 `addr_id`），且**至少要有一列**，每列需含 `addr_id`。缺少即 422 `addresses: required`／`addresses.N.addr_id: required_integer`。
+  - 社會機構的**別名**（`SOCIAL_INSTITUTION_ALTNAME_DATA`）用選填的 **`alt_names` 陣列**，create 與 update 都收：
+    - **鍵不存在＝別名不動**；鍵存在（含空陣列 `[]`）＝以這份清單為準做集合對賬（`[]` 會刪除全部別名；空物件 `{}` 解碼後與 `[]` 無從區分，同樣會刪除全部別名）。**這是全欄覆寫的唯一例外**（見下方「聚合的 `update` 是全欄覆寫」一條），刻意如此：編輯頁與既有呼叫端的整份 payload 都沒有這個鍵，照全欄覆寫解讀會在第一次存檔時清掉所有別名。**送 `"alt_names": null` 不等於不帶**，會回 422 `alt_names: invalid`——要不動別名請整個不帶這個鍵。
+    - ⚠️ **改別名前無法經 API 讀出現有清單**（別名沒有 `/api/v2/get`，也沒有其他 API 端點；站內 `/app/codes/SOCIAL_INSTITUTION_ALTNAME_DATA` 頁面可以瀏覽，但那不是穩定的 API 契約），而帶了 `alt_names` 的 update 會**刪除清單外的全部既有別名**。請以上一次寫入回應的 `row.alt_names`（或每週 SQLite 發佈檔）為底稿，整份改好再送；沒有可靠底稿時不要帶 `alt_names`。
+    - 每列：`name`（或 `c_inst_altname_hz`）必填、至多 255 字；`type_code`（或 `c_inst_altname_type`）選填，鍵不存在預設 `0`（`[未詳]`），**明示 `null`（或空字串）則保留 `null`**，給值須存在於 `SOCIAL_INSTITUTION_ALTNAME_CODES`；`source_id`（或 `c_source`）選填，須存在於 `TEXT_CODES`；`pinyin`（`c_inst_altname_py`）與 `pages`（`c_pages`）選填、各至多 255 字；`notes`（`c_notes`）選填。
+    - 列的識別是「類型＋名稱」：先找同類型、**字面相同**的既有別名；沒有，再找同類型、**異體字歸一後相同**的既有別名——找到則視為同一列、**沿用既有字形**，並在 `notices` 說明。配對到既有列時，該列的 `source_id`／`pages`／`notes` **以本次為準**（沒帶就寫成 `null`），只有 `pinyin` 未提供、為 `null` 或空字串時保留原值；未配對的請求列是新增，`pinyin` 沒帶時由名稱派生。**類型為 `null` 的既有列送回時須明示 `"type_code": null`**，否則會被當成類型 `0` 的新別名、原列被刪除。
+    - 新別名的名稱，以及各列的 `pages`／`notes`，落庫前經異體字替換（寬鬆模式，與機構名同）；替換說明在頂層 `notices`。因此原樣送回的既有列，其 `pages`／`notes` 若含變體字也會被改寫（計入 `alt_names_updated`）。
+    - 校驗錯誤（422）：`alt_names: invalid`（不是陣列，或為 `null`）、`alt_names.N: invalid`（該列是純量，不是物件）、`alt_names.N.name: required`／`too_long`、`alt_names.N.name|pinyin|pages|notes: invalid`（非純量）、`alt_names.N.pinyin|pages: too_long`、`alt_names.N.type_code: integer`／`not_found_in_altname_codes`、`alt_names.N.source_id: integer`／`not_found_in_text_codes`、`alt_names.N: duplicate`（同一請求內同類型同名；或兩列歸一後相同、而兩個字形並非都是既有別名）。
+    - 409（皆整筆回滾、不寫入；回應形如 `{"ok": false, "message": "…", "errors": {"alt_names": ["…"]}}`）：
+      - `alt_names: existing_duplicate_rows`：該機構既有別名裡有字面完全相同的重複列。這張表**在資料庫沒有主鍵**，那種列無法逐列區分；**API 無法清理，須由管理者直接處理資料庫**。此檢查在提交當下就做（含 `mode=proposal`），不會留下提案；不帶 `alt_names` 的一般更新不受影響。
+      - `alt_names: already_exists`：新增的別名在寫入當下已存在（例如並發寫入剛建立）。此時無法經 API 讀到剛建立的那一列；確認後重送時請注意，清單外的別名（含對方剛建立的）會被刪除。
+      - `alt_names: unexpected_row_count`：改／刪影響的列數不符預期（**刪除機構時也可能出現**）。不要重試，回報管理者。
+    - 名稱為 `null` 的既有列無法以本 API 指稱，對賬時原樣保留；刪除機構時一併刪除。
   - 文獻（create／update 共用同一形狀）**必填只有 `title`**（或 `c_title_chn`）。選填：`title_pinyin`（或 `c_title`；留空由伺服器派生——去卷冊註記＋異體字歸一化逐字轉拼音，給值則僅做空白／大小寫與 v→ü 正規化）、`title_trans`、`title_alt_chn`、`type_id`（`c_text_type_id`，須存在於 `TEXT_TYPE`）、`year`、`nh_code`（須存在於 `NIAN_HAO`）、`nh_year`、`range_code`（`YEAR_RANGE_CODES`）、`bibl_cat_code`（`TEXT_BIBLCAT_CODES`）、`extant`（`EXTANT_CODES`）、`country`（`COUNTRY_CODES`）、`dynasty_code`（`c_text_dy`）、`source_id`（`c_source`，著錄來源樹的上層節點，須存在於 `TEXT_CODES`；**可為 null**——樹需要根節點）、`pages`、`url_api`、`url_api_coda`、`url_homepage`、`notes`。書名落庫前一律經 `char_variant_map` 寬鬆字形標準化與空白／括號／冒號正規化（與批量匯入同語義），回應 `result.variant_replacements` 列出被替換的字。
   - 文獻的**版本列**用 `instances` 陣列（選填、可空；update 為集合對賬——同鍵改值、僅增刪差異）。每列**必填 `edition_id` 與 `instance_id`**（正整數，於文獻內定位版本；同一請求內不可重複，違者 422 `instances.N.key: duplicate`），選填 `title_chn`、`title_pinyin`（留空且有 `title_chn` 時派生）、`publisher`、`pub_loc`、`pub_year`、`pub_dy`、`pub_nh_code`、`pub_nh_year`、`source_id`、`pages`、`extant`、`notes`。**對賬只認上述欄位**：同鍵保留的列，其未列入的實體欄位（如 `c_part_of_instance`、`c_print`）不受影響；但整列被移除再重加會丟失那些欄位。
-- **聚合的 `update` 是「全欄覆寫」，不是第七章的 PATCH 語義**：沒帶到的選填欄會被寫成 `null`（例如漏帶 `name_alt`／`pages` 就會清掉既有值）。更新前請先讀出現值、補齊整份 payload。
+- **聚合的 `update` 是「全欄覆寫」，不是第七章的 PATCH 語義**：沒帶到的選填欄會被寫成 `null`（例如漏帶 `name_alt`／`pages` 就會清掉既有值）。更新前請先讀出現值、補齊整份 payload。**唯一例外是社會機構的 `alt_names`**：沒帶＝不動（見上）。
 - 校驗錯誤是語義鍵而非資料表欄名，例如 `name: required`、`type_ids: required` / `not_found_in_office_type_tree`、`type: invalid`、`type_label: not_found`、`source_id: required_integer` / `not_found_in_text_codes`、`dynasty: invalid`、`dynasty_label: not_found`、`addr_id: required_integer` / `not_found_in_addr_codes`、`addresses: required`、`addresses.N.addr_id: required_integer`，以及各選填整數欄的 `integer`、`floruit_dy`／`end_dy: invalid`、`by_nianhao_code`／`ey_nianhao_code: not_found_in_nian_hao`、`by_year_range`／`ey_year_range: not_found_in_year_range_codes`。
 - 引用護欄：
   - 官職 `delete`：仍被人物任官引用時回 **409** `c_office_id: referenced_by_postings`，並附 `reference_count`。
@@ -1515,14 +1528,14 @@ Authorization: Bearer <token>
   - 文獻 `update`：`source_id` 指向自己或自己的後代（會使著錄來源樹成環）時回 **422** `source_id: source_cycle`。
 - 回應 `result` 除了 `pk`／`status`（`created`／`updated`／`deleted`）／`operation_id` 外，還有實體專屬欄位：
   - 官職：create／update 帶 `row`（含 `type_ids`），update 另帶 `types_added`／`types_removed`，delete 帶 `rel_deleted`。
-  - 社會機構：create 帶 `name_created`，update 帶 `name_changed`／`addr_added`／`addr_removed`，delete 帶 `addr_deleted`。
+  - 社會機構：create 帶 `name_created`／`alt_names_added`，update 帶 `name_changed`／`addr_added`／`addr_removed`／`alt_names_added`／`alt_names_removed`／`alt_names_updated`（沒帶 `alt_names` 時三者皆 0），delete 帶 `addr_deleted`／`alt_names_deleted`。create／update 的 `row.alt_names` 是**寫入後實際落庫的別名清單**——別名沒有 `/api/v2/get`，這是呼叫端唯一的讀回（create 未帶 `alt_names` 時為空陣列）。每列的鍵同請求（`type_code`／`name`／`pinyin`／`source_id`／`pages`／`notes`；`name` 可能為 `null`），依類型、名稱排序，可直接作為下次 `alt_names` 的底稿（`name` 為 `null` 的列須先剔除；剔除不會刪除它，見上）。只有 `direct` 回應帶 `row`。
   - 文獻：create 帶 `instances_added`／`variant_replacements`／`row`，update 帶 `instances_added`／`instances_removed`／`instances_updated`／`row`，delete 帶 `instances_deleted`。
 - 社會機構的 `create` 回應 `result.pk` 有**兩個鍵**（`c_inst_code` + `c_inst_name_code`），與表格所列的單一主鍵欄不同——請以回應為準。
 - `proposal` 模式存的是「聚合意圖」（`__entity_aggregate`、`__entity_resource`、`__entity_operation`、`__entity_pk` 與原始 `changes`），核准時以 `direct` 重放；因此 create 提案的 `result.pk` 為 `null`（主鍵尚未配發）。核准後提案的 `resource_data` 另記 `__applied_operation_id`（實際落庫的 direct operation id）與配發的識別鍵（create），`__review_status` 轉 `approved`。
 - 聚合提案的 `operations.resource` 存的是**聚合名**（`office`／`social-institution`／`text-entity`），不是資料表名——用 `GET /api/v2/operations` 追蹤時要以此篩選。
 - 聚合提案可用第十一章的 resubmit 端點修改（站內），**新增提案重發時信封要帶 `operation: "create"`**（該端點缺 `operation` 時當 update，會回 422 `c_office_id: required_integer` 之類的「target.pk 缺識別鍵」）。
 - `delete` 的引用護欄在**提案提交當下**就會擋（回 409，不會留下提案），不是等到核准才發現。
-- 稽核足跡：`direct` 的聚合寫入除主表外，**下層資料列的增刪會逐列各寫一筆 `operations` 與 `audit_log`**（官職的每一筆類型關聯、社會機構的每一筆地址增刪都各算一筆，筆數隨關聯列數增加），但回應只回主表那一筆的 `operation_id`。少數欄位是整批更新（例如社會機構改名時同步 `SOCIAL_INSTITUTION_ADDR` 的名碼），那類更新不逐列記。
+- 稽核足跡：`direct` 的聚合寫入除主表外，**下層資料列的增刪會逐列各寫一筆 `operations` 與 `audit_log`**（官職的每一筆類型關聯、社會機構的每一筆地址增刪都各算一筆，筆數隨關聯列數增加），但回應只回主表那一筆的 `operation_id`。少數欄位是整批更新（例如社會機構改名時同步 `SOCIAL_INSTITUTION_ADDR` 的名碼），那類更新不逐列記。**別名列例外**：別名的增刪改、以及改名時同步的名碼，**每一列都各記一筆**（各帶自己的前後快照；`operations.resource` 為 `SOCIAL_INSTITUTION_ALTNAME_DATA`，`resource_id` 是邏輯鍵 `c_inst_code`／`c_inst_altname_type`／`c_inst_altname_hz`）。這張表沒有主鍵，`/app/operations` 的「還原」對別名列不提供（頁面提示「該類操作暫不支援復原」）；要恢復請把快照**併入完整的現有別名清單**後再送 `alt_names`——它是整份清單的集合對賬，只送快照那一列會刪除其他所有別名；沒有可靠的完整清單時不要送（機構已刪除者也無法以此恢復）。`operations` 與 `audit_log` 皆保存與操作相符的快照（更新保存前後快照、新增保存新增後快照、刪除保存刪除前快照），是改動前狀態僅有的紀錄。
 - 社會機構改名時，若目標名稱已存在於名稱代碼表，會**複用既有名碼**而不新增；舊名碼不會回收。
 - 眾包帳號在這裡與代碼表不同：**聚合的 `proposal` 是真的支援**（`direct` 403、`proposal` 200）；而代碼表的 `create`／`delete` 只有 `direct`，送 `proposal` 會 501。
 

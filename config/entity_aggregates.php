@@ -64,8 +64,8 @@ return [
             'create_route' => 'app.social-institution.create',
             'edit_route' => 'app.social-institution.edit',
             'form_capability' => 'propose',
-            'tables' => ['SOCIAL_INSTITUTION_NAME_CODES', 'SOCIAL_INSTITUTION_CODES', 'SOCIAL_INSTITUTION_ADDR'],
-            'closed_code_tables' => ['SOCIAL_INSTITUTION_CODES', 'SOCIAL_INSTITUTION_NAME_CODES', 'SOCIAL_INSTITUTION_ADDR'],
+            'tables' => ['SOCIAL_INSTITUTION_NAME_CODES', 'SOCIAL_INSTITUTION_CODES', 'SOCIAL_INSTITUTION_ADDR', 'SOCIAL_INSTITUTION_ALTNAME_DATA'],
+            'closed_code_tables' => ['SOCIAL_INSTITUTION_CODES', 'SOCIAL_INSTITUTION_NAME_CODES', 'SOCIAL_INSTITUTION_ADDR', 'SOCIAL_INSTITUTION_ALTNAME_DATA'],
             'nav' => [
                 'key' => 'social-institution-codes',
                 'label' => 'codes.social_institution_codes',

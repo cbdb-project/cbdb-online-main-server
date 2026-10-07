@@ -3,6 +3,7 @@
 namespace App\Services\Mutations;
 
 use App\Services\Mutations\EntityAggregate\AbstractEntityAggregateHandler;
+use App\Services\Mutations\EntityAggregate\AggregateWriteConflictException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
@@ -39,12 +40,17 @@ class EntityAggregateCreateHandler extends AbstractEntityAggregateHandler {
             return $this->storeProposal($definition, 'create', null, $personId, $changes, $meta);
         }
 
-        $result = DB::transaction(fn () => $definition->result(
-            'create',
-            null,
-            $input,
-            $definition->service()->create($input, $personId)
-        ));
+        try {
+            $result = DB::transaction(fn () => $definition->result(
+                'create',
+                null,
+                $input,
+                $definition->service()->create($input, $personId)
+            ));
+        } catch (AggregateWriteConflictException $e) {
+            // 交易已整筆回滾；資料狀態不容許安全寫入（見該例外類註）。
+            return $this->errorResponse($e->getMessage(), 409, $e->errors());
+        }
 
         return $this->envelope($definition->resourceName(), 'create', $result);
     }

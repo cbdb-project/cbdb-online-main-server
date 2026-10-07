@@ -8,6 +8,7 @@
 ## §D. 決策定案（LLM 照此執行，勿再確認）
 
 - **D-1 無主鍵表 `SOCIAL_INSTITUTION_ALTNAME_DATA`：直接 SKIP。** 該表無編輯入口，**排除於本 API 與遷移之外、不處理**（不採「合成識別鍵」方案）。下文所有關於此表的「合成 key／特例處理」段落一律視為**不執行、僅跳過**。
+  - **2026-10 更新**：本計畫仍不處理此表，但它已不再沒有寫入途徑——別名改經 `social-institution` 實體聚合的 `alt_names` 清單寫入（API.md §13.4），邏輯列鍵 (c_inst_code, c_inst_altname_type, c_inst_altname_hz) 登記於 `CompositePrimaryKey::SCHEMAS` 與 `OperationsController::resourceKeyColumns()`。資料庫未加合成鍵；定位以名稱的二進位比對進行，泛用還原對此表一律拒絕。
 - **D-2 `/codes` 管理介面審計缺口：本計畫範圍內補齊。** 於 `CodesController` 直寫路徑（`store`/`update`/`destroy`）加 `AuditLogService::write()`，使 UI 與新 API 審計一致（從「可選後續」升為**必做**）。
 - **D-3 `person_id` 契約：實作者自選、二擇一，皆以測試兜住、非阻塞。**
   - (a) 改 `MutationController`：code resource（`person_id_column === null`）時 `person_id` 可選——**須以回歸測試確保既有人物子資源行為不變**（缺 person_id 仍 422、交叉校驗仍觸發）；或

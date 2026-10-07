@@ -335,6 +335,7 @@ class SocialInstituteImportService implements EntityAggregateService {
      * @return array{added: int, removed: int, updated: int}
      */
     protected function reconcileAltNames(int $instCode, int $nameCode, array $rows, int $actorPersonId): array {
+        $this->assertAltNameCodesFit($instCode, $nameCode);
         $current = DB::table(self::ALTNAME_TABLE)
             ->where('c_inst_code', $instCode)
             ->whereNotNull('c_inst_altname_hz')
@@ -501,6 +502,7 @@ class SocialInstituteImportService implements EntityAggregateService {
      * （名碼屬於機構、不屬於別名本身）。
      */
     protected function renameAltNames(int $instCode, int $oldNameCode, int $nameCode, int $actorPersonId): void {
+        $this->assertAltNameCodesFit($instCode, $nameCode);
         $groups = [];
         foreach (DB::table(self::ALTNAME_TABLE)->where('c_inst_code', $instCode)->lockForUpdate()->get() as $a) {
             $row = $this->altNameRowFromDb($a);
@@ -528,6 +530,21 @@ class SocialInstituteImportService implements EntityAggregateService {
                     $actorPersonId
                 );
             }
+        }
+    }
+
+    /**
+     * 別名表的 c_inst_code／c_inst_name_code 是有號 SMALLINT（上限 32767）。在完整遷移後的 schema
+     * 裡機構表與名稱表的對應欄同樣是 SMALLINT，正常情況下不會出現超限的碼；這是**防禦性**檢查，
+     * 針對手動改過或舊版的 schema：超過上限時 MariaDB 非 strict 模式會**靜默截斷**，別名會掛到
+     * 另一個機構上，寧可擋下整筆寫入。（2026-10 生產最大 c_inst_code 為 4010。）
+     */
+    protected function assertAltNameCodesFit(int $instCode, int $nameCode): void {
+        if ($instCode > 32767 || $nameCode > 32767) {
+            throw new AggregateWriteConflictException(
+                "機構碼或名稱碼超出別名表欄位上限（SMALLINT 32767；c_inst_code={$instCode}、c_inst_name_code={$nameCode}），未寫入",
+                ['alt_names' => ['code_out_of_range']]
+            );
         }
     }
 
@@ -972,7 +989,9 @@ class SocialInstituteImportService implements EntityAggregateService {
      * @return array{inst_code:int,addr_deleted:int,operation_id_code:?int}
      */
     public function delete(int $instCode, int $actorPersonId = 0): array {
-        $before = (array) DB::table('SOCIAL_INSTITUTION_CODES')->where('c_inst_code', $instCode)->first();
+        // 先鎖機構列、再碰下層列：與 update() 的上鎖順序一致（機構列 → 別名列），
+        // 並發的 update 與 delete 才不會互等成死結。
+        $before = (array) DB::table('SOCIAL_INSTITUTION_CODES')->where('c_inst_code', $instCode)->lockForUpdate()->first();
         $nameCode = (int) ($before['c_inst_name_code'] ?? 0);
 
         $addrRows = DB::table('SOCIAL_INSTITUTION_ADDR')->where('c_inst_code', $instCode)->get();

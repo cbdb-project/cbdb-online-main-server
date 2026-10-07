@@ -717,6 +717,7 @@ class ApiV2MutateSocialInstituteEntityTest extends TestCase {
         );
         $this->assertSame(1, DB::table('audit_log')->where('table_name', 'SOCIAL_INSTITUTION_ALTNAME_DATA')->where('operation', 'INSERT')->count());
         $this->assertNotNull($res->json('result.row.alt_names.0.pinyin'), '沒給拼音時由名稱派生');
+        $this->assertSame('bai lu shu yuan', $res->json('result.row.alt_names.0.pinyin'));
     }
 
     /**
@@ -880,6 +881,7 @@ class ApiV2MutateSocialInstituteEntityTest extends TestCase {
 
         $this->assertSame(0, DB::table('SOCIAL_INSTITUTION_ALTNAME_DATA')->count());
         $this->assertSame(2, DB::table('audit_log')->where('table_name', 'SOCIAL_INSTITUTION_ALTNAME_DATA')->where('operation', 'DELETE')->count());
+        $this->assertSame(2, DB::table('operations')->where('resource', 'SOCIAL_INSTITUTION_ALTNAME_DATA')->where('op_type', Operation::TYPE_DELETE)->count());
     }
 
     /** create 也收 alt_names。 */
@@ -897,6 +899,7 @@ class ApiV2MutateSocialInstituteEntityTest extends TestCase {
 
         $this->assertDatabaseHas('SOCIAL_INSTITUTION_ALTNAME_DATA', [
             'c_inst_code' => $res->json('result.pk.c_inst_code'), 'c_inst_altname_hz' => '新院',
+            'c_inst_name_code' => $res->json('result.pk.c_inst_name_code'),
         ]);
     }
 
@@ -912,7 +915,7 @@ class ApiV2MutateSocialInstituteEntityTest extends TestCase {
         $this->actingAs($this->makeUser('si-alt-p-reviewer@example.com'));
         $this->post(route('operations.proposals.approve', Operation::findOrFail($res->json('result.operation_id'))))->assertRedirect();
 
-        $this->assertDatabaseHas('SOCIAL_INSTITUTION_ALTNAME_DATA', ['c_inst_code' => 10, 'c_inst_altname_hz' => '白鹿書院']);
+        $this->assertDatabaseHas('SOCIAL_INSTITUTION_ALTNAME_DATA', ['c_inst_code' => 10, 'c_inst_altname_hz' => '白鹿書院', 'c_inst_name_code' => 5]);
     }
 
     /** operations 的別名列能連回機構編輯頁（具名 resource_id 經 SCHEMAS 解析）。 */
@@ -1098,5 +1101,20 @@ class ApiV2MutateSocialInstituteEntityTest extends TestCase {
         $this->assertSame(0, DB::table('SOCIAL_INSTITUTION_CODES')->where('c_inst_code', 11)->count(), '整筆回滾');
         $this->assertSame(0, DB::table('SOCIAL_INSTITUTION_NAME_CODES')->where('c_inst_name_hz', '新書院')->count());
         $this->assertSame(0, DB::table('operations')->count());
+    }
+
+    /** 別名表的機構碼欄是 SMALLINT：超出上限時整筆擋下（409），不讓 MariaDB 靜默截斷、掛錯機構。 */
+    #[Test]
+    public function testAliasesAreRefusedWhenTheInstitutionCodeExceedsTheAliasColumn(): void {
+        DB::table('SOCIAL_INSTITUTION_CODES')->where('c_inst_code', 10)->update(['c_inst_code' => 40000]);
+        DB::table('SOCIAL_INSTITUTION_ADDR')->where('c_inst_code', 10)->update(['c_inst_code' => 40000]);
+        $this->actingAs($this->makeUser('si-alt-range@example.com'));
+
+        $payload = $this->updatePayload(['alt_names' => [['name' => '白鹿書院']]]);
+        $payload['target']['pk']['c_inst_code'] = 40000;
+        $this->postJson('/api/v2/mutate', $payload)
+            ->assertStatus(409)
+            ->assertJsonPath('errors.alt_names.0', 'code_out_of_range');
+        $this->assertSame(0, DB::table('SOCIAL_INSTITUTION_ALTNAME_DATA')->count());
     }
 }

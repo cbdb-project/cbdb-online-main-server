@@ -109,11 +109,13 @@ class VariantReplaceHookCoverageTest extends TestCase {
         ],
         'EntityAggregateCreateHandler' => [
             'app/Services/Import/OfficeImportService.php' => 1,
-            'app/Services/Import/SocialInstituteImportService.php' => 4,
+            // 名稱碼、機構文本欄、地址文本欄、名稱探測，加上別名的歸一鍵／別名名稱／別名文本欄。
+            'app/Services/Import/SocialInstituteImportService.php' => 7,
         ],
         'EntityAggregateUpdateHandler' => [
             'app/Services/Import/OfficeImportService.php' => 1,
-            'app/Services/Import/SocialInstituteImportService.php' => 4,
+            // 名稱碼、機構文本欄、地址文本欄、名稱探測，加上別名的歸一鍵／別名名稱／別名文本欄。
+            'app/Services/Import/SocialInstituteImportService.php' => 7,
         ],
     ];
 

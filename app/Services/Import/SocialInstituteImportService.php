@@ -6,6 +6,7 @@ use App\Repositories\OperationRepository;
 use App\Services\AuditLogService;
 use App\Services\CharVariantMapService;
 use App\Services\Import\Concerns\SharesImportHelpers;
+use App\Services\Mutations\EntityAggregate\AggregateWriteConflictException;
 use App\Support\VariantLabelMap;
 use Illuminate\Support\Facades\DB;
 
@@ -40,6 +41,12 @@ use Illuminate\Support\Facades\DB;
  * 除 create() 外亦提供 load()／update()／delete()，作為「機構實體」聚合 CRUD 的單一真源，
  * 供 mutation API 與前端聚合編輯頁共用。update() 對 SOCIAL_INSTITUTION_ADDR 做集合對賬
  * （同鍵改值、僅增刪差異）。delete() 前須先 referenceCount() 檢查四張人物表引用。
+ *
+ * 【別名】SOCIAL_INSTITUTION_ALTNAME_DATA 也屬本聚合（選填的 alt_names 清單）：create 時
+ * 一併寫入、update 時**僅在請求帶了 alt_names 才**集合對賬（沒帶＝不動，見
+ * ResolvesSocialInstituteAggregateInput::parseSocialInstituteAltNames()）、改名時整批改寫名碼、
+ * delete 時先子後父逐列刪除。該表在資料庫**沒有主鍵**，邏輯列鍵是
+ * (c_inst_code, c_inst_altname_type, c_inst_altname_hz)，見 reconcileAltNames()。
  */
 class SocialInstituteImportService implements EntityAggregateService {
     use SharesImportHelpers;
@@ -51,6 +58,13 @@ class SocialInstituteImportService implements EntityAggregateService {
      * @var array<string,string|array<int,string>>
      */
     protected array $lastVariantReplaced = [];
+
+    /**
+     * 上一次寫入的別名通知（非字元替換：送來的字形被併入既有的另一個字形）。
+     *
+     * @var array<int, string>
+     */
+    protected array $lastAltNameNotices = [];
 
     public function __construct(
         protected OperationRepository $operationRepository,
@@ -201,6 +215,350 @@ class SocialInstituteImportService implements EntityAggregateService {
             'pages' => $str($row->c_pages),
             'notes' => $str($row->c_notes),
             'addresses' => $addresses,
+            'alt_names' => $this->loadAltNames($instCode),
+        ];
+    }
+
+    /**
+     * 別名資料表。**資料庫沒有主鍵、全欄可空**；本聚合以 (c_inst_code, 類型, 別名) 作邏輯列鍵
+     * （CompositePrimaryKey::SCHEMAS 同名項），定位一律走 whereAltName()。
+     *
+     * 異體字替換模式：c_inst_altname_hz **刻意走預設的寬鬆模式**，不列入
+     * VariantReplaceScope::STRICT_COLUMNS。strict 是人名／人物別名欄（BIOG_MAIN 姓名、
+     * ALTNAME_DATA.c_alt_name_chn）的逐欄例外；機構名 SOCIAL_INSTITUTION_NAME_CODES.c_inst_name_hz
+     * 是寬鬆的，機構別名與機構名同一套規則，兩者的字形才不會分歧。
+     */
+    protected const ALTNAME_TABLE = 'SOCIAL_INSTITUTION_ALTNAME_DATA';
+
+    /** 合法的別名類型碼（SOCIAL_INSTITUTION_ALTNAME_CODES；目前只有 0「未詳」）。 */
+    public function altNameTypeCodes(): array {
+        return DB::table('SOCIAL_INSTITUTION_ALTNAME_CODES')
+            ->whereNotNull('c_inst_altname_type')
+            ->pluck('c_inst_altname_type')
+            ->map(fn ($v) => (int) $v)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * 別名的「歸一鍵」：類型＋**異體字歸一後**的名稱。用於認出兩形並存（§1.3）：
+     * 既有列存「淸涼寺」、請求送「清涼寺」，比原字面會判成兩個不同別名——刪舊增新，
+     * 既有列的原字面就被靜默改寫了。
+     */
+    public function altNameKey(?int $type, string $name): string {
+        $reference = CharVariantMapService::replaceFor(self::ALTNAME_TABLE, 'c_inst_altname_hz', $name)['text'];
+
+        return self::altNameTypeKey($type).'|'.$reference;
+    }
+
+    /**
+     * 別名的「字面鍵」：類型＋原字面（不歸一）。
+     *
+     * 尾端空白不算：MariaDB 的 utf8mb4_bin 是 PAD SPACE collation，whereAltName() 下
+     * 'X' 與 'X ' 相等。字面鍵若把兩者當成不同，重複列護欄就看不到這一對，而 where 卻會
+     * 一次命中兩列。（API 寫入的名稱本來就 trim 過，這只關乎 API 以外寫進來的資料。）
+     */
+    public static function altNameLiteralKey(?int $type, ?string $name): string {
+        return self::altNameTypeKey($type).'|'.($name === null ? "\0null" : rtrim($name, ' '));
+    }
+
+    protected static function altNameTypeKey(?int $type): string {
+        return $type === null ? 'null' : (string) $type;
+    }
+
+    /**
+     * 機構的別名列（依類型、名稱排序）。
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function loadAltNames(int $instCode): array {
+        return DB::table(self::ALTNAME_TABLE)
+            ->where('c_inst_code', $instCode)
+            ->orderBy('c_inst_altname_type')
+            ->orderBy('c_inst_altname_hz')
+            ->get()
+            ->map(fn ($a) => $this->altNameRowFromDb($a))
+            ->values()
+            ->all();
+    }
+
+    /** @return array<string, mixed> 正規化列（與 reconcileAltNames() 的期望列同形；name 可為 null） */
+    protected function altNameRowFromDb(object $a): array {
+        return [
+            'type_code' => $a->c_inst_altname_type !== null ? (int) $a->c_inst_altname_type : null,
+            'name' => $a->c_inst_altname_hz !== null ? (string) $a->c_inst_altname_hz : null,
+            'pinyin' => $a->c_inst_altname_py !== null ? (string) $a->c_inst_altname_py : null,
+            'source_id' => $a->c_source !== null ? (int) $a->c_source : null,
+            'pages' => $a->c_pages !== null ? (string) $a->c_pages : null,
+            'notes' => $a->c_notes !== null ? (string) $a->c_notes : null,
+        ];
+    }
+
+    /**
+     * 以邏輯鍵定位別名列。
+     *
+     * **名稱用二進位比對**：欄位是 utf8mb4_general_ci，在它之下大小寫不分、**所有增補平面
+     * 字元（擴展 B 以後的漢字）彼此相等**。這張表沒有主鍵擋重複，「𡒄山」「𡕒山」兩列可以並存，
+     * 用預設 collation 的 `=` 刪其中一列會把兩列一起刪掉、卻只記一筆稽核。MariaDB 上改用
+     * utf8mb4_bin；SQLite（測試）的 `=` 本來就是二進位比對。
+     * NULL 的類型／名稱走 IS NULL（`= NULL` 永遠不成立）。
+     */
+    protected function whereAltName(int $instCode, ?int $type, ?string $name): \Illuminate\Database\Query\Builder {
+        $query = DB::table(self::ALTNAME_TABLE)->where('c_inst_code', $instCode);
+        $type === null ? $query->whereNull('c_inst_altname_type') : $query->where('c_inst_altname_type', $type);
+        if ($name === null) {
+            $query->whereNull('c_inst_altname_hz');
+        } elseif (is_mysql()) {
+            $query->whereRaw('c_inst_altname_hz = ? COLLATE utf8mb4_bin', [$name]);
+        } else {
+            $query->where('c_inst_altname_hz', $name);
+        }
+
+        return $query;
+    }
+
+    /**
+     * 別名集合對賬（於呼叫端交易內；呼叫端須已過 SocialInstitutionAggregateDefinition::guardWrite()
+     * 的別名護欄）。逐列記 operations + audit_log。
+     *
+     * 配對順序：同字面的既有列優先；沒有才以歸一鍵配對既有列（依字面排序，結果確定）；
+     * 都沒有就是新增。沒被配到的既有列刪除。
+     * - **配對到既有列時沿用其原字面**（D6：不回溯改寫既有的變體形）；只有新增的列落參考形，
+     *   替換紀錄也只在真的落了參考形時才進 notices。
+     * - 拼音：請求有給就用；沒給時，既有列保留原拼音，新列由參考形派生。
+     * - 名稱為 NULL 的既有列 API 無從指稱，**不參與對賬、原樣保留**。
+     * - 每一筆 update／delete 都斷言恰好影響 1 列、每一筆 insert 都先確認同鍵不存在；
+     *   不符就拋例外讓整筆交易回滾——寧可失敗，不可在沒有主鍵的表上誤改他列。
+     *
+     * @param array<int, array<string, mixed>> $rows 已驗證的別名列（見 parseSocialInstituteAltNames()）
+     * @return array{added: int, removed: int, updated: int}
+     */
+    protected function reconcileAltNames(int $instCode, int $nameCode, array $rows, int $actorPersonId): array {
+        $current = DB::table(self::ALTNAME_TABLE)
+            ->where('c_inst_code', $instCode)
+            ->whereNotNull('c_inst_altname_hz')
+            // 鎖定讀＝當前讀：核准重放時外層交易的一致性快照可能早於並發寫入，用快照讀會
+            // 漏看剛落庫的同名別名而再插一列。
+            ->lockForUpdate()
+            ->get()
+            ->map(fn ($a) => $this->altNameRowFromDb($a))
+            ->sortBy(fn ($r) => self::altNameLiteralKey($r['type_code'], $r['name']))
+            ->values()
+            ->all();
+
+        $byLiteral = [];
+        foreach ($current as $i => $row) {
+            $literal = self::altNameLiteralKey($row['type_code'], $row['name']);
+            if (isset($byLiteral[$literal])) {
+                // guardWrite() 已以 409 擋下；走到這裡代表護欄被繞過，不可在分不開的列上動手。
+                throw new AggregateWriteConflictException(
+                    '此機構的既有別名有完全相同的重複列，無法安全對賬；請先清理重複列',
+                    ['alt_names' => ['existing_duplicate_rows']]
+                );
+            }
+            $byLiteral[$literal] = $i;
+        }
+
+        $text = function (?string $value, string $column): ?string {
+            if ($value === null || $value === '') {
+                return null;
+            }
+            $result = CharVariantMapService::replaceFor(self::ALTNAME_TABLE, $column, $value);
+            $this->lastVariantReplaced = CharVariantMapService::mergeReplaced($this->lastVariantReplaced, $result['replaced']);
+
+            return $result['text'];
+        };
+
+        $claimed = [];
+        $plan = [];
+        // 第一輪：字面相同者先配對（兩形並存時，送哪一形就留哪一形）。
+        foreach ($rows as $j => $r) {
+            $i = $byLiteral[self::altNameLiteralKey($r['type_code'], (string) $r['name'])] ?? null;
+            if ($i !== null && !isset($claimed[$i])) {
+                $claimed[$i] = true;
+                $plan[$j] = $i;
+            }
+        }
+        // 第二輪：歸一鍵配對剩下的既有列。
+        foreach ($rows as $j => $r) {
+            if (array_key_exists($j, $plan)) {
+                continue;
+            }
+            $plan[$j] = null;
+            $key = $this->altNameKey($r['type_code'], (string) $r['name']);
+            foreach ($current as $i => $row) {
+                if (!isset($claimed[$i]) && $this->altNameKey($row['type_code'], $row['name']) === $key) {
+                    $claimed[$i] = true;
+                    $plan[$j] = $i;
+
+                    break;
+                }
+            }
+        }
+
+        $added = 0;
+        $removed = 0;
+        $updated = 0;
+
+        foreach ($current as $i => $row) {
+            if (isset($claimed[$i])) {
+                continue;
+            }
+            $affected = $this->whereAltName($instCode, $row['type_code'], $row['name'])->delete();
+            $this->assertAltNameAffected($affected, 1, $instCode, 'delete');
+            $this->recordDelete(self::ALTNAME_TABLE, $this->altNamePk($instCode, $row), $this->altNamePayload($instCode, $nameCode, $row), $actorPersonId);
+            $removed++;
+        }
+
+        foreach ($rows as $j => $r) {
+            $existing = $plan[$j] !== null ? $current[$plan[$j]] : null;
+            if ($existing !== null) {
+                $name = $existing['name'];
+                if ($name !== (string) $r['name']) {
+                    // 不是「正規化」（方向可能相反），記成 replaced 會謊稱已歸一；比照機構名的
+                    // 「併入既有字形」改發一般通知。
+                    $this->lastAltNameNotices[] = "別名「{$r['name']}」與既有別名「{$name}」為同一別名的不同字形，沿用既有字形";
+                }
+            } else {
+                $replacement = CharVariantMapService::replaceFor(self::ALTNAME_TABLE, 'c_inst_altname_hz', (string) $r['name']);
+                $this->lastVariantReplaced = CharVariantMapService::mergeReplaced($this->lastVariantReplaced, $replacement['replaced']);
+                $name = $replacement['text'];
+            }
+            $pinyin = $r['pinyin'] ?? null;
+            if ($pinyin === null || $pinyin === '') {
+                $pinyin = $existing !== null ? $existing['pinyin'] : $this->buildPinyin($name);
+            }
+            $desired = [
+                'type_code' => $existing !== null ? $existing['type_code'] : $r['type_code'],
+                'name' => $name,
+                'pinyin' => $pinyin,
+                'source_id' => $r['source_id'] !== null ? (int) $r['source_id'] : null,
+                'pages' => $text($r['pages'] ?? null, 'c_pages'),
+                'notes' => $text($r['notes'] ?? null, 'c_notes'),
+            ];
+
+            if ($existing === null) {
+                if ($this->whereAltName($instCode, $desired['type_code'], $name)->lockForUpdate()->exists()) {
+                    throw new AggregateWriteConflictException(
+                        '此機構已有同名別名（可能剛被另一筆寫入建立），本次未寫入',
+                        ['alt_names' => ['already_exists']]
+                    );
+                }
+                $payload = $this->altNamePayload($instCode, $nameCode, $desired);
+                DB::table(self::ALTNAME_TABLE)->insert($payload);
+                $this->recordOp(self::ALTNAME_TABLE, $this->altNamePk($instCode, $desired), $payload, $actorPersonId);
+                $added++;
+            } elseif ($existing !== $desired) {
+                $changes = array_intersect_key(
+                    $this->altNamePayload($instCode, $nameCode, $desired),
+                    array_flip(['c_inst_altname_py', 'c_source', 'c_pages', 'c_notes'])
+                );
+                $affected = $this->whereAltName($instCode, $existing['type_code'], $existing['name'])->update($changes);
+                $this->assertAltNameAffected($affected, 1, $instCode, 'update');
+                $this->recordUpdate(
+                    self::ALTNAME_TABLE,
+                    $this->altNamePk($instCode, $desired),
+                    $this->altNamePayload($instCode, $nameCode, $existing),
+                    $this->altNamePayload($instCode, $nameCode, $desired),
+                    $actorPersonId
+                );
+                $updated++;
+            }
+        }
+
+        return ['added' => $added, 'removed' => $removed, 'updated' => $updated];
+    }
+
+    /**
+     * 刪除機構的全部別名（delete() 用，先子後父）。逐列記錄：字面完全相同的重複列一條 delete
+     * 敘述會一起刪掉，所以**每一列實體列各記一筆**（各帶自己的快照），筆數必須與刪除列數相符。
+     */
+    protected function deleteAllAltNames(int $instCode, int $actorPersonId): int {
+        $groups = [];
+        foreach (DB::table(self::ALTNAME_TABLE)->where('c_inst_code', $instCode)->lockForUpdate()->get() as $a) {
+            $row = $this->altNameRowFromDb($a);
+            $groups[self::altNameLiteralKey($row['type_code'], $row['name'])][] = [$row, (array) $a];
+        }
+
+        $deleted = 0;
+        foreach ($groups as $members) {
+            [$first] = $members[0];
+            $affected = $this->whereAltName($instCode, $first['type_code'], $first['name'])->delete();
+            $this->assertAltNameAffected($affected, count($members), $instCode, 'delete');
+            foreach ($members as [$row, $snapshot]) {
+                $this->recordDelete(self::ALTNAME_TABLE, $this->altNamePk($instCode, $row), $snapshot, $actorPersonId);
+                $deleted++;
+            }
+        }
+
+        return $deleted;
+    }
+
+    /**
+     * 改名時把別名列的 c_inst_name_code 改成新碼，**逐列**記 UPDATE（每一列實體列各一筆，
+     * 帶自己的前後快照）。分組與筆數斷言同 deleteAllAltNames()。名稱為 NULL 的列一併改寫
+     * （名碼屬於機構、不屬於別名本身）。
+     */
+    protected function renameAltNames(int $instCode, int $oldNameCode, int $nameCode, int $actorPersonId): void {
+        $groups = [];
+        foreach (DB::table(self::ALTNAME_TABLE)->where('c_inst_code', $instCode)->lockForUpdate()->get() as $a) {
+            $row = $this->altNameRowFromDb($a);
+            $groups[self::altNameLiteralKey($row['type_code'], $row['name'])][] = [$row, (array) $a];
+        }
+
+        foreach ($groups as $members) {
+            [$first] = $members[0];
+            $affected = $this->whereAltName($instCode, $first['type_code'], $first['name'])
+                ->update(['c_inst_name_code' => $nameCode]);
+            // 名碼本來就等於新碼的列不會被計入（MariaDB 回報的是「實際改變」的列數）。
+            $expected = count(array_filter($members, fn ($m) => (int) ($m[1]['c_inst_name_code'] ?? 0) !== $nameCode));
+            if ($affected !== $expected && $affected !== count($members)) {
+                $this->assertAltNameAffected($affected, $expected, $instCode, 'rename');
+            }
+            foreach ($members as [$row, $before]) {
+                if ((int) ($before['c_inst_name_code'] ?? 0) === $nameCode) {
+                    continue;
+                }
+                $this->recordUpdate(
+                    self::ALTNAME_TABLE,
+                    $this->altNamePk($instCode, $row),
+                    $before,
+                    array_merge($before, ['c_inst_name_code' => $nameCode]),
+                    $actorPersonId
+                );
+            }
+        }
+    }
+
+    protected function assertAltNameAffected(int $affected, int $expected, int $instCode, string $what): void {
+        if ($affected !== $expected) {
+            throw new AggregateWriteConflictException(
+                "別名{$what}影響 {$affected} 列、預期 {$expected} 列（c_inst_code={$instCode}），已整筆回滾、未寫入",
+                ['alt_names' => ['unexpected_row_count']]
+            );
+        }
+    }
+
+    /** 別名列的邏輯鍵（審計 row_pk、operations.resource_id）。 */
+    protected function altNamePk(int $instCode, array $r): array {
+        return [
+            'c_inst_code' => $instCode,
+            'c_inst_altname_type' => $r['type_code'],
+            'c_inst_altname_hz' => $r['name'],
+        ];
+    }
+
+    protected function altNamePayload(int $instCode, int $nameCode, array $r): array {
+        return [
+            'c_inst_name_code' => $nameCode,
+            'c_inst_code' => $instCode,
+            'c_inst_altname_type' => $r['type_code'],
+            'c_inst_altname_hz' => $r['name'],
+            'c_inst_altname_py' => $r['pinyin'],
+            'c_source' => $r['source_id'],
+            'c_pages' => $r['pages'],
+            'c_notes' => $r['notes'],
         ];
     }
 
@@ -395,6 +753,7 @@ class SocialInstituteImportService implements EntityAggregateService {
         // 批次匯入是同一個 service 實例逐列呼叫；不重置會把上一列的替換紀錄
         // 帶到下一列的結果頁（本累積器由 codeColumns()／resolveNameCode() 以 merge 寫入）。
         $this->lastVariantReplaced = [];
+        $this->lastAltNameNotices = [];
         $name = $input['name'];
 
         // 名稱去重：同名已存在則複用碼、不新增 NAME_CODES（見 resolveNameCode）。
@@ -438,6 +797,12 @@ class SocialInstituteImportService implements EntityAggregateService {
         ];
         $addrOp = $this->recordOp('SOCIAL_INSTITUTION_ADDR', $addrPk, $addrPayload, $actorPersonId);
 
+        // 選填的別名（批量匯入不帶這個鍵，行為不變）。
+        $altResult = ['added' => 0];
+        if (($input['alt_names'] ?? null) !== null) {
+            $altResult = $this->reconcileAltNames($instCode, $nameCode, $input['alt_names'], $actorPersonId);
+        }
+
         return [
             'inst_code' => $instCode,
             'name_code' => $nameCode,
@@ -446,10 +811,13 @@ class SocialInstituteImportService implements EntityAggregateService {
             'operation_id_name' => $resolved['operation_id'],
             'operation_id_code' => $codeOp?->id,
             'operation_id_addr' => $addrOp?->id,
+            'alt_names_added' => $altResult['added'],
+            'alt_names' => ($input['alt_names'] ?? null) !== null ? $this->loadAltNames($instCode) : [],
             // 實際生效的機構名（複用既有碼時是既有列的字面——**刻意不歸一**，見 resolveNameCode()）
             // 與本次替換紀錄。
             'name' => $resolved['name_hz'],
             'variant_replaced' => $this->lastVariantReplaced,
+            'alt_name_notices' => $this->lastAltNameNotices,
         ];
     }
 
@@ -471,6 +839,7 @@ class SocialInstituteImportService implements EntityAggregateService {
         // 批次匯入是同一個 service 實例逐列呼叫；不重置會把上一列的替換紀錄
         // 帶到下一列的結果頁（本累積器由 codeColumns()／resolveNameCode() 以 merge 寫入）。
         $this->lastVariantReplaced = [];
+        $this->lastAltNameNotices = [];
         $before = (array) DB::table('SOCIAL_INSTITUTION_CODES')->where('c_inst_code', $instCode)->lockForUpdate()->first();
         $oldNameCode = (int) $before['c_inst_name_code'];
 
@@ -493,6 +862,9 @@ class SocialInstituteImportService implements EntityAggregateService {
             DB::table('SOCIAL_INSTITUTION_ADDR')
                 ->where('c_inst_code', $instCode)
                 ->update(['c_inst_name_code' => $nameCode]);
+            // 別名列同樣冗餘存名碼。與 ADDR 不同，這裡**逐列記**：這張表沒有主鍵、也不開放泛用
+            // 還原，operations／audit_log 是改名前狀態唯一的紀錄。
+            $this->renameAltNames($instCode, $oldNameCode, $nameCode, $actorPersonId);
         }
 
         // ADDR 集合對賬。
@@ -567,6 +939,12 @@ class SocialInstituteImportService implements EntityAggregateService {
             $actorPersonId
         );
 
+        // 別名：請求帶了 alt_names 才對賬；沒帶＝不動（見 parseSocialInstituteAltNames()）。
+        $altResult = ['added' => 0, 'removed' => 0, 'updated' => 0];
+        if (($input['alt_names'] ?? null) !== null) {
+            $altResult = $this->reconcileAltNames($instCode, $nameCode, $input['alt_names'], $actorPersonId);
+        }
+
         return [
             'inst_code' => $instCode,
             'name_code' => $nameCode,
@@ -575,8 +953,13 @@ class SocialInstituteImportService implements EntityAggregateService {
             // 與本次替換紀錄（供呼叫端組 notices／結果頁）。
             'name' => $resolved['name_hz'],
             'variant_replaced' => $this->lastVariantReplaced,
+            'alt_name_notices' => $this->lastAltNameNotices,
             'addr_added' => $result['added'],
             'addr_removed' => $result['removed'],
+            'alt_names_added' => $altResult['added'],
+            'alt_names_removed' => $altResult['removed'],
+            'alt_names_updated' => $altResult['updated'],
+            'alt_names' => $this->loadAltNames($instCode),
             'operation_id_code' => $codeOp?->id,
         ];
     }
@@ -612,6 +995,9 @@ class SocialInstituteImportService implements EntityAggregateService {
             ], (array) $a, $actorPersonId);
         }
 
+        // 別名列（先子後父，逐列記；泛用還原不支援這張表，操作記錄是唯一紀錄）。
+        $altDeleted = $this->deleteAllAltNames($instCode, $actorPersonId);
+
         DB::table('SOCIAL_INSTITUTION_CODES')->where('c_inst_code', $instCode)->delete();
         $codeOp = $this->recordDelete(
             'SOCIAL_INSTITUTION_CODES',
@@ -623,6 +1009,7 @@ class SocialInstituteImportService implements EntityAggregateService {
         return [
             'inst_code' => $instCode,
             'addr_deleted' => count($addrRows),
+            'alt_names_deleted' => $altDeleted,
             'operation_id_code' => $codeOp?->id,
         ];
     }

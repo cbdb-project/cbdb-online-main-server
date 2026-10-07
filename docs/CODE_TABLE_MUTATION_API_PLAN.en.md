@@ -8,6 +8,7 @@
 ## §D. Locked Decisions (execute as-is; do NOT re-confirm)
 
 - **D-1 No-PK table `SOCIAL_INSTITUTION_ALTNAME_DATA`: SKIP.** It has no edit entry point, so it is **excluded from this API and from the migration — not handled** (do NOT build a "synthetic identifier" path). Treat every "synthetic key / special-case handling" passage about this table below as **not to be executed — simply skip it**.
+  - **Update 2026-10:** this plan still does not handle the table, but it is no longer without a write path. Aliases are now written through the `social-institution` entity aggregate's `alt_names` list (API.md §13.4), with the logical row key (c_inst_code, c_inst_altname_type, c_inst_altname_hz) registered in `CompositePrimaryKey::SCHEMAS` and `OperationsController::resourceKeyColumns()`. No synthetic DB key was added; rows are located with a binary comparison on the name, and generic restore is refused for the table.
 - **D-2 `/codes` UI audit gap: fix it within this plan's scope.** Add `AuditLogService::write()` to the `CodesController` direct-write paths (`store`/`update`/`destroy`) so the UI is audited consistently with the new API (promoted from "optional follow-up" to **required**).
 - **D-3 `person_id` contract: implementer's choice, either option, both guarded by tests and non-blocking.**
   - (a) Modify `MutationController`: make `person_id` optional for code resources (`person_id_column === null`) — **regression tests must confirm existing person sub-resources are unchanged** (still 422 on missing person_id; cross-check still fires); OR

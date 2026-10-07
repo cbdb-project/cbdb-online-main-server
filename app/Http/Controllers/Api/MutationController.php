@@ -15,6 +15,9 @@ class MutationController extends Controller {
     /** batch_mutate 單次請求最多筆數（避免超大請求撐爆記憶體/逾時）。 */
     public const BATCH_MAX_ITEMS = 500;
 
+    /** 修改提案（resubmit）時，若表單重送未帶、就沿用舊提案值的實體聚合鍵，依聚合名（見 resubmit()）。 */
+    private const AGGREGATE_KEYS_CARRIED_ON_RESUBMIT = ['social-institution' => ['alt_names']];
+
     protected MutationHandlerRegistry $handlerRegistry;
     protected MutationReadService $readService;
     protected RelationshipMirrorService $mirrorService;
@@ -147,6 +150,18 @@ class MutationController extends Controller {
         }
         if ($personId === null || $personId === '') {
             return $this->errorResponse('缺少 person_id', 422, ['person_id' => ['required']]);
+        }
+
+        // 實體聚合提案裡**編輯頁沒有欄位**的鍵（目前是社會機構的 alt_names）：表單重送的
+        // changes 不會帶它，而聚合對它的語義是「沒帶＝不動」——於是經 API 提出的別名變更會在
+        // 重送時被靜默丟掉、舊提案又被撤回。沒帶就沿用舊提案的值。
+        $carriedKeys = self::AGGREGATE_KEYS_CARRIED_ON_RESUBMIT[(string) ($oldPayload['__entity_resource'] ?? '')] ?? [];
+        if (($oldPayload['__entity_aggregate'] ?? false) === true && is_array($oldPayload['changes'] ?? null)) {
+            foreach ($carriedKeys as $key) {
+                if (array_key_exists($key, $oldPayload['changes']) && !array_key_exists($key, $changes)) {
+                    $changes[$key] = $oldPayload['changes'][$key];
+                }
+            }
         }
 
         // mode 一律強制 proposal：resubmit 的語義就是重發提案，不接受 direct。

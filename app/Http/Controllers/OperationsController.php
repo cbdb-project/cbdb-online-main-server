@@ -1352,7 +1352,10 @@ class OperationsController extends Controller {
             return redirect()->back();
         }
 
-        if ($operation->resource === 'POSTED_TO_ADDR_DATA') {
+        // SOCIAL_INSTITUTION_ALTNAME_DATA：資料庫沒有主鍵、名稱欄是 general_ci（增補平面漢字彼此
+        // 相等），泛用還原的 where 可能一次改到或刪到他列；重建被刪列也會繞過聚合的去重、在
+        // 機構已刪後留下孤兒。這張表只經社會機構聚合（alt_names）寫入，要恢復請在那裡重送。
+        if (in_array($operation->resource, ['POSTED_TO_ADDR_DATA', 'SOCIAL_INSTITUTION_ALTNAME_DATA'], true)) {
             flash(__('operations.restore_not_supported'), 'warning');
 
             return redirect()->back();
@@ -1926,6 +1929,8 @@ class OperationsController extends Controller {
             'SOCIAL_INSTITUTION_TYPES' => ['c_inst_type_code'],
             'SOCIAL_INSTITUTION_CODES' => ['c_inst_code','c_inst_name_code'],
             'SOCIAL_INSTITUTION_ADDR' => ['c_inst_addr_id','c_inst_addr_type_code','c_inst_code','c_inst_name_code','inst_xcoord','inst_ycoord'],
+            // 機構別名：表無主鍵，這是聚合的邏輯列鍵（見 CompositePrimaryKey::SCHEMAS 同名項）。
+            'SOCIAL_INSTITUTION_ALTNAME_DATA' => ['c_inst_code','c_inst_altname_type','c_inst_altname_hz'],
             'ADMIN_CAT_CODES' => ['c_admin_cat_code'],
             'ADDR_CODES' => ['c_addr_id'],
             'ADDR_BELONGS_DATA' => ['c_addr_id', 'c_belongs_to', 'c_firstyear', 'c_lastyear'],

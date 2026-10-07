@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
  * 「社會機構實體」聚合輸入的解析與校驗（update 用；create 維持 SocialInstitutionAggregateDefinition::validateCreate
  * 既有語義以相容批量匯入）。必填核心與 create 一致（AGENTS.md：必填欄位 create／update 一致）：
  * name、type_code、dynasty_code、source_id、至少一列地址。其餘欄位選填，給值時校驗參照表存在。
+ * 別名清單 alt_names 選填、且**不帶＝不動**（見 parseSocialInstituteAltNames()），create 亦共用。
  *
  * 回傳 [errors, input]；input 形狀即 SocialInstituteImportService::update() 的輸入。
  */
@@ -145,7 +146,128 @@ trait ResolvesSocialInstituteAggregateInput {
             }
         }
         $input['addresses'] = $addresses;
+        $input['alt_names'] = $this->parseSocialInstituteAltNames($changes, $service, $errors);
 
         return [$errors, $input];
+    }
+
+    /**
+     * `alt_names`（SOCIAL_INSTITUTION_ALTNAME_DATA）的解析與校驗；create／update 共用。
+     *
+     * **鍵不存在＝不動別名**（回 null），刻意不同於聚合其餘欄位的「全欄覆寫」：既有呼叫端
+     * （React 編輯頁、舊客戶端）送的整份 payload 都沒有這個鍵，若照全欄覆寫語義解讀成「清空」，
+     * 第一次存檔就會把別名全數刪掉。鍵存在（含空陣列）才是「以這份清單為準」做集合對賬。
+     *
+     * 每列：`name`（或 `c_inst_altname_hz`）必填；`type_code`（`c_inst_altname_type`）選填——
+     * 鍵不存在預設 0、明示 null 則保留 null（讓 load() 讀回的列能原樣送回），給值須存在於
+     * SOCIAL_INSTITUTION_ALTNAME_CODES；`source_id`（`c_source`）選填、須存在於 TEXT_CODES；
+     * `pinyin`／`pages`／`notes` 選填。
+     * 這裡只擋**字面完全相同**的重複（同類型、同原字）；「歸一後相同、字面不同」要看既有列才能
+     * 判斷（兩形若本來就並存，送回兩形是合法的），交給 definition 的 guardWrite()。
+     *
+     * @param array<string, mixed>              $changes
+     * @param array<string, array<int, mixed>>  $errors  就地追加錯誤
+     * @return array<int, array<string, mixed>>|null
+     */
+    protected function parseSocialInstituteAltNames(array $changes, SocialInstituteImportService $service, array &$errors): ?array {
+        if (!array_key_exists('alt_names', $changes)) {
+            return null;
+        }
+
+        $raw = $changes['alt_names'];
+        if (!is_array($raw) || ($raw !== [] && !array_is_list($raw))) {
+            $errors['alt_names'] = ['invalid'];
+
+            return null;
+        }
+
+        $typeCodes = $service->altNameTypeCodes();
+        $text = function (array $row, string $field, string $column, string $label, int $i, ?int $max) use (&$errors) {
+            $value = $row[$field] ?? $row[$column] ?? null;
+            if ($value !== null && !is_scalar($value)) {
+                $errors["alt_names.$i.$label"] = ['invalid'];
+
+                return null;
+            }
+            $value = $value === null ? null : trim((string) $value);
+            if ($value === '' || $value === null) {
+                return null;
+            }
+            if ($max !== null && mb_strlen($value) > $max) {
+                $errors["alt_names.$i.$label"] = ['too_long'];
+
+                return null;
+            }
+
+            return $value;
+        };
+        $integer = function (array $row, string $field, string $column, int $i) use (&$errors): ?int {
+            $value = $row[$field] ?? $row[$column] ?? null;
+            if ($value === null || $value === '') {
+                return null;
+            }
+            if (!is_scalar($value) || !preg_match('/^-?\d+$/', (string) $value)) {
+                $errors["alt_names.$i.$field"] = ['integer'];
+
+                return null;
+            }
+
+            return (int) $value;
+        };
+
+        $rows = [];
+        $seen = [];
+        $sourceIds = [];
+        foreach ($raw as $i => $row) {
+            if (!is_array($row)) {
+                $errors["alt_names.$i"] = ['invalid'];
+
+                continue;
+            }
+            $name = $text($row, 'name', 'c_inst_altname_hz', 'name', $i, 255);
+            if ($name === null) {
+                $errors["alt_names.$i.name"] ??= ['required'];
+
+                continue;
+            }
+            $typeGiven = array_key_exists('type_code', $row) || array_key_exists('c_inst_altname_type', $row);
+            $type = $integer($row, 'type_code', 'c_inst_altname_type', $i);
+            if ($type === null && !$typeGiven) {
+                $type = 0;
+            }
+            if ($type !== null && !in_array($type, $typeCodes, true)) {
+                $errors["alt_names.$i.type_code"] ??= ['not_found_in_altname_codes'];
+            }
+            $sourceId = $integer($row, 'source_id', 'c_source', $i);
+            if ($sourceId !== null) {
+                $sourceIds[$i] = $sourceId;
+            }
+
+            $dedupeKey = SocialInstituteImportService::altNameLiteralKey($type, $name);
+            if (isset($seen[$dedupeKey])) {
+                $errors["alt_names.$i"] = ['duplicate'];
+
+                continue;
+            }
+            $seen[$dedupeKey] = true;
+
+            $rows[] = [
+                'type_code' => $type,
+                'name' => $name,
+                'pinyin' => $text($row, 'pinyin', 'c_inst_altname_py', 'pinyin', $i, 255),
+                'source_id' => $sourceId,
+                'pages' => $text($row, 'pages', 'c_pages', 'pages', $i, 255),
+                'notes' => $text($row, 'notes', 'c_notes', 'notes', $i, null),
+            ];
+        }
+
+        $missing = $service->missingSourceIds(array_values($sourceIds));
+        foreach ($sourceIds as $i => $sourceId) {
+            if (in_array($sourceId, $missing, true)) {
+                $errors["alt_names.$i.source_id"] = ['not_found_in_text_codes'];
+            }
+        }
+
+        return $rows;
     }
 }

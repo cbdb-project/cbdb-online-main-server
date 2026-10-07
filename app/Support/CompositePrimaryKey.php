@@ -176,6 +176,14 @@ class CompositePrimaryKey {
             'inst_xcoord',
             'inst_ycoord',
         ],
+        // 機構別名。資料表**沒有**主鍵；這是社會機構聚合用的邏輯列鍵（機構＋類型＋別名），
+        // 由 SocialInstituteImportService::altNamePk() 產生、對賬保證不重複。
+        // 與 OperationsController::resourceKeyColumns() 同步。
+        'SOCIAL_INSTITUTION_ALTNAME_DATA' => [
+            'c_inst_code',
+            'c_inst_altname_type',
+            'c_inst_altname_hz',
+        ],
         'ADMIN_CAT_CODES' => [
             'c_admin_cat_code',
         ],

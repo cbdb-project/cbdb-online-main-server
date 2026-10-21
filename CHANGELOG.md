@@ -4,6 +4,14 @@
 
 ## 2026-10
 
+### 🚑 修正：prod（`route:cache`）下舊網址導向 500（`Call to undefined function cbdb_legacy_page_redirect()`）
+
+舊 Blade 網址（`/codes/...`、`/manage`、`/profile`、`/admin/...`）的 302 導向 closure 呼叫的
+`cbdb_legacy_page_redirect()` 原本定義在 `routes/web.php`。prod 跑 `route:cache`，走快取時路由檔不會被執行，
+函式因此不存在，2026-10-15 起 laravel.log 累積 12,570 次 500。函式已移到 `app/helpers.php`（composer autoload），
+行為一字未改。測試環境一定會執行路由檔，所以既有導向測試全綠也抓不到；新增兩條護欄：子行程只載入 composer
+autoload 驗證函式存在，以及 token 掃描禁止 `routes/{web,api,ai}.php` 宣告具名函式／類別／常數。
+
 ### 🏷️ 社會機構別名可經 API 寫入（`social-institution` 聚合的 `alt_names`）
 
 `SOCIAL_INSTITUTION_ALTNAME_DATA` 過去沒有任何寫入途徑（無主鍵，代碼表 API 計畫 D-1 刻意跳過）。現在社會機構聚合的

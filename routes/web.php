@@ -223,39 +223,11 @@ Route::get('basicinformation/{id}/Duplicate_Collateral_Info', 'BasicInformationC
 // 它們產出的 URL 仍會 302 到 React 版。那些回退本身的收斂屬環節 4d。
 // ── Blade 下架環節 4b-4a：codes 顯示頁的 302 導向 ────────────────────────
 //
-// 🔴 **一律走 `route($target, $request->route()->parameters(), false)`，不要手拼字串**
-// （第一版手拼，被 review 抓出兩個 bug）：
-//  1. **編碼**：手拼會讓 `Location` 吐出裸 UTF-8／裸空白，而代碼表**已支援文本主鍵**
-//     （`ADDR_CODES` 之外還有 `ALTNAME_DATA.c_alt_name_chn` 這類），所以 `$id = '慎'`
-//     不是假想。更糟的是 `a%2Fb` 會被解成真的路徑分隔。`route()` 會做 rawurlencode
-//     並只放行 `/ ? & # %`——那正是舊 `RetireLegacyBladePage` 的行為（該 middleware 已於
-//     環節 4b-4c 移除，這裡指的是它被刪之前的實作）。
-//  2. **query string**：五條裡有一條漏拼（`proposals/{operation}/edit`），而舊 middleware
-//     對所有導向型一律保留 QS。書籤／從 operations 頁帶參數過來都會受影響。
-//
-// 這個小工具把兩件事收在一起，順帶消掉硬編碼的 `/app/codes` 字面值。
-//
-// ⚠️ **不要在交給 route() 之前自己先 rawurlencode**（codex 提過、實測後決定不改）：
-// `route()` 只放行 `/ ? & # %`，而 codes 的 `{id}` 是 `where('id', '.*')`，
-// `operations.resource_id` 對複合主鍵存的就是 `c_personid=1&c_x=2` 這種**帶 `=` 與 `&`** 的
-// 格式。先編碼會把那個形狀改寫成 `%3D`／`%26`——那是單方面改掉一個出現在 operations
-// payload 裡的 URL。這裡的目標是與被移除的 middleware **一字不差的 parity**
-// （已刪除的 `RetireLegacyBladePage` 第 80-81 行就是這兩行）。取捨與理由釘在
-// `LegacyBladePageRetirementTest::codes_redirects_preserve_the_query_string_and_encode_the_id()`。
-if (!function_exists('cbdb_legacy_page_redirect')) {
-    /**
-     * legacy 顯示頁 → `/app` 對應頁的 302（環節 4a／4b-4 共用）。
-     *
-     * 名稱在環節 4b-4b 從 `cbdb_legacy_codes_redirect` 改過來：它從來就不限 codes，
-     * 4b-4b 起 manage／profile／admin 全部共用同一份。
-     */
-    function cbdb_legacy_page_redirect(string $target, \Illuminate\Http\Request $request) {
-        $url = route($target, $request->route()->parameters(), false);
-        $qs = $request->getQueryString();
-
-        return redirect()->to($url.($qs ? '?'.$qs : ''), 302);
-    }
-}
+// 導向一律走 `cbdb_legacy_page_redirect()`，定義在 app/helpers.php（composer 自動載入）。
+// 🔴 **不要把它（或任何具名函式）搬回本檔**：prod 用 `route:cache`，走快取時
+// `routes/{web,api,ai}.php` 根本不會被執行，定義在這裡的函式就不存在，closure 一呼叫就
+// `Call to undefined function` ⇒ 500（2026-10-15 起 laravel.log 實際累積上萬次）。
+// 護欄：`LegacyBladePageRetirementTest::the_legacy_redirect_helper_survives_route_caching()`。
 
 Route::get('codes', fn (\Illuminate\Http\Request $request) => cbdb_legacy_page_redirect('app.codes.index', $request))
     ->name('codes.index');

@@ -201,6 +201,104 @@ class LegacyBladePageRetirementTest extends TestCase {
     }
 
     /**
+     * ── 2026-10-21（prod 事故：route:cache 下 `cbdb_legacy_page_redirect()` 未定義）────
+     *
+     * 🔴 **導向 closure 呼叫的 helper 必須由 composer autoload 提供，不能定義在路由檔裡。**
+     *
+     * prod 跑 `route:cache`：走快取時 Laravel 只載入 `bootstrap/cache/routes-v7.php`，
+     * **`routes/web.php` 根本不會被執行**。原本 helper 就定義在 web.php 裡，於是快取環境中
+     * 所有舊網址（`/codes/...`、`/manage`、`/profile`、`/admin/...`）一律
+     * `Call to undefined function cbdb_legacy_page_redirect()` ⇒ 500，
+     * 2026-10-15 起 laravel.log 累積了一萬多次。
+     *
+     * ⚠️ **為什麼要開子行程**：本測試行程在 bootstrap 時已經 require 過 routes/web.php，
+     * 不論函式定義在哪裡，這裡的 `function_exists()` 都恆為真——上面那幾條導向測試
+     * 因此全綠、完全沒抓到這個 bug。只有「只載入 composer autoload、不碰路由檔」的
+     * 乾淨行程才能重現快取環境的前提。
+     */
+    #[Test]
+    public function the_legacy_redirect_helper_survives_route_caching(): void {
+        $process = new \Symfony\Component\Process\Process([
+            PHP_BINARY,
+            '-r',
+            'require $argv[1]; echo function_exists("cbdb_legacy_page_redirect") ? "defined" : "missing";',
+            base_path('vendor/autoload.php'),
+        ]);
+        $process->mustRun();
+
+        $this->assertSame(
+            'defined',
+            trim($process->getOutput()),
+            'cbdb_legacy_page_redirect() 必須由 composer autoload（app/helpers.php）定義；'
+            .'定義在 routes/web.php 裡的話，route:cache 環境下所有舊網址都會 500'
+        );
+    }
+
+    /**
+     * 🔴 **路由檔裡不可以宣告具名函式（或類別）。**
+     *
+     * 上一條只守住 `cbdb_legacy_page_redirect()` 這一個名字；這條守住「同一類錯誤再犯」：
+     * 任何寫在路由檔裡的具名函式，在 `route:cache` 環境下都不存在，
+     * 但在測試與本機（不跑 route:cache）一律看起來正常——這正是這次 bug 藏了一陣子的原因。
+     * closure（`function (...)`／`fn (...)`）不受影響：它們被序列化進快取檔。
+     *
+     * 範圍只限 `RouteServiceProvider::map()` 載入、會被 `route:cache` 取代的三支檔
+     *（web／api／ai）。`channels.php`（BroadcastServiceProvider 每次 boot 都 require）
+     * 與 `console.php`（console kernel 載入）不受路由快取影響，刻意不掃。
+     */
+    #[Test]
+    public function route_files_do_not_declare_named_functions(): void {
+        $offending = [];
+        foreach (['web.php', 'api.php', 'ai.php'] as $name) {
+            $file = base_path('routes/'.$name);
+            $this->assertFileExists($file, '路由檔改名／新增時要同步這份清單（對照 RouteServiceProvider::map()）');
+            $tokens = array_values(array_filter(
+                token_get_all(file_get_contents($file)),
+                fn ($t) => !is_array($t) || !in_array($t[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)
+            ));
+            foreach ($tokens as $i => $token) {
+                if (!is_array($token)) {
+                    continue;
+                }
+                $prev = $tokens[$i - 1] ?? null;
+                // 頂層 `const X = ...;` 與 `define('X', ...)`（含 `\define(`）同樣只在路由檔被執行時才存在。
+                // `Foo::define(` 與 `$x->define(` 是方法呼叫，不算。
+                $isDefineCall = in_array($token[0], [T_STRING, T_NAME_FULLY_QUALIFIED], true)
+                    && strtolower(ltrim($token[1], '\\')) === 'define'
+                    && ($tokens[$i + 1] ?? null) === '('
+                    && !(is_array($prev) && in_array($prev[0], [T_DOUBLE_COLON, T_OBJECT_OPERATOR, T_NULLSAFE_OBJECT_OPERATOR], true));
+                if ($token[0] === T_CONST || $isDefineCall) {
+                    $offending[] = basename($file).':'.$token[2].' '.$token[1];
+
+                    continue;
+                }
+                if (!in_array($token[0], [T_FUNCTION, T_CLASS, T_INTERFACE, T_TRAIT, T_ENUM], true)) {
+                    continue;
+                }
+                // `Foo::class` 不是宣告；`use function foo;` 是匯入；`function (` 是 closure。
+                if (is_array($prev) && in_array($prev[0], [T_DOUBLE_COLON, T_USE], true)) {
+                    continue;
+                }
+                $next = $tokens[$i + 1] ?? null;
+                // PHP 8.1+ 把 `function &foo` 的 `&` 切成具名 token，不是裸字串。
+                if ((is_array($next) ? $next[1] : $next) === '&') {
+                    $next = $tokens[$i + 2] ?? null;
+                }
+                if (is_array($next) && $next[0] === T_STRING) {
+                    $offending[] = basename($file).':'.$token[2].' '.$next[1];
+                }
+            }
+        }
+
+        $this->assertSame(
+            [],
+            $offending,
+            'routes/{web,api,ai}.php 裡宣告的具名函式／類別／常數在 route:cache 環境下不會被載入（路由檔不執行），'
+            .'呼叫時會 500。請移到 app/helpers.php（composer autoload files）或 app/ 底下的類別。'
+        );
+    }
+
+    /**
      * ── 2026-09-15（環節 4b-4b，codex 查出）─────────────────────────────
      *
      * 🔴 **把 controller 換成 closure 會弄丟「建構式 middleware」。**

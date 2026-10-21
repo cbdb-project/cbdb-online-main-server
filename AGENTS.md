@@ -304,6 +304,7 @@ php artisan cbdb:fetch-chgis-map        # 下載 CHGIS 底圖（缺檔才下載�
 - commit message 使用繁體中文
 
 ## 高風險區域備忘
+- prod 跑 `route:cache`／`config:cache`：**`routes/{web,api,ai}.php` 不可宣告具名函式、類別、常數（`const`／`define()`）**——走路由快取時這三支路由檔不執行（`channels.php`／`console.php` 不受影響），那些東西不存在，closure 一呼叫就 500（2026-10 `cbdb_legacy_page_redirect()` 事故）。共用 helper 放 `app/helpers.php`。護欄：`LegacyBladePageRetirementTest::route_files_do_not_declare_named_functions()`。另外 `routes/ai.php` 依 `MCP_ENABLED`／`MCP_REQUIRED_ABILITY` 決定的路由在快取時就定死，改這兩個 env 後要重跑 `route:cache`。
 - `ALTNAME_DATA` 現行主鍵是 3-key，不含 `c_sequence`。
 - `POSTED_TO_ADDR_DATA` 的 `resource_id` 會沿用 `POSTED_TO_OFFICE_DATA` 格式，地址明細存於 `resource_data['rows']`。
 - 與時間欄位有關的修改，請注意 `DB_TIMEZONE` 必須與 `APP_TIMEZONE` 對齊；資料庫時區使用數字偏移，例如 `+08:00`。

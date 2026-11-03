@@ -18,6 +18,17 @@
     <env name="QUEUE_CONNECTION" value="sync"/>
     <env name="SKIP_CSRF_TOKEN" value="true"/>
     <env name="LOG_CHANNEL" value="errorlog"/>
+    <!-- LLM 主端點固定為 chat/completions：端點以 /responses 結尾時會改走 Responses API 並轉換請求/回應格式，
+         開發者本機 .env 若已指向 /responses（例如 HUIT），測試裡偽造的 chat 形狀回應就會對不上。
+         要測 /responses 的測試請在案例內自己 config(['services.gemini.api_endpoint' => ...])。
+         同理 key 與備援（_1）一律固定為空：備援 key 只要非空就會啟用備援，開發者本機 .env 有填時
+         測試會多出備援重試或打向沒被 fake 的端點；CI 的 .env 沒有這些變量，固定為空才與 CI 行為一致。 -->
+    <env name="GEMINI_API_ENDPOINT" value="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" force="true"/>
+    <env name="GEMINI_MODEL" value="gemini-3-flash-preview" force="true"/>
+    <env name="GEMINI_API_KEY" value="" force="true"/>
+    <env name="GEMINI_API_KEY_1" value="" force="true"/>
+    <env name="GEMINI_API_ENDPOINT_1" value="" force="true"/>
+    <env name="GEMINI_MODEL_1" value="" force="true"/>
     <env name="PROMETHEUS_ENABLED" value="false"/>
     <env name="PROMETHEUS_STORAGE_ADAPTER" value="memory"/>
   </php>

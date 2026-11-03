@@ -48,6 +48,21 @@ class McpProtocolCompatibilityTest extends TestCase {
         ], $headers + ['Accept' => 'application/json']);
     }
 
+    /**
+     * 工具呼叫必須「真的拿到工具結果」：有 result、isError 明確為 false、content 的文字能解出 allowed_tables。
+     * 只斷言「沒有 error」不夠——回應若連 result 都沒有（沒收到任何結果）那種情況也會通過。
+     */
+    private function assertListAllowedTablesSucceeded($response, string $context = ''): void {
+        $this->assertNull($response->json('error'), $context.' JSON-RPC error：'.json_encode($response->json('error')));
+        $this->assertIsArray($response->json('result'), $context.' 回應沒有 result');
+        $this->assertFalse($response->json('result.isError'), $context.' isError 必須明確為 false');
+
+        $payload = json_decode((string) $response->json('result.content.0.text'), true);
+        $this->assertIsArray($payload, $context.' 工具沒有回傳可解析的內容');
+        $this->assertArrayHasKey('allowed_tables', $payload, $context);
+        $this->assertArrayHasKey('count', $payload, $context);
+    }
+
     private function modernMeta(): array {
         return ['_meta' => [
             'io.modelcontextprotocol/protocolVersion' => self::MODERN,
@@ -118,7 +133,7 @@ class McpProtocolCompatibilityTest extends TestCase {
                 ['MCP-Protocol-Version' => $version]
             );
             $call->assertOk();
-            $this->assertNull($call->json('error'), "版本頭 {$version}：".json_encode($call->json('error')));
+            $this->assertListAllowedTablesSucceeded($call, "版本頭 {$version}");
         }
     }
 
@@ -183,13 +198,7 @@ class McpProtocolCompatibilityTest extends TestCase {
         $response = $this->rpc('tools/call', ['name' => 'list_allowed_tables', 'arguments' => (object) []]);
 
         $response->assertOk();
-        $this->assertNull($response->json('error'), 'tools/call 不應回 JSON-RPC 錯誤：'.json_encode($response->json('error')));
-        $this->assertFalse((bool) $response->json('result.isError'));
-
-        $payload = json_decode((string) $response->json('result.content.0.text'), true);
-        $this->assertIsArray($payload);
-        $this->assertArrayHasKey('allowed_tables', $payload);
-        $this->assertArrayHasKey('count', $payload);
+        $this->assertListAllowedTablesSucceeded($response, '舊客戶端（無 _meta／無 MCP 標頭）');
     }
 
     // ───────── 新客戶端：2026-07-28 ─────────
@@ -220,8 +229,7 @@ class McpProtocolCompatibilityTest extends TestCase {
         );
 
         $response->assertOk();
-        $this->assertNull($response->json('error'), json_encode($response->json('error')));
-        $this->assertFalse((bool) $response->json('result.isError'));
+        $this->assertListAllowedTablesSucceeded($response, '新客戶端（2026-07-28）');
     }
 
     public function test_modern_request_with_a_mismatched_method_header_is_rejected_with_32020() {

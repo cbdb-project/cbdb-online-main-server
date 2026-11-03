@@ -53,6 +53,10 @@ codex mcp get cbdb-http-mcp
 
 ## 4. 協議層 smoke test（cURL）
 
+> 下面的範例用的是以 `initialize` 開場的流程（協定 `2025-06-18`），伺服器（`laravel/mcp` 1.x 起預設說 `2026-07-28`）仍向下相容這種流程，照做即可。
+> 新協定（`server/discover`、每個請求帶 `_meta` 與 `MCP-Protocol-Version`／`Mcp-Method`／`Mcp-Name` 標頭）與錯誤碼的完整說明見 [API.md 14.6](../API.md)。
+> 注意：JSON-RPC 錯誤現在會對應 HTTP 400／404／500（以前一律 200），用 `curl` 排錯時請看回應本體，不要只看狀態碼。
+
 ### 4.1 initialize
 
 ```bash
@@ -96,13 +100,15 @@ curl -sS https://input.cbdb.fas.harvard.edu/api/mcp \
 
 ## 5. 可用工具
 
-目前提供 5 個 read-only 工具：
+目前提供 7 個 read-only 工具：
 
-1. `list_allowed_tables`
-2. `query_table_schema`
-3. `get_table_row_by_id`
-4. `get_sample_data`
-5. `query_table`
+1. `list_allowed_tables`：列出允許查詢的資料表
+2. `query_table_schema`：取得資料表的 schema、索引、外鍵等中繼資料
+3. `get_table_row_by_id`：依 ID 欄位與值取得單一列
+4. `get_sample_data`：取得資料表的範例列（可分頁）
+5. `query_table`：以篩選條件、欄位與分頁查詢資料表
+6. `query_read_only_sql`：執行唯讀 SQL（僅 `SELECT`／`WITH`，限允許的資料表）
+7. `search_person_by_name`：依人名搜尋人物（含字、號、別名）
 
 ## 6. 常見錯誤與排除
 

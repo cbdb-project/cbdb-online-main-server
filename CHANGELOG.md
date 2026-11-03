@@ -4,6 +4,16 @@
 
 ## 2026-11
 
+### ⬆️ Inertia 升級到 v3（`inertia-laravel` 2→3.5、`@inertiajs/react` 2→3.11，前後端必須同時升）
+- 起因：Dependabot 的 #1346 只升了 composer，CI 測試 141 筆失敗；而且前端還是 v2——v3 起首屏資料一律以
+  `<script data-page="app" type="application/json">` 輸出、不再有 `<div data-page>`，兩邊主版本不一致會整個前端白屏，CI 的 PHP 測試完全看不出來。
+- `config/inertia.php` 改成 v3 結構：`pages.{ensure_pages_exist,paths,extensions}`（原 `page_paths`／`page_extensions`／`testing.page_paths`），
+  `testing` 只剩 `ensure_pages_exist`；`ssr.enabled` v3 預設為 true，本專案明確維持 false。
+- `app.tsx` 的 `resolve` 回傳型別在 v3 必須是元件，替 `import.meta.glob` 標上 `ResolvedComponent`。
+- 新增 `InertiaInitialPageScriptElementTest`：鎖住伺服器端首屏輸出形狀，並檢查 `composer.json` 與 `package.json` 的 Inertia 主版本一致。
+- v3 的 `@inertiajs/core` 不再依賴 axios／lodash-es，`package-lock.json` 因此少了 37 個傳遞依賴；本專案程式碼沒有直接引用它們。
+- 本專案沒有用到被移除的 `Inertia::lazy`／`LazyProp`；前端 v3 的破壞性變更（`router.cancel`、事件改名、`hideProgress`、`<Head>` 屬性等）也都沒有命中。
+
 ### 🤖 LLM 主通道支援 Responses API（`reasoning_effort=low` + 函式工具）
 - 起因：HUIT 網關上的 `gpt-6-luna`／`terra` 預設帶推理強度，`/v1/chat/completions` 帶函式工具時一律 400，
   自然語言問答因此全數降級到 Gemini 備援（備援預付額度耗盡後變成 402）。

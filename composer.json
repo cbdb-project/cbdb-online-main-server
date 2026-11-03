@@ -9,7 +9,7 @@
         "ext-curl": "*",
         "frankslin/opencc-pinyin": "^1.0",
         "guzzlehttp/guzzle": "^7.2",
-        "inertiajs/inertia-laravel": "^2.0",
+        "inertiajs/inertia-laravel": "^3.6",
         "laracasts/flash": "^3.0",
         "laravel/framework": "^12.0",
         "laravel/mcp": "^0.5.7",

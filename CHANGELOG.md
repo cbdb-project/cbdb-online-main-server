@@ -13,6 +13,13 @@
 - 新增 `InertiaInitialPageScriptElementTest`：鎖住伺服器端首屏輸出形狀，並檢查 `composer.json` 與 `package.json` 的 Inertia 主版本一致。
 - v3 的 `@inertiajs/core` 不再依賴 axios／lodash-es，`package-lock.json` 因此少了 37 個傳遞依賴；本專案程式碼沒有直接引用它們。
 - 本專案沒有用到被移除的 `Inertia::lazy`／`LazyProp`；前端 v3 的破壞性變更（`router.cancel`、事件改名、`hideProgress`、`<Head>` 屬性等）也都沒有命中。
+- **DevTools 預設關閉（程式碼層）**：v3 的 DevTools 在 `APP_ENV=local` 時預設啟用，而它的 `/_inertia/devtools/*` 路由在 local 環境**不要求登入**、記錄裡有每個頁面的 props（含登入者資訊）；
+  `docker-compose.yml`／`.env.docker.example` 都寫死 `APP_ENV=local`，所以 `AppServiceProvider::register()` 把「未明確設定」固定成關閉，只有明確設 `INERTIA_DEVTOOLS_ENABLED=true` 才會開。
+  （不寫進 `config/inertia.php`：套件設定只做頂層浅合併，會把套件預設的脫敏清單整塊蓋掉。）
+- ⚠️ **部署注意（前後端必須同時換）**：後端 v3 配上前端 v2 的建置產物（或反過來），首屏資料格式對不上，前端**可能**整個白屏。`deploy.sh` 並行跑 `composer install` 與 `npm ci && npm run build`，
+  若 `composer` 先成功、`npm` 失敗，腳本雖會因 `set -e` 中止，但 `vendor/` 已是 v3，會停在「後端 v3 + 前端 v2」；`docker/entrypoint.sh` 把 `set -e` 註解掉了，建置失敗後仍可能用舊產物啟動。
+  建議這次升級在維護窗口內部署（`php artisan down`），確認 `npm run build` 成功、新產物到位後再 `php artisan up`（這是操作建議，腳本本身並不保證）；
+  `InertiaInitialPageScriptElementTest` 只能在 CI 擋住 lock 檔主版本不一致，擋不住部署順序問題。
 
 ### 🤖 LLM 主通道支援 Responses API（`reasoning_effort=low` + 函式工具）
 - 起因：HUIT 網關上的 `gpt-6-luna`／`terra` 預設帶推理強度，`/v1/chat/completions` 帶函式工具時一律 400，

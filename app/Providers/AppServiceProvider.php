@@ -40,6 +40,16 @@ class AppServiceProvider extends ServiceProvider {
         $this->app->singleton(PersonChangeIndexService::class, function () {
             return new PersonChangeIndexService();
         });
+
+        // Inertia v3 的 DevTools 在 APP_ENV=local 時預設啟用（INERTIA_DEVTOOLS_ENABLED 未設 = null = 看環境），
+        // 而它的 /_inertia/devtools/* 路由在 local 環境「不要求登入」（Inertia\DevTools\Http\Authorize），
+        // 記錄裡有每個頁面的 props（含登入者資訊）。docker-compose.yml／.env.docker.example 都寫死 APP_ENV=local，
+        // 所以光靠 .env 提醒不夠——這裡把「未明確設定」固定成關閉，只有明確設 INERTIA_DEVTOOLS_ENABLED=true 才會開。
+        // 不寫進 config/inertia.php：Laravel 對套件設定只做頂層浅合併，在那裡寫 devtools 會把套件預設的
+        // redact（脫敏）清單等整塊蓋掉。套件的 provider 先於 App 的 provider 註冊，此時 mergeConfigFrom 已完成。
+        if (config('inertia.devtools.enabled') === null) {
+            config(['inertia.devtools.enabled' => false]);
+        }
     }
 
     /**

@@ -17,8 +17,9 @@ class InertiaInitialPageScriptElementTest extends TestCase {
     public function test_initial_page_is_emitted_as_a_json_script_element_not_a_data_page_attribute() {
         $html = $this->get('/login')->assertOk()->getContent();
 
+        // `<script\s` 而不是 `<script`：否則 `<scripture ...>` 這種假標籤也會通過。
         $this->assertMatchesRegularExpression(
-            '/<script[^>]*data-page="app"[^>]*type="application\/json"[^>]*>|<script[^>]*type="application\/json"[^>]*data-page="app"[^>]*>/',
+            '/<script\s[^>]*data-page="app"[^>]*type="application\/json"[^>]*>|<script\s[^>]*type="application\/json"[^>]*data-page="app"[^>]*>/',
             $html,
             '首屏資料應以 <script data-page="app" type="application/json"> 輸出（inertia-laravel v3）。'
         );

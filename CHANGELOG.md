@@ -4,6 +4,19 @@
 
 ## 2026-11
 
+### ⬆️ `laravel/mcp` 0.5 → 1.1（MCP 協定改說 2026-07-28，舊客戶端仍相容）
+- 取代 Dependabot #1345。`laravel/mcp` 1.0 起預設改說 MCP `2026-07-28`（`server/discover` 取代 `initialize` 握手、每個請求帶 `_meta` 協定版本、HTTP 需 `MCP-Protocol-Version`／`Mcp-Method`／`Mcp-Name` 標頭），
+  且移除 session。我們的 `POST /api/mcp` 有外部客戶端在用，所以這次不能只看 CI——原本 CI 只有 schema／middleware 單元測試，**沒有任何測試走過真實協定流程**。
+- 新增 `McpProtocolCompatibilityTest`（15 個，走真實 HTTP + Sanctum token）：舊客戶端的握手、帶協商版本標頭的 `tools/list`（7 個工具）與 `tools/call`、`notifications/initialized`→202；
+  新客戶端的 `server/discover`／`tools/list`／`tools/call`；標頭不符回 400 與 `-32020`；舊式請求帶不支援的版本標頭回 `-32022`；JSON-RPC 錯誤→HTTP 狀態碼。
+  已用對照實驗（把 `vendor/laravel/mcp` 換回 0.5.7 跑同一批測試）驗證：舊客戶端的真實流程在 0.5.7 上同樣通過（描述的是既有行為），失敗的恰好就是下面列的行為變動。
+- 結論：以 `initialize` 開場的舊客戶端（`2025-11-25`／`2025-06-18`／`2025-03-26`）照常運作。**行為變動（都已寫進 `API.md` 14.6）**：
+  ① 聲明 `2024-11-05` 的最舊客戶端，`initialize` 會被回 `2025-11-25`（不再原樣回 `2024-11-05`）；
+  ② JSON-RPC 錯誤現在對應 HTTP 400／404／500（0.5.7 一律回 200）——只看 HTTP 狀態碼的客戶端會看到以前沒有的錯誤；
+  ③ 沒有 `_meta` 的舊式請求若帶了不受支援的 `MCP-Protocol-Version` 標頭（如 `2024-11-05`）→ 400 + `-32022`；
+  ④ 不再有 session（`MCP-Session-Id`）。
+- `API.md` 14.6 補上協定版本、兩類客戶端的要求與錯誤碼。本專案程式碼沒有用到被移除的 `sessionId()`／`SessionInitialized`／`CAPABILITY_UI`。
+
 ### ⬆️ Inertia 升級到 v3（`inertia-laravel` 2→3.5、`@inertiajs/react` 2→3.11，前後端必須同時升）
 - 起因：Dependabot 的 #1346 只升了 composer，CI 測試 141 筆失敗；而且前端還是 v2——v3 起首屏資料一律以
   `<script data-page="app" type="application/json">` 輸出、不再有 `<div data-page>`，兩邊主版本不一致會整個前端白屏，CI 的 PHP 測試完全看不出來。

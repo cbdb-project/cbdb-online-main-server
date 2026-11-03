@@ -1686,6 +1686,22 @@ v2 提案流程上線前的舊機制，仍在線但**建議一律改用 `/api/v2
 
 同一路徑的 `GET` 只是 MCP 協定要求的 SSE 佔位，**恆回 405**（意思是「本伺服器不支援 SSE」）。它刻意不要求認證——回應不含任何資料，加認證會讓探測階段拿到 401 而非協定所期待的 405——但同樣受上述 120 次／分鐘的限流保護。不要拿它當健康檢查。
 
+**協定版本（`laravel/mcp` 1.x 起）**：伺服器預設說 MCP **`2026-07-28`**，同時**向下相容仍以 `initialize` 開場的舊客戶端**。對外提供 7 個唯讀工具：`list_allowed_tables`、`query_table_schema`、`get_table_row_by_id`、`get_sample_data`、`query_table`、`query_read_only_sql`、`search_person_by_name`，兩種流程看到的工具與結果相同。
+
+| 客戶端類型 | 開場方式 | 後續請求的要求 |
+| ------ | ------ | ------ |
+| 新（`2026-07-28`） | `server/discover`（取代 `initialize`） | 每個有 `id` 的 JSON-RPC 請求，其 `params._meta` 都要帶 `io.modelcontextprotocol/protocolVersion` 與 `io.modelcontextprotocol/clientCapabilities`；HTTP 另需 `MCP-Protocol-Version` 與 `Mcp-Method` 標頭（值須與請求本體一致），`tools/call` 另需 `Mcp-Name`（＝ `params.name`；`prompts/get` 同，`resources/read` 用 `params.uri`——本伺服器沒有 prompts／resources）。套件不對 notification 執行這些檢查。標頭不一致或缺漏回 **400**，JSON-RPC 錯誤碼 **`-32020`**；`_meta` 缺鍵為 `-32602`；`_meta` 裡的協定版本不是 `2026-07-28` 為 `-32022` |
+| 舊（`2025-11-25`／`2025-06-18`／`2025-03-26`） | `initialize` | **不需要** `_meta` 與 `Mcp-Method`／`Mcp-Name`；伺服器以客戶端要求的版本回應。這類客戶端在 `initialize` 之後的每個請求會帶 `MCP-Protocol-Version: <協商出的版本>`，在允許集合內，照常通過 |
+| 最舊（`2024-11-05`） | `initialize` | 伺服器**改回 `2025-11-25`**（不再原樣回 `2024-11-05`；任何不認得的版本都一樣）。依 MCP 規範，客戶端若不支援被提議的版本可以斷線——仍停在 `2024-11-05` 的客戶端請升級 |
+
+**行為變動（對照升級前）：**
+1. **JSON-RPC 錯誤現在對應 HTTP 4xx／5xx**：方法不存在 `404`、內部錯誤 `500`、其餘（含 `-32602` 無效參數、`-32020`、`-32022`）`400`；回應本體仍是標準 JSON-RPC error。升級前**一律回 HTTP 200**（本體才有 error）。只看 HTTP 狀態碼、或遇到 4xx 就丟掉回應本體的客戶端會看到以前沒有的錯誤。工具**執行失敗**（回應 `result.isError: true`）不是 JSON-RPC 錯誤，仍是 200。通知（無 `id`）回 202。
+2. **沒有 `_meta` 的舊式請求若帶了不受支援的 `MCP-Protocol-Version` 標頭**（不在 `2025-11-25`／`2025-06-18`／`2025-03-26` 內，例如 `2024-11-05` 或 `2099-01-01`）→ **400 + `-32022`**。升級前不檢查這個標頭。
+3. **不再有 session**：移除 `MCP-Session-Id` 標頭，每個 HTTP 請求獨立處理，不先 `initialize` 直接 `tools/list`／`tools/call` 也可行。
+4. 回應新增 `resultType`、`_meta["io.modelcontextprotocol/serverInfo"]`，`tools/list` 的每個工具多 `title`（純增量，舊客戶端會忽略）。`resources/read` 找不到 URI 的錯誤碼由 `-32002` 改為 `-32602`（本伺服器不提供 resources，無實際影響）。
+
+協定相容性由 `tests/Feature/McpProtocolCompatibilityTest.php` 走真實 HTTP 流程把關。
+
 ### 14.7 人物頁 API
 
 `GET /cbdbapi/person`（等同舊路徑 `/cbdbapi/person.php`）——依 `id` 或 `name` 取單一人物資料。**完全公開，不需認證；它在 `web` 群組，應用程式路由層也未配置限流**（同 1.3：不代表永遠不會遇到 429，反向代理／WAF 仍可能回，客戶端請照樣處理）。

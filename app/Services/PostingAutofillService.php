@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Support\LlmFallbackTrait;
+use App\Support\ResponsesApiAdapter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -168,7 +169,7 @@ class PostingAutofillService {
                 'Content-Type' => 'application/json',
                 'Authorization' => 'Bearer ' . $this->apiKey,
             ])
-            ->post($this->apiEndpoint, [
+            ->post($this->apiEndpoint, $this->llmRequestBody([
                 'model' => $this->model,
                 'messages' => [
                     [
@@ -185,7 +186,7 @@ class PostingAutofillService {
                         'schema' => $this->getJsonSchema(),
                     ],
                 ],
-            ]);
+            ]));
 
         if (!$response->successful()) {
             return [
@@ -195,7 +196,16 @@ class PostingAutofillService {
             ];
         }
 
-        $responseData = $response->json();
+        $responseData = $this->llmResponseJson($response->json());
+        $responseFailure = ResponsesApiAdapter::responseFailureMessage($responseData);
+        if ($responseFailure !== null) {
+            return [
+                'success' => false,
+                'data' => null,
+                'error' => 'AI API 回應失敗：' . $responseFailure,
+            ];
+        }
+
         $content = $responseData['choices'][0]['message']['content'] ?? null;
 
         if (!$content) {

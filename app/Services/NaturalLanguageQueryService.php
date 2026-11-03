@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Support\LlmFallbackTrait;
+use App\Support\ResponsesApiAdapter;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -1469,6 +1470,9 @@ PROMPT;
                 ];
             }
 
+            // 依目前端點決定是否轉成 Responses API 格式（備援切換後端點會變，故每次呼叫都重算）
+            $requestData = $this->llmRequestBody($requestData);
+
             $maxAttempts = 3;
             $retryDelayMs = 800;
             $response = null;
@@ -1526,9 +1530,33 @@ PROMPT;
                 ];
             }
 
+            $data = $this->llmResponseJson($response['json']);
+
+            // Responses API 可能以 HTTP 200 + status=failed 回報失敗；轉換層原樣放行，
+            // 這裡視為失敗，才會觸發備援而不是被當成「空回應」。
+            $responseFailure = ResponsesApiAdapter::responseFailureMessage($data);
+            if ($responseFailure !== null) {
+                $errorMessage = $this->extractApiErrorMessage($data, (string) ($response['body'] ?? ''));
+                if ($errorMessage === '' || $errorMessage === '未知錯誤') {
+                    $errorMessage = $responseFailure;
+                }
+                Log::error('LLM API 回傳失敗狀態', [
+                    'status' => $data['status'] ?? null,
+                    'error' => $errorMessage,
+                    'model' => $this->model,
+                    'endpoint' => $this->apiEndpoint,
+                ]);
+
+                return [
+                    'success' => false,
+                    'data' => null,
+                    'error' => "LLM API 调用失败: {$errorMessage}",
+                ];
+            }
+
             return [
                 'success' => true,
-                'data' => $response['json'],
+                'data' => $data,
                 'error' => null,
             ];
 

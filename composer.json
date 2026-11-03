@@ -15,7 +15,7 @@
         "laravel/mcp": "^0.5.7",
         "laravel/sanctum": "^4.0",
         "laravel/serializable-closure": "^2.1",
-        "laravel/tinker": "^2.8",
+        "laravel/tinker": "^3.0",
         "laravel/ui": "^4.5",
         "nesbot/carbon": "^3.0",
         "phpmyadmin/sql-parser": "^6.0",

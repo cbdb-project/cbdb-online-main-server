@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Support\LlmFallbackTrait;
+use App\Support\ResponsesApiAdapter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -304,6 +305,8 @@ PROMPT;
                 ],
             ];
 
+            $requestData = $this->llmRequestBody($requestData);
+
             $maxAttempts = 3;
             $retryDelayMs = 800;
             $response = null;
@@ -364,9 +367,15 @@ PROMPT;
                 ];
             }
 
+            $data = $this->llmResponseJson($response->json());
+            $responseFailure = ResponsesApiAdapter::responseFailureMessage($data);
+            if ($responseFailure !== null) {
+                return ['success' => false, 'data' => null, 'error' => $responseFailure];
+            }
+
             return [
                 'success' => true,
-                'data' => $response->json(),
+                'data' => $data,
                 'error' => null,
             ];
         } catch (\Exception $e) {

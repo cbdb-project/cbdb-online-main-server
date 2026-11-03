@@ -79,6 +79,107 @@ class NaturalLanguageQueryServiceTest extends TestCase {
         $this->assertNull($result['error']);
     }
 
+    /**
+     * 原始故障場景：帶函式工具的多輪問答。主通道為 /responses 時，
+     * 第 2 輪請求必須帶 function_call + function_call_output，且每個工具 strict=false、effort=low。
+     */
+    #[Test]
+    public function it_runs_the_tool_loop_over_the_responses_api() {
+        $endpoint = 'https://primary.example.com/v2/responses';
+        Config::set('services.gemini.api_endpoint', $endpoint);
+        Config::set('services.gemini.model', 'gpt-6-luna');
+        Config::set('services.gemini_fallback.api_key', '');
+        Config::set('nl_query_tools.enabled', true);
+
+        $schemaService = $this->createMock(DatabaseSchemaService::class);
+        $schemaService->method('generateSchemaPrompt')->willReturn('Mock schema info');
+        $toolsService = $this->createMock(NlQueryToolsService::class);
+        $toolsService->method('getToolDefinitions')->willReturn([[
+            'type' => 'function',
+            'function' => [
+                'name' => 'query_table',
+                'description' => 'd',
+                'parameters' => ['type' => 'object', 'properties' => ['table' => ['type' => 'string']]],
+            ],
+        ]]);
+        $toolsService->method('executeTool')->willReturn(['success' => true, 'rows' => [['c_dy' => 1]]]);
+        $service = new NaturalLanguageQueryService($schemaService, $toolsService);
+
+        Http::fake([
+            $endpoint => Http::sequence()
+                ->push([
+                    'status' => 'completed',
+                    'output' => [
+                        ['type' => 'reasoning', 'summary' => []],
+                        ['type' => 'function_call', 'call_id' => 'call_1', 'name' => 'query_table', 'arguments' => '{"table":"DYNASTIES"}'],
+                    ],
+                ], 200)
+                ->push([
+                    'status' => 'completed',
+                    'output' => [['type' => 'message', 'content' => [['type' => 'output_text', 'text' => json_encode([
+                        'sql' => 'SELECT * FROM DYNASTIES', 'explanation' => '朝代', 'error' => null,
+                    ])]]]],
+                ], 200),
+        ]);
+
+        $result = $service->generateSQL('顯示所有朝代');
+
+        $this->assertTrue($result['success'], (string) ($result['error'] ?? ''));
+        $this->assertSame('SELECT * FROM DYNASTIES', $result['sql']);
+
+        $bodies = [];
+        Http::assertSent(function ($request) use (&$bodies) {
+            $bodies[] = $request->data();
+
+            return true;
+        });
+        $this->assertCount(2, $bodies);
+
+        $first = $bodies[0];
+        $this->assertSame(['effort' => 'low'], $first['reasoning']);
+        $this->assertArrayNotHasKey('messages', $first);
+        $this->assertFalse($first['tools'][0]['strict']);
+
+        $types = array_map(fn ($item) => $item['type'] ?? $item['role'], $bodies[1]['input']);
+        $this->assertContains('function_call', $types);
+        $this->assertContains('function_call_output', $types);
+        $call = collect($bodies[1]['input'])->firstWhere('type', 'function_call');
+        $output = collect($bodies[1]['input'])->firstWhere('type', 'function_call_output');
+        $this->assertSame('call_1', $call['call_id']);
+        $this->assertSame('call_1', $output['call_id']);
+    }
+
+    /**
+     * Responses API 以 HTTP 200 + status=failed 回報失敗時要當成失敗，才會觸發備援，而不是被當成空回應。
+     */
+    #[Test]
+    public function it_treats_http_200_failed_status_as_failure_and_falls_back_to_chat_endpoint() {
+        $primary = 'https://primary.example.com/v2/responses';
+        $fallback = 'https://fallback.example.com/chat/completions';
+        Config::set('services.gemini.api_endpoint', $primary);
+        Config::set('services.gemini_fallback.api_key', 'fallback-key');
+        Config::set('services.gemini_fallback.api_endpoint', $fallback);
+        Config::set('services.gemini_fallback.model', 'fallback-model');
+
+        $schemaService = $this->createMock(DatabaseSchemaService::class);
+        $schemaService->method('generateSchemaPrompt')->willReturn('Mock schema info');
+        $service = new NaturalLanguageQueryService($schemaService, $this->createMock(NlQueryToolsService::class));
+
+        Http::fake([
+            $primary => Http::response(['status' => 'failed', 'error' => ['message' => 'upstream down'], 'output' => []], 200),
+            $fallback => Http::response(['choices' => [['message' => [
+                'role' => 'assistant',
+                'content' => json_encode(['sql' => 'SELECT 1', 'explanation' => '備援', 'error' => null]),
+            ], 'finish_reason' => 'stop']]], 200),
+        ]);
+
+        $result = $service->generateSQL('test', null, null, false);
+
+        $this->assertTrue($result['success'], (string) ($result['error'] ?? ''));
+        $this->assertSame('SELECT 1', $result['sql']);
+        Http::assertSent(fn ($request) => $request->url() === $fallback && isset($request->data()['messages']));
+    }
+
     #[Test]
     public function it_handles_api_errors() {
         $this->schemaService->method('generateSchemaPrompt')

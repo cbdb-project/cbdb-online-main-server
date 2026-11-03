@@ -2,6 +2,17 @@
 
 本檔案改為維護近階段的重要變更與產品方向，不再保留完整歷史流水帳。較舊的大型升級請參考 `docs/` 下專門文檔。
 
+## 2026-11
+
+### 🤖 LLM 主通道支援 Responses API（`reasoning_effort=low` + 函式工具）
+- 起因：HUIT 網關上的 `gpt-6-luna`／`terra` 預設帶推理強度，`/v1/chat/completions` 帶函式工具時一律 400，
+  自然語言問答因此全數降級到 Gemini 備援（備援預付額度耗盡後變成 402）。
+- 作法：`GEMINI_API_ENDPOINT` 以 `/responses` 結尾時，三個 LLM 服務（自然語言問答、CodeLookup、任官 AI 填表）
+  改走 Responses API 並固定 `reasoning.effort=low`；備援 `_1` 若仍是 chat/completions 端點則維持原格式。
+  **不新增任何 env**；轉換邏輯在 `App\Support\ResponsesApiAdapter`，經 `LlmFallbackTrait` 接入。
+- 部署：把 prod `.env` 的 `GEMINI_API_ENDPOINT` 改成 `.../ais-openai-direct/v2/responses` 後重跑 `config:cache`；回滾只要改回 chat/completions 端點。
+- 已知限制：無狀態（`store=false`）且不回傳 reasoning item，多輪工具呼叫之間推理脈絡不延續。
+
 ## 2026-10
 
 ### 🚑 修正：prod（`route:cache`）下舊網址導向 500（`Call to undefined function cbdb_legacy_page_redirect()`）

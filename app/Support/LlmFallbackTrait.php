@@ -33,6 +33,21 @@ trait LlmFallbackTrait {
         }
     }
 
+    /**
+     * 依「目前」的 $apiEndpoint 準備請求體：/responses 端點轉成 Responses 格式，其餘原樣。
+     * 必須在每次發送前呼叫（備援切換後端點會變）。
+     */
+    protected function llmRequestBody(array $chatRequest): array {
+        return ResponsesApiAdapter::prepareRequest($this->apiEndpoint, $chatRequest);
+    }
+
+    /**
+     * 把回應轉回 chat-completions 形狀，讓呼叫端一律讀 choices[0].message。
+     */
+    protected function llmResponseJson(mixed $json): mixed {
+        return ResponsesApiAdapter::normalizeResponse($this->apiEndpoint, $json);
+    }
+
     protected function hasFallback(): bool {
         return $this->fallbackAvailable;
     }

@@ -53,14 +53,17 @@ class ExportMysqlToSqlite extends Command {
         'cache' => '快取值，可能含 token',
         'cache_locks' => '快取鎖（與 cache 同組）',
         'sessions' => '登入 session 的 payload（session driver 設為 database 時才存在）',
-        // 以下 5 張已由 2025_12_18_050122_remove_passport_oauth_tables 移除，完整 migrate 過的庫
-        // 不會有它們（其中 oauth_clients.secret 是明文 client secret）。留在清單裡是因為這份
-        // blocklist 的用途正是保護「--source 指向任意／陳舊／從備份還原的 MySQL」那種情境。
-        'oauth_access_tokens' => 'Passport access token（舊表，已於 migration 移除）',
-        'oauth_refresh_tokens' => 'Passport refresh token（舊表，已於 migration 移除）',
-        'oauth_auth_codes' => 'Passport 授權碼（舊表，已於 migration 移除）',
-        'oauth_clients' => 'Passport client 的**明文** secret（舊表，已於 migration 移除）',
-        'oauth_personal_access_clients' => 'Passport personal access client（舊表，已於 migration 移除）',
+        // OAuth／OIDC Provider（Passport，docs/OIDC_PROVIDER_PLAN.md）。這些表一度被
+        // 2025_12_18_050122_remove_passport_oauth_tables 移除，現在由 2026_11_05_* 的遷移**重新建立**
+        // （其中 oauth_clients.secret 是明文 client secret）——所以它們是**現役**的憑證表，不是舊表。
+        // 這份 blocklist 同時保護「--source 指向任意／陳舊／從備份還原的 MySQL」的情境。
+        'oauth_access_tokens' => 'Passport access token',
+        'oauth_refresh_tokens' => 'Passport refresh token',
+        'oauth_auth_codes' => 'Passport 授權碼',
+        'oauth_clients' => 'Passport client 的**明文** secret',
+        'oauth_device_codes' => 'Passport 裝置授權碼（device code／user code）與使用者 ID',
+        // 這張只存在於「裝過舊 Passport」的庫；本專案新的遷移不會再建立它。
+        'oauth_personal_access_clients' => 'Passport personal access client（舊表，新遷移不再建立）',
     ];
 
     /**

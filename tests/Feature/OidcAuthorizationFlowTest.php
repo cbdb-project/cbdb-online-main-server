@@ -587,6 +587,30 @@ class OidcAuthorizationFlowTest extends TestCase {
         $this->assertSame(600, \App\Providers\RouteServiceProvider::oidcTokenRateLimit());
     }
 
+    // ───────────── iss 不可來自請求的 Host ─────────────
+
+    #[Test]
+    public function the_id_token_issuer_is_the_configured_one_even_when_the_host_header_is_spoofed(): void {
+        $user = $this->makeUser();
+        [$client, $secret] = $this->makeClient();
+        [$verifier, $challenge] = $this->pkcePair();
+
+        $query = $this->redirectQuery($this->actingAs($user)->get($this->authorizeUrl($client, $challenge)));
+
+        // 兌換授權碼的請求帶著偽造的 Host：iss 必須仍是設定的 issuer，不是 evil.example。
+        $response = $this->call('POST', '/oauth/token', [
+            'grant_type' => 'authorization_code',
+            'client_id' => $client->getKey(),
+            'client_secret' => $secret,
+            'redirect_uri' => self::REDIRECT,
+            'code' => $query['code'],
+            'code_verifier' => $verifier,
+        ], [], [], ['HTTP_HOST' => 'evil.example']);
+
+        $response->assertOk();
+        $this->assertSame('https://op.test', $this->decodeIdToken($response->json('id_token'))['iss']);
+    }
+
     // ───────────── RP 視角：只靠 JWKS 驗章 ─────────────
 
     #[Test]

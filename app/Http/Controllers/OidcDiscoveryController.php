@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Http\Middleware\RestrictOidcGrantTypes;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\URL;
 use OpenIDConnect\Laravel\LaravelCurrentRequestService;
 use OpenIDConnect\Services\IssuedByGetter;
 
@@ -24,19 +23,23 @@ use OpenIDConnect\Services\IssuedByGetter;
  *  - claims 對應 UserIdentityRepository 的白名單。
  * 一致性由 tests/Feature/OidcDiscoveryAndJwksTest.php 鎖住。
  *
+ * 端點網址**以 issuer 為基底**，不是用 `route()` 依當下請求的 Host 產生：issuer 來自設定（可信），
+ * 請求的 Host 標頭則不是——兩者不一致時，文件會公布指向別的主機或 http 的端點。scheme 因此也由 issuer 決定
+ * （`oidc:check` 要求 prod 的 issuer 是 https），不必再用 URL::forceScheme()——那會改動共用的 URL 產生器，
+ * 在常駐行程（Octane）裡會影響之後的請求。
+ *
  * 套件的 discovery 路由（config openid.routes.discovery）必須保持關閉，否則兩條路由撞名撞路徑。
  */
 class OidcDiscoveryController {
     public function __invoke(LaravelCurrentRequestService $currentRequestService): JsonResponse {
-        if (config('openid.forceHttps', true)) {
-            URL::forceScheme('https'); // 下面的 route() 呼叫
-        }
+        $issuer = IssuedByGetter::get($currentRequestService, (string) config('openid.issuedBy', 'laravel'));
+        $base = rtrim($issuer, '/');
 
         return response()->json([
-            'issuer' => IssuedByGetter::get($currentRequestService, (string) config('openid.issuedBy', 'laravel')),
-            'authorization_endpoint' => route('passport.authorizations.authorize'),
-            'token_endpoint' => route('passport.token'),
-            'jwks_uri' => route('openid.jwks'),
+            'issuer' => $issuer,
+            'authorization_endpoint' => $base . route('passport.authorizations.authorize', [], false),
+            'token_endpoint' => $base . route('passport.token', [], false),
+            'jwks_uri' => $base . route('openid.jwks', [], false),
             'response_types_supported' => ['code'],
             'response_modes_supported' => ['query'],
             'grant_types_supported' => RestrictOidcGrantTypes::ALLOWED,

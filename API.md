@@ -1831,7 +1831,7 @@ JWT，RS256。`iss` 為 `OIDC_ISSUER`（未設則 `APP_URL`），`aud` 為 clien
 | `claims_supported` | `sub iss aud exp iat nonce name email email_verified` | `UserIdentityRepository` 的白名單 |
 | `token_endpoint_auth_methods_supported` | `client_secret_basic`、`client_secret_post`、`none` | `none` 給 public client（靠 PKCE） |
 
-沒有 `userinfo_endpoint`、`end_session_endpoint`、`registration_endpoint`、`revocation_endpoint`、`introspection_endpoint`。端點網址一律 `https`（`OIDC_FORCE_HTTPS`，只有沒有 https 的本機開發才設 false）。
+沒有 `userinfo_endpoint`、`end_session_endpoint`、`registration_endpoint`、`revocation_endpoint`、`introspection_endpoint`。**端點網址以 issuer 為基底**（`{issuer}/oauth/authorize` 等），**不**依當下請求的 Host 標頭產生：issuer 來自設定、是可信的，Host 不是，偽造的 Host 不會讓文件公布指向別處的端點。scheme 因此由 issuer 決定，`oidc:check` 要求非 local／testing 環境的 issuer 是 `https`。**沒有明確 issuer 時，authorize、token、discovery 三個端點一律回 `503`（`server_error`）**：套件在 `issuedBy` 為 `laravel`／`server` 時會從請求的 Host 標頭推導 issuer，連 id_token 的 `iss` 也是，而 Host 是攻擊者可控的輸入；`OIDC_ISSUER` 與 `APP_URL` 都沒設時就會退回 `laravel`，所以這是「忘了設環境變數」就會發生的事，必須在執行期 fail-closed，不能靠人記得跑 `oidc:check`。**issuer 不可帶路徑**（discovery 只在主機根路徑 `/.well-known/openid-configuration` 提供；OIDC Discovery 規定的 `{issuer}/.well-known/...` 在帶路徑時會是 404），`oidc:check` 會擋。
 
 **JWKS**（`/oauth/jwks`）只有**一把** RSA 簽章公鑰（`alg: RS256`、`use: sig`），`kid` 是公鑰的 RFC 7638 指紋，id_token 頭部帶同一個 `kid`。
 
@@ -1839,7 +1839,9 @@ JWT，RS256。`iss` 為 `OIDC_ISSUER`（未設則 `APP_URL`），`aud` 為 clien
 
 **第一次部署**：在 prod 執行**一次** `php artisan passport:keys`（只做一次；**之後不要加 `--force`**，那會換掉簽章金鑰）。金鑰在 `storage/*.key`（已被 `.gitignore`，部署不會動它），私鑰權限必須是 `0600`。
 
-**上線前檢查**：`php artisan oidc:check`（`deploy.sh` 在開關開啟時會自動跑，失敗只警告、不中斷部署）。檢查 `ext-sodium`、`APP_KEY`；**公鑰與私鑰各自獨立**檢查是否存在（來源可以是環境變數 `PASSPORT_PUBLIC_KEY`／`PASSPORT_PRIVATE_KEY` 或檔案，兩邊可以不同）、私鑰檔案的權限、公鑰是有效的 RSA 公鑰、**公私鑰是同一對**（不成對時 JWKS 公布 A 的公鑰、id_token 卻用 B 的私鑰簽，RP 永遠驗不過）；issuer 明確且是 https；Passport 的 scope 沒被 `mcp:use` 污染；cache store 是 `file`／`array` 時警告（多節點部署必須用共享 store）。
+**上線前檢查**：`php artisan oidc:check`（`deploy.sh` 在開關開啟時會自動跑，失敗只警告、不中斷部署）。檢查 `ext-sodium`；`APP_KEY` 不只要非空，還要能被 Laravel 的 encrypter 接受（長度須符合 cipher）；**公鑰與私鑰各自獨立**檢查是否存在（來源可以是環境變數 `PASSPORT_PUBLIC_KEY`／`PASSPORT_PRIVATE_KEY` 或檔案，兩邊可以不同）、私鑰檔案的權限、公鑰是有效的 RSA 公鑰、**公私鑰是同一對**（不成對時 JWKS 公布 A 的公鑰、id_token 卻用 B 的私鑰簽，RP 永遠驗不過）；**RSA 至少 2048 位元**（`passport:keys` 預設 4096；更短的可被分解，攻擊者就能偽造 id_token）；issuer 是有效的 URL、不帶路徑與使用者資訊（`user:pass@`）、非 local／testing 環境必須是 https；Passport 的 scope 沒被 `mcp:use` 污染；cache store 是 `file`／`array` 時警告；**無條件**提醒「多節點必須用同一對簽章金鑰」（與 cache store 無關，用 redis 的多節點部署一樣會中）。
+
+**多節點部署的兩個前提**（`oidc:check` 只看得到本機，無法跨節點驗證，所以只能提醒）：① 限流計數存在預設 cache store，必須用共享 store（redis／database），否則實際上限是「節點數 × 上限」；② **所有節點必須使用同一對簽章金鑰**——相同的 `PASSPORT_PUBLIC_KEY`／`PASSPORT_PRIVATE_KEY` 環境變數，或共享掛載的金鑰目錄。JWKS 只公布一把鑰，若每個節點各用自己的 `storage/oauth-*.key`，一個節點簽的 id_token 在另一個節點的 JWKS 下驗不過，登入成不成功取決於請求落在哪個節點。
 
 ---
 

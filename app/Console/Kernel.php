@@ -36,8 +36,15 @@ class Kernel extends ConsoleKernel {
      * @return void
      */
     protected function schedule(Schedule $schedule) {
-        // $schedule->command('inspire')
-        //          ->hourly();
+        // OIDC Provider 的 token 清理（docs/OIDC_PROVIDER_PLAN.md §8.1）。
+        // 總開關關閉時不排程（表可能根本沒資料）；--expired --hours=24：只刪「過期滿一天」的列；不加 --expired 的話 purge 會無條件刪掉所有已撤銷的列（--hours 只管過期那一支）。撤銷的列因此保留到過期後一天。
+        // 前提：prod 要有 `* * * * * php artisan schedule:run`，否則這條不會跑。
+        $schedule->command('passport:purge --expired --hours=24')
+            ->daily()
+            ->at('04:15')
+            ->onOneServer()
+            ->withoutOverlapping()
+            ->when(fn () => (bool) config('oidc.enabled'));
     }
 
     /**

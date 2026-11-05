@@ -49,7 +49,7 @@ OIDC = OAuth 2.0 授權碼流程 + 身份層：
 | 項目 | 現況 | 對方案的影響 |
 |---|---|---|
 | OAuth 伺服器 | **目前沒有 Passport、league/oauth2-server、任何 JWT 庫**（`composer.lock` 已確認）。⚠️ **但專案以前用過 Passport 並刻意換掉**：#622（`fe272a48`）換成 Sanctum、#628（`66a8df64`）清遺留設定，並留下 `2025_12_18_050122_remove_passport_oauth_tables`（`dropIfExists` 五張 `oauth_*` 表，`down()` 為空） | 這是**回頭路**，不是乾淨安裝：見 §6.7。`docs/API_AUTHENTICATION.md`「為什麼選擇 Sanctum」寫著「CBDB 不需要 OAuth2 的授權流程」，實作時要同步改寫 |
-| `laravel/mcp` 的 OAuth | `Client/OAuth/*` 是客戶端側；但 `Server/Registrar.php` 會引用 `Laravel\Passport\Passport`，其 `Mcp::oauthRoutes()` 會註冊 `/.well-known/oauth-authorization-server`、`/.well-known/oauth-protected-resource`、`POST oauth/register`，並把 `mcp:use` 塞進 Passport scopes。應用目前**從未呼叫** `oauthRoutes()`（app／routes／config 皆無） | 現在無衝突；裝上 Passport 後**禁止呼叫 `Mcp::oauthRoutes()`**，否則與本計畫的 discovery 路由撞車（建議加護欄測試） |
+| `laravel/mcp` 的 OAuth | `Client/OAuth/*` 是客戶端側；但 `Server/Registrar.php` 會引用 `Laravel\Passport\Passport`，其 `Mcp::oauthRoutes()` 會註冊 `/.well-known/oauth-authorization-server`、`/.well-known/oauth-protected-resource`、`POST oauth/register`，並把 `mcp:use` 塞進 Passport scopes。應用目前**從未呼叫** `oauthRoutes()`（app／routes／config 皆無） | 現在無衝突。裝上 Passport 後**不要呼叫 `Mcp::oauthRoutes()`**——不是因為路徑與本計畫的 discovery 撞車（路徑不同），而是它會開放 `POST oauth/register`（動態 client 註冊）並新增 `mcp:use` scope，與「只有手動建立的 first-party client」的前提相反（建議加護欄測試） |
 | 現有 token | Sanctum（`api` guard，`expiration => null`）；MCP 端點掛 `auth:sanctum` + `mcp.ability`；另有 `confirmation_token` 眾包憑證 | OIDC 是第三套憑證，**不要與之混用或重用**；`api` guard 仍是 sanctum，Passport 只用於 `/oauth/*` |
 | 登入 | `web` guard（session）、`Auth\LoginController`；登入後 `authenticated()` 擋 `!isActive()` | 未登入訪問 `/oauth/authorize?...` 時走 `Handler::unauthenticated()` → `redirect()->guest(route('login'))`，**完整 URL（含 query）存進 `url.intended`**，登入後由 `redirect()->intended()` 回跳，所以 `state`／`nonce`／`code_challenge` 會保留（React 登入頁是否原樣回傳尚未驗證）。`storeIntendedRedirect`／`isSafeRedirectPath` 只服務顯式的 `?redirect=` 輸入，且**檢查偏弱**：只擋 `//` 開頭，`/\evil.com` 之類會通過（見 §6.8） |
 | `auth` middleware | 專案覆寫了 `auth` 別名（`App\Http\Middleware\Authenticate`，含 `isActive()` 檢查） | Passport 預設的 `/oauth/authorize` 路由中介層不保證用的是這個別名，**必須明確確認**授權端走的是會檢查 `isActive()` 的那一個 |
@@ -77,7 +77,7 @@ Passport 本身**不含 OIDC**（無 id_token、discovery、JWKS），需第三�
 
 ### 6.1 身分與 claims
 
-- `sub` = `users.id`（內部穩定鍵），**不用 email**。
+- `sub` = `users.id`（內部穩定鍵），**不用 email**。**必須明確轉成字串**（`(string) $user->id`）：OIDC 規定 `sub` 是 JSON string，而 `users.id` 是整數，沒有轉型的話很可能被序列化成 JSON 數字（取決於套件實作），符合規範的 RP 庫會拒絕。實作時要有測試直接解碼 id_token 斷言 `sub` 的型別是 string。
 - claims 預設僅 `sub`、`name`；**`email` 只在下游確實需要時才輸出**（越少越不易出帳號串接錯誤），輸出時 `email_verified` 恆為 `false`。
 - **不輸出** `is_admin`、`is_active`、`settings`、`institution`、`confirmation_token` 等任何欄位。claims 一律走**顯式白名單**，不可序列化整個 `User`。⚠️ 不要照抄 `Api\UserController::show()` 的欄位清單：它含 `is_admin`／`is_active`。
 - 軟刪除帳號（`deactivate_soft_deleted_users`）不得核發 token；`users.id` 不得在刪除後重用。
@@ -93,6 +93,8 @@ Passport 本身**不含 OIDC**（無 id_token、discovery、JWKS），需第三�
 
 - access token 與 id_token 壽命要短（建議 10 分鐘量級）。
 - **refresh 時必須檢查 `isActive()`**，否則停用帳號可無限續期。league/oauth2-server 的 refresh grant 不會呼叫任何「使用者狀態」hook，所以這**不是一行設定**，需要明確機制，擇一：自訂 `RefreshTokenRepository`／覆寫 refresh grant，或在 `/oauth/token` 前掛 middleware，經 `oauth_refresh_tokens` → `oauth_access_tokens` 的關聯找出使用者再檢查（refresh token 是不透明憑證，不能假設可從 token 本身解出使用者；檢查必須覆蓋實際核發新 access token 與 id_token 的那條路徑）。同理 refresh 時簽發的 id_token 也要擋。
+- **授權碼兌換（`authorization_code` grant）同樣要檢查 `isActive()`**：帳號可能在發碼之後、兌換之前被停用。refresh 與兌換都要擋，另外「停用帳號」與「撤銷 token」放在同一個交易內，只能避免**撤銷做到一半中斷**，擋不住**並發**：兌換或 refresh 可能和停用同時發生，仍簽出新 token。要補上其一：發放路徑在簽發前對 `users` 該列加鎖（`lockForUpdate`）並重查 `isActive()`，或簽發後再查一次、失敗就撤銷剛簽出的 token。做不到嚴格串行時，退而接受的窗口＝access token 壽命，**但這個上限只在「refresh 路徑一律重查 `isActive()`」確實落地時才成立**：競態中簽出的 refresh token 會在下次使用時被擋，沒有這道檢查的話，它能存活到 refresh token 自己的壽命。注意：競態中簽出的 **access token 本身**無法被事後撤銷追回，它會活到自己的過期時間——這正是上述「窗口＝access token 壽命」的含義，所以 access token 壽命要夠短（§6.3 開頭）。文件與測試都要明確寫出這個上限與其前提。
+- **refresh token 的發放不要假設一定有**：Passport 預設會發 refresh token，但 OIDC 規範上它對應 `offline_access` scope。要嘛明定「first-party client 一律發、不需 `offline_access`」並在文件中寫明這是 Provider 的決定（OIDC Core 要求發放離線存取的 refresh token 前要取得同意；first-party client 由我們自己預先授權、視為預先同意，這是刻意的決議，必須寫進文件而非默認），要嘛要求 RP 申請 `offline_access` 並在 §1 的 scope 清單加上它。實作時擇一，並測 token 回應確實含（或不含）`refresh_token`。
 - **停用帳號當下就撤銷該用戶全部 oauth token**：在管理端停用路徑（`/manage` 的 `performUserUpdate()` 與 `cbdb:manage-user`）掛撤銷，把暴露窗口從 refresh token 壽命縮到 access token 壽命。
 - **refresh token 壽命也要設上限**（Passport 預設很長，會抵銷短 access token 的補償），並決定是否輪替與重用偵測。實作時要測：帳號被停用後 refresh 失敗、`/authorize` 被拒、token 已被撤銷。
 - 下游若是自簽 JWT 本地驗證，**看不到撤銷**，窗口期 = access token 剩餘壽命。需告知下游開發者：自己的 session cookie 不要設太長。
@@ -103,7 +105,7 @@ Passport 本身**不含 OIDC**（無 id_token、discovery、JWKS），需第三�
 - 一到兩個 first-party client，用 artisan 命令建立（Passport 內建 `passport:client`）即可；管理頁（React/Inertia）延後。
 - 僅授權碼 + PKCE + refresh，不開 implicit／password／client_credentials。
 - **PKCE 只對 public client 強制**（league 的行為）。Node 伺服器端 RP 若是 confidential client（有 secret），預設可以不送 PKCE。要嘛註冊成 `--public`，要嘛由伺服器端強制所有 client 必須帶 `code_challenge` 且僅接受 `S256`。
-- first-party 免同意頁要有明確機制（例如自訂 Client model 的 `skipsAuthorization()`），並決定 `prompt=login`／`max_age` 的政策，否則 RP 無法強制重新驗證。auto-approve 下 `GET /oauth/authorize` 對任何已登入瀏覽器都會直接發 code，**因此 `redirect_uri` 精確比對（不得有萬用字元）與 PKCE 是把關的重點，但不是全部**：授權碼必須一次性、綁定 client 與 PKCE verifier，RP 端還必須驗 `state`／`nonce`（§6.9）。這幾道少任何一道，自動核准都不算安全。
+- first-party 免同意頁要有明確機制（例如自訂 Client model 的 `skipsAuthorization()`），並決定 `prompt=login`／`prompt=consent`／`max_age` 的政策：`login` 與 `max_age` 要能強制重新驗證；本計畫沒有同意頁，所以 **`prompt=consent` 不可被靜默當成已同意**：OIDC Core 規定伺服器無法取得同意時必須回錯誤（規範寫「通常是 `consent_required`」，具體錯誤碼實作時對照規範與套件行為）；`prompt=none` 在未登入時回 `login_required`。auto-approve 下 `GET /oauth/authorize` 對任何已登入瀏覽器都會直接發 code，**因此 `redirect_uri` 精確比對（不得有萬用字元）與 PKCE 是把關的重點，但不是全部**：授權碼必須一次性、綁定 client 與 PKCE verifier，RP 端還必須驗 `state`／`nonce`（§6.9）。這幾道少任何一道，自動核准都不算安全。
 
 ### 6.5 資料庫與專案規則
 

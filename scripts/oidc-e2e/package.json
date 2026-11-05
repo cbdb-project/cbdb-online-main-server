@@ -1,0 +1,16 @@
+{
+  "name": "cbdb-oidc-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "用標準 OIDC 函式庫（openid-client）對本專案的 OIDC Provider 做端到端驗證；與主站的前端依賴無關，見 README.md",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "e2e": "node e2e.mjs"
+  },
+  "dependencies": {
+    "openid-client": "6.8.9"
+  }
+}

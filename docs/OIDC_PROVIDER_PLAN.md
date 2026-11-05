@@ -1,6 +1,7 @@
 # OIDC Provider 方案評估：把後台登入提供給其他專案
 
-> 狀態：**調研結論，尚未實作**（2026-11-05）。本文件只記錄評估與決議，沒有任何程式碼或依賴變更。
+> 狀態：**§8 的第 0–5 步都已實作並合併**（2026-11-05）；總開關 `OIDC_PROVIDER_ENABLED` **預設關閉**，開啟前請逐項過 §8.1 的上線前檢查清單。
+> 本文件前半（§1–§7）是當初的評估與決議，後半（§8）記錄各步實際做了什麼與實作中發現的事——**以 §8 為準**，兩者有出入時（例如 §1 曾列 refresh token，§8 第 4 步已決議不簽發），§8 是現況。
 > 對外 API 一旦落地，必須同步 [API.md](../API.md) 與 `docs/openapi/openapi.yaml`。
 
 ## 1. 目標與範圍
@@ -229,12 +230,29 @@ Passport 本身**不含 OIDC**（無 id_token、discovery、JWKS），需第三�
    - **授權碼原子消耗**（`AtomicAuthCodeRepository`）：league 的順序是 `validateAuthorizationCode()` 先檢查 `isAuthCodeRevoked()`、簽發 token 之後才 `revokeAuthCode()`，兩個並發請求可以都讀到未撤銷。把 `isAuthCodeRevoked()` 改成一條 `UPDATE ... SET revoked=1 WHERE id=? AND revoked=0`，影響 0 列＝已用過，資料庫保證只有一個請求得到 1 列。測試驗證 SQL 形狀（有條件式 UPDATE、沒有對 `oauth_auth_codes` 的 SELECT）。**取捨**：消耗發生在 PKCE 驗證之前，所以一次失敗的兌換（`code_verifier` 不對）也會燒掉這張碼，使用者重新登入即可。**注意：Passport 預設就能擋住「串行」的第二次兌換，所以『同一張碼不能用兩次』這種測試抓不到原子性問題，必須驗證 SQL 形狀。**
    - **停用帳號時撤銷 OIDC 憑證**：`AccountAccessRevoker::revokeOidcTokens()` 撤銷 access token、尚未兌換的授權碼與（若存在的）refresh token；撤銷而非刪除（保留列供追溯，過期與已撤銷的列由 `passport:purge` 清理）；寫 `oidc_tokens_revoked_on_deactivation` 審計；表不存在時 no-op。兩個呼叫點（`ManagementController::revokeApiTokens()` 的停用／軟刪除／角色變更，與 `ManageUser` CLI）都已接上，並有靜態守衛。**`passport:purge` 沒有被排程**（`Kernel::schedule()` 是空的、prod 是否跑 scheduler 未知），需要人工或另行排程。
    - 🔴 **兩個測試自身的缺陷，都是變異檢查抓到的**：① 靜態守衛原本找 `revokeOidcTokens(` 字串，而被守的檔案**註解裡**也有這個字樣，所以呼叫被刪掉守衛照樣通過——改成只認 `->revokeOidcTokens($user,`；② 我自己的變異腳本一度沒有真正施加變異（`sed` 的反斜線模式沒匹配上，我把「`::class` 出現次數沒變」誤讀成「已刪除」），所以報出「測試全過」。**變異檢查必須驗證變異確實施加了**（例如被刪除的那一行的計數降為 0），否則『全過』什麼都證明不了。
-5. 以 `openid-client` 做端到端驗證；文件（`API.md`、openapi、接入說明）。
+5. ✅ **已完成：以 `openid-client` 做端到端驗證，與下游接入說明**。`scripts/oidc-e2e/`（`run.sh` 啟動完全隔離的伺服器與 SQLite，`e2e.mjs` 以 `openid-client` v6.8.9 走真實的瀏覽器路徑，**19 項檢查**全過；說明見該目錄 README）；接入說明見 `API.md` 15.7（與 e2e 腳本用同一套 API，是被實際跑過的）。
+   - **這一步證明了什麼**：前面所有測試都是我們自己寫的，驗證的是「我們以為的 OIDC」。讓下游真正會用的函式庫去做 discovery（並逐字比對 issuer）、抓 JWKS、驗 id_token 的簽章與 `iss`／`aud`／`exp`／`nonce`／`state`，才證明兩邊互通。**它沒有發現產品缺陷**；失敗的三次都是腳本自己的假設錯誤：① Laravel 保存 `url.intended` 時會把查詢串**規範化**（按字母序、空格從 `+` 變 `%20`），參數集合完全相同，所以要比較集合而不是原始字串；② 已登入的 session 訪問授權端會直接帶 code 重導向，不經登入頁；③ 登入失敗的 `ValidationException` 會 `back()` 到 `Referer`，腳本沒帶 `Referer`（瀏覽器會帶）所以落到 `/`——真正的性質是「登入失敗後仍是未登入」，改為斷言這個結果。
+   - **腳本本身有鑑別力**（變異檢查，並驗證變異確實施加）：去掉 `RequirePkceS256` → 「沒有 PKCE 被拒絕」那項變紅；去掉 `EnsureOidcUserIsActive` → 「停用帳號的舊 session 拿不到授權碼」那項變紅。
+   - **隔離是這個腳本最重要的設計**：`seed.php` 會 drop／建立 `users` 表，指到開發或正式資料庫就是災難。護欄：資料庫不是位於工作目錄內的 SQLite 就**直接中止**——實測在這台機器（`.env` 指向 MySQL `cbdb_data`）直接執行會以 exit 3 中止、沒有任何寫入。另外：金鑰經環境變數提供、不碰 `storage/oauth-*.key`；`APP_CONFIG_CACHE`／`APP_ROUTES_CACHE` 指向不存在的檔案（否則開發機殘留的 `config:cache` 會讓所有隔離失效）；只結束自己啟動的那一個伺服器行程；`SKIP_CSRF_TOKEN` 只設在該行程的環境。
+   - **不在 CI 裡跑**（需要網路與本機埠）；改動 OIDC 相關程式後請手動跑一次。驗證的是 `http://127.0.0.1` 的 issuer；https、反向代理、多節點要在實際環境另外驗證。
+   - **`docs/openapi/openapi.yaml` 沒有更新**：它描述的是 v2 讀寫 API，OAuth／OIDC 端點是標準協定（discovery 文件本身就是機器可讀規格），`API.md` 第十五章已涵蓋。
+
+### 8.1 上線前檢查清單（總開關保持預設關閉，直到逐項確認）
+
+1. **prod 的 PHP 有 `ext-sodium`**（CI 與本機已確認；prod 未確認，`composer install` 缺它會失敗）。
+2. **第一次部署只跑一次 `php artisan passport:keys`**（之後不要加 `--force`），私鑰權限 0600；多節點部署所有節點必須使用**同一對**金鑰。
+3. 設定 `OIDC_ISSUER`（對外 https 網址、不帶路徑）；沒有明確 issuer 時所有端點會回 503。
+4. **`php artisan oidc:check` 通過**（`deploy.sh` 在開關開啟時自動跑，失敗只警告）。
+5. 管理員以 `php artisan passport:client --name=… --redirect_uri=…` 為下游建立 client，把 `client_id`／`client_secret` 轉交下游。
+6. 下游依 `API.md` 15.7 接入，**用 `sub` 識別使用者並自行維護白名單**。
+7. **（建議，尚未做）在 MariaDB 上以兩個並發連線實測 `lockForUpdate` 的序列化行為**——SQLite 上它是 no-op，目前只驗證了語意；見 `API.md` 15.5。
+8. **（建議）排程 `php artisan passport:purge`** 清理過期與已撤銷的憑證列（`Kernel::schedule()` 目前是空的、prod 是否跑 scheduler 未知）。
+9. 設定 `OIDC_PROVIDER_ENABLED=true` 後重新部署（`route:cache`／`config:cache` 要重建才會生效），再跑一次 `scripts/oidc-e2e/run.sh` 以外的實際環境驗證（以測試帳號走一次完整登入）。
 
 ## 9. 開放問題
 
 1. 一般用戶與眾包用戶是否也能登入下游？（§6.2 的預設決議是「是」，這裡只是請使用者最後確認；若否，需要 client 級範圍限制。）
-2. 下游自己的 session 壽命上限是多少？決定 access token 該多短。
+2. ~~下游自己的 session 壽命上限是多少？決定 access token 該多短。~~ **已不相關**：不簽發 refresh token、access token 預設 10 分鐘且對下游沒有用途（沒有受保護的資源），下游的工作階段由它自己決定。
 3. `RESERVED`（`is_active=2`）帳號是否視同停用？目前 `isActive()` 如此處理，OIDC 沿用即可，但請確認這符合意圖。
 
 ## 參考

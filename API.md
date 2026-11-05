@@ -1845,6 +1845,61 @@ JWT，RS256。`iss` 為 `OIDC_ISSUER`（未設則 `APP_URL`），`aud` 為 clien
 
 **多節點部署的兩個前提**（`oidc:check` 只看得到本機，無法跨節點驗證，所以只能提醒）：① 限流計數存在預設 cache store，必須用共享 store（redis／database），否則實際上限是「節點數 × 上限」；② **所有節點必須使用同一對簽章金鑰**——相同的 `PASSPORT_PUBLIC_KEY`／`PASSPORT_PRIVATE_KEY` 環境變數，或共享掛載的金鑰目錄。JWKS 只公布一把鑰，若每個節點各用自己的 `storage/oauth-*.key`，一個節點簽的 id_token 在另一個節點的 JWKS 下驗不過，登入成不成功取決於請求落在哪個節點。
 
+### 15.7 下游（Node.js）接入說明
+
+本節的 `openid-client` 呼叫（`discovery`、`buildAuthorizationUrl`、`authorizationCodeGrant`…）與 `scripts/oidc-e2e/e2e.mjs`（端到端驗證，見 [scripts/oidc-e2e/README.md](./scripts/oidc-e2e/README.md)）完全相同，API 名稱與簽章都對照 v6.8.9 驗證過；差別只在驗證腳本以 `http://127.0.0.1` 的本機 issuer 跑（所以多帶了 `allowInsecureRequests`，prod 的 https 不需要），而下面的範例另外加了 Express 的 session 處理。
+
+**1. 管理員為下游建立 client**（沒有自助註冊）：
+
+```bash
+php artisan passport:client --name="下游專案名稱" --redirect_uri="https://rp.example/callback"
+```
+
+預設就是**授權碼型、有 secret 的 confidential client**（輸出會顯示 `client_id` 與只出現一次的 `client_secret`，請轉交下游保存）。`redirect_uri` 必須與下游登記的**逐字相同**。不要加 `--client`（client_credentials）、`--password`、`--implicit`、`--device`：這些 grant 會被伺服器拒絕。
+
+**2. 下游設定**：只需要 issuer（`OIDC_ISSUER`，即 `https://input.cbdb.fas.harvard.edu` 之類，不帶路徑）、`client_id`、`client_secret`、自己的 `redirect_uri`。
+
+**3. 以 `openid-client`（v6）接入**：
+
+```js
+import * as client from 'openid-client';
+
+// 啟動時做一次：自動讀 {issuer}/.well-known/openid-configuration，並逐字比對 issuer。
+const config = await client.discovery(new URL(process.env.CBDB_OIDC_ISSUER), CLIENT_ID, CLIENT_SECRET);
+
+// ① 使用者按「以 CBDB 帳號登入」：產生 PKCE、state、nonce，存進**使用者自己的 session**，再導向授權端。
+const codeVerifier = client.randomPKCECodeVerifier();
+const state = client.randomState();
+const nonce = client.randomNonce();
+req.session.oidc = { codeVerifier, state, nonce };
+res.redirect(client.buildAuthorizationUrl(config, {
+  redirect_uri: REDIRECT_URI,
+  scope: 'openid profile email',        // 必須含 openid；只接受 openid／profile／email
+  state,
+  nonce,
+  code_challenge: await client.calculatePKCECodeChallenge(codeVerifier),
+  code_challenge_method: 'S256',        // 只接受 S256，所有 client 一律強制
+}).href);
+
+// ② 回呼：函式庫會自己抓 JWKS、驗簽章，並驗 iss／aud／exp／nonce／state。
+const tokens = await client.authorizationCodeGrant(config, new URL(req.originalUrl, BASE_URL), {
+  pkceCodeVerifier: req.session.oidc.codeVerifier,
+  expectedState: req.session.oidc.state,
+  expectedNonce: req.session.oidc.nonce,
+  idTokenExpected: true,
+});
+const claims = tokens.claims();
+// 以 claims.sub 識別使用者（users.id 的字串形式）。**不要用 email 當身份鍵**：email 未驗證且使用者可自行修改。
+```
+
+**4. 下游必須自己處理的事**：
+
+- **用 `sub` 建立與比對使用者**，不要用 `email`。
+- **下游自己管工作階段**：本專案沒有單點登出，使用者在這裡登出或被停用，下游不會被通知。id_token 只是登入當下的斷言（有效期最長 1 小時），**不要當成工作階段**；也不要用 access token 證明身分（它沒有受保護的資源可呼叫）。下游的 session 壽命請自行決定，需要重新驗證時重新走一次授權流程。
+- **誰能登入下游由下游決定**：本專案只證明「這是一個被管理員啟用過的 CBDB 帳號」（含一般與眾包帳號）。要限制範圍，請在下游以 `sub` 維護白名單。
+- **沒有 refresh token**：這是設計決議（見 15.2）。需要時重新走授權流程即可。
+- 授權請求被拒絕（`login_required`、`consent_required`、`invalid_scope`…）時，錯誤會以 `error` 參數帶回 `redirect_uri`；PKCE 缺漏、缺 `openid`、`redirect_uri` 不符等**不會**重導向，直接回 400 JSON。
+
 ---
 
 # 舊版 API 文檔

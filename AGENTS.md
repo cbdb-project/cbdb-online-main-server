@@ -314,6 +314,17 @@ php artisan cbdb:fetch-chgis-map        # 下載 CHGIS 底圖（缺檔才下載�
   （翻 `MIGRATION_FLAG_CODES=old` 一直都沒有效果——封路 middleware 不讀 flag。）
   詳見 [docs/CODES_SORT_FILTER_AUTH_GATE.md](./docs/CODES_SORT_FILTER_AUTH_GATE.md)。
 
+- **OIDC Provider（把後台登入提供給下游專案）**：總開關 `OIDC_PROVIDER_ENABLED` **預設關閉**，設計、決議與逐步發現見 [docs/OIDC_PROVIDER_PLAN.md](./docs/OIDC_PROVIDER_PLAN.md)（以 §8 為準），對外說明見 [API.md](./API.md) 第十五章。改動這一塊前先讀 §8，下面這些**不照做就會出事**：
+  - **`composer.json` 的 `extra.laravel.dont-discover: ["laravel/passport"]` 不能拿掉**：兩個 provider 並存時 Passport 的授權服務器會蓋掉帶 id_token 的那個，token 回應**沒有任何錯誤**地少了 `id_token`。
+  - **只註冊 `GET /oauth/authorize` 與 `POST /oauth/token`**（`OidcServiceProvider`）。不要拿掉 `AuthServiceProvider` 的 `Passport::ignoreRoutes()`（Passport 完整路由集含 `/oauth/clients`，任何已登入者都能建立 OAuth client），不要呼叫 `Mcp::oauthRoutes()`（會開動態 client 註冊）。
+  - 套件預設的 `IdentityEntity` 回傳**寫死的演示身分**（Jon Snow、`email_verified: true`）：必須保持 `config/openid.php` 的 `repositories.identity` 指向 `App\Support\Oidc\UserIdentityRepository`；claims 只有 `sub`（`users.id` 的**字串**）、`name`、`email`、`email_verified`（恆為 false），不要序列化整個 `User`。
+  - **沒有明確 issuer 時所有端點回 503**（`RequireExplicitIssuer`）：套件在 `issuedBy` 為 `laravel`／`server` 時會從請求的 Host 標頭推導 issuer，連 id_token 的 `iss` 也是。discovery 端點網址以 issuer 為基底、不用 `route()`。
+  - 授權請求必須帶 `openid` 與 PKCE `S256`（`RequireOpenIdScope`／`RequirePkceS256`）；token 端點只放行 `authorization_code`（`RestrictOidcGrantTypes`，discovery 的 `grant_types_supported` 取自它）；**不簽發 refresh token**（`NoRefreshTokenRepository`）。若要開放 refresh，必須同時恢復簽發、加進 `ALLOWED`，並補「refresh 時重查 `isActive()`、輪換、停用時撤銷」的測試。
+  - `isActive()` 的把關在 `ActiveUserAccessTokenRepository`（簽發 access token 前、與落庫同一個交易、鎖同一列 `users`）與 `AccountAccessRevoker::revokeOidcTokens()`（停用／軟刪除／變更角色時撤銷，用同一把鎖）；授權碼以條件式 `UPDATE` 原子消耗（`AtomicAuthCodeRepository`）。**新增任何會停用／刪除帳號的路徑，都要呼叫 `revokeOidcTokens()`。**
+  - **新增任何存憑證的表**，要同步三處：`VariantReplaceScope::EXCLUDED_TABLES`、`ExportMysqlToSqlite::CREDENTIAL_TABLES`（測試硬編碼精確順序）、釋出 allowlist；`oauth_*` 五張表已列入。
+  - 測試裡要在 boot 時就生效的設定用 `tests/CreatesApplication.php` 的 `bootConfigOverrides()`，**不要用環境變數**（CI 會 `cp .env.example .env`，`.env` 載入器是 immutable 且記得自己載入過什麼，同一行程較早的測試載入過 `.env` 後，預先設的環境變數會被蓋回去）。涉及 `.env.example` 的改動，本機要用 `.env.testing`（`.env.example` 的副本）模擬 CI 再跑，跑完刪掉。
+  - 上線前跑 `php artisan oidc:check`；第一次部署在 prod 只跑**一次** `php artisan passport:keys`，**之後不要加 `--force`**（會換掉簽章金鑰；`docs/UPGRADE.md` 裡舊 Passport 時代的 `--force` 指示照做會中）；多節點所有節點必須用同一對金鑰。改動後可手動跑 `scripts/oidc-e2e/run.sh`（以 `openid-client` 做隔離的端到端驗證）。
+
 ## 文檔維護原則
 - `AGENTS.md` 只保留目前有效的規則與入口，不記錄已淘汰的歷史流程。
 - `CHANGELOG.md` 只記錄近階段高價值變更與方向，不再維護超長流水帳。
@@ -339,6 +350,8 @@ php artisan cbdb:fetch-chgis-map        # 下載 CHGIS 底圖（缺檔才下載�
 - [docs/VIEWS.md](./docs/VIEWS.md)
 - [docs/POSTING_OFFICE.md](./docs/POSTING_OFFICE.md)
 - [docs/COMPOSITE_PRIMARY_KEY_URL_DESIGN.md](./docs/COMPOSITE_PRIMARY_KEY_URL_DESIGN.md)
+- [docs/OIDC_PROVIDER_PLAN.md](./docs/OIDC_PROVIDER_PLAN.md)（把後台登入提供給下游專案的 OIDC Provider：設計、逐步發現、上線前檢查清單；改動前必讀 §8）
+- [scripts/oidc-e2e/README.md](./scripts/oidc-e2e/README.md)（OIDC 端到端驗證：以 openid-client 對隔離的伺服器走一遍真實流程）
 
 ## AI / Claude skills
 - `.claude/skills/database-schema.md`

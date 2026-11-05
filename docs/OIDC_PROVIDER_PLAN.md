@@ -51,7 +51,7 @@ OIDC = OAuth 2.0 授權碼流程 + 身份層：
 | OAuth 伺服器 | **目前沒有 Passport、league/oauth2-server、任何 JWT 庫**（`composer.lock` 已確認）。⚠️ **但專案以前用過 Passport 並刻意換掉**：#622（`fe272a48`）換成 Sanctum、#628（`66a8df64`）清遺留設定，並留下 `2025_12_18_050122_remove_passport_oauth_tables`（`dropIfExists` 五張 `oauth_*` 表，`down()` 為空） | 這是**回頭路**，不是乾淨安裝：見 §6.7。`docs/API_AUTHENTICATION.md`「為什麼選擇 Sanctum」寫著「CBDB 不需要 OAuth2 的授權流程」，實作時要同步改寫 |
 | `laravel/mcp` 的 OAuth | `Client/OAuth/*` 是客戶端側；但 `Server/Registrar.php` 會引用 `Laravel\Passport\Passport`，其 `Mcp::oauthRoutes()` 會註冊 `/.well-known/oauth-authorization-server`、`/.well-known/oauth-protected-resource`、`POST oauth/register`，並把 `mcp:use` 塞進 Passport scopes。應用目前**從未呼叫** `oauthRoutes()`（app／routes／config 皆無） | 現在無衝突。裝上 Passport 後**不要呼叫 `Mcp::oauthRoutes()`**——不是因為路徑與本計畫的 discovery 撞車（路徑不同），而是它會開放 `POST oauth/register`（動態 client 註冊）並新增 `mcp:use` scope，與「只有手動建立的 first-party client」的前提相反（建議加護欄測試） |
 | 現有 token | Sanctum（`api` guard，`expiration => null`）；MCP 端點掛 `auth:sanctum` + `mcp.ability`；另有 `confirmation_token` 眾包憑證 | OIDC 是第三套憑證，**不要與之混用或重用**；`api` guard 仍是 sanctum，Passport 只用於 `/oauth/*` |
-| 登入 | `web` guard（session）、`Auth\LoginController`；登入後 `authenticated()` 擋 `!isActive()` | 未登入訪問 `/oauth/authorize?...` 時走 `Handler::unauthenticated()` → `redirect()->guest(route('login'))`，**完整 URL（含 query）存進 `url.intended`**，登入後由 `redirect()->intended()` 回跳，所以 `state`／`nonce`／`code_challenge` 會保留（React 登入頁是否原樣回傳尚未驗證）。`storeIntendedRedirect`／`isSafeRedirectPath` 只服務顯式的 `?redirect=` 輸入，且**檢查偏弱**：只擋 `//` 開頭，`/\evil.com` 之類會通過（見 §6.8） |
+| 登入 | `web` guard（session）、`Auth\LoginController`；登入後 `authenticated()` 擋 `!isActive()` | 未登入訪問 `/oauth/authorize?...` 時走 `Handler::unauthenticated()` → `redirect()->guest(route('login'))`，**完整 URL（含 query）存進 `url.intended`**，登入後由 `redirect()->intended()` 回跳，所以 `state`／`nonce`／`code_challenge` 會保留（React 登入頁是否原樣回傳尚未驗證）。`storeIntendedRedirect`／`isSafeRedirectPath` 只服務顯式的 `?redirect=` 輸入，原本只擋 `//` 開頭、檢查偏弱，**第 0 步已加固**（拒絕反斜線／控制字元／空白及路徑中的編碼形式，見 §6.8） |
 | `auth` middleware | 專案覆寫了 `auth` 別名（`App\Http\Middleware\Authenticate`，含 `isActive()` 檢查） | Passport 預設的 `/oauth/authorize` 路由中介層不保證用的是這個別名，**必須明確確認**授權端走的是會檢查 `isActive()` 的那一個 |
 | 帳號狀態 | `is_active`：0 停用、1 啟用、**2 RESERVED**；`isActive()` 只認 1 | 授權與 refresh 都必須以 `isActive()` 為準 |
 | email | `users_email_unique` 唯一，但**註冊沒有 email 驗證**，且使用者可在 `UserProfileController` 自行改 email（只驗格式與唯一性，**沒有所有權驗證**） | email **既未驗證又可變**：`email_verified` 不可宣稱為 true，下游**不可以 email 當身份鍵** |
@@ -137,7 +137,8 @@ Passport 本身**不含 OIDC**（無 id_token、discovery、JWKS），需第三�
 
 ### 6.8 登入回跳加固
 
-- `isSafeRedirectPath()` 目前只擋 `//` 開頭，`/\evil.com`、`/%09/evil.com` 這類瀏覽器會當成協定相對 URL 的值會通過。**在讓授權流程依賴這條回跳之前先加固**（拒絕反斜線與控制字元），並補測試。
+- ✅ **已完成（第 0 步）**：`isSafeRedirectPath()` 原本只擋 `//` 開頭，`/\evil.com`、`/<TAB>/evil.com`、`/%09/evil.com`、`/%5cevil.com` 這類值會通過。現在拒絕反斜線、控制字元與空白（原始形式），以及路徑部分的百分號編碼形式（`%00–%1f`、`%7f`、`%5c`）；查詢串裡的 `%20`、`%2F`、`%3A` 之類是正常內容，**不誤殺**（OIDC 的 `state`／`redirect_uri` 參數會用到）。測試見 `tests/Feature/LoginRedirectTest.php`。
+- **實際可利用性要如實說**：這是**縱深防禦，不是已知可被利用的開放轉址**。`url.intended` 由 `redirect()->intended()` → `UrlGenerator::to()` 消費，單斜線開頭的值會被補上本站根網址（`formatRoot()`），所以上述 payload 的主機換不掉；`//…` 與 `https://…` 本來就被擋。加固的理由是這個欄位之後會承載 OIDC 授權請求，而且一道只擋 `//` 的檢查不該靠下游的補根行為才安全。
 - 授權請求在登入後要**重新驗證**，不能信任 session 裡存的 URL。測試要涵蓋 `state`／`nonce`／`code_challenge` 經登入往返後完整保留。
 
 ### 6.9 RP 端驗證與金鑰管理
@@ -156,7 +157,7 @@ Passport 本身**不含 OIDC**（無 id_token、discovery、JWKS），需第三�
 | `email` 未驗證被下游當身份 | `email_verified=false`，文件明講以 `sub` 為準 |
 | 任何有效帳號都能進下游 | 6.2：明確寫進下游接入說明，由下游白名單 |
 | 與 Sanctum／眾包 token 混淆 | 保持 `api` guard 為 sanctum；OIDC 只用於 `/oauth/*`；文件分清三種憑證 |
-| 登入回跳被當開放轉址 | §6.8：加固 `isSafeRedirectPath()` 並補測試 |
+| 登入回跳被當開放轉址 | §6.8：✅ 已加固 `isSafeRedirectPath()` 並補測試（原本屬縱深防禦缺口，非已知可利用） |
 | 與 `Mcp::oauthRoutes()`、舊 drop migration 衝突 | §4、§6.7：護欄測試 + 全新／既有 DB 各驗一次 `migrate` |
 | 簽章金鑰外洩或遺失 | 不入版控、部署流程管理、規劃輪換 |
 | `/oauth/token` 被暴力破解 | 具名 limiter，並核對 `ThrottleFailedAuthentication` 的行為 |
@@ -164,7 +165,7 @@ Passport 本身**不含 OIDC**（無 id_token、discovery、JWKS），需第三�
 
 ## 8. 建議的實作拆分（每步獨立 review、獨立 PR）
 
-0. **先加固 `isSafeRedirectPath()`**（§6.8），它與 OIDC 無關、可獨立先上。
+0. ✅ **已完成：加固 `isSafeRedirectPath()`**（§6.8），它與 OIDC 無關、獨立先上。
 1. 核實套件（維護度、與 Passport 13／Laravel 12 的實測相容），裝上並跑通 migration（MariaDB + SQLite、全新與既有 DB），處理 cascade、`int unsigned` 型別與歷史 drop migration（§6.7）。
 2. 授權端：授權頁／auto-approve、`isActive()` 把關、登入回跳、client 建立命令。
 3. id_token／claims 白名單、discovery、JWKS、`email_verified` 規則。

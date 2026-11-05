@@ -21,7 +21,7 @@
 
 由此收斂出的範圍：
 
-- **做：** OIDC 授權碼流程 + PKCE、`openid`／`profile`／`email` scope、id_token、discovery、JWKS、refresh token、token 撤銷。
+- **做：** OIDC 授權碼流程 + PKCE、`openid`／`profile`／`email` scope、id_token、discovery、JWKS、token 撤銷。**不簽發 refresh token**（原稿曾把它列在「做」裡；第 4 步決議不簽發，理由見 §8 第 4 步——下游只在登入那一刻要 id_token）。
 - **不做：** 單點登出（含 RP-Initiated 與 Back-channel）、角色／權限 claim、同意頁（first-party client 跳過）、client 自助註冊、MFA、implicit／password grant。
 
 ## 2. 協定概述
@@ -31,7 +31,7 @@ OIDC = OAuth 2.0 授權碼流程 + 身份層：
 1. RP 把使用者導到本專案 `/oauth/authorize`（帶 `client_id`、`redirect_uri`、`scope=openid profile email`、`state`、`nonce`、PKCE challenge）。
 2. 使用者在本專案登入（沿用現有 session 登入）。
 3. 本專案帶一次性 `code` 導回 RP 的 `redirect_uri`。
-4. RP 後端以 `code` 呼叫 `/oauth/token`，換得 `access_token`、`id_token`（JWT）、`refresh_token`。
+4. RP 後端以 `code` 呼叫 `/oauth/token`，換得 `access_token`、`id_token`（JWT）。（原稿還有 `refresh_token`；**實際不簽發**，見 §8 第 4 步。）
 5. RP 以 JWKS 驗 id_token 簽章，取出 `sub`／`name`／`email`。
 
 需要提供的端點：`/oauth/authorize`、`/oauth/token`、`/.well-known/openid-configuration`、`/.well-known/jwks.json`（或套件預設的 `/oauth/jwks`）；`/userinfo` 可選。
@@ -54,7 +54,7 @@ OIDC = OAuth 2.0 授權碼流程 + 身份層：
 | 現有 token | Sanctum（`api` guard，`expiration => null`）；MCP 端點掛 `auth:sanctum` + `mcp.ability`；另有 `confirmation_token` 眾包憑證 | OIDC 是第三套憑證，**不要與之混用或重用**；`api` guard 仍是 sanctum，Passport 只用於 `/oauth/*` |
 | 登入 | `web` guard（session）、`Auth\LoginController`；登入後 `authenticated()` 擋 `!isActive()` | 未登入訪問 `/oauth/authorize?...` 時走 `Handler::unauthenticated()` → `redirect()->guest(route('login'))`，**完整 URL（含 query）存進 `url.intended`**，登入後由 `redirect()->intended()` 回跳，所以 `state`／`nonce`／`code_challenge` 會保留（React 登入頁是否原樣回傳尚未驗證）。`storeIntendedRedirect`／`isSafeRedirectPath` 只服務顯式的 `?redirect=` 輸入，原本只擋 `//` 開頭、檢查偏弱，**第 0 步已加固**（拒絕反斜線／控制字元／空白及路徑中的編碼形式，見 §6.8） |
 | `auth` middleware | 專案覆寫了 `auth` 別名（`App\Http\Middleware\Authenticate`，含 `isActive()` 檢查） | Passport 預設的 `/oauth/authorize` 路由中介層不保證用的是這個別名，**必須明確確認**授權端走的是會檢查 `isActive()` 的那一個 |
-| 帳號狀態 | `is_active`：0 停用、1 啟用、**2 RESERVED**；`isActive()` 只認 1 | 授權與 refresh 都必須以 `isActive()` 為準 |
+| 帳號狀態 | `is_active`：0 停用、1 啟用、**2 RESERVED**；`isActive()` 只認 1 | 授權與簽發 access token 都必須以 `isActive()` 為準（不簽發 refresh token，沒有 refresh 要把關） |
 | email | `users_email_unique` 唯一，但**註冊沒有 email 驗證**，且使用者可在 `UserProfileController` 自行改 email（只驗格式與唯一性，**沒有所有權驗證**） | email **既未驗證又可變**：`email_verified` 不可宣稱為 true，下游**不可以 email 當身份鍵** |
 | 註冊與啟用 | 註冊對匿名開放，但新帳號 `is_active=0`（欄位預設 0、不在 `$fillable`、`registered()` 立刻登出），須管理員在 `/manage` 或 `cbdb:manage-user` 手動啟用 | 「任何有效帳號」＝**任何被管理員啟用過的帳號**（含一般與眾包用戶）。啟用是唯一關卡，而它的門檻是人工審核未驗證 email 的自助註冊 |
 | `users.id` | `int unsigned AUTO_INCREMENT`（`import_cbdb_schema.php`） | Passport 的 `user_id` 預期為 bigint／uuid，**型別必然不一致**，要調整 migration，不能照單全收 |
@@ -106,19 +106,21 @@ Passport 本身**不含 OIDC**（無 id_token、discovery、JWKS），需第三�
 
 ### 6.3 停用帳號與 token 壽命（沒有單點登出的補償）
 
-- access token 與 id_token 壽命要短（建議 10 分鐘量級）。
-- **refresh 時必須檢查 `isActive()`**，否則停用帳號可無限續期。league/oauth2-server 的 refresh grant 不會呼叫任何「使用者狀態」hook，所以這**不是一行設定**，需要明確機制，擇一：自訂 `RefreshTokenRepository`／覆寫 refresh grant，或在 `/oauth/token` 前掛 middleware，經 `oauth_refresh_tokens` → `oauth_access_tokens` 的關聯找出使用者再檢查（refresh token 是不透明憑證，不能假設可從 token 本身解出使用者；檢查必須覆蓋實際核發新 access token 與 id_token 的那條路徑）。同理 refresh 時簽發的 id_token 也要擋。
-- **授權碼兌換（`authorization_code` grant）同樣要檢查 `isActive()`**：帳號可能在發碼之後、兌換之前被停用。refresh 與兌換都要擋，另外「停用帳號」與「撤銷 token」放在同一個交易內，只能避免**撤銷做到一半中斷**，擋不住**並發**：兌換或 refresh 可能和停用同時發生，仍簽出新 token。要補上其一：發放路徑在簽發前對 `users` 該列加鎖（`lockForUpdate`）並重查 `isActive()`，或簽發後再查一次、失敗就撤銷剛簽出的 token。做不到嚴格串行時，退而接受的窗口＝access token 壽命，**但這個上限只在「refresh 路徑一律重查 `isActive()`」確實落地時才成立**：競態中簽出的 refresh token 會在下次使用時被擋，沒有這道檢查的話，它能存活到 refresh token 自己的壽命。注意：競態中簽出的 **access token 本身**無法被事後撤銷追回，它會活到自己的過期時間——這正是上述「窗口＝access token 壽命」的含義，所以 access token 壽命要夠短（§6.3 開頭）。文件與測試都要明確寫出這個上限與其前提。
-- **refresh token 的發放不要假設一定有**：Passport 預設會發 refresh token，但 OIDC 規範上它對應 `offline_access` scope。要嘛明定「first-party client 一律發、不需 `offline_access`」並在文件中寫明這是 Provider 的決定（OIDC Core 要求發放離線存取的 refresh token 前要取得同意；first-party client 由我們自己預先授權、視為預先同意，這是刻意的決議，必須寫進文件而非默認），要嘛要求 RP 申請 `offline_access` 並在 §1 的 scope 清單加上它。實作時擇一，並測 token 回應確實含（或不含）`refresh_token`。
-- **停用帳號當下就撤銷該用戶全部 oauth token**：在管理端停用路徑（`/manage` 的 `performUserUpdate()` 與 `cbdb:manage-user`）掛撤銷，把暴露窗口從 refresh token 壽命縮到 access token 壽命。
-- **refresh token 壽命也要設上限**（Passport 預設很長，會抵銷短 access token 的補償），並決定是否輪替與重用偵測。實作時要測：帳號被停用後 refresh 失敗、`/authorize` 被拒、token 已被撤銷。
-- 下游若是自簽 JWT 本地驗證，**看不到撤銷**，窗口期 = access token 剩餘壽命。需告知下游開發者：自己的 session cookie 不要設太長。
+> ⚠️ **本節是設計階段的分析。第 4 步決議不簽發 refresh token**（見 §8 第 4 步），所以下面所有關於 refresh token 的條目（標有「僅日後開放 refresh 時才需要」）**目前都不適用**；保留它們是因為日後若下游真的需要長工作階段，這些就是必須補的檢查。其餘條目已實作：access token 壽命在第 2 步，授權碼兌換檢查、停用時撤銷、停用與簽發的競態在第 4 步，現況以 §8 為準。
+
+- access token 壽命要短（建議 10 分鐘量級，第 2 步已明確設定；Passport 預設是一年）。id_token 的有效期由套件寫死為 1 小時、無法設定（見 §8 第 2 步），所以它只能當「登入當下的斷言」，不能當工作階段。
+- 【僅日後開放 refresh 時才需要；目前不簽發 refresh token】**refresh 時必須檢查 `isActive()`**，否則停用帳號可無限續期。league/oauth2-server 的 refresh grant 不會呼叫任何「使用者狀態」hook，所以這**不是一行設定**，需要明確機制，擇一：自訂 `RefreshTokenRepository`／覆寫 refresh grant，或在 `/oauth/token` 前掛 middleware，經 `oauth_refresh_tokens` → `oauth_access_tokens` 的關聯找出使用者再檢查（refresh token 是不透明憑證，不能假設可從 token 本身解出使用者；檢查必須覆蓋實際核發新 access token 與 id_token 的那條路徑）。同理 refresh 時簽發的 id_token 也要擋。
+- **授權碼兌換（`authorization_code` grant）同樣要檢查 `isActive()`**：帳號可能在發碼之後、兌換之前被停用。兌換要擋（refresh 的部分僅日後開放時才需要），另外「停用帳號」與「撤銷 token」放在同一個交易內，只能避免**撤銷做到一半中斷**，擋不住**並發**：兌換可能和停用同時發生，仍簽出新 token。要補上其一：發放路徑在簽發前對 `users` 該列加鎖（`lockForUpdate`）並重查 `isActive()`，或簽發後再查一次、失敗就撤銷剛簽出的 token。（**第 4 步採用前者**：檢查與落庫在同一個交易、鎖同一列 `users`，與停用時的撤銷用同一把鎖，**對 access token** 兩種先後順序都不會漏；id_token 的最後確認不在鎖內，見 §8 第 4 步。）若做不到嚴格串行，退而接受的窗口＝access token 壽命：競態中簽出的 **access token 本身**無法被事後撤銷追回，它會活到自己的過期時間，所以 access token 壽命要夠短。（設計時還曾考慮「這個上限要求 refresh 路徑也重查 `isActive()`，否則競態中簽出的 refresh token 能存活到自己的壽命」——**因為不簽發 refresh token，這個前提不存在，access token 的上限無條件成立**。這個上限**只針對 access token**；id_token 另論：最長 1 小時、無法撤回，只是登入當下的斷言，見 `API.md` 15.5。）
+- 【僅日後開放 refresh 時才需要；目前不簽發 refresh token】**refresh token 的發放不要假設一定有**：Passport 預設會發 refresh token，但 OIDC 規範上它對應 `offline_access` scope。要嘛明定「first-party client 一律發、不需 `offline_access`」並在文件中寫明這是 Provider 的決定（OIDC Core 要求發放離線存取的 refresh token 前要取得同意；first-party client 由我們自己預先授權、視為預先同意，這是刻意的決議，必須寫進文件而非默認），要嘛要求 RP 申請 `offline_access` 並在 §1 的 scope 清單加上它。實作時擇一，並測 token 回應確實含（或不含）`refresh_token`。
+- **停用帳號當下就撤銷該用戶全部 oauth token**：在管理端停用路徑（`/manage` 的 `performUserUpdate()` 與 `cbdb:manage-user`）掛撤銷，把「已簽出的 access token 還能用多久」縮到 access token 壽命（不簽發 refresh token，沒有更長的憑證）。這裡說的只是 access token：已簽出的 **id_token** 有效期是 1 小時、無法撤回，但它只是登入當下的身分斷言、不授予對任何受保護資源的存取（見 `API.md` 15.5）。
+- 【僅日後開放 refresh 時才需要；目前不簽發 refresh token】**refresh token 壽命也要設上限**（Passport 預設很長，會抵銷短 access token 的補償），並決定是否輪替與重用偵測。實作時要測：帳號被停用後 refresh 失敗、`/authorize` 被拒、token 已被撤銷。
+- 下游若是自簽 JWT 本地驗證，**看不到撤銷**：access token 的窗口期 = 剩餘壽命（預設 10 分鐘）；id_token 則最長 1 小時（套件寫死、無法撤回）。實務上下游沒有任何受保護資源要用這兩張 token 去存取，所以真正要緊的是下游**自己的** session：需告知下游開發者，自己的 session cookie 不要設太長（見 `API.md` 15.7）。
 - 使用者在本專案登出，下游**不會**同步登出（刻意不做）。
 
 ### 6.4 Client 管理
 
 - 一到兩個 first-party client，用 artisan 命令建立（Passport 內建 `passport:client`）即可；管理頁（React/Inertia）延後。
-- 僅授權碼 + PKCE + refresh，不開 implicit／password／client_credentials。
+- 僅授權碼 + PKCE，不開 refresh（第 4 步決議不簽發 refresh token）、implicit、password、client_credentials。
 - **PKCE 只對 public client 強制**（league 的行為）。Node 伺服器端 RP 若是 confidential client（有 secret），預設可以不送 PKCE。要嘛註冊成 `--public`，要嘛由伺服器端強制所有 client 必須帶 `code_challenge` 且僅接受 `S256`。
 - first-party 免同意頁要有明確機制（例如自訂 Client model 的 `skipsAuthorization()`），並決定 `prompt=login`／`prompt=consent`／`max_age` 的政策：`login` 與 `max_age` 要能強制重新驗證；本計畫沒有同意頁，所以 **`prompt=consent` 不可被靜默當成已同意**：OIDC Core 規定伺服器無法取得同意時必須回錯誤（規範寫「通常是 `consent_required`」，具體錯誤碼實作時對照規範與套件行為）；`prompt=none` 在未登入時回 `login_required`。auto-approve 下 `GET /oauth/authorize` 對任何已登入瀏覽器都會直接發 code，**因此 `redirect_uri` 精確比對（不得有萬用字元）與 PKCE 是把關的重點，但不是全部**：授權碼必須一次性、綁定 client 與 PKCE verifier，RP 端還必須驗 `state`／`nonce`（§6.9）。這幾道少任何一道，自動核准都不算安全。
 
@@ -168,7 +170,7 @@ Passport 本身**不含 OIDC**（無 id_token、discovery、JWKS），需第三�
 | 風險 | 緩解 |
 |---|---|
 | OIDC 套件維護者在找接手人 | 實作前看近期 commit／issue；把依賴封在薄層，保留退回「自行在 league/oauth2-server 上簽 id_token」的可能 |
-| 停用帳號仍可續期 | 6.3：refresh 前檢查 `isActive()` + 測試 |
+| 停用帳號仍可續期 | 不簽發 refresh token，所以不存在續期路徑（第 4 步決議）；access token 簽發前檢查 `isActive()` 並在停用時撤銷 |
 | `email` 未驗證被下游當身份 | `email_verified=false`，文件明講以 `sub` 為準 |
 | 任何有效帳號都能進下游 | 6.2：明確寫進下游接入說明，由下游白名單 |
 | 與 Sanctum／眾包 token 混淆 | 保持 `api` guard 為 sanctum；OIDC 只用於 `/oauth/*`；文件分清三種憑證 |

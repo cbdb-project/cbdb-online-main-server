@@ -242,7 +242,7 @@ Passport 本身**不含 OIDC**（無 id_token、discovery、JWKS），需第三�
 ### 8.1 上線前檢查清單（總開關保持預設關閉，直到逐項確認）
 
 1. **prod 的 PHP 有 `ext-sodium`**：**已確認（2026-11-05，唯讀 SSH 檢查）**——prod 是 PHP 8.4.27，`php -m`（CLI）與 `php-fpm8.4 -m`（網頁請求實際用的）都列出 `sodium`，`php8.4-fpm` 服務為 active。
-2. **第一次部署只跑一次 `php artisan passport:keys`**（之後不要加 `--force`），私鑰權限 0600；多節點部署所有節點必須使用**同一對**金鑰。
+2. **第一次部署只跑一次 `php artisan passport:keys`**（之後不要加 `--force`），私鑰不可被其他使用者讀取（0600，或擁有者與網頁伺服器不同時用 0640 並把群組改成網頁伺服器的群組，見下面的 prod 紀錄）；多節點部署所有節點必須使用**同一對**金鑰。
 3. 設定 `OIDC_ISSUER`（對外 https 網址、不帶路徑）；沒有明確 issuer 時所有端點會回 503。
 4. **`php artisan oidc:check` 通過**（`deploy.sh` 在開關開啟時自動跑，失敗只警告）。
 5. 管理員以 `php artisan passport:client --name=… --redirect_uri=…` 為下游建立 client，把 `client_id`／`client_secret` 轉交下游。
@@ -251,7 +251,16 @@ Passport 本身**不含 OIDC**（無 id_token、discovery、JWKS），需第三�
 8. **token 清理（已由週六釋出腳本順便處理，不需要新增 cron）**：`scripts/weekly-sqlite-sync-and-oidc-purge.sh`（原 `weekly-sqlite-sync.sh`，檔名改成帶上這件事）在釋出之後順便跑 `php artisan passport:purge --expired --hours=24`，**失敗只警告、不影響釋出的結束碼**（有測試鎖住，`WeeklyScriptOidcPurgeStepTest`）。prod 本來就有每週六 19:00 的 cron 在跑這支腳本，所以不必新增 `schedule:run`（2026-11-05 唯讀 SSH 檢查確認 prod 沒有 `schedule:run`，且 `/etc/cron.*`、systemd timer 都沒有）。`Kernel::schedule()` 裡的每日排程保留為「哪天有人加了 scheduler 就自動生效」的備援，沒有也無妨。
    **改檔名已收尾（2026-11-05）**：prod 的 crontab 已改指新檔名（`0 19 * * 6 …/scripts/weekly-sqlite-sync-and-oidc-purge.sh`，改前的 crontab 備份在 prod 的 `~/crontab.bak-20261105`），舊檔名的轉接檔因此移除。
    清理本身**不影響登入的正確性**（purge 只清過期的 token 列；各 repository 與 revoker 都不依賴列被清掉），所以這一項不擋上線。
-   **prod 部署（2026-11-05，使用者明確指示）**：prod 已部署到 `cb78cb89`（原為 `66fce183`）。步驟：`git pull`（22 個提交）→ `composer install`（pull 後 `vendor/` 尚缺 Passport，網頁請求會短暫 500，所以必須先於 migrate；裝完 Passport 未被自動探索，`dont-discover` 生效）→ `migrate --database=mysql_migrate`（恰好 5 個 `oauth_*` 建表，沒有改既有表）→ `./deploy.sh`（exit 0，`oidc:check` 顯示開關關閉）。核對：登入頁 200、`/oauth/authorize` 與 `/.well-known/openid-configuration` 皆 404（休眠符合預期）。部署途中 `optimize:clear` 重建快取的瞬間有短暫的 bootstrap/cache 錯誤，之後沒有新錯誤。**OIDC 總開關仍是預設關閉**；第 2–6、9 項（`passport:keys`、`OIDC_ISSUER`、建 client、開開關等）是開啟 OIDC 時才做，尚未做。
+   **prod 部署（2026-11-05，使用者明確指示）**：prod 已部署到 `cb78cb89`（原為 `66fce183`）。步驟：`git pull`（22 個提交）→ `composer install`（pull 後 `vendor/` 尚缺 Passport，網頁請求會短暫 500，所以必須先於 migrate；裝完 Passport 未被自動探索，`dont-discover` 生效）→ `migrate --database=mysql_migrate`（恰好 5 個 `oauth_*` 建表，沒有改既有表）→ `./deploy.sh`（exit 0，`oidc:check` 顯示開關關閉）。核對：登入頁 200、`/oauth/authorize` 與 `/.well-known/openid-configuration` 皆 404（休眠符合預期）。部署途中 `optimize:clear` 重建快取的瞬間有短暫的 bootstrap/cache 錯誤，之後沒有新錯誤。**部署當下總開關仍關閉**。
+   **prod 開啟 OIDC（2026-11-05，使用者明確指示「开启」）**：第 2、3、4、9 項已做，第 5、6 項（建 client、下游接入）**尚未做——還沒有下游的名稱與 redirect URI，建 client 不需要先於開啟**。步驟與核對：
+   - `.env` 先備份為 `.env.bak.20261105.pre-oidc`，再寫入 `OIDC_ISSUER=https://input.cbdb.fas.harvard.edu` 與 `OIDC_PROVIDER_ENABLED=true`（prod 的 `APP_URL` 是 `http://localhost`，所以 issuer 必須顯式設）。
+   - `php artisan passport:keys` 只跑一次、未加 `--force`。⚠️ 產生的檔案是 `ubuntu:caddy`、私鑰 `0600`，PHP-FPM 的 worker 是 `www-data` 讀不到，所以**要改成 `ubuntu:www-data`、`0640`**（`oidc:check` 的規則是「其他使用者不可讀」，0640 符合）。
+   - `APP_CONFIG_CACHE=/nonexistent php artisan oidc:check`（忽略舊快取）通過；兩個警告（限流計數在 file cache、多節點金鑰提醒）對單節點無妨。
+   - `optimize:clear` 後重建 config／route／view 快取。
+   - 核對（從外部對公開網址）：登入頁 200；`/.well-known/openid-configuration` 200 且 issuer 正確；`/oauth/jwks` 200（RS256）；`/oauth/authorize` 與 POST `/oauth/token` 不帶參數回 400。
+   - ⚠️ 重建快取後**立刻**請求會看到 404（opcache 的 `revalidate_freq=2` 視窗），等幾秒再驗，別誤判成沒生效。
+   - ⚠️ prod 的 CLI 跑 `route:list` 會被 `PrometheusServiceProvider` 的 APC 儲存拋錯（CLI 沒有 APC），這是既有現象、與 OIDC 無關；要確認路由請看 `bootstrap/cache/routes-v7.php` 或直接 curl。
+   - **第 9 項後半（以測試帳號走一次完整登入）尚未做**：需要一個 client，而且會在 prod 留下授權碼／token 列與審計，等有第一個下游時一起做。
 9. 設定 `OIDC_PROVIDER_ENABLED=true` 後重新部署（`route:cache`／`config:cache` 要重建才會生效），再跑一次 `scripts/oidc-e2e/run.sh` 以外的實際環境驗證（以測試帳號走一次完整登入）。
 
 ## 9. 開放問題

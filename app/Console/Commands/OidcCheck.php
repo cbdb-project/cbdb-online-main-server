@@ -99,7 +99,7 @@ class OidcCheck extends Command {
         // 私鑰不可被「其他人」讀取（只有它是檔案時才檢查）。Windows 的檔案權限模型不同，不檢查。
         $privatePath = $keys['私鑰']['path'];
         if ($keys['私鑰']['configured'] === '' && !windows_os() && is_file($privatePath) && (fileperms($privatePath) & 0007) !== 0) {
-            $errors[] = "私鑰 {$privatePath} 可被其他使用者讀取（權限應為 0600）。請 chmod 600，並確認只有網頁伺服器的使用者能讀。";
+            $errors[] = "私鑰 {$privatePath} 可被其他使用者讀取。請改成 0600（擁有者就是網頁伺服器的使用者）或 0640（擁有者是部署帳號時，把群組改成網頁伺服器的群組），確保只有網頁伺服器的使用者能讀。";
         }
 
         if ($keys['公鑰']['pem'] === '' || $keys['私鑰']['pem'] === '') {

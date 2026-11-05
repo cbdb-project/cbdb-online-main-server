@@ -187,7 +187,7 @@ class AssertSqliteReleaseScopeTest extends TestCase {
 
     #[Test]
     public function the_default_min_tables_is_the_full_allowlist(): void {
-        // 漏傳 --min-tables 不該讓下界掉到 1：weekly-sqlite-sync.sh 的上傳邊界那次呼叫就沒傳，
+        // 漏傳 --min-tables 不該讓下界掉到 1：weekly-sqlite-sync-and-oidc-purge.sh 的上傳邊界那次呼叫就沒傳，
         // 若預設是 1，把產物換成只含一張 allowlist 內表的檔案也會通過（codex 覆核時指出）。
         $path = $this->makeSqlite('single', ['BIOG_MAIN']);
 

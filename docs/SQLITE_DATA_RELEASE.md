@@ -47,7 +47,7 @@ Metadata 內容包含：
 1. 執行每週同步腳本
 
 ```bash
-./scripts/weekly-sqlite-sync.sh
+./scripts/weekly-sqlite-sync-and-oidc-purge.sh
 ```
 
 2. 腳本流程包含：
@@ -67,7 +67,7 @@ Metadata 內容包含：
 
 上述兩條由**三道防線**守住：
 
-1. **產物自檢（繞不過去的那道）**：`scripts/export-daily-sqlite.sh` 在匯出完成後、產生 metadata 之前，對輸出檔跑 `php artisan cbdb:assert-sqlite-release-scope "$OUTPUT_FILE" --min-tables="${#TABLES[@]}"`（實作於 [app/Console/Commands/AssertSqliteReleaseScope.php](../app/Console/Commands/AssertSqliteReleaseScope.php)），`scripts/weekly-sqlite-sync.sh` 在打包上傳前再跑一次。它直接讀產物的 `sqlite_master`（表與檢視都算）並檢查三件事：
+1. **產物自檢（繞不過去的那道）**：`scripts/export-daily-sqlite.sh` 在匯出完成後、產生 metadata 之前，對輸出檔跑 `php artisan cbdb:assert-sqlite-release-scope "$OUTPUT_FILE" --min-tables="${#TABLES[@]}"`（實作於 [app/Console/Commands/AssertSqliteReleaseScope.php](../app/Console/Commands/AssertSqliteReleaseScope.php)），`scripts/weekly-sqlite-sync-and-oidc-purge.sh` 在打包上傳前再跑一次。它直接讀產物的 `sqlite_master`（表與檢視都算）並檢查三件事：
    - 不含 `ExportMysqlToSqlite::CREDENTIAL_TABLES` 內的帳號／憑證表（單獨列出只為了給出明確的錯誤訊息，它們本來也不在下面那份 allowlist 裡）；
    - 每個名稱都必須出現在 [`App\Support\SqliteReleaseTables::PUBLIC_TABLES`](../app/Support/SqliteReleaseTables.php) 這份**精確集合**裡——**這一條才是守住上面第二點的東西**，`audit_log`、`operations`、`nl_query_logs` 都不在憑證名單裡，只比對憑證名會整批漏掉。刻意不用「全大寫就算公開 CBDB 表」的形狀判準：那會放行任何日後新增的大寫表，而 `AUDIT_LOG_ARCHIVE`、`USER_LOGIN_EVENTS` 這種名字一樣全大寫、卻是個資；
    - 不含檢視（view）。檢視也會被下面的表數算進去，若不擋掉，78 個「與 allowlist 同名的空檢視」就能冒充一份完整產物；
@@ -81,7 +81,7 @@ Metadata 內容包含：
 
 為什麼需要疊這幾道：靜態檢查看的是「意圖」，任何一層間接（`TABLES+=`、換個變數名餵 `for` 迴圈、`source` 外部檔、`eval`）都可能讓實際匯出範圍與清單不一致，追不完；產物自檢看的是**真正要上傳的那個檔案**；閘門測試證明的是「自檢失敗真的會擋下流程」。反過來，靜態測試的價值在於「有人動了釋出範圍的形狀時會被看到」。
 
-真正擋下上傳的是**結束碼**：`weekly-sqlite-sync.sh` 有 `set -e` 且以裸 `bash scripts/export-daily-sqlite.sh` 呼叫匯出（沒有 `|| true`、不在 pipeline 或條件式裡），所以匯出腳本一非零就整條中止。不要以為「沒產生 metadata」本身能擋住：`weekly-sqlite-sync.sh` 在 metadata 不存在時只會印警告，然後照樣上傳 zip。
+真正擋下上傳的是**結束碼**：`weekly-sqlite-sync-and-oidc-purge.sh` 有 `set -e` 且以裸 `bash scripts/export-daily-sqlite.sh` 呼叫匯出（沒有 `|| true`、不在 pipeline 或條件式裡），所以匯出腳本一非零就整條中止。不要以為「沒產生 metadata」本身能擋住：`weekly-sqlite-sync-and-oidc-purge.sh` 在 metadata 不存在時只會印警告，然後照樣上傳 zip。
 
 新增 CBDB 表時要顯式加進那兩份 allowlist（不會自動被收錄）；**不要**把腳本改成「動態取全部表」——那會讓釋出範圍變成由來源資料庫決定，等於把上述契約交給環境。
 
@@ -95,7 +95,7 @@ Metadata 內容包含：
 - 匯出 `BIOG_MAIN` 時排除 `c_name_chn = '<待删除>'` 的列（`c_name_chn` 為 `NULL` 視為正常，保留）。
 - 匯出其餘表時，排除所有指向 `BIOG_MAIN.c_personid` 的欄位（含 `c_personid` 本身，以及透過正式 FK 宣告、由 `information_schema.KEY_COLUMN_USAGE` 動態偵測到的關係欄位，如 `KIN_DATA.c_kin_id`、`ASSOC_DATA.c_assoc_id` 等）屬於已刪除人物的列；一列只要有任一人物 ID 欄位命中已刪除人物即整列排除。
 - 少數未宣告正式 FK、但語意上仍指向人物的欄位（目前僅 `MERGED_PERSON_DATA.c_merged_from_personid`）列在程式碼常數 `EXTRA_PERSON_ID_COLUMNS` 中，需手動維護。
-- 正式匯出（來源為 MySQL）時，若 `information_schema` 查詢失敗，該表會被標記為匯出失敗（不會悄悄降級為「只過濾 `c_personid`」）；`export-daily-sqlite.sh` 仍會繼續處理其餘表，但只要有任何表失敗就以非零結束碼收尾，`weekly-sqlite-sync.sh`（`set -e`）因此不會繼續執行後面的壓縮與 `hf upload`，避免關係欄位過濾被無聲跳過又外流到公開釋出檔。
+- 正式匯出（來源為 MySQL）時，若 `information_schema` 查詢失敗，該表會被標記為匯出失敗（不會悄悄降級為「只過濾 `c_personid`」）；`export-daily-sqlite.sh` 仍會繼續處理其餘表，但只要有任何表失敗就以非零結束碼收尾，`weekly-sqlite-sync-and-oidc-purge.sh`（`set -e`）因此不會繼續執行後面的壓縮與 `hf upload`，避免關係欄位過濾被無聲跳過又外流到公開釋出檔。
 
 ## 注意事項
 
@@ -103,4 +103,4 @@ Metadata 內容包含：
 - `public/latest.zip` 會被覆寫為當日釋出檔案。
 - 若需調整上傳路徑或命名，請同步更新：
   - `scripts/export-daily-sqlite.sh`
-  - `scripts/weekly-sqlite-sync.sh`
+  - `scripts/weekly-sqlite-sync-and-oidc-purge.sh`

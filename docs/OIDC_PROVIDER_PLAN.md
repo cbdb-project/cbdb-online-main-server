@@ -187,8 +187,21 @@ Passport 本身**不含 OIDC**（無 id_token、discovery、JWKS），需第三�
    - **`ExportMysqlToSqlite::CREDENTIAL_TABLES` 要同步**（Sourcery 指出）：清單裡原本就有四張 `oauth_*`（移除 Passport 時留下，註解寫「舊表」），現在它們是**現役**憑證表，已更正註解並補上 `oauth_device_codes`。每週對外釋出走 allowlist（第一道防線）不受影響，但裸跑 `db:export-to-sqlite` 會。**新增任何存憑證的表，都要檢查這份清單、`VariantReplaceScope`、以及釋出 allowlist 三處。**
    - **遷移保護改為 `PassportMigrationGuard`**（Sourcery 指出單純 `hasTable → return` 的兩個洞）：表已存在但**缺欄位 → 直接報錯**（不悄悄標成已套用，否則 Passport 在執行期才失敗）；`down()` 只在表為**空**時才刪（可能是跳過建立的既有表，或存著未過期憑證）。刻意**不**處理的：兩個部署行程同時跑 migrate 的競態——那是全站所有遷移共有的問題，部署本來就單行程。
    - **還沒做、仍待確認**：MariaDB 實機跑一次 migration（目前只在 SQLite 驗證）；prod 的 `migrations` 表是否殘留舊 Passport 檔名（不影響本方案，因為已改名）；`docs/API_AUTHENTICATION.md`「為什麼選擇 Sanctum」要等端點真的放行時再改寫。
-2. 授權端：授權頁／auto-approve、`isActive()` 把關、登入回跳、client 建立命令。
-3. id_token／claims 白名單、discovery、JWKS、`email_verified` 規則。
+2. ✅ **已完成：授權端與令牌端**（總開關 `OIDC_PROVIDER_ENABLED`，**預設關閉**）。只註冊 `GET /oauth/authorize` 與 `POST /oauth/token` 兩條路由（`OidcServiceProvider`）；id_token 的 `sub`／`name`／`email`／`email_verified` 走白名單（`App\Support\Oidc\UserIdentityRepository`）；端到端測試 `tests/Feature/OidcAuthorizationFlowTest.php`（22 個，六組變異檢查確認每道保護都有測試守著）；對外說明見 `API.md` §十五。**實作中發現的事**（每一項都是不照著做就會出事的）：
+   - 🔴 **套件預設的 `IdentityEntity` 回傳寫死的演示身分**：Jon Snow、`jon.snow@dorne.com`、`email_verified => true`、電話、地址。不覆寫的話，每個 id_token 都帶著假身分與「已驗證」的 email。已改用自己的白名單實作，並有測試斷言不出現 `Jon Snow`／`dorne.com`／`phone_number`／`address`／`is_admin`／`confirmation_token` 等。
+   - 🔴 **兩個 provider 同時被自動發現，Passport 的授權服務器會蓋掉帶 id_token 的那個**：症狀是 token 回應完全沒有 `id_token`，而且沒有任何錯誤。套件 README 要求在 `composer.json` 的 `extra.laravel.dont-discover` 加 `laravel/passport`（OIDC 包的 provider 繼承了它）。已加。**這條只有端到端測試抓得到**，單元測試與 migration 測試都看不出來。
+   - 🔴 **`mcp:use` scope 會被 `laravel/mcp` 悄悄塞進 Passport**：它在 `app->booted()` 回調裡**合併**進 `Passport::$scopes`，於是 RP 能申請 `mcp:use`。`OidcServiceProvider` 的 `tokensCan()` 也放進 `booted()`、整個取代（我們的回調註冊得比它晚、所以後執行）。這是**順序依賴**，由 `only_openid_profile_and_email_scopes_exist` 與 `scopes_the_project_does_not_offer_are_rejected`（含 `mcp:use`）鎖住。
+   - 🔴 **Passport 的完整路由集不能整套放行**：它含 `/oauth/clients` 的增刪改（任何已登入使用者都能建立 OAuth client）、`/oauth/personal-access-tokens`、`/oauth/tokens`、裝置授權。所以保持 `Passport::ignoreRoutes()`，只註冊需要的兩條；`POST/DELETE /oauth/authorize`（核准／拒絕）也不註冊，因為沒有同意頁。
+   - **Passport 的授權路由只掛 `web`、沒有 `isActive()` 檢查**：被停用但 session 仍有效的帳號會直接拿到授權碼。`EnsureOidcUserIsActive` 把這種帳號當成未登入處理（登出＋作廢 session），`prompt=none` 時 RP 看到的是 `login_required`，與沒登入無法區分。
+   - **PKCE 只對 public client 強制**：`RequirePkceS256` 對所有 client 一律要求 `S256`；缺漏直接回 `400`、不重導向（此時 `redirect_uri` 還沒驗證）。
+   - **`prompt` 處理 Passport 13 已內建**（`none`／`login`／`consent`），不必重寫；沒有同意頁，所以 `prompt=consent` 與非 first-party client 以 `OidcConsentRequiredResponse` 回 `consent_required`（Passport 13 沒綁這個視圖會 `BindingResolutionException`）。OIDC Core 規定伺服器無法取得同意時必須回錯誤（規範寫「通常是 `consent_required`」）。
+   - **套件寫死的時間**：id_token 有效期固定 **1 小時**（`PT1H`）、授權碼固定 10 分鐘，都無法設定。Passport 自己的 access／refresh token 預設是**一年**，所以 `OidcServiceProvider` 明確指定（預設 10 分鐘／7 天，env 可調）。
+   - 🔴 **停用帳號的 `isActive()` 檢查只在 token 帶 `openid` scope 時才會被呼叫**（code review 發現，已實測證實）：檢查掛在 `UserIdentityRepository`，而套件的 `IdTokenResponse` 在沒有 `openid` scope 時整段跳過（含身分查詢）。`scope` 又是授權請求的選用參數。**實測**：臨時拿掉強制後，用 `scope=profile` 走完「授權 → 停用帳號 → 兌換」，token 端點回 **200 並給出 `access_token` 與 7 天的 `refresh_token`**，完全沒經過任何 `isActive()`。修法：`RequireOpenIdScope` 強制授權請求必須含 `openid`（缺漏回 400、不重導向），每張授權碼與其衍生的 token 因此都含 `openid`。這是把關能成立的**前提之一**，不是形式要求。
+   - 🔴 **`POST /oauth/token` 上 `refresh_token` 與 `client_credentials` 是無條件註冊的**，只靠 client 自己的 `grant_types` 欄位擋。`client_credentials` 不需要使用者（管理員誤建 `passport:client --client` 就能無使用者簽發 token）；`refresh_token` 的把關是第 4 步。`RestrictOidcGrantTypes` 目前**只放行 `authorization_code`**，其餘一律 `400 unsupported_grant_type`——這也讓 refresh 在第 4 步做完檢查前整條路徑保持關閉。**第 4 步開放 refresh 時，把 `refresh_token` 加進 `RestrictOidcGrantTypes::ALLOWED` 並補測試。**
+   - ⚠️ **兌換授權碼時的 `isActive()` 檢查目前只是過渡性的**：由 `UserIdentityRepository` 在簽發 id_token 時拒絕（前提是上面兩條：授權請求必須含 `openid`、token 端點只放行 `authorization_code`），失敗的兌換不會把 token 交給 RP；但 token 在檢查**之前**就已寫進資料庫，**沒有被撤銷**。完整的撤銷、refresh 把關與限流是第 4 步。**所以總開關在第 4 步完成前不可在 prod 開啟**（`.env.example`、`config/oidc.php`、`API.md` 都已標註）。
+   - **本機 PHP 的 openssl 沒有設定檔**，`openssl_pkey_new` 不能用；測試改用 Passport 自帶的 `passport:keys`（phpseclib），整個測試類只生成一次金鑰。
+   - **開關是在 route 註冊時讀的**：`route:cache` 之後改 `OIDC_PROVIDER_ENABLED` 要重跑 `route:cache` 與 `config:cache`（與 `routes/ai.php` 依 `MCP_ENABLED` 同理）。
+3. id_token／claims 白名單與 `email_verified` 規則（✅ 已在第 2 步完成）；**剩下**：discovery、JWKS、`kid` 與金鑰輪換、`passport:keys` 的部署流程。
 4. refresh 與停用帳號、token 壽命、限流。
 5. 以 `openid-client` 做端到端驗證；文件（`API.md`、openapi、接入說明）。
 

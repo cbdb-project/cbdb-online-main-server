@@ -4,21 +4,41 @@
  * OIDC Provider（jeremy379/laravel-openid-connect）的**覆寫項**。
  *
  * 套件自己會 mergeConfigFrom 它的預設值；這裡只放本專案要改的鍵。合併是**淺層**的（頂層鍵整個取代），
- * 所以 `routes` 這種巢狀陣列必須寫全，不能只寫要改的那一格。
+ * 所以 `routes`、`passport` 這種巢狀陣列必須寫全，不能只寫要改的那一格。
  *
- * 計畫與分步落地見 docs/OIDC_PROVIDER_PLAN.md。目前處於「已安裝、全部關閉」階段：
- * 路由全關，避免在授權端的 isActive() 把關與登入回跳測試完成前暴露任何端點。
- * 護欄測試：tests/Feature/OidcProviderDormantTest.php。
+ * 計畫與分步落地見 docs/OIDC_PROVIDER_PLAN.md；總開關與壽命見 config/oidc.php。
+ * 護欄測試：tests/Feature/OidcProviderDormantTest.php、tests/Feature/OidcAuthorizationFlowTest.php。
  */
 return [
     'routes' => [
-        // 第 3 步（id_token／claims／discovery／JWKS）才有意地打開，並補測試。
+        // 第 3 步（discovery／JWKS）才有意地打開，並補測試。
         'discovery' => false,
         'jwks' => false,
         'jwks_url' => '/oauth/jwks',
         // 刻意長期關閉：計畫決議不啟用 /userinfo（id_token 已含所需 claims；
         // Bearer 失敗還會被全域 ThrottleFailedAuthentication 計入），見 docs/OIDC_PROVIDER_PLAN.md §6.7。
         'userinfo' => false,
+    ],
+
+    /*
+     * 只開放 openid／profile／email。套件預設還有 phone／address：本專案沒有那些資料，
+     * 留著只會讓 RP 以為能要到、並讓 discovery 對外宣稱支援。
+     */
+    'passport' => [
+        'tokens_can' => [
+            'openid' => 'Enable OpenID Connect',
+            'profile' => 'Information about your profile',
+            'email' => 'Information about your email address',
+        ],
+    ],
+
+    /*
+     * ⚠️ 套件預設的 IdentityRepository 會回傳**寫死的演示身分**（Jon Snow、jon.snow@dorne.com，
+     * 且 `email_verified => true`）。一定要覆寫成本專案的白名單實作，否則每個 id_token 都會帶著
+     * 假身分與「已驗證」的 email。
+     */
+    'repositories' => [
+        'identity' => \App\Support\Oidc\UserIdentityRepository::class,
     ],
 
     /*

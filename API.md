@@ -27,6 +27,7 @@ v2 分成兩類端點：
 | 十二、社會關係與親屬的互逆鏡像 | `POST /api/v2/relationship/opposite-edges` | 雙向關係的連帶寫入、衝突與復原 |
 | 十三、代碼表與複合實體寫入 | — | 代碼表更新／新增、office 與 social-institution 聚合 |
 | 十四、其他開放端點 | 見該章 | 著作查詢、帳號與 token、代碼選單、AI 輔助、MCP、人物頁 API |
+| 十五、OIDC Provider（實驗性，預設關閉） | `GET /oauth/authorize`、`POST /oauth/token` | 把本專案的後台登入提供給其他專案（授權碼 + PKCE，回傳 id_token） |
 
 ---
 
@@ -1734,6 +1735,73 @@ v2 提案流程上線前的舊機制，仍在線但**建議一律改用 `/api/v2
 | GET | `/sanctum/csrf-cookie` | 取得 CSRF cookie。**只有 cookie-based（session）客戶端需要**；用 Bearer token 呼叫 `/api/v2/*` 不需要它 |
 
 這些端點的回應格式隨頁面需求調整，**不提供穩定性保證**。另外 Query Playground 的 JSON／SSE 端點（`/query-playground/*`）雖然也是 JSON 介面，但需要登入 session、且設計上專供站內頁面使用，不在本文件的對外 API 範圍內。
+
+
+---
+
+## 十五、OIDC Provider（實驗性，預設關閉）
+
+把本專案的後台登入提供給其他專案使用（本專案是 OpenID Connect Provider，下游是 Relying Party）。設計、決議與風險見 [docs/OIDC_PROVIDER_PLAN.md](./docs/OIDC_PROVIDER_PLAN.md)。
+
+> **預設關閉**：沒有設定環境變數 `OIDC_PROVIDER_ENABLED=true` 時，下列端點都不存在（404）。計畫第 4 步（授權碼兌換與 refresh 的停用帳號把關）完成前，**不可在 prod 開啟**。discovery（`/.well-known/openid-configuration`）與 JWKS（`/oauth/jwks`）屬計畫第 3 步，目前**沒有**；`/oauth/userinfo` 刻意不提供（id_token 已含所需 claims）。
+
+| 方法 | 路徑 | 說明 |
+| ------ | ------ | ------ |
+| GET | `/oauth/authorize` | 授權端點。瀏覽器導向；需要登入 session，未登入會被導到 `/login` 並在登入後回跳（完整 URL 含 query 保留） |
+| POST | `/oauth/token` | 令牌端點。伺服器對伺服器呼叫（不帶 session／CSRF），限流 60 次／分／IP |
+
+沒有其他 `/oauth/*` 端點：Passport 的 client 管理 JSON API、personal access token、裝置授權、核准／拒絕路由一律不存在。client 由管理員以 `php artisan passport:client` 手動建立，沒有自助註冊。
+
+### 15.1 授權請求（`GET /oauth/authorize`）
+
+| 參數 | 必填 | 說明 |
+| ------ | ------ | ------ |
+| `response_type` | 是 | 固定 `code` |
+| `client_id` | 是 | client 的 UUID |
+| `redirect_uri` | 是 | 必須與 client 登記的位址**逐字相同**（不支援萬用字元、不做前綴比對） |
+| `scope` | **是，且必須含 `openid`** | 空白分隔，只接受 `openid`、`profile`、`email`；其他（含 `phone`、`address`、`mcp:use`）回 `invalid_scope`。缺少 `openid`（含完全不帶 scope、只帶 `profile`／`email`）回 `400` JSON `{"error":"invalid_scope"}`，**不**重導向。這是把關的一環，不只是規範：停用帳號的檢查在簽發 id_token 時，而沒有 `openid` 就不會簽發 id_token |
+| `state` | 建議 | 原樣回傳 |
+| `nonce` | 建議 | 原樣寫入 id_token |
+| `code_challenge` | **是** | 43–128 字元，`[A-Za-z0-9-._~]` |
+| `code_challenge_method` | **是** | **只接受 `S256`**（對所有 client 一律強制，包含有 secret 的 confidential client） |
+| `prompt` | 否 | `none`、`login`；見下 |
+
+- **PKCE 缺漏或不合法**：直接回 `400` JSON `{"error":"invalid_request", ...}`，**不**重導向（此時 `redirect_uri` 尚未驗證）。
+- **成功**：`302` 到 `redirect_uri?code=...&state=...`。
+- **沒有同意頁**。first-party client（沒有擁有者者，即管理員建立的）自動核准。`prompt=consent`、或有擁有者的 client，一律以 `302` 帶 `error=consent_required` 回到 `redirect_uri`。
+- **`prompt=none`**：未登入回 `error=login_required`；**已被停用的帳號與未登入無法區分**（同樣回 `login_required`），不洩漏帳號狀態。`prompt=login` 會強制重新登入。
+- **已停用的帳號**（`is_active` 不是 1，含保留帳號）即使 session 仍有效也拿不到授權碼，session 會被登出。
+- 錯誤 `redirect_uri`、不存在的 client：回 JSON 錯誤，**不會**重導向。
+
+### 15.2 令牌請求（`POST /oauth/token`）
+
+`application/x-www-form-urlencoded`。**只接受 `grant_type=authorization_code`**，帶 `client_id`、`redirect_uri`、`code`、`code_verifier`；confidential client 另帶 `client_secret`（public client 不帶 secret，靠 PKCE）。其他 `grant_type`（`refresh_token`、`client_credentials`、`password`、裝置授權、缺漏）一律回 `400` JSON `{"error":"unsupported_grant_type"}`，**即使 client 自己的 `grant_types` 欄位允許**——`client_credentials` 不需要使用者，管理員若誤建了這種 client 也不該變成漏洞；`refresh_token` 在計畫第 4 步完成停用帳號把關前不開放。
+
+回應 `200` JSON：`token_type`（`Bearer`）、`expires_in`（秒，預設約 600）、`access_token`、`refresh_token`、`scope`、`id_token`。
+
+- access token 預設 **10 分鐘**（`OIDC_ACCESS_TOKEN_TTL_MINUTES`）、refresh token 預設 **7 天**（`OIDC_REFRESH_TOKEN_TTL_DAYS`）。Passport 自己的預設是一年，本專案一律明確指定。
+- 授權碼有效期 10 分鐘、**id_token 有效期 1 小時**，兩者由套件寫死，無法設定。id_token 只是「登入當下的身分斷言」，RP **不可**把它當成工作階段。
+- 兌換時若帳號已被停用，回錯誤（不會把 `access_token` 交給 RP）。這個把關成立的前提是授權請求必須帶 `openid`（見 15.1）。⚠️ 目前這只是**過渡性**把關：token 在檢查之前就已寫進資料庫，失敗的兌換**沒有撤銷**它們；完整的撤銷與 refresh 把關屬計畫第 4 步。
+- **目前沒有 refresh**：`refresh_token` grant 被拒絕（見上）。回應裡仍會有 `refresh_token` 欄位，RP **不應使用也不應儲存**；第 4 步開放時會另行公告。
+
+### 15.3 id_token
+
+JWT，RS256。`iss` 為 `OIDC_ISSUER`（未設則 `APP_URL`），`aud` 為 client id。
+
+| claim | 說明 |
+| ------ | ------ |
+| `sub` | `users.id` 的**字串**形式（內部穩定鍵）。**RP 必須以 `sub` 識別使用者，不可用 email** |
+| `nonce` | 授權請求帶了才有，原樣回傳 |
+| `name` | 需 scope `profile` |
+| `email`、`email_verified` | 需 scope `email`。`email_verified` **恆為 `false`**：註冊沒有 email 所有權驗證，使用者也能自行修改 email |
+
+只有上述 claim。**不會**出現角色、權限、`is_admin`、`is_active`、設定、機構等任何其他欄位（沒有角色權限 claim 是刻意的決議）。
+
+**誰能登入下游**：本專案只證明「這是一個被管理員啟用過的 CBDB 帳號」，含一般與眾包帳號。要限制誰能進下游，由**下游自己**以 `sub` 維護白名單。
+
+### 15.4 RP 必須做的驗證
+
+驗證 `iss`、`aud`（必須等於自己的 client id）、`exp`、`nonce`、簽章，且**鎖定 RS256**（拒絕 `none`、HS256）。access token 本身也是 JWT、與 id_token 共用金鑰，**不可把 access token 當成身分證明**。沒有單點登出：使用者在本專案登出，下游不會同步登出，下游的工作階段壽命請自行控制。
 
 ---
 

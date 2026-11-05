@@ -209,7 +209,7 @@ crontab -e
 0 3 * * 0 /path/to/cbdb-online-main-server/scripts/weekly-sqlite-sync-and-oidc-purge.sh >> /var/log/cbdb-sqlite-sync.log 2>&1
 ```
 
-> 腳本由 `weekly-sqlite-sync.sh` 改名而來（檔名帶上「順便清理 OIDC 過期 token」這件事）。舊檔名保留為轉接檔，crontab 還指著舊路徑也能運作；方便時改指新檔名即可，之後可刪掉轉接檔。
+> 腳本由 `weekly-sqlite-sync.sh` 改名而來（檔名帶上「順便清理 OIDC 過期 token」這件事）。既有部署的 crontab 若還指著舊檔名，要改指新檔名。
 
 ### 手動執行
 

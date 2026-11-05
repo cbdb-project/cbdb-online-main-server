@@ -69,6 +69,13 @@
             "./vendor/bin/phpunit"
         ]
     },
+    "extra": {
+        "laravel": {
+            "dont-discover": [
+                "laravel/passport"
+            ]
+        }
+    },
     "config": {
         "preferred-install": "dist",
         "sort-packages": true,

@@ -21,8 +21,10 @@ use Tests\TestCase;
 /**
  * OIDC Provider 授權端（docs/OIDC_PROVIDER_PLAN.md §8 第 2 步）的端到端測試。
  *
- * 總開關 OIDC_PROVIDER_ENABLED 預設關閉，路由是在 boot 時依 env 註冊的，所以這個測試在 **建立 app 之前**
- * 設定環境變數（setUp 先於 parent::setUp()），tearDown 還原，不影響別的測試。
+ * 總開關 `oidc.enabled` 預設關閉，路由是在 provider boot 時註冊的，所以用 `bootConfigOverrides()` 在
+ * 「設定載入後、provider 啟動前」打開它。**不要改回用環境變數**：.env 載入器是 immutable 且記得自己載入過什麼，
+ * 同一個行程裡較早的測試載入過 .env 之後，這裡預先設定的環境變數會被 .env 蓋回去——CI 會把 .env.example
+ * 複製成 .env（其中 OIDC_PROVIDER_ENABLED=false），於是這個類在 CI 上 20 個全失敗，本機因為 .env 沒有那個變數而全綠。
  *
  * 「兌換授權碼時帳號被停用」只鎖住目前的**過渡**行為（簽發 id_token 的 identity 查詢會拒絕）：
  * token 本身已經寫進資料庫，完整的撤銷與 refresh 把關屬第 4 步，到時這裡的斷言要加強。
@@ -32,12 +34,11 @@ class OidcAuthorizationFlowTest extends TestCase {
 
     private static ?string $keyDir = null;
 
-    private string $previousEnabled = '';
+    protected function bootConfigOverrides(): array {
+        return ['oidc.enabled' => true];
+    }
 
     protected function setUp(): void {
-        $this->previousEnabled = (string) (getenv('OIDC_PROVIDER_ENABLED') ?: '');
-        $this->setEnv('OIDC_PROVIDER_ENABLED', 'true');
-
         parent::setUp();
 
         $this->withoutMiddleware(\App\Http\Middleware\PrometheusMetrics::class);
@@ -54,19 +55,6 @@ class OidcAuthorizationFlowTest extends TestCase {
     protected function tearDown(): void {
         Passport::loadKeysFrom(storage_path());
         parent::tearDown();
-        $this->setEnv('OIDC_PROVIDER_ENABLED', $this->previousEnabled === '' ? null : $this->previousEnabled);
-    }
-
-    private function setEnv(string $key, ?string $value): void {
-        if ($value === null) {
-            putenv($key);
-            unset($_ENV[$key], $_SERVER[$key]);
-
-            return;
-        }
-        putenv("{$key}={$value}");
-        $_ENV[$key] = $value;
-        $_SERVER[$key] = $value;
     }
 
     private function createSchema(): void {

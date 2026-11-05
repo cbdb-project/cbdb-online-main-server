@@ -2,12 +2,14 @@
 
 namespace App\Providers;
 
+use App\Http\Controllers\OidcDiscoveryController;
 use App\Http\Middleware\EnsureOidcUserIsActive;
 use App\Http\Middleware\RequireOpenIdScope;
 use App\Http\Middleware\RequirePkceS256;
 use App\Http\Middleware\RestrictOidcGrantTypes;
 use App\Http\Responses\OidcConsentRequiredResponse;
 use App\Models\OidcClient;
+use App\Support\Oidc\SigningKey;
 use DateInterval;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -29,13 +31,41 @@ use Laravel\Passport\Passport;
  * 路由用 class 參照而非 closure，才能通過 `route:cache`。
  */
 class OidcServiceProvider extends ServiceProvider {
+    /**
+     * 開啟時才打開套件自帶的 JWKS 路由（`/oauth/jwks`）。
+     *
+     * 必須在 register() 而不是 boot()：套件的 provider 在**自己的 boot()** 裡 `loadRoutesFrom()`、
+     * 當下讀 `openid.routes.*`；所有 provider 的 register() 都先於任何 boot()，所以這裡改設定一定來得及。
+     * discovery 則**不**用套件的（見 OidcDiscoveryController：它宣稱了我們不支援的 grant 與 PKCE 方法），
+     * `openid.routes.discovery` 必須保持 false。
+     */
+    public function register(): void {
+        if (config('oidc.enabled')) {
+            config(['openid.routes.jwks' => true]);
+        }
+    }
+
     public function boot(): void {
         if (!config('oidc.enabled')) {
             return;
         }
 
         $this->configurePassport();
+        $this->configureKeyId();
         $this->registerRoutes();
+    }
+
+    /**
+     * id_token 頭部與 JWKS 的 `kid`：由公鑰算出的 RFC 7638 指紋（見 SigningKey）。
+     * 兩處都讀 `openid.token_headers.kid`，所以一定一致。金鑰不存在時不設（`oidc:check` 會報出來），
+     * 而不是在啟動時丟例外把整個站打掛。
+     */
+    private function configureKeyId(): void {
+        $kid = SigningKey::kid();
+
+        if ($kid !== null) {
+            config(['openid.token_headers.kid' => $kid]);
+        }
     }
 
     private function configurePassport(): void {
@@ -73,5 +103,8 @@ class OidcServiceProvider extends ServiceProvider {
                 ->middleware(['throttle:oidc-token', RestrictOidcGrantTypes::class])
                 ->name('passport.token');
         });
+
+        // OpenID Connect Discovery。這是公開的靜態資料、沒有 session；下游伺服器抓取，不需要 CORS。
+        Route::get('/.well-known/openid-configuration', OidcDiscoveryController::class)->name('openid.discovery');
     }
 }

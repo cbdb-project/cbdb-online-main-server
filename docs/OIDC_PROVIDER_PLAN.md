@@ -206,7 +206,17 @@ Passport 本身**不含 OIDC**（無 id_token、discovery、JWKS），需第三�
    - **第 4 步必須處理的（Sourcery 指出、核實後成立）**：① 授權碼消耗不是原子的（league 先讀「是否已撤銷」再撤銷，並發兌換理論上兩者都成功）——需要自訂 `AuthCodeRepository` 以條件式 UPDATE 消耗；② 兌換失敗時 token 已持久化卻沒撤銷；③ 停用帳號只撤銷 Sanctum token，不撤銷 Passport token；④ 停用與簽發之間的競態（鎖定 `users` 列並重查，或簽發後再查、失敗就撤銷）。這四項都寫在 `API.md` 15.5 對外說明。
    - **本機 PHP 的 openssl 沒有設定檔**，`openssl_pkey_new` 不能用；測試改用 Passport 自帶的 `passport:keys`（phpseclib），整個測試類只生成一次金鑰。
    - **開關是在 route 註冊時讀的**：`route:cache` 之後改 `OIDC_PROVIDER_ENABLED` 要重跑 `route:cache` 與 `config:cache`（與 `routes/ai.php` 依 `MCP_ENABLED` 同理）。
-3. id_token／claims 白名單與 `email_verified` 規則（✅ 已在第 2 步完成）；**剩下**：discovery、JWKS、`kid` 與金鑰輪換、`passport:keys` 的部署流程。
+3. ✅ **已完成：discovery、JWKS、`kid`、金鑰部署與上線前檢查**（id_token／claims 白名單與 `email_verified` 規則在第 2 步完成）。測試：`OidcDiscoveryAndJwksTest`（8）、`OidcCheckCommandTest`（10，其中權限檢查在 Windows 跳過、CI 的 Linux 才真正跑）、流程測試新增「RP 視角」驗章；對外說明見 `API.md` 15.6。**實作中發現的事**：
+   - 🔴 **套件自己的 discovery 對外宣稱了我們不支援的東西**：`grant_types_supported` 寫死含 `client_credentials` 與 `refresh_token`、`code_challenge_methods_supported` 含 `plain`、沒有 `claims_supported`。RP 的函式庫會據此行事（看到 refresh_token 就去用，然後吃 `unsupported_grant_type`）。所以**不用套件的 discovery**（`openid.routes.discovery` 永遠 false，有測試鎖住且斷言只有一條該路徑的路由），改由 `OidcDiscoveryController` 提供，**每一項都對應一個強制點**：grant 取自 `RestrictOidcGrantTypes::ALLOWED`（單一真源——第 4 步開放 refresh 時 discovery 自動跟上）、PKCE 只有 `S256`、scope 取自 `config/openid.php`、claims 對應 `UserIdentityRepository` 的白名單。測試用「禁止字串」斷言套件預設會宣稱的那些值都不出現。
+   - **JWKS 用套件自帶的路由**，但只在總開關開啟時才打開：必須在 `OidcServiceProvider::register()` 設 `openid.routes.jwks`，因為套件在**自己的 `boot()`** 裡 `loadRoutesFrom()` 並當下讀設定，所有 `register()` 都先於任何 `boot()`。
+   - **`kid` 是公鑰的 RFC 7638 指紋**（`SigningKey`），由公鑰決定、不必另外維護；id_token 頭部與 JWKS 都讀 `openid.token_headers.kid`，所以一定一致。測試由 JWKS 公布的 `n`／`e` **獨立重算**指紋，並以 `JWK::parseKeySet` + `JWT::decode` 做「只靠 JWKS 驗章」的 RP 視角驗證。**金鑰缺漏或格式錯誤時 `kid` 為 null，不在啟動時丟例外**（否則缺一個檔案整個站掛掉），改由 `oidc:check` 報出來。
+   - ⚠️ **測試陷阱：金鑰目錄必須在 app 啟動『之前』設好**。`kid` 在 provider 的 `boot()` 計算，所以測試的金鑰助手 `Tests\Support\OidcTestKeys::install()` 要放在 `bootConfigOverrides()` 裡（它早於 provider 啟動）；放在 `setUp()` 會得到沒有 `kid` 的 id_token。
+   - **金鑰輪換沒有新舊並存的過渡期**（套件一次只發布一把鑰）。換鑰＝換檔案＋部署，`kid` 自動跟著變，RP 的函式庫遇到不認得的 `kid` 會重抓 JWKS；換鑰前簽出的 id_token（最長 1 小時）之後驗不過，這沒有影響（id_token 只是登入當下的斷言）。換鑰瞬間進行中的登入會失敗一次、重試即可。
+   - 🔴 **`docs/UPGRADE.md` 裡有舊 Passport 時代的 `passport:keys --force` 指示，照做會換掉簽章金鑰**。已加警示。新的規則：第一次部署只跑**一次** `passport:keys`，**之後不要加 `--force`**，私鑰權限 0600。`deploy.sh` 每次部署做 `config:cache`／`route:cache` 但不動 `storage/*.key`（已被 `.gitignore`），所以金鑰會在部署之間保留。
+   - **`oidc:check`**（`App\Console\Commands\OidcCheck`，**要登記在 `app/Console/Kernel.php` 的 `$commands`**，本專案不自動載入命令）：檢查 `ext-sodium`、`APP_KEY`、**公鑰與私鑰各自獨立**檢查存在（來源可為環境變數或檔案）與私鑰權限、公鑰是有效 RSA 公鑰、**公私鑰是同一對**、issuer 明確且是 https、Passport scope 沒被 `mcp:use` 污染；cache store 是 `file`／`array` 時警告。**這些問題都不會讓應用啟動失敗，而是第一個下游登入時才以 500 或「id_token 驗不過」冒出來**，所以需要主動檢查。`deploy.sh` 新增 4b 步驟在開關開啟時自動跑，**失敗只警告、不中斷部署**（與 CHGIS 步驟一致）。總開關關閉時直接成功。
+   - 🔴 **`oidc:check` 一度會誤報通過**（review 發現）：原本只要公鑰或私鑰『任何一邊』來自環境變數，就把整段存在與權限檢查跳過，於是「私鑰在環境變數、公鑰根本不存在」顯示『檢查通過（kid: ）』，實際上 `/oauth/jwks` 會 500；而且從未檢查公私鑰是不是同一對。已改為兩把鑰各自獨立檢查並比對 modulus／exponent，有測試守著（含變異檢查）。**上線閘門本身的漏洞比功能漏洞更危險，因為它讓人放心。**
+   - **issuer 結尾斜線只警告**：它是 `iss` 與 discovery 的 `issuer`，RP 會**逐字**比對，下游設定必須完全相同。
+   - **沒有加 CORS、沒有給 discovery／JWKS 限流**：下游是伺服器端的 Node 程式抓取，不需要 CORS；兩者都是廉價的靜態回應。若日後被濫用再補。
 4. refresh 與停用帳號、token 壽命、限流。
 5. 以 `openid-client` 做端到端驗證；文件（`API.md`、openapi、接入說明）。
 

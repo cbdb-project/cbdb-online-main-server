@@ -1873,6 +1873,11 @@ SLACK_WEBHOOK_URL=your-slack-webhook-url
 - 可使用 `./vendor/bin/upgrade-carbon` 獲取升級幫助
 
 ### Passport 升級
+> ⚠️ **這是舊 Passport 時代的升級記錄，已不適用**（專案後來換成 Sanctum，2026-11 起又以 OIDC Provider 的形式重新引入 Passport 13）。
+> 下面的 `passport:keys --force` **會換掉簽章金鑰**：在現行環境重跑它，所有尚未過期的 id_token 都會驗不過。
+> 現行的金鑰管理（第一次只跑一次 `passport:keys`、不加 `--force`、權限 0600、輪換方式）見 `API.md` 15.6 與
+> `docs/OIDC_PROVIDER_PLAN.md`；上線前檢查用 `php artisan oidc:check`。
+
 - Passport 從 6.x 升級到 7.x
 - OAuth2 Server 維持在 7.x
 - 升級後需運行（在 PHP 7.4 環境）：
@@ -2084,6 +2089,11 @@ SLACK_WEBHOOK_URL=your-slack-webhook-url
 - 參見 `UPGRADE_INSTRUCTIONS.md` 了解 Carbon 升級計劃
 
 ### Passport 升級
+> ⚠️ **這是舊 Passport 時代的升級記錄，已不適用**（專案後來換成 Sanctum，2026-11 起又以 OIDC Provider 的形式重新引入 Passport 13）。
+> 下面的 `passport:keys --force` **會換掉簽章金鑰**：在現行環境重跑它，所有尚未過期的 id_token 都會驗不過。
+> 現行的金鑰管理（第一次只跑一次 `passport:keys`、不加 `--force`、權限 0600、輪換方式）見 `API.md` 15.6 與
+> `docs/OIDC_PROVIDER_PLAN.md`；上線前檢查用 `php artisan oidc:check`。
+
 - Passport 從 4.x 升級到 6.x
 - OAuth2 Server 從 6.x 升級到 7.x
 - 升級後需運行：

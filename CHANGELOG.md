@@ -9,6 +9,8 @@
 - **總開關 `OIDC_PROVIDER_ENABLED` 預設 false**，關閉時 `/oauth/*` 都不存在。**第 4 步（停用帳號的 token 撤銷、refresh 把關）完成前不可在 prod 開啟**；部署前還要確認 prod 的 PHP 有 `ext-sodium`（`lcobucci/jwt` 需要，已寫進 `composer.json`）。
 - 新增依賴 `laravel/passport` 13 與 `jeremy379/laravel-openid-connect` 3.3（`composer.json` 以 `dont-discover` 關掉 Passport 自己的自動發現）。只註冊 `GET /oauth/authorize` 與 `POST /oauth/token`；授權碼＋PKCE（S256，所有 client）、必須帶 `openid`、只放行 `authorization_code`；沒有角色權限 claim、沒有單點登出、沒有同意頁。
 - id_token 只有 `sub`（`users.id` 的字串）、`name`、`email`、`email_verified`（恆為 false）。
+- **discovery 與 JWKS**（`/.well-known/openid-configuration`、`/oauth/jwks`）：不用套件自己的 discovery（它宣稱了 `client_credentials`／`refresh_token`／`plain`，我們都不支援），改由自己的控制器提供，每一項宣稱都對應一個實際的強制點。`kid` 是公鑰的 RFC 7638 指紋，金鑰輪換不需人工介入。
+- 新增 `php artisan oidc:check`（上線前檢查：sodium、金鑰與權限、issuer、scope），`deploy.sh` 在開關開啟時自動跑、失敗只警告。**第一次部署在 prod 跑一次 `php artisan passport:keys`，之後不要加 `--force`**（`docs/UPGRADE.md` 裡舊 Passport 時代的 `--force` 指示照做會換掉簽章金鑰，已加警示）。
 - 新增 5 張 `oauth_*` 資料表（遷移改用新時戳並加保護），**已列入異體字替換排除清單與 SQLite 匯出的憑證表清單**。
 - 順帶修正：登入回跳的 `isSafeRedirectPath()` 加固（#1356）、測試不再讀 `config:cache`／`route:cache` 留下的快取（#1355，開發機專屬的假紅）。
 

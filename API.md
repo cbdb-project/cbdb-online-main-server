@@ -27,7 +27,7 @@ v2 分成兩類端點：
 | 十二、社會關係與親屬的互逆鏡像 | `POST /api/v2/relationship/opposite-edges` | 雙向關係的連帶寫入、衝突與復原 |
 | 十三、代碼表與複合實體寫入 | — | 代碼表更新／新增、office 與 social-institution 聚合 |
 | 十四、其他開放端點 | 見該章 | 著作查詢、帳號與 token、代碼選單、AI 輔助、MCP、人物頁 API |
-| 十五、OIDC Provider（實驗性，預設關閉） | `GET /oauth/authorize`、`POST /oauth/token` | 把本專案的後台登入提供給其他專案（授權碼 + PKCE，回傳 id_token） |
+| 十五、OIDC Provider（實驗性，預設關閉） | `GET /oauth/authorize`、`POST /oauth/token`、`GET /.well-known/openid-configuration`、`GET /oauth/jwks` | 把本專案的後台登入提供給其他專案（授權碼 + PKCE，回傳 id_token；含 discovery 與 JWKS） |
 
 ---
 
@@ -1743,11 +1743,13 @@ v2 提案流程上線前的舊機制，仍在線但**建議一律改用 `/api/v2
 
 把本專案的後台登入提供給其他專案使用（本專案是 OpenID Connect Provider，下游是 Relying Party）。設計、決議與風險見 [docs/OIDC_PROVIDER_PLAN.md](./docs/OIDC_PROVIDER_PLAN.md)。
 
-> **預設關閉**：沒有設定環境變數 `OIDC_PROVIDER_ENABLED=true` 時，下列端點都不存在（404）。計畫第 4 步（授權碼兌換與 refresh 的停用帳號把關）完成前，**不可在 prod 開啟**。discovery（`/.well-known/openid-configuration`）與 JWKS（`/oauth/jwks`）屬計畫第 3 步，目前**沒有**；`/oauth/userinfo` 刻意不提供（id_token 已含所需 claims）。
+> **預設關閉**：沒有設定環境變數 `OIDC_PROVIDER_ENABLED=true` 時，下列端點都不存在（404）。計畫第 4 步（授權碼兌換與 refresh 的停用帳號把關）完成前，**不可在 prod 開啟**。`/oauth/userinfo` 刻意不提供（id_token 已含所需 claims）。開啟前請先跑 `php artisan oidc:check`（見 15.6）。
 
 | 方法 | 路徑 | 說明 |
 | ------ | ------ | ------ |
 | GET | `/oauth/authorize` | 授權端點。瀏覽器導向；需要登入 session，未登入會被導到 `/login` 並在登入後回跳（完整 URL 含 query 保留） |
+| GET | `/.well-known/openid-configuration` | OpenID Connect Discovery 文件，見 15.6。公開、沒有 session，下游伺服器抓取，不需要 CORS |
+| GET | `/oauth/jwks` | JWKS：id_token 的驗章公鑰，見 15.6 |
 | POST | `/oauth/token` | 令牌端點。伺服器對伺服器呼叫（不帶 session／CSRF）。具名限流器 `oidc-token`，預設 60 次／分／IP（`OIDC_TOKEN_RATE_LIMIT_PER_MINUTE`，0／負數會退回 60、上限 600）；計數存在預設 cache store，**多節點部署必須用共享 store**（redis／database），否則實際上限是「節點數 × 上限」 |
 
 沒有其他 `/oauth/*` 端點：Passport 的 client 管理 JSON API、personal access token、裝置授權、核准／拒絕路由一律不存在。client 由管理員以 `php artisan passport:client` 手動建立，沒有自助註冊。
@@ -1812,6 +1814,32 @@ JWT，RS256。`iss` 為 `OIDC_ISSUER`（未設則 `APP_URL`），`aud` 為 clien
 - **停用與簽發之間有競態窗口**：管理員在身分查詢通過之後、回應送出之前停用帳號，仍會簽出 token。上限是 access token 壽命。
 - **授權碼的消耗不是原子的**：league/oauth2-server 先讀「是否已撤銷」再撤銷，同一張授權碼被兩個並發請求同時兌換，理論上兩者都可能成功。兌換同時需要授權碼、`code_verifier` 與（confidential client 的）`client_secret`，攻擊面很窄，但仍屬缺口。
 - **授權碼兌換仍會簽發 `refresh_token`（回應有這個欄位，也會寫進資料庫），但 `grant_type=refresh_token` 目前被拒絕**，所以它無法使用：RP 不應使用也不應儲存。這個「不會有真實 refresh token 流出」的說法**以 prod 的總開關保持關閉為前提**；第 4 步開放 refresh 時，開關前簽出的 token 不應被視為有效，上線前要清掉。
+
+### 15.6 Discovery、JWKS 與金鑰
+
+**下游只需要設定 issuer**（`OIDC_ISSUER`，未設則 `APP_URL`），標準函式庫（例如 Node.js 的 `openid-client`）會自己讀 `{issuer}/.well-known/openid-configuration`。
+
+**discovery 的每一項都對應一個實際的強制點**，不多宣稱：
+
+| 欄位 | 值 | 強制點 |
+| ------ | ------ | ------ |
+| `response_types_supported` | `["code"]` | 只有授權碼流程 |
+| `grant_types_supported` | `["authorization_code"]` | `RestrictOidcGrantTypes`（單一真源；開放 refresh 時 discovery 會自動跟上） |
+| `code_challenge_methods_supported` | `["S256"]` | `RequirePkceS256`（**不接受 `plain`**） |
+| `id_token_signing_alg_values_supported` | `["RS256"]` | |
+| `scopes_supported` | `["openid","profile","email"]` | `config/openid.php` |
+| `claims_supported` | `sub iss aud exp iat nonce name email email_verified` | `UserIdentityRepository` 的白名單 |
+| `token_endpoint_auth_methods_supported` | `client_secret_basic`、`client_secret_post`、`none` | `none` 給 public client（靠 PKCE） |
+
+沒有 `userinfo_endpoint`、`end_session_endpoint`、`registration_endpoint`、`revocation_endpoint`、`introspection_endpoint`。端點網址一律 `https`（`OIDC_FORCE_HTTPS`，只有沒有 https 的本機開發才設 false）。
+
+**JWKS**（`/oauth/jwks`）只有**一把** RSA 簽章公鑰（`alg: RS256`、`use: sig`），`kid` 是公鑰的 RFC 7638 指紋，id_token 頭部帶同一個 `kid`。
+
+**金鑰輪換**：換掉 `storage/oauth-private.key`／`oauth-public.key`（或環境變數 `PASSPORT_PRIVATE_KEY`／`PASSPORT_PUBLIC_KEY`）並重新部署即可，`kid` 會自動跟著變。RP 的函式庫遇到不認得的 `kid` 會重抓 JWKS，不需要人工介入；換鑰前簽出的 id_token（有效期最長 1 小時）之後無法再被驗證，這沒有影響，因為 id_token 只是登入當下的斷言、RP 不該拿它當工作階段。**沒有新舊兩把鑰並存的過渡期**（套件一次只發布一把），所以換鑰瞬間仍在進行中的登入會失敗一次、重試即可。
+
+**第一次部署**：在 prod 執行**一次** `php artisan passport:keys`（只做一次；**之後不要加 `--force`**，那會換掉簽章金鑰）。金鑰在 `storage/*.key`（已被 `.gitignore`，部署不會動它），私鑰權限必須是 `0600`。
+
+**上線前檢查**：`php artisan oidc:check`（`deploy.sh` 在開關開啟時會自動跑，失敗只警告、不中斷部署）。檢查 `ext-sodium`、`APP_KEY`；**公鑰與私鑰各自獨立**檢查是否存在（來源可以是環境變數 `PASSPORT_PUBLIC_KEY`／`PASSPORT_PRIVATE_KEY` 或檔案，兩邊可以不同）、私鑰檔案的權限、公鑰是有效的 RSA 公鑰、**公私鑰是同一對**（不成對時 JWKS 公布 A 的公鑰、id_token 卻用 B 的私鑰簽，RP 永遠驗不過）；issuer 明確且是 https；Passport 的 scope 沒被 `mcp:use` 污染；cache store 是 `file`／`array` 時警告（多節點部署必須用共享 store）。
 
 ---
 

@@ -54,6 +54,12 @@ php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
+# 4b. OIDC Provider 上線前檢查（docs/OIDC_PROVIDER_PLAN.md）
+#     OIDC_PROVIDER_ENABLED 不是 true 時直接成功；開啟時檢查 sodium／金鑰／issuer／scope。
+#     失敗只警告、不中斷部署（與 CHGIS 步驟一致）：這些問題在第一個下游登入時才會冒出來，不影響其餘功能。
+echo "檢查 OIDC Provider..."
+php artisan oidc:check || echo "警告: oidc:check 發現問題，請依上面的輸出修正（在修正前不要把 OIDC_PROVIDER_ENABLED 設為 true）"
+
 # 5. 確認 CHGIS 底圖（缺檔則自 HuggingFace 下載；失敗不中斷部署）
 echo "檢查 CHGIS 底圖..."
 php artisan cbdb:fetch-chgis-map || echo "警告: CHGIS 底圖下載失敗，地圖功能將於首次訪問時重試"

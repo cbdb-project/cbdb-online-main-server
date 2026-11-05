@@ -11,8 +11,11 @@
  */
 return [
     'routes' => [
-        // 第 3 步（discovery／JWKS）才有意地打開，並補測試。
+        // discovery 永遠關閉：套件的 discovery 宣稱了我們不支援的 grant 與 PKCE 方法，改由
+        // App\Http\Controllers\OidcDiscoveryController 提供（路由由 OidcServiceProvider 註冊）。
         'discovery' => false,
+        // 這裡刻意是 false：OidcServiceProvider::register() 在總開關開啟時才把它設成 true，
+        // 所以關閉時 /oauth/jwks 不存在。
         'jwks' => false,
         'jwks_url' => '/oauth/jwks',
         // 刻意長期關閉：計畫決議不啟用 /userinfo（id_token 已含所需 claims；
@@ -47,4 +50,9 @@ return [
      * 優先 OIDC_ISSUER，退而用 APP_URL（兩者都沒設時回到套件的 'laravel' 推導行為）。
      */
     'issuedBy' => env('OIDC_ISSUER') ?: (env('APP_URL') ?: 'laravel'),
+
+    /*
+     * discovery 文件裡的端點網址一律用 https。prod 應保持 true；只有沒有 https 的本機開發才設 false。
+     */
+    'forceHttps' => (bool) env('OIDC_FORCE_HTTPS', true),
 ];

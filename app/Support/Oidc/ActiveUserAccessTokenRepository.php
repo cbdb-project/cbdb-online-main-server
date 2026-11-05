@@ -21,7 +21,7 @@ use League\OAuth2\Server\Exception\OAuthServerException;
  * 若簽發端讀到 is_active=1 之後、落庫之前，管理員剛好停用並跑完撤銷，這張新 token 就沒人會撤它。
  * 簽發端在交易內鎖住 users 列，停用的 UPDATE 就必須等簽發交易結束，之後的撤銷一定看得到這張 token；
  * 反過來停用先提交，簽發端讀到的就是 is_active=0 而被拒絕。兩種順序都不會漏。
- * 與 AccountAccessRevoker::revokeOidcTokens() 用同一把鎖。（SQLite 的 lockForUpdate 是 no-op，測試只能驗證語意。）
+ * 與 AccountAccessRevoker::revokeOidcTokens() 用同一把鎖。（SQLite 的 lockForUpdate 是 no-op，PHPUnit 只能驗證語意；MariaDB 上的列鎖行為已手動實測，見 API.md 15.5。）
  */
 class ActiveUserAccessTokenRepository extends AccessTokenRepository {
     public function persistNewAccessToken(AccessTokenEntityInterface $accessTokenEntity): void {

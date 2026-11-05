@@ -249,9 +249,9 @@ Passport 本身**不含 OIDC**（無 id_token、discovery、JWKS），需第三�
 6. 下游依 `API.md` 15.7 接入，**用 `sub` 識別使用者並自行維護白名單**。
 7. **（已做，範圍有限）MariaDB 上的 `lockForUpdate` 序列化實測**：2026-11-05 在隔離容器（mariadb:10.11.14、REPEATABLE-READ）以兩個並發連線驗證——持鎖交易擋住同列的 `FOR UPDATE` 直到提交；停用先提交時，先做過一致性讀的簽發交易其鎖定讀仍讀到最新值。範圍限制：用原生 PDO 重現等價的主鍵等值鎖定讀，不是 `ActiveUserAccessTokenRepository` 本身在 MariaDB 上並發執行（測試套件強制 SQLite，無自動化回歸）；細節見 `API.md` 15.5。
 8. **token 清理（已由週六釋出腳本順便處理，不需要新增 cron）**：`scripts/weekly-sqlite-sync-and-oidc-purge.sh`（原 `weekly-sqlite-sync.sh`，檔名改成帶上這件事）在釋出之後順便跑 `php artisan passport:purge --expired --hours=24`，**失敗只警告、不影響釋出的結束碼**（有測試鎖住，`WeeklyScriptOidcPurgeStepTest`）。prod 本來就有每週六 19:00 的 cron 在跑這支腳本，所以不必新增 `schedule:run`（2026-11-05 唯讀 SSH 檢查確認 prod 沒有 `schedule:run`，且 `/etc/cron.*`、systemd timer 都沒有）。`Kernel::schedule()` 裡的每日排程保留為「哪天有人加了 scheduler 就自動生效」的備援，沒有也無妨。
-   ⚠️ **改檔名的連帶影響**：prod 的 crontab 現在指著舊路徑 `scripts/weekly-sqlite-sync.sh`。為避免部署後每週釋出無聲停掉，舊檔名保留為一支 3 行的轉接檔（`exec` 新腳本，有測試鎖住）。**管理者方便時把 crontab 改指新檔名，然後可刪掉轉接檔。**不改也能運作。
+   **改檔名已收尾（2026-11-05）**：prod 的 crontab 已改指新檔名（`0 19 * * 6 …/scripts/weekly-sqlite-sync-and-oidc-purge.sh`，改前的 crontab 備份在 prod 的 `~/crontab.bak-20261105`），舊檔名的轉接檔因此移除。
    清理本身**不影響登入的正確性**（purge 只清過期的 token 列；各 repository 與 revoker 都不依賴列被清掉），所以這一項不擋上線。
-   （同次檢查：prod 的 git 為 `66fce183`，尚未部署任何 OIDC 程式，`.env` 也沒有 `OIDC_PROVIDER_ENABLED`，開關自然是預設關閉。）
+   **prod 部署（2026-11-05，使用者明確指示）**：prod 已部署到 `cb78cb89`（原為 `66fce183`）。步驟：`git pull`（22 個提交）→ `composer install`（pull 後 `vendor/` 尚缺 Passport，網頁請求會短暫 500，所以必須先於 migrate；裝完 Passport 未被自動探索，`dont-discover` 生效）→ `migrate --database=mysql_migrate`（恰好 5 個 `oauth_*` 建表，沒有改既有表）→ `./deploy.sh`（exit 0，`oidc:check` 顯示開關關閉）。核對：登入頁 200、`/oauth/authorize` 與 `/.well-known/openid-configuration` 皆 404（休眠符合預期）。部署途中 `optimize:clear` 重建快取的瞬間有短暫的 bootstrap/cache 錯誤，之後沒有新錯誤。**OIDC 總開關仍是預設關閉**；第 2–6、9 項（`passport:keys`、`OIDC_ISSUER`、建 client、開開關等）是開啟 OIDC 時才做，尚未做。
 9. 設定 `OIDC_PROVIDER_ENABLED=true` 後重新部署（`route:cache`／`config:cache` 要重建才會生效），再跑一次 `scripts/oidc-e2e/run.sh` 以外的實際環境驗證（以測試帳號走一次完整登入）。
 
 ## 9. 開放問題

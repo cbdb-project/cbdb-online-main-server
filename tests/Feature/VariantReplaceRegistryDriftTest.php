@@ -44,6 +44,13 @@ class VariantReplaceRegistryDriftTest extends TestCase {
         'operations',
         'nl_query_logs',
         'ai_fill_logs',
+        // OAuth／OIDC Provider 憑證表（Passport，docs/OIDC_PROVIDER_PLAN.md）：token、client 密鑰、
+        // redirect URI 必須保留原字（同時在 VariantReplaceScope::EXCLUDED_TABLES）
+        'oauth_access_tokens',
+        'oauth_auth_codes',
+        'oauth_clients',
+        'oauth_device_codes',
+        'oauth_refresh_tokens',
         // 專案自建的派生索引（sidecar）：內容由來源表重算，不是錄入端
         'person_change_index',
         // Access 時代遺留的 metadata 表：描述「schema 長什麼樣」而非 CBDB 學術資料，

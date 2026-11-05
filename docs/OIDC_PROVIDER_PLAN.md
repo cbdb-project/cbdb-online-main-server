@@ -180,7 +180,11 @@ Passport 本身**不含 OIDC**（無 id_token、discovery、JWKS），需第三�
 ## 8. 建議的實作拆分（每步獨立 review、獨立 PR）
 
 0. ✅ **已完成：加固 `isSafeRedirectPath()`**（§6.8），它與 OIDC 無關、獨立先上。
-1. ✅ 套件調研已完成（§5.1）；**剩下的是安裝**：先確認 `ext-sodium`（本機與 prod），再裝上並跑通 migration（MariaDB + SQLite、全新與既有 DB），處理 cascade、`int unsigned` 型別與歷史 drop migration（§6.7）。
+1. ✅ **已完成：安裝（惰性）**——`laravel/passport` 13.10.0 與 `jeremy379/laravel-openid-connect` 3.3.0 已裝上（`composer.lock` 純新增 16 個套件、既有套件 0 變動），**所有端點關閉**：`AuthServiceProvider::register()` 呼叫 `Passport::ignoreRoutes()`、`config/openid.php` 把 discovery／jwks／userinfo 路由全關。護欄：`tests/Feature/OidcProviderDormantTest.php`。實作中的發現：
+   - **`ext-sodium`**：本機已在 `C:\php\php.ini` 啟用（備份在 `php.ini.bak-before-sodium-2026-11-05`）。**prod 仍須在部署前確認**，否則 `composer install` 會失敗。
+   - **Passport 的 migration 發佈時保留 2016／2024 年檔名**（`vendor:publish` 不會換成當下時戳）。已改為 `2026_11_05_00000{1..5}_*` 並加 `hasTable` 保護（§6.7 的風險確實存在）。遷移**沒有外鍵、沒有 CASCADE**（符合 §1.1）；`user_id` 是 `bigint unsigned` 而 `users.id` 是 `int unsigned`，因為沒有外鍵約束所以無害，將來若要加外鍵必須對齊。
+   - **`oauth_*` 五張表已列入 `VariantReplaceScope::EXCLUDED_TABLES`**（§1.3：token、密鑰、redirect URI 必須保留原字）。這是 `VariantReplaceRegistryDriftTest` 抓到的，新增帶憑證的表時要記得做。
+   - **還沒做、仍待確認**：MariaDB 實機跑一次 migration（目前只在 SQLite 驗證）；prod 的 `migrations` 表是否殘留舊 Passport 檔名（不影響本方案，因為已改名）；`docs/API_AUTHENTICATION.md`「為什麼選擇 Sanctum」要等端點真的放行時再改寫。
 2. 授權端：授權頁／auto-approve、`isActive()` 把關、登入回跳、client 建立命令。
 3. id_token／claims 白名單、discovery、JWKS、`email_verified` 規則。
 4. refresh 與停用帳號、token 壽命、限流。

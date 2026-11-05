@@ -164,7 +164,7 @@ npm run build
 ### 腳本位置
 
 - **匯出腳本**：`scripts/export-daily-sqlite.sh` - 將 MySQL/MariaDB 表格匯出為 SQLite
-- **同步腳本**：`scripts/weekly-sqlite-sync.sh` - 匯出、壓縮並上傳到 HuggingFace
+- **同步腳本**：`scripts/weekly-sqlite-sync-and-oidc-purge.sh` - 匯出、壓縮並上傳到 HuggingFace
 
 ### 前置安裝（Ubuntu）
 
@@ -206,14 +206,16 @@ hf auth status
 crontab -e
 
 # 每週日凌晨 3 點執行（GMT+8）
-0 3 * * 0 /path/to/cbdb-online-main-server/scripts/weekly-sqlite-sync.sh >> /var/log/cbdb-sqlite-sync.log 2>&1
+0 3 * * 0 /path/to/cbdb-online-main-server/scripts/weekly-sqlite-sync-and-oidc-purge.sh >> /var/log/cbdb-sqlite-sync.log 2>&1
 ```
+
+> 腳本由 `weekly-sqlite-sync.sh` 改名而來（檔名帶上「順便清理 OIDC 過期 token」這件事）。舊檔名保留為轉接檔，crontab 還指著舊路徑也能運作；方便時改指新檔名即可，之後可刪掉轉接檔。
 
 ### 手動執行
 
 ```bash
 # 執行完整同步流程
-bash scripts/weekly-sqlite-sync.sh
+bash scripts/weekly-sqlite-sync-and-oidc-purge.sh
 
 # 僅匯出 SQLite（不上傳）
 bash scripts/export-daily-sqlite.sh
@@ -221,7 +223,7 @@ bash scripts/export-daily-sqlite.sh
 
 ### 腳本流程說明
 
-`weekly-sqlite-sync.sh` 執行以下步驟：
+`weekly-sqlite-sync-and-oidc-purge.sh` 執行以下步驟：
 
 1. **前置檢查**：確認 `zip`、`hf` 已安裝且 HuggingFace 認證有效
 2. **匯出數據庫**：呼叫 `export-daily-sqlite.sh` 產生 `cbdb_YYYYMMDD.sqlite3` 與 `cbdb_YYYYMMDD.json`

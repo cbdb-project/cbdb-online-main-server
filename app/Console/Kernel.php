@@ -38,7 +38,8 @@ class Kernel extends ConsoleKernel {
     protected function schedule(Schedule $schedule) {
         // OIDC Provider 的 token 清理（docs/OIDC_PROVIDER_PLAN.md §8.1）。
         // 總開關關閉時不排程（表可能根本沒資料）；--expired --hours=24：只刪「過期滿一天」的列；不加 --expired 的話 purge 會無條件刪掉所有已撤銷的列（--hours 只管過期那一支）。撤銷的列因此保留到過期後一天。
-        // 需要 `* * * * * php artisan schedule:run` 的 cron 才會自動跑；沒有的話不會跑，只是過期列不被清理，不影響登入（選配）。
+        // 需要 `* * * * * php artisan schedule:run` 的 cron 才會生效；prod 目前沒有，沒有也無妨——週六的
+        // scripts/weekly-sqlite-sync-and-oidc-purge.sh 已經順便跑同一條清理。這裡是備援。
         $schedule->command('passport:purge --expired --hours=24')
             ->daily()
             ->at('04:15')

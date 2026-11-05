@@ -128,7 +128,7 @@ return [
 - 檔案：`chgis_map.mbtiles`
 - 下載 URL（resolve raw）：
   `https://huggingface.co/datasets/cbdb/chgis-map/resolve/main/chgis_map.mbtiles`
-- 與既有 `scripts/weekly-sqlite-sync.sh` 同生態系（HuggingFace datasets）。本功能為**只讀下載**，公開 dataset 無需 token。
+- 與既有 `scripts/weekly-sqlite-sync-and-oidc-purge.sh` 同生態系（HuggingFace datasets）。本功能為**只讀下載**，公開 dataset 無需 token。
 
 `config/chgis_map.php` 追加：
 ```php

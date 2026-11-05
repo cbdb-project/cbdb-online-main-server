@@ -289,14 +289,14 @@ class SqliteReleaseAllowlistTest extends TestCase {
     #[Test]
     public function the_upload_script_re_checks_the_artifact_before_packaging(): void {
         // 上傳邊界再驗一次：export-daily-sqlite.sh 的自檢與 hf upload 之間隔了一整個腳本。
-        $path = base_path('scripts/weekly-sqlite-sync.sh');
+        $path = base_path('scripts/weekly-sqlite-sync-and-oidc-purge.sh');
         $this->assertFileExists($path);
         $source = str_replace("\r\n", "\n", file_get_contents($path));
 
         $this->assertMatchesRegularExpression(
             '/^set -e$/m',
             $source,
-            'weekly-sqlite-sync.sh 必須有 set -e，否則匯出腳本的非零結束碼不會擋下上傳'
+            'weekly-sqlite-sync-and-oidc-purge.sh 必須有 set -e，否則匯出腳本的非零結束碼不會擋下上傳'
         );
 
         $this->assertSame(
@@ -307,7 +307,7 @@ class SqliteReleaseAllowlistTest extends TestCase {
                 $matches,
                 PREG_OFFSET_CAPTURE
             ),
-            'weekly-sqlite-sync.sh 必須在打包前對 $SQLITE_FILE 再跑一次產物自檢（裸呼叫）'
+            'weekly-sqlite-sync-and-oidc-purge.sh 必須在打包前對 $SQLITE_FILE 再跑一次產物自檢（裸呼叫）'
         );
 
         $zipAt = strpos($source, 'zip -j -9');

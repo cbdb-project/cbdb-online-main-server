@@ -186,7 +186,7 @@ class ReleaseScriptSelfCheckGateTest extends TestCase {
         $this->assertNotSame(
             0,
             $result['code'],
-            '產物自檢失敗時釋出腳本必須以非零結束碼收尾（weekly-sqlite-sync.sh 的 set -e 才會擋下 '
+            '產物自檢失敗時釋出腳本必須以非零結束碼收尾（weekly-sqlite-sync-and-oidc-purge.sh 的 set -e 才會擋下 '
                 . "hf upload）。腳本輸出：\n" . $result['output']
         );
         $this->assertSame(

@@ -46,7 +46,7 @@ class AssertSqliteReleaseScope extends Command {
         $file = (string) $this->argument('file');
 
         // 預設就是「完整的 78 張」：漏傳這個選項不該讓下界掉到 1。上傳邊界那次呼叫（
-        // weekly-sqlite-sync.sh）就沒傳，若預設是 1，把產物換成只含一張表的檔案也會通過。
+        // weekly-sqlite-sync-and-oidc-purge.sh）就沒傳，若預設是 1，把產物換成只含一張表的檔案也會通過。
         $minTables = $this->option('min-tables');
         if ($minTables === null) {
             $minTables = count(SqliteReleaseTables::PUBLIC_TABLES);

@@ -248,7 +248,9 @@ Passport 本身**不含 OIDC**（無 id_token、discovery、JWKS），需第三�
 5. 管理員以 `php artisan passport:client --name=… --redirect_uri=…` 為下游建立 client，把 `client_id`／`client_secret` 轉交下游。
 6. 下游依 `API.md` 15.7 接入，**用 `sub` 識別使用者並自行維護白名單**。
 7. **（已做，範圍有限）MariaDB 上的 `lockForUpdate` 序列化實測**：2026-11-05 在隔離容器（mariadb:10.11.14、REPEATABLE-READ）以兩個並發連線驗證——持鎖交易擋住同列的 `FOR UPDATE` 直到提交；停用先提交時，先做過一致性讀的簽發交易其鎖定讀仍讀到最新值。範圍限制：用原生 PDO 重現等價的主鍵等值鎖定讀，不是 `ActiveUserAccessTokenRepository` 本身在 MariaDB 上並發執行（測試套件強制 SQLite，無自動化回歸）；細節見 `API.md` 15.5。
-8. **（選配，不擋上線）token 清理排程**：`passport:purge --expired --hours=24` 已排進 `Kernel::schedule()`，但它只在有 `* * * * * php artisan schedule:run` 的 cron 時才會自動跑。2026-11-05 唯讀 SSH 檢查：prod 目前沒有這條 cron（ubuntu crontab、`/etc/cron.*`、systemd timer 都沒有，也沒有 queue／schedule 類常駐服務）。**這不影響登入的正確性**——purge 只是清理過期的 token 列，下游只有一兩個、表長得很慢，不跑也沒有實際害處。要自動清理才需要由管理者加 cron（本次未改動 prod）；否則偶爾手動跑一次 `php artisan passport:purge --expired --hours=24` 即可。
+8. **token 清理（已由週六釋出腳本順便處理，不需要新增 cron）**：`scripts/weekly-sqlite-sync-and-oidc-purge.sh`（原 `weekly-sqlite-sync.sh`，檔名改成帶上這件事）在釋出之後順便跑 `php artisan passport:purge --expired --hours=24`，**失敗只警告、不影響釋出的結束碼**（有測試鎖住，`WeeklyScriptOidcPurgeStepTest`）。prod 本來就有每週六 19:00 的 cron 在跑這支腳本，所以不必新增 `schedule:run`（2026-11-05 唯讀 SSH 檢查確認 prod 沒有 `schedule:run`，且 `/etc/cron.*`、systemd timer 都沒有）。`Kernel::schedule()` 裡的每日排程保留為「哪天有人加了 scheduler 就自動生效」的備援，沒有也無妨。
+   ⚠️ **改檔名的連帶影響**：prod 的 crontab 現在指著舊路徑 `scripts/weekly-sqlite-sync.sh`。為避免部署後每週釋出無聲停掉，舊檔名保留為一支 3 行的轉接檔（`exec` 新腳本，有測試鎖住）。**管理者方便時把 crontab 改指新檔名，然後可刪掉轉接檔。**不改也能運作。
+   清理本身**不影響登入的正確性**（purge 只清過期的 token 列；各 repository 與 revoker 都不依賴列被清掉），所以這一項不擋上線。
    （同次檢查：prod 的 git 為 `66fce183`，尚未部署任何 OIDC 程式，`.env` 也沒有 `OIDC_PROVIDER_ENABLED`，開關自然是預設關閉。）
 9. 設定 `OIDC_PROVIDER_ENABLED=true` 後重新部署（`route:cache`／`config:cache` 要重建才會生效），再跑一次 `scripts/oidc-e2e/run.sh` 以外的實際環境驗證（以測試帳號走一次完整登入）。
 

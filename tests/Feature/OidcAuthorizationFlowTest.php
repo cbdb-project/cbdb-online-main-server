@@ -16,6 +16,7 @@ use Laravel\Passport\ClientRepository;
 use Laravel\Passport\Passport;
 use League\OAuth2\Server\Exception\OAuthServerException;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\OidcTestKeys;
 use Tests\TestCase;
 
 /**
@@ -32,9 +33,10 @@ use Tests\TestCase;
 class OidcAuthorizationFlowTest extends TestCase {
     private const REDIRECT = 'https://rp.example/callback';
 
-    private static ?string $keyDir = null;
-
     protected function bootConfigOverrides(): array {
+        // 金鑰目錄必須在 app 啟動**之前**就指好：OidcServiceProvider 在 boot 時由公鑰算 `kid`。
+        OidcTestKeys::install();
+
         return ['oidc.enabled' => true];
     }
 
@@ -49,7 +51,6 @@ class OidcAuthorizationFlowTest extends TestCase {
         ]);
 
         $this->createSchema();
-        $this->ensureKeys();
     }
 
     protected function tearDown(): void {
@@ -79,18 +80,6 @@ class OidcAuthorizationFlowTest extends TestCase {
             glob(database_path('migrations/*_create_oauth_*_table.php')) ?: []
         );
         $this->assertSame(0, Artisan::call('migrate', ['--path' => $paths, '--no-interaction' => true]), Artisan::output());
-    }
-
-    /** RSA 金鑰整個測試類只生成一次（phpseclib 純 PHP 生成 2048 位元較慢；本機 openssl 也沒有設定檔，不能用 openssl_pkey_new）。 */
-    private function ensureKeys(): void {
-        if (self::$keyDir === null) {
-            self::$keyDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'oidc-test-keys-' . bin2hex(random_bytes(4));
-            mkdir(self::$keyDir, 0700, true);
-            Passport::loadKeysFrom(self::$keyDir);
-            $this->assertSame(0, Artisan::call('passport:keys', ['--force' => true, '--length' => 2048]), Artisan::output());
-        }
-
-        Passport::loadKeysFrom(self::$keyDir);
     }
 
     private function makeUser(int $active = User::STATUS_ACTIVE, string $email = 'alice@example.org'): User {
@@ -176,7 +165,7 @@ class OidcAuthorizationFlowTest extends TestCase {
     }
 
     private function decodeIdToken(string $jwt): array {
-        $public = (string) file_get_contents(self::$keyDir . DIRECTORY_SEPARATOR . 'oauth-public.key');
+        $public = OidcTestKeys::publicKeyPem();
 
         return (array) JWT::decode($jwt, new Key($public, 'RS256'));
     }
@@ -202,9 +191,8 @@ class OidcAuthorizationFlowTest extends TestCase {
         $this->actingAs($user)->post('/oauth/authorize')->assertStatus(405);
         $this->actingAs($user)->delete('/oauth/authorize')->assertStatus(405);
 
-        // discovery／JWKS 屬第 3 步，仍關閉。
-        $this->get('/.well-known/openid-configuration')->assertNotFound();
-        $this->get('/oauth/jwks')->assertNotFound();
+        // discovery 與 JWKS 的內容與一致性見 OidcDiscoveryAndJwksTest。這裡只確認 userinfo 等其餘端點不存在。
+        $this->get('/oauth/userinfo')->assertNotFound();
     }
 
     #[Test]
@@ -597,5 +585,27 @@ class OidcAuthorizationFlowTest extends TestCase {
 
         config(['oidc.token_rate_limit_per_minute' => 100000]);
         $this->assertSame(600, \App\Providers\RouteServiceProvider::oidcTokenRateLimit());
+    }
+
+    // ───────────── RP 視角：只靠 JWKS 驗章 ─────────────
+
+    #[Test]
+    public function an_rp_can_verify_the_id_token_using_only_the_jwks_and_the_kid_header(): void {
+        $user = $this->makeUser();
+        [$client, $secret] = $this->makeClient();
+        $idToken = $this->exchange($client, $secret, $user)->assertOk()->json('id_token');
+
+        $header = json_decode((string) base64_decode(strtr(explode('.', $idToken)[0], '-_', '+/')), true);
+        $jwks = $this->getJson('/oauth/jwks')->assertOk()->json();
+
+        $this->assertSame('RS256', $header['alg']);
+        $this->assertNotEmpty($header['kid'], 'id_token 頭部必須帶 kid，RP 才能在輪換時挑對鑰。');
+        $this->assertSame($jwks['keys'][0]['kid'], $header['kid']);
+
+        // 下游真正會做的事：只用公布的 JWKS 驗章，完全不碰伺服器的公鑰檔。
+        $claims = (array) JWT::decode($idToken, \Firebase\JWT\JWK::parseKeySet($jwks, 'RS256'));
+
+        $this->assertSame('https://op.test', $claims['iss']);
+        $this->assertSame((string) $user->getKey(), $claims['sub']);
     }
 }

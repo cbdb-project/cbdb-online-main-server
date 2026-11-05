@@ -26,6 +26,7 @@ class Kernel extends ConsoleKernel {
         \App\Console\Commands\MigratePinyinV::class,
         \App\Console\Commands\MigrateCodeTablePinyinV::class,
         \App\Console\Commands\NormalizeAddrCoords::class,
+        \App\Console\Commands\OidcCheck::class,
     ];
 
     /**

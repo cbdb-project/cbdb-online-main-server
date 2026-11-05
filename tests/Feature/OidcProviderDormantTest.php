@@ -23,6 +23,14 @@ use Tests\TestCase;
 class OidcProviderDormantTest extends TestCase {
     private const DROP_MIGRATION = '2025_12_18_050122_remove_passport_oauth_tables';
 
+    /**
+     * 「預設關閉」是這個類的前提，所以明確固定為關閉，不受開發者本機或 CI 的 .env 影響
+     * （見 tests/CreatesApplication.php 對為什麼不用環境變數的說明）。
+     */
+    protected function bootConfigOverrides(): array {
+        return ['oidc.enabled' => false];
+    }
+
     /** @return list<string> 本專案發佈的 Passport 建表遷移（絕對路徑，依檔名排序） */
     private function oauthMigrationFiles(): array {
         $files = glob(database_path('migrations/*_create_oauth_*_table.php')) ?: [];

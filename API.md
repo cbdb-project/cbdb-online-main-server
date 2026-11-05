@@ -1777,7 +1777,7 @@ v2 提案流程上線前的舊機制，仍在線但**建議一律改用 `/api/v2
 
 ### 15.2 令牌請求（`POST /oauth/token`）
 
-`application/x-www-form-urlencoded`。**只接受 `grant_type=authorization_code`**，帶 `client_id`、`redirect_uri`、`code`、`code_verifier`；confidential client 另帶 `client_secret`（public client 不帶 secret，靠 PKCE）。其他 `grant_type`（`refresh_token`、`client_credentials`、`password`、裝置授權、缺漏）一律回 `400` JSON `{"error":"unsupported_grant_type"}`，**即使 client 自己的 `grant_types` 欄位允許**——`client_credentials` 不需要使用者，管理員若誤建了這種 client 也不該變成漏洞；`refresh_token` 在計畫第 4 步完成停用帳號把關前不開放。
+`application/x-www-form-urlencoded`。**只接受 `grant_type=authorization_code`**，帶 `client_id`、`redirect_uri`、`code`、`code_verifier`；confidential client 另帶 `client_secret`（public client 不帶 secret，靠 PKCE）。其他 `grant_type`（`refresh_token`、`client_credentials`、`password`、裝置授權、缺漏）一律回 `400` JSON `{"error":"unsupported_grant_type"}`，**即使 client 自己的 `grant_types` 欄位允許**——`client_credentials` 不需要使用者，管理員若誤建了這種 client 也不該變成漏洞；`refresh_token` 不開放：本專案不簽發 refresh token（見下）。
 
 回應 `200` JSON：`token_type`（`Bearer`）、`expires_in`（秒，預設約 600）、`access_token`、`scope`、`id_token`。**沒有 `refresh_token` 欄位**（見下）。
 
@@ -1813,6 +1813,7 @@ JWT，RS256。`iss` 為 `OIDC_ISSUER`（未設則 `APP_URL`），`aud` 為 clien
 仍存在的限制（誠實列出）：
 
 - **已簽出的 id_token 無法撤回，這不是可以修掉的缺陷，是任何身分提供方共有的性質**：id_token 是「某個時間點的身分斷言」，停用前一毫秒簽出的和窗口內簽出的本質上無法區分，也沒有人能撤回一張已簽出的 JWT。能做的是縮短它被誤用的機會：它有效期有限（最長 1 小時），且 RP 不該把它當成工作階段（見 15.4）。下面這一條說的只是這個窗口出現在哪裡：
+- **已評估、未實作的緩解**：把整個 token 請求包進外層交易、讓列鎖一直持有到 id_token 建構完成。它**能做到**的是：停用帳號的更新必須等整個簽發（含 id_token 建構）結束，所以停用不會再夾在「access token 已落庫」與「id_token 的最後確認」之間。它**做不到**的是：鎖必須在回應送達 RP 之前釋放，所以「id_token 建構完成」到「RP 收到回應」之間仍有窗口，而已簽出的斷言無法撤回；簽發後再複查同理。所以它只能把窗口從「簽發途中」縮到「簽發完成之後、送達之前」，不能消除。在「id_token 只用於登入當下證明身分、不用來存取任何受保護資源」的設計下，殘餘風險就是「在帳號被停用的瞬間放行一次登入」，與其付出把鎖持有跨越整個回應建構的代價，不如接受它。
 - **id_token 在簽發那一刻的最後確認不在鎖內**：`UserIdentityRepository` 在簽發 id_token 時再確認一次帳號狀態，但那一步沒有鎖；停用帳號發生在這一步與回應送出之間（毫秒級）時，RP 仍會收到一張 id_token。id_token 只是登入當下的身分斷言、沒有被用來呼叫任何受保護資源，這個窗口的影響只是「在帳號被停用的瞬間放行一次登入」。access token 的簽發則在鎖內，不受此限。
 - **鎖定行為只在 SQLite 上驗證了語意**：`lockForUpdate()` 在 SQLite 是 no-op，測試只能證明「檢查通過才落庫、停用後不落庫、撤銷看得到所有已落庫的 token」。真正的列鎖序列化行為需要在 MariaDB 上以兩個並發連線實測，**目前沒有做**；上線前建議補一次。
 - **`oidc:check` 只檢查本機**：多節點部署時所有節點必須使用同一對簽章金鑰（見 15.6），命令無法跨節點驗證。

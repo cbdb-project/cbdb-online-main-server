@@ -114,4 +114,59 @@ class LoginRedirectTest extends TestCase {
 
         $this->assertSame('/dashboard', session('url.intended'));
     }
+
+    /**
+     * 測試：反斜線、控制字元與其編碼版本會被瀏覽器解讀成協定相對 URL，必須拒絕
+     */
+    #[Test]
+    #[\PHPUnit\Framework\Attributes\DataProvider('unsafeRedirectProvider')]
+    public function test_show_login_form_rejects_browser_normalised_open_redirects(string $redirect) {
+        $controller = new LoginController();
+        session()->put('url.intended', '/dashboard');
+
+        $request = Request::create('/login', 'GET', ['redirect' => $redirect]);
+        $request->setLaravelSession(app('session.store'));
+
+        $controller->showLoginForm($request);
+
+        $this->assertSame('/dashboard', session('url.intended'));
+    }
+
+    public static function unsafeRedirectProvider(): array {
+        return [
+            'backslash host' => ['/\evil.com'],
+            'backslash after slash' => ['/\/evil.com'],
+            'encoded backslash' => ['/%5cevil.com'],
+            'encoded backslash upper' => ['/%5Cevil.com'],
+            'raw tab' => ["/\t/evil.com"],
+            'raw newline' => ["/\n/evil.com"],
+            'raw carriage return' => ["/\r/evil.com"],
+            'raw space' => ['/ /evil.com'],
+            'encoded tab' => ['/%09/evil.com'],
+            'encoded newline' => ['/%0a/evil.com'],
+            'encoded carriage return' => ['/%0D/evil.com'],
+            'encoded nul' => ['/%00/evil.com'],
+            'encoded delete' => ['/%7f/evil.com'],
+            'backslash in query' => ['/ok?next=\evil.com'],
+            'protocol relative' => ['//evil.com'],
+            'absolute url' => ['https://evil.com/x'],
+            'login loop' => ['/login'],
+        ];
+    }
+
+    /**
+     * 測試：帶百分號編碼查詢串的授權請求型 URL 必須原樣保留（state／nonce／PKCE 不能被誤殺或改寫）
+     */
+    #[Test]
+    public function test_show_login_form_keeps_query_with_encoded_values_intact() {
+        $controller = new LoginController();
+        $redirect = '/oauth/authorize?client_id=abc&redirect_uri=https%3A%2F%2Frp.example%2Fcb&state=a%20b&nonce=n1&code_challenge=xyz&code_challenge_method=S256';
+
+        $request = Request::create('/login', 'GET', ['redirect' => $redirect]);
+        $request->setLaravelSession(app('session.store'));
+
+        $controller->showLoginForm($request);
+
+        $this->assertSame($redirect, session('url.intended'));
+    }
 }

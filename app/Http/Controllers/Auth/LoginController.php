@@ -171,9 +171,21 @@ class LoginController extends Controller {
             return false;
         }
 
+        // 反斜線、控制字元（含 tab／換行）與空白：瀏覽器的 URL 解析器會剝除或改寫它們，
+        // `/\evil.com`、`/<TAB>/evil.com` 會被解讀成協定相對的 `//evil.com`。只靠「不以 // 開頭」擋不住。
+        if (preg_match('/[\x00-\x20\x7f\\\\]/', $redirect) === 1) {
+            return false;
+        }
+
         $path = parse_url($redirect, PHP_URL_PATH);
 
         if (!is_string($path) || $path === '') {
+            return false;
+        }
+
+        // 路徑部分的百分號編碼版本一併擋掉（%00–%1f、%7f、%5c）。只看路徑：查詢串裡的 %20 之類是正常內容
+        // （例如 OIDC 授權請求的 state／redirect_uri 參數），不能誤殺。
+        if (preg_match('/%(?:[01][0-9a-f]|7f|5c)/i', $path) === 1) {
             return false;
         }
 

@@ -241,14 +241,15 @@ Passport 本身**不含 OIDC**（無 id_token、discovery、JWKS），需第三�
 
 ### 8.1 上線前檢查清單（總開關保持預設關閉，直到逐項確認）
 
-1. **prod 的 PHP 有 `ext-sodium`**（CI 與本機已確認；prod 未確認，`composer install` 缺它會失敗）。
+1. **prod 的 PHP 有 `ext-sodium`**：**已確認（2026-11-05，唯讀 SSH 檢查）**——prod 是 PHP 8.4.27，`php -m`（CLI）與 `php-fpm8.4 -m`（網頁請求實際用的）都列出 `sodium`，`php8.4-fpm` 服務為 active。
 2. **第一次部署只跑一次 `php artisan passport:keys`**（之後不要加 `--force`），私鑰權限 0600；多節點部署所有節點必須使用**同一對**金鑰。
 3. 設定 `OIDC_ISSUER`（對外 https 網址、不帶路徑）；沒有明確 issuer 時所有端點會回 503。
 4. **`php artisan oidc:check` 通過**（`deploy.sh` 在開關開啟時自動跑，失敗只警告）。
 5. 管理員以 `php artisan passport:client --name=… --redirect_uri=…` 為下游建立 client，把 `client_id`／`client_secret` 轉交下游。
 6. 下游依 `API.md` 15.7 接入，**用 `sub` 識別使用者並自行維護白名單**。
 7. **（已做，範圍有限）MariaDB 上的 `lockForUpdate` 序列化實測**：2026-11-05 在隔離容器（mariadb:10.11.14、REPEATABLE-READ）以兩個並發連線驗證——持鎖交易擋住同列的 `FOR UPDATE` 直到提交；停用先提交時，先做過一致性讀的簽發交易其鎖定讀仍讀到最新值。範圍限制：用原生 PDO 重現等價的主鍵等值鎖定讀，不是 `ActiveUserAccessTokenRepository` 本身在 MariaDB 上並發執行（測試套件強制 SQLite，無自動化回歸）；細節見 `API.md` 15.5。
-8. **確認 prod 有 scheduler**：`passport:purge --expired --hours=24` 已排進 `Kernel::schedule()`，但需 `* * * * * php artisan schedule:run` 的 cron 才會跑（README 目前只記載每週 sqlite-sync 的 cron，沒有 schedule:run）。
+8. **⚠️ prod 目前未發現 scheduler，需先補上（2026-11-05 唯讀 SSH 檢查）**：`passport:purge --expired --hours=24` 已排進 `Kernel::schedule()`，但 prod 的 ubuntu crontab 只有每週 sqlite-sync、每小時 log 輪替與暫存清理三條；`sudo -n crontab -l`（root）沒有輸出（`sudo -n true` 也無錯誤，所以較可能是空的）、`/etc/cron.d`（cbdb-query-guard、php 等）與 systemd timer 都沒有 `schedule:run`，`/etc/cron.*` 全部檔案也 grep 不到 `artisan`，也沒有 queue／schedule／horizon 類的常駐服務。所以**排程應該不會執行**。開啟 OIDC 前要由有權限的人在 prod 加一條 `* * * * * cd /home/ubuntu/cbdb_input && php artisan schedule:run >> /dev/null 2>&1`（本次檢查未改動 prod；是否補上由管理者決定），或改成定期手動跑 `php artisan passport:purge --expired --hours=24`。另外 `Kernel::schedule()` 目前只有這一個排程，加了 scheduler 不會連帶啟動其他東西。補上後請回頭把本項改成「已確認」。
+   （同次檢查：prod 的 git 為 `66fce183`，尚未部署任何 OIDC 程式，`.env` 也沒有 `OIDC_PROVIDER_ENABLED`，開關自然是預設關閉。）
 9. 設定 `OIDC_PROVIDER_ENABLED=true` 後重新部署（`route:cache`／`config:cache` 要重建才會生效），再跑一次 `scripts/oidc-e2e/run.sh` 以外的實際環境驗證（以測試帳號走一次完整登入）。
 
 ## 9. 開放問題

@@ -1840,7 +1840,7 @@ JWT，RS256。`iss` 為 `OIDC_ISSUER`（未設則 `APP_URL`），`aud` 為 clien
 
 **金鑰輪換**：換掉 `storage/oauth-private.key`／`oauth-public.key`（或環境變數 `PASSPORT_PRIVATE_KEY`／`PASSPORT_PUBLIC_KEY`）並重新部署即可，`kid` 會自動跟著變。RP 的函式庫遇到不認得的 `kid` 會重抓 JWKS，不需要人工介入；換鑰前簽出的 id_token（有效期最長 1 小時）之後無法再被驗證，這沒有影響，因為 id_token 只是登入當下的斷言、RP 不該拿它當工作階段。**沒有新舊兩把鑰並存的過渡期**（套件一次只發布一把），所以換鑰瞬間仍在進行中的登入會失敗一次、重試即可。
 
-**第一次部署**：在 prod 執行**一次** `php artisan passport:keys`（只做一次；**之後不要加 `--force`**，那會換掉簽章金鑰）。金鑰在 `storage/*.key`（已被 `.gitignore`，部署不會動它），私鑰權限必須是 `0600`。
+**第一次部署**：在 prod 執行**一次** `php artisan passport:keys`（只做一次；**之後不要加 `--force`**，那會換掉簽章金鑰）。金鑰在 `storage/*.key`（已被 `.gitignore`，部署不會動它），私鑰**不可被其他使用者讀取**（`oidc:check` 檢查「其他人」位元為 0）：檔案擁有者就是網頁伺服器的使用者時用 `0600`；擁有者是部署帳號、網頁伺服器用另一個使用者時，把檔案群組改成網頁伺服器的群組並用 `0640`（prod 就是 `ubuntu:www-data`、`0640`——`passport:keys` 預設產生的 `0600` 會讓 PHP-FPM 讀不到私鑰）。
 
 **上線前檢查**：`php artisan oidc:check`（`deploy.sh` 在開關開啟時會自動跑，失敗只警告、不中斷部署）。檢查 `ext-sodium`；`APP_KEY` 不只要非空，還要能被 Laravel 的 encrypter 接受（長度須符合 cipher）；**公鑰與私鑰各自獨立**檢查是否存在（來源可以是環境變數 `PASSPORT_PUBLIC_KEY`／`PASSPORT_PRIVATE_KEY` 或檔案，兩邊可以不同）、私鑰檔案的權限、公鑰是有效的 RSA 公鑰、**公私鑰是同一對**（不成對時 JWKS 公布 A 的公鑰、id_token 卻用 B 的私鑰簽，RP 永遠驗不過）；**RSA 至少 2048 位元**（`passport:keys` 預設 4096；更短的可被分解，攻擊者就能偽造 id_token）；issuer 是有效的 URL、不帶路徑與使用者資訊（`user:pass@`）、非 local／testing 環境必須是 https；Passport 的 scope 沒被 `mcp:use` 污染；cache store 是 `file`／`array` 時警告；**無條件**提醒「多節點必須用同一對簽章金鑰」（與 cache store 無關，用 redis 的多節點部署一樣會中）。
 

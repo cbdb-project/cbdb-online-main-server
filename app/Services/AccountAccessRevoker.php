@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class AccountAccessRevoker {
     public function __construct(private SecurityAuditLogger $securityAudit) {
@@ -68,5 +69,71 @@ class AccountAccessRevoker {
         );
 
         return $tokens->count();
+    }
+
+    /**
+     * 撤銷帳號的所有 OIDC（Passport）憑證：access token、授權碼，以及（若存在）refresh token。
+     *
+     * 與 revokeApiTokens() 是同一個道理：`is_active` 複查只是擋下請求，資料庫裡的憑證列還是有效的。
+     * Sanctum 與 Passport 是兩套互不相干的表，停用帳號只撤銷前者的話，已簽出的 OIDC access token 會活到自己過期，
+     * 尚未兌換的授權碼也還能換出新 token（兌換時的 isActive() 檢查是縱深防禦，不是唯一防線）。
+     *
+     * **撤銷而非刪除**：把 `revoked` 設為 true、保留列，供事後追溯；過期與已撤銷的列由 `passport:purge` 清理。
+     *
+     * 鎖 `users` 列後才讀寫，與 App\Support\Oidc\ActiveUserAccessTokenRepository::persistNewAccessToken() 用**同一把鎖**：
+     * 簽發端在交易內「檢查 is_active → 落庫」，這裡的撤銷必須等它結束才看得到那張新 token，
+     * 兩種先後順序都不會留下沒人撤銷的 token。
+     *
+     * 表不存在時為 no-op（兼容未建這些表的環境與測試）。
+     *
+     * @param  string  $context  觸發來源（'management_ui'、'cli'），寫進 audit 供追溯
+     * @return int 實際被撤銷的列數（access token＋授權碼＋refresh token）
+     */
+    public function revokeOidcTokens(User $user, string $context): int {
+        foreach (['oauth_access_tokens', 'oauth_auth_codes', 'oauth_refresh_tokens'] as $table) {
+            if (!Schema::hasTable($table)) {
+                return 0;
+            }
+        }
+
+        $summary = DB::transaction(function () use ($user): array {
+            DB::table('users')->where('id', $user->id)->lockForUpdate()->first();
+
+            // refresh token 沒有 user_id，只能經由 access_token_id 找到。先取清單再更新（不論 access token 本身
+            // 是否已被撤銷，其 refresh token 都要撤）。分批以避開 SQLite 的繫結變數上限。
+            $accessIds = DB::table('oauth_access_tokens')->where('user_id', $user->id)->pluck('id')->all();
+
+            $refresh = 0;
+            foreach (array_chunk($accessIds, 500) as $chunk) {
+                $refresh += DB::table('oauth_refresh_tokens')->whereIn('access_token_id', $chunk)->where('revoked', false)->update(['revoked' => true]);
+            }
+
+            return [
+                'access_tokens' => DB::table('oauth_access_tokens')->where('user_id', $user->id)->where('revoked', false)->update(['revoked' => true]),
+                'auth_codes' => DB::table('oauth_auth_codes')->where('user_id', $user->id)->where('revoked', false)->update(['revoked' => true]),
+                'refresh_tokens' => $refresh,
+            ];
+        });
+
+        $total = array_sum($summary);
+
+        if ($total === 0) {
+            return 0;
+        }
+
+        // 審計失敗絕不讓撤銷失敗（見 SecurityAuditLogger），所以放在交易外。
+        $this->securityAudit->record(
+            table: 'oauth_access_tokens',
+            operation: 'UPDATE',
+            rowPk: ['user_id' => $user->id],
+            event: 'oidc_tokens_revoked_on_deactivation',
+            before: ['context' => $context, 'reason' => 'account_deactivated'],
+            after: $summary,
+            channel: str_starts_with($context, 'cli')
+                ? SecurityAuditLogger::CHANNEL_CLI
+                : SecurityAuditLogger::CHANNEL_HTTP
+        );
+
+        return $total;
     }
 }

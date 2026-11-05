@@ -222,7 +222,13 @@ Passport 本身**不含 OIDC**（無 id_token、discovery、JWKS），需第三�
    - **JWKS 測試要斷言成員集合『恰好』等於公鑰允許的那幾個**（Sourcery 指出）：原本只排除 `d`／`p`／`q`，`dp`／`dq`／`qi`／`oth` 同樣是私鑰材料。
    - **issuer 結尾斜線只警告**：它是 `iss` 與 discovery 的 `issuer`，RP 會**逐字**比對，下游設定必須完全相同。
    - **沒有加 CORS、沒有給 discovery／JWKS 限流**：下游是伺服器端的 Node 程式抓取，不需要 CORS；兩者都是廉價的靜態回應。若日後被濫用再補。
-4. refresh 與停用帳號、token 壽命、限流。
+4. ✅ **已完成：憑證撤銷與 token 持久化層加固**（測試：`OidcAuthorizationFlowTest` 新增 8 個、`OidcTokenRevocationTest` 8 個；每道保護都做過變異檢查）。
+   - **設計決議：不簽發 refresh token，也不接受 `refresh_token` grant。** 重新審視需求：下游只需要在**登入那一刻**拿到 id_token 確認身分，沒有單點登出、下游自己管工作階段——refresh token 對我們沒有任何用處，卻是風險最大的一塊（長壽憑證，要在每次使用時重查帳號狀態、處理輪換與重用偵測、停用時撤銷）。與其把這些都做對，不如**根本不簽發**，攻擊面整個消失。做法：`NoRefreshTokenRepository::getNewRefreshToken()` 回 `null`，league 的 `issueRefreshToken()` 就不簽發、不落庫，回應也沒有 `refresh_token` 欄位。**這縮減了原本計畫的範圍（§1 曾列 refresh token）**；若日後下游真的需要長工作階段，要有意地改回來，並補「refresh 時重查 isActive()、輪換、停用時撤銷」的測試（`RestrictOidcGrantTypes` 與 `NoRefreshTokenRepository` 的 docblock 都寫了怎麼做）。連帶移除了 `OIDC_REFRESH_TOKEN_TTL_DAYS` 與 `Passport::refreshTokensExpireIn`（沒有東西要過期）。
+   - **簽發 access token 之前檢查 `isActive()`**（`ActiveUserAccessTokenRepository`）：掛在 `persistNewAccessToken`，在落庫**之前**拒絕，失敗不留任何記錄，且**不論 scope**。這修掉了第 2 步發現的根因（`isActive()` 只在簽發 id_token 時被呼叫、沒有 `openid` 就整段跳過）；`RequireOpenIdScope` 因此成為縱深防禦。
+   - **停用與簽發之間的競態用同一把列鎖關閉**：檢查與落庫在同一個交易、`lockForUpdate` 同一列 `users`；`AccountAccessRevoker::revokeOidcTokens()` 撤銷時鎖同一列。停用是「先改 `is_active`、再撤銷」，所以兩種先後都不會漏：簽發交易持鎖時，停用的 UPDATE 必須等它結束，之後的撤銷一定看得到那張新 token；停用先提交，簽發端讀到的就是 `is_active=0` 而被拒絕。⚠️ **`lockForUpdate` 在 SQLite 是 no-op，測試只能驗證語意；真正的列鎖序列化沒有在 MariaDB 上以兩個並發連線實測**（沒有安全的 MariaDB 可用，不連使用者的 `.env` 指向的資料庫）。已寫進 `API.md` 15.5，上線前建議補一次。
+   - **授權碼原子消耗**（`AtomicAuthCodeRepository`）：league 的順序是 `validateAuthorizationCode()` 先檢查 `isAuthCodeRevoked()`、簽發 token 之後才 `revokeAuthCode()`，兩個並發請求可以都讀到未撤銷。把 `isAuthCodeRevoked()` 改成一條 `UPDATE ... SET revoked=1 WHERE id=? AND revoked=0`，影響 0 列＝已用過，資料庫保證只有一個請求得到 1 列。測試驗證 SQL 形狀（有條件式 UPDATE、沒有對 `oauth_auth_codes` 的 SELECT）。**取捨**：消耗發生在 PKCE 驗證之前，所以一次失敗的兌換（`code_verifier` 不對）也會燒掉這張碼，使用者重新登入即可。**注意：Passport 預設就能擋住「串行」的第二次兌換，所以『同一張碼不能用兩次』這種測試抓不到原子性問題，必須驗證 SQL 形狀。**
+   - **停用帳號時撤銷 OIDC 憑證**：`AccountAccessRevoker::revokeOidcTokens()` 撤銷 access token、尚未兌換的授權碼與（若存在的）refresh token；撤銷而非刪除（保留列供追溯，過期與已撤銷的列由 `passport:purge` 清理）；寫 `oidc_tokens_revoked_on_deactivation` 審計；表不存在時 no-op。兩個呼叫點（`ManagementController::revokeApiTokens()` 的停用／軟刪除／角色變更，與 `ManageUser` CLI）都已接上，並有靜態守衛。**`passport:purge` 沒有被排程**（`Kernel::schedule()` 是空的、prod 是否跑 scheduler 未知），需要人工或另行排程。
+   - 🔴 **兩個測試自身的缺陷，都是變異檢查抓到的**：① 靜態守衛原本找 `revokeOidcTokens(` 字串，而被守的檔案**註解裡**也有這個字樣，所以呼叫被刪掉守衛照樣通過——改成只認 `->revokeOidcTokens($user,`；② 我自己的變異腳本一度沒有真正施加變異（`sed` 的反斜線模式沒匹配上，我把「`::class` 出現次數沒變」誤讀成「已刪除」），所以報出「測試全過」。**變異檢查必須驗證變異確實施加了**（例如被刪除的那一行的計數降為 0），否則『全過』什麼都證明不了。
 5. 以 `openid-client` 做端到端驗證；文件（`API.md`、openapi、接入說明）。
 
 ## 9. 開放問題

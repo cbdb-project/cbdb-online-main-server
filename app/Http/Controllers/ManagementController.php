@@ -291,6 +291,9 @@ class ManagementController extends Controller {
         if (Schema::hasTable('personal_access_tokens')) {
             app(AccountAccessRevoker::class)->revokeApiTokens($user, 'management_ui');
         }
+
+        // OIDC（Passport）的 token 是另一套表，Sanctum 的撤銷碰不到它；表不存在時 revokeOidcTokens() 自己是 no-op。
+        app(AccountAccessRevoker::class)->revokeOidcTokens($user, 'management_ui');
     }
 
     /**

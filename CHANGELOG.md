@@ -4,6 +4,10 @@
 
 ## 2026-11
 
+### 📚 v2 API 開放 `TEXT_INSTANCE_DATA`（文獻版本表）的新增與整列修改
+- 新增 `text-instance-data`（別名 `text_instance_data`／`text_instance` 等）的 `create`：三欄複合主鍵（`c_textid`、`c_text_edition_id`、`c_text_instance_id`）全由呼叫端給定、不配發；刪除仍全面停用。
+- `update` 白名單由 3 欄（`c_instance_title`／`c_pub_year`／`c_publisher`）擴到與 create 相同的 24 個非主鍵欄（`CodeTableWriteConfigDriftTest` 機械把關兩端一致）；與 `text-entity` 聚合並存。
+
 ### 🔐 OIDC Provider（把後台登入提供給其他專案）——已安裝、授權端與令牌端完成，**預設關閉**
 - 本專案可作為 OpenID Connect Provider，讓自家下游專案（Node.js）以後台帳號登入。設計、決議與風險見 `docs/OIDC_PROVIDER_PLAN.md`；對外說明見 `API.md` 第十五章。
 - 過期 token 的清理（`passport:purge --expired --hours=24`）併進週六釋出腳本，腳本因此改名為 `scripts/weekly-sqlite-sync-and-oidc-purge.sh`（prod 的 crontab 已改指新檔名）；失敗不影響釋出結果。

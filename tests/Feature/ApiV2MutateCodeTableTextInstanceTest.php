@@ -167,7 +167,7 @@ class ApiV2MutateCodeTableTextInstanceTest extends TestCase {
 
     #[Test]
     public function testDisallowedFieldStillRejected(): void {
-        // 只放行 c_pub_year/c_publisher/c_instance_title；其餘欄位仍須 422。
+        // 白名單外的欄位（稽核欄由系統蓋章，不可由呼叫端寫）仍須 422。
         $this->actingAs($this->makeUser('ti-bad@example.com'));
         $this->seedBaojing();
 
@@ -176,10 +176,10 @@ class ApiV2MutateCodeTableTextInstanceTest extends TestCase {
             'person_id' => 0,
             'operation' => 'update',
             'target' => ['pk' => ['c_textid' => 4452, 'c_text_edition_id' => 1, 'c_text_instance_id' => 1]],
-            'changes' => ['c_pub_notes' => 'x'],
+            'changes' => ['c_created_by' => '偽造署名'],
         ])->assertStatus(422);
 
-        $this->assertSame('-1', DB::table('TEXT_INSTANCE_DATA')->where('c_textid', 4452)->value('c_pub_notes'));
+        $this->assertNull(DB::table('TEXT_INSTANCE_DATA')->where('c_textid', 4452)->value('c_created_by'));
     }
 
     /**

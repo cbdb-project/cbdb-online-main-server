@@ -53,6 +53,36 @@ return [
             ],
             'long_text_fields' => ['c_notes'],
         ],
+        // 文獻版本表（TEXT_INSTANCE_DATA）：三欄複合主鍵（文獻、版本、版本實例）全由呼叫端給定，
+        // 沒有 auto_assign。原本只有 update 端、且只開 c_instance_title／c_pub_year／c_publisher 三欄，
+        // 沒有新增入口。與 text-entity 聚合並存：聚合負責「一整筆文獻＋其版本集合」，本入口是
+        // 「就這一列、就這些欄」的機器化寫入。刪除仍全面停用。
+        'TEXT_INSTANCE_DATA' => [
+            'resource' => 'text-instance-data',
+            'aliases' => [
+                'text-instance-data', 'text_instance_data', 'textinstancedata',
+                'text-instance', 'text_instance',
+            ],
+            'table' => 'TEXT_INSTANCE_DATA',
+            'display_name' => '文獻版本',
+            'key_columns' => ['c_textid', 'c_text_edition_id', 'c_text_instance_id'],
+            'auto_assign_id' => false,
+            'allowed_fields' => [
+                'c_instance_title_chn', 'c_instance_title', 'c_instance_title_trans',
+                'c_part_of_instance', 'c_part_of_instance_notes',
+                'c_pub_country', 'c_pub_dy', 'c_pub_year', 'c_pub_nh_code', 'c_pub_nh_year',
+                'c_pub_range_code', 'c_pub_loc', 'c_publisher', 'c_print', 'c_pub_notes',
+                'c_source', 'c_pages', 'c_extant', 'c_url_api', 'c_url_homepage',
+                'c_notes', 'c_number', 'c_counter', 'c_title_alt_chn',
+            ],
+            // 逐欄對照 schema：以下全是 smallint／int（外鍵欄 c_pub_country／c_pub_dy／
+            // c_pub_nh_code／c_pub_range_code／c_source 指向不存在的列時由 handler 回 422）。
+            'integer_fields' => [
+                'c_part_of_instance', 'c_pub_country', 'c_pub_dy', 'c_pub_year',
+                'c_pub_nh_code', 'c_pub_nh_year', 'c_pub_range_code', 'c_source', 'c_extant',
+            ],
+            'long_text_fields' => ['c_notes'],
+        ],
         'char_variant_map' => [
             'resource' => 'char-variant-map',
             'aliases' => ['char-variant-map', 'char_variant_map', 'charvariantmap'],

@@ -17,6 +17,15 @@
     <env name="SESSION_DRIVER" value="array"/>
     <env name="QUEUE_CONNECTION" value="sync"/>
     <env name="SKIP_CSRF_TOKEN" value="true"/>
+    <!-- 測試永遠不讀 `php artisan config:cache`／`route:cache` 留下的快取檔。
+         有快取時，`.env`／本檔的環境變數整個失效（`CACHE_DRIVER=array` 也不生效）：測試會用機器上
+         那份舊的 local／prod 設定跑——限流計數落到磁碟 file 快取、在測試之間甚至兩次執行之間殘留
+         （症狀：FailedAuthenticationThrottleTest 第一個過、其餘全回 429），路由則可能缺少新加的路由。
+         CI 沒有快取檔所以看不出來，是開發機專屬的假紅。
+         這兩個變數指向**刻意不存在**的檔案，Laravel 就視為「沒有快取」；force 讓它不被本機環境變數蓋掉。
+         守護測試：tests/Unit/TestEnvironmentIsolationTest.php -->
+    <env name="APP_CONFIG_CACHE" value="bootstrap/cache/config.phpunit-absent.php" force="true"/>
+    <env name="APP_ROUTES_CACHE" value="bootstrap/cache/routes.phpunit-absent.php" force="true"/>
     <env name="LOG_CHANNEL" value="errorlog"/>
     <!-- LLM 主端點固定為 chat/completions：端點以 /responses 結尾時會改走 Responses API 並轉換請求/回應格式，
          開發者本機 .env 若已指向 /responses（例如 HUIT），測試裡偽造的 chat 形狀回應就會對不上。

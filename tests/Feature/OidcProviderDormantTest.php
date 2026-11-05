@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Passport\Passport;
@@ -45,6 +47,11 @@ class OidcProviderDormantTest extends TestCase {
             'jwks' => ['GET', '/oauth/jwks'],
             'discovery' => ['GET', '/.well-known/openid-configuration'],
             'userinfo' => ['GET', '/oauth/userinfo'],
+            // Mcp::oauthRoutes() 會註冊的三條（動態 client 註冊＋兩份 well-known metadata）。字串掃描擋不住
+            // `Mcp::oauthRoutes ()`、call_user_func 之類的寫法，所以另以**執行期**請求確認它們不存在。
+            'mcp dynamic client registration' => ['POST', '/oauth/register'],
+            'mcp authorization-server metadata' => ['GET', '/.well-known/oauth-authorization-server'],
+            'mcp protected-resource metadata' => ['GET', '/.well-known/oauth-protected-resource'],
         ];
     }
 
@@ -118,7 +125,7 @@ class OidcProviderDormantTest extends TestCase {
             'oauth_access_tokens' => ['id', 'user_id', 'client_id', 'name', 'scopes', 'revoked', 'expires_at'],
             'oauth_refresh_tokens' => ['id', 'access_token_id', 'revoked', 'expires_at'],
             'oauth_clients' => ['id', 'owner_type', 'owner_id', 'name', 'secret', 'provider', 'redirect_uris', 'grant_types', 'revoked'],
-            'oauth_device_codes' => ['id', 'user_id', 'client_id', 'user_code', 'scopes', 'revoked', 'expires_at'],
+            'oauth_device_codes' => ['id', 'user_id', 'client_id', 'user_code', 'scopes', 'revoked', 'user_approved_at', 'last_polled_at', 'expires_at'],
         ];
         foreach ($expected as $table => $columns) {
             $this->assertTrue(Schema::hasTable($table), "{$table} 應已建立。");
@@ -131,5 +138,64 @@ class OidcProviderDormantTest extends TestCase {
             $migration->up();
         }
         $this->assertTrue(Schema::hasTable('oauth_clients'));
+    }
+
+    private function migrateOauthTables(): void {
+        $paths = array_map(fn (string $f) => 'database/migrations/' . basename($f), $this->oauthMigrationFiles());
+        $this->assertSame(0, Artisan::call('migrate', ['--path' => $paths, '--no-interaction' => true]), Artisan::output());
+    }
+
+    #[Test]
+    public function an_existing_table_missing_passport_columns_makes_the_migration_fail_loudly(): void {
+        // 舊版 Passport 殘留的不完整表：不可被悄悄標成「已套用」，Passport 之後才在執行期缺欄位出錯。
+        Schema::create('oauth_refresh_tokens', function (Blueprint $table) {
+            $table->string('id');
+        });
+
+        $migration = require database_path('migrations/2026_11_05_000003_create_oauth_refresh_tokens_table.php');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('access_token_id');
+        $migration->up();
+    }
+
+    #[Test]
+    public function an_existing_complete_table_and_its_rows_are_left_untouched(): void {
+        $this->migrateOauthTables();
+        DB::table('oauth_refresh_tokens')->insert(['id' => 'keep-me', 'access_token_id' => 'a', 'revoked' => false]);
+
+        $migration = require database_path('migrations/2026_11_05_000003_create_oauth_refresh_tokens_table.php');
+        $migration->up();
+
+        $this->assertSame(1, DB::table('oauth_refresh_tokens')->where('id', 'keep-me')->count());
+    }
+
+    #[Test]
+    public function rollback_refuses_to_drop_a_table_that_still_has_rows(): void {
+        // 表可能是遷移跳過建立的既有表，也可能存著尚未過期的憑證——刪除要是有意識的動作。
+        $this->migrateOauthTables();
+        DB::table('oauth_refresh_tokens')->insert(['id' => 'live', 'access_token_id' => 'a', 'revoked' => false]);
+
+        $migration = require database_path('migrations/2026_11_05_000003_create_oauth_refresh_tokens_table.php');
+
+        try {
+            $migration->down();
+            $this->fail('非空的表不應被 rollback 刪除。');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('truncate', $e->getMessage());
+        }
+
+        $this->assertTrue(Schema::hasTable('oauth_refresh_tokens'));
+        $this->assertSame(1, DB::table('oauth_refresh_tokens')->count());
+    }
+
+    #[Test]
+    public function rollback_drops_an_empty_table(): void {
+        $this->migrateOauthTables();
+
+        $migration = require database_path('migrations/2026_11_05_000003_create_oauth_refresh_tokens_table.php');
+        $migration->down();
+
+        $this->assertFalse(Schema::hasTable('oauth_refresh_tokens'));
     }
 }

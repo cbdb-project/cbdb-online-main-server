@@ -52,6 +52,7 @@ class ExportMysqlToSqliteExcludesCredentialTablesTest extends TestCase {
         'oauth_refresh_tokens',
         'oauth_auth_codes',
         'oauth_clients',
+        'oauth_device_codes',
         'oauth_personal_access_clients',
     ];
 

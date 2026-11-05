@@ -10,10 +10,14 @@ use App\Http\Middleware\RequirePkceS256;
 use App\Http\Middleware\RestrictOidcGrantTypes;
 use App\Http\Responses\OidcConsentRequiredResponse;
 use App\Models\OidcClient;
+use App\Support\Oidc\ActiveUserAccessTokenRepository;
+use App\Support\Oidc\AtomicAuthCodeRepository;
+use App\Support\Oidc\NoRefreshTokenRepository;
 use App\Support\Oidc\SigningKey;
 use DateInterval;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Passport\Bridge;
 use Laravel\Passport\Contracts\AuthorizationViewResponse;
 use Laravel\Passport\Http\Controllers\AccessTokenController;
 use Laravel\Passport\Http\Controllers\AuthorizationController;
@@ -81,9 +85,18 @@ class OidcServiceProvider extends ServiceProvider {
             Passport::tokensCan(config('openid.passport.tokens_can'));
         });
 
-        // Passport 的預設壽命是一年。沒有單點登出，這兩個值就是「帳號被停用後已簽出的 token 還能活多久」。
+        // Passport 的預設壽命是一年。這就是「帳號被停用後，若撤銷沒生效，已簽出的 access token 還能活多久」的上限。
+        // （不簽發 refresh token，所以沒有 refresh 壽命要設——見 NoRefreshTokenRepository。）
         Passport::tokensExpireIn(new DateInterval('PT' . (int) config('oidc.access_token_ttl_minutes') . 'M'));
-        Passport::refreshTokensExpireIn(new DateInterval('P' . (int) config('oidc.refresh_token_ttl_days') . 'D'));
+
+        // token 的持久化層（docs/OIDC_PROVIDER_PLAN.md §8 第 4 步）。Passport 與 OIDC 套件都以這些具體類別名稱 make()，
+        // 所以以 bind 覆寫解析即可，不必改任何 vendor 程式。
+        //  - 不簽發 refresh token（下游只在登入那一刻要 id_token）；
+        //  - 簽發 access token 前檢查 isActive()，檢查與落庫在同一個交易、鎖同一列 users；
+        //  - 授權碼以條件式 UPDATE 原子消耗，並發兌換只有一個會成功。
+        $this->app->bind(Bridge\RefreshTokenRepository::class, NoRefreshTokenRepository::class);
+        $this->app->bind(Bridge\AccessTokenRepository::class, ActiveUserAccessTokenRepository::class);
+        $this->app->bind(Bridge\AuthCodeRepository::class, AtomicAuthCodeRepository::class);
 
         // 沒有同意頁：需要同意的情況（prompt=consent、非 first-party client）回 OIDC 錯誤。
         // Passport 13 若沒綁這個，/oauth/authorize 會 BindingResolutionException。
@@ -99,8 +112,8 @@ class OidcServiceProvider extends ServiceProvider {
 
             // 伺服器對伺服器呼叫：不掛 web 群組（沒有 session、沒有 CSRF）。
             Route::post('/token', [AccessTokenController::class, 'issueToken'])
-                // 只放行 authorization_code（RestrictOidcGrantTypes）：refresh_token 的把關是計畫第 4 步，
-                // client_credentials 不需要使用者，兩者都不能只靠 client 的 grant_types 欄位擋。
+                // 只放行 authorization_code（RestrictOidcGrantTypes）：refresh_token 不簽發也不接受（下游只在登入那一刻
+                // 要 id_token），client_credentials 不需要使用者，兩者都不能只靠 client 的 grant_types 欄位擋。
                 ->middleware(['throttle:oidc-token', RequireExplicitIssuer::class, RestrictOidcGrantTypes::class])
                 ->name('passport.token');
         });

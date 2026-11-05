@@ -17,7 +17,7 @@ use OpenIDConnect\Services\IssuedByGetter;
  * 宣稱與實際行為不一致，比不宣稱更糟：RP 看到 refresh_token 就會去用，然後吃 `unsupported_grant_type`。
  *
  * 這裡的每一項都對應一個實際的強制點：
- *  - grant 來自 RestrictOidcGrantTypes::ALLOWED（單一真源，第 4 步開放 refresh 時 discovery 自動跟上）；
+ *  - grant 來自 RestrictOidcGrantTypes::ALLOWED（單一真源，日後若開放 refresh，discovery 自動跟上）；
  *  - code challenge 方法對應 RequirePkceS256；response_type 只有 code；
  *  - scope 來自 config('openid.passport.tokens_can')（OidcServiceProvider 以它設定 Passport）；
  *  - claims 對應 UserIdentityRepository 的白名單。

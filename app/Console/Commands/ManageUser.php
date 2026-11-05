@@ -331,6 +331,14 @@ class ManageUser extends Command {
             }
         }
 
+        // OIDC（Passport）的 token 是另一套表，上面 Sanctum 的撤銷碰不到它。
+        if (!$user->isActive()) {
+            $oidcRevoked = app(AccountAccessRevoker::class)->revokeOidcTokens($user, 'cli');
+            if ($oidcRevoked > 0) {
+                $this->warn("已撤銷該帳號 {$oidcRevoked} 筆 OIDC 憑證（access token／授權碼）。");
+            }
+        }
+
         $this->newLine();
         $this->info('✓ 用戶信息更新成功！');
         $this->displayUserInfo($user);

@@ -12,8 +12,9 @@ use Illuminate\Http\Request;
  * `grant_types` 欄位擋。這不夠：
  *  - **`client_credentials`** 不需要使用者——管理員若誤建了帶這個 grant 的 client（例如
  *    `passport:client --client`），就能無使用者地簽發 token；
- *  - **`refresh_token`** 的 isActive() 把關與撤銷屬計畫第 4 步，完成前不可開放，否則停用帳號的 refresh
- *    根本沒人檢查。（第 4 步完成時，把 `refresh_token` 加進 ALLOWED 並補測試。）
+ *  - **`refresh_token`**：本專案**不簽發** refresh token（NoRefreshTokenRepository；下游只在登入那一刻要 id_token），
+ *    所以也不接受這個 grant——不依賴「沒有人持有 refresh token」。若日後要開放，必須有意地同時：恢復簽發、
+ *    把它加進 ALLOWED，並補「refresh 時重查 isActive()、輪換、停用時撤銷」的測試。
  *
  * 在 client 的 `grant_types` 之外再擋一層，管理員建錯 client 也不會變成漏洞。
  * docs/OIDC_PROVIDER_PLAN.md §6.3／§6.4。

@@ -9,9 +9,11 @@ use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
+use Laravel\Passport\Bridge;
 use Laravel\Passport\ClientRepository;
 use Laravel\Passport\Passport;
 use League\OAuth2\Server\Exception\OAuthServerException;
@@ -199,8 +201,6 @@ class OidcAuthorizationFlowTest extends TestCase {
     public function token_lifetimes_are_short_and_explicit_not_passports_one_year_default(): void {
         $this->assertSame(10, (int) Passport::tokensExpireIn()->i);
         $this->assertSame(0, (int) Passport::tokensExpireIn()->y);
-        $this->assertSame(7, (int) Passport::refreshTokensExpireIn()->d);
-        $this->assertSame(0, (int) Passport::refreshTokensExpireIn()->y);
     }
 
     #[Test]
@@ -224,7 +224,8 @@ class OidcAuthorizationFlowTest extends TestCase {
 
         $this->assertSame('Bearer', $body['token_type']);
         $this->assertNotEmpty($body['access_token']);
-        $this->assertNotEmpty($body['refresh_token']);
+        // 設計決議：不簽發 refresh token（下游只在登入那一刻要 id_token）。見 NoRefreshTokenRepository。
+        $this->assertArrayNotHasKey('refresh_token', $body);
         $this->assertLessThanOrEqual(600, $body['expires_in']);
         $this->assertGreaterThan(590, $body['expires_in']);
         $this->assertSame('openid profile email', $body['scope']);
@@ -386,6 +387,10 @@ class OidcAuthorizationFlowTest extends TestCase {
         $this->assertGreaterThanOrEqual(400, $response->getStatusCode());
         $this->assertNull($response->json('id_token'));
         $this->assertNull($response->json('access_token'), '失敗的兌換不可把 access token 交給 RP。');
+
+        // 在落庫「之前」就拒絕：不是事後才拒絕、留下沒被撤銷的 token 列。
+        $this->assertSame(0, DB::table('oauth_access_tokens')->count(), '停用帳號的兌換不可留下 access token 記錄。');
+        $this->assertSame(0, DB::table('oauth_refresh_tokens')->count());
     }
 
     // ───────────── prompt／同意頁／未登入 ─────────────
@@ -538,15 +543,15 @@ class OidcAuthorizationFlowTest extends TestCase {
     public function the_token_endpoint_only_accepts_the_authorization_code_grant(): void {
         $user = $this->makeUser();
         [$client, $secret] = $this->makeClient();
-        $flow = $this->exchange($client, $secret, $user)->assertOk()->json();
+        $this->exchange($client, $secret, $user)->assertOk();
 
         $machine = app(ClientRepository::class)->createClientCredentialsGrantClient('machine client');
 
         $attempts = [
             // client 自己的 grant_types 欄位允許，也不可以：不需要使用者的 token 不該存在。
             'client_credentials' => ['grant_type' => 'client_credentials', 'client_id' => $machine->getKey(), 'client_secret' => $machine->plainSecret],
-            // refresh 的 isActive() 把關是第 4 步；完成前整條路徑關閉。
-            'refresh_token' => ['grant_type' => 'refresh_token', 'client_id' => $client->getKey(), 'client_secret' => $secret, 'refresh_token' => $flow['refresh_token']],
+            // 不簽發 refresh token，所以這條路徑沒有東西可以換；仍明確拒絕（不依賴「沒有人持有 refresh token」）。
+            'refresh_token' => ['grant_type' => 'refresh_token', 'client_id' => $client->getKey(), 'client_secret' => $secret, 'refresh_token' => 'any-value'],
             'password' => ['grant_type' => 'password', 'client_id' => $client->getKey(), 'client_secret' => $secret, 'username' => 'alice@example.org', 'password' => 'secret-password'],
             'missing' => ['client_id' => $client->getKey(), 'client_secret' => $secret],
             'bogus' => ['grant_type' => 'urn:ietf:params:oauth:grant-type:device_code', 'client_id' => $client->getKey(), 'client_secret' => $secret],
@@ -631,5 +636,155 @@ class OidcAuthorizationFlowTest extends TestCase {
 
         $this->assertSame('https://op.test', $claims['iss']);
         $this->assertSame((string) $user->getKey(), $claims['sub']);
+    }
+
+    // ───────────── 第 4 步：token 持久化層 ─────────────
+
+    #[Test]
+    public function no_refresh_token_is_issued_or_persisted(): void {
+        $user = $this->makeUser();
+        [$client, $secret] = $this->makeClient();
+
+        $response = $this->exchange($client, $secret, $user)->assertOk();
+
+        $this->assertArrayNotHasKey('refresh_token', $response->json());
+        $this->assertSame(0, DB::table('oauth_refresh_tokens')->count(), '不簽發 refresh token，也就不該有任何記錄。');
+        $this->assertSame(1, DB::table('oauth_access_tokens')->count());
+    }
+
+    #[Test]
+    public function the_token_repositories_are_the_hardened_subclasses(): void {
+        $this->assertInstanceOf(\App\Support\Oidc\NoRefreshTokenRepository::class, app(Bridge\RefreshTokenRepository::class));
+        $this->assertInstanceOf(\App\Support\Oidc\ActiveUserAccessTokenRepository::class, app(Bridge\AccessTokenRepository::class));
+        $this->assertInstanceOf(\App\Support\Oidc\AtomicAuthCodeRepository::class, app(Bridge\AuthCodeRepository::class));
+    }
+
+    /** 對持久化層直接驗證的 access token（繞過路由層的所有中介層）。 */
+    private function persistAccessTokenFor(string $userIdentifier): void {
+        [$client] = $this->makeClient();
+        $bridgeClient = app(Bridge\ClientRepository::class)->getClientEntity($client->getKey());
+
+        $repository = app(Bridge\AccessTokenRepository::class);
+        $token = $repository->getNewToken($bridgeClient, [], $userIdentifier);
+        $token->setIdentifier(bin2hex(random_bytes(20)));
+        $token->setExpiryDateTime(new \DateTimeImmutable('+10 minutes'));
+
+        $repository->persistNewAccessToken($token);
+    }
+
+    #[Test]
+    public function the_active_check_does_not_depend_on_the_openid_scope(): void {
+        // RequireOpenIdScope 擋掉了沒有 openid 的授權請求；這裡直接對持久化層驗證「就算有人繞過那層」也不會簽出 token。
+        // （實測過：沒有這一層時，scope=profile 的流程在帳號停用後仍拿到 access／refresh token。）
+        $user = $this->makeUser(User::STATUS_INACTIVE, 'inactive@example.org');
+
+        try {
+            $this->persistAccessTokenFor((string) $user->getKey());
+            $this->fail('停用帳號的 access token 不應被持久化。');
+        } catch (OAuthServerException $e) {
+            $this->assertSame('access_denied', $e->getErrorType());
+        }
+
+        $this->assertSame(0, DB::table('oauth_access_tokens')->count());
+    }
+
+    #[Test]
+    public function the_access_token_repository_refuses_unknown_and_reserved_accounts_but_accepts_an_active_one(): void {
+        $reserved = $this->makeUser(User::STATUS_RESERVED, 'reserved@example.org');
+        $active = $this->makeUser();
+
+        foreach (['999999', 'not-a-user', (string) $reserved->getKey()] as $refused) {
+            try {
+                $this->persistAccessTokenFor($refused);
+                $this->fail("身分 {$refused} 不應拿到 token。");
+            } catch (OAuthServerException $e) {
+                $this->assertSame('access_denied', $e->getErrorType(), $refused);
+            }
+        }
+        $this->assertSame(0, DB::table('oauth_access_tokens')->count());
+
+        $this->persistAccessTokenFor((string) $active->getKey());
+
+        $this->assertSame(1, DB::table('oauth_access_tokens')->count(), '啟用中的帳號仍可正常簽發。');
+    }
+
+    #[Test]
+    public function an_authorization_code_can_be_redeemed_only_once(): void {
+        $user = $this->makeUser();
+        [$client, $secret] = $this->makeClient();
+        [$verifier, $challenge] = $this->pkcePair();
+
+        $query = $this->redirectQuery($this->actingAs($user)->get($this->authorizeUrl($client, $challenge)));
+        $body = [
+            'grant_type' => 'authorization_code', 'client_id' => $client->getKey(), 'client_secret' => $secret,
+            'redirect_uri' => self::REDIRECT, 'code' => $query['code'], 'code_verifier' => $verifier,
+        ];
+
+        $this->post('/oauth/token', $body)->assertOk();
+        $this->post('/oauth/token', $body)->assertStatus(400)->assertJsonPath('error', 'invalid_grant');
+
+        $this->assertSame(1, DB::table('oauth_access_tokens')->count(), '同一張授權碼不可換出第二組 token。');
+    }
+
+    #[Test]
+    public function the_authorization_code_is_consumed_by_a_single_conditional_update(): void {
+        // 並發兌換只有一個會成功的保證來自資料庫：「檢查是否已用過」與「標記為已用」必須是同一條
+        // `UPDATE ... WHERE revoked = 0`，而不是先 SELECT 再 UPDATE（league 預設的順序，兩個並發請求可以都讀到未撤銷）。
+        $user = $this->makeUser();
+        [$client, $secret] = $this->makeClient();
+        [$verifier, $challenge] = $this->pkcePair();
+        $query = $this->redirectQuery($this->actingAs($user)->get($this->authorizeUrl($client, $challenge)));
+
+        $statements = [];
+        DB::listen(function ($event) use (&$statements): void {
+            $statements[] = strtolower($event->sql);
+        });
+
+        $this->post('/oauth/token', [
+            'grant_type' => 'authorization_code', 'client_id' => $client->getKey(), 'client_secret' => $secret,
+            'redirect_uri' => self::REDIRECT, 'code' => $query['code'], 'code_verifier' => $verifier,
+        ])->assertOk();
+
+        $conditional = array_values(array_filter($statements, fn (string $sql) => str_starts_with($sql, 'update "oauth_auth_codes"') && str_contains($sql, '"revoked" = ?') && str_contains($sql, 'where')));
+        $this->assertNotEmpty($conditional, '應有 UPDATE oauth_auth_codes SET revoked = ? WHERE ... revoked = ? 的條件式更新。');
+
+        $selects = array_filter($statements, fn (string $sql) => str_starts_with($sql, 'select') && str_contains($sql, '"oauth_auth_codes"'));
+        $this->assertSame([], array_values($selects), '不可再有對 oauth_auth_codes 的 SELECT 檢查（先讀再寫就有並發窗口）。');
+    }
+
+    #[Test]
+    public function consuming_is_atomic_at_the_repository_level(): void {
+        $user = $this->makeUser();
+        [$client] = $this->makeClient();
+        DB::table('oauth_auth_codes')->insert([
+            'id' => 'code-1', 'user_id' => $user->getKey(), 'client_id' => $client->getKey(),
+            'scopes' => '[]', 'revoked' => false, 'expires_at' => now()->addMinutes(10),
+        ]);
+        $repository = app(Bridge\AuthCodeRepository::class);
+
+        $this->assertFalse($repository->isAuthCodeRevoked('code-1'), '第一次：尚未用過，並在這一步被消耗。');
+        $this->assertTrue($repository->isAuthCodeRevoked('code-1'), '第二次：已被消耗。');
+        $this->assertTrue($repository->isAuthCodeRevoked('code-1'));
+        $this->assertTrue($repository->isAuthCodeRevoked('no-such-code'), '不存在的碼一律視為已撤銷。');
+        $this->assertSame(1, (int) DB::table('oauth_auth_codes')->where('id', 'code-1')->value('revoked'));
+    }
+
+    #[Test]
+    public function a_failed_pkce_attempt_burns_the_code(): void {
+        // 取捨（見 AtomicAuthCodeRepository）：消耗發生在 PKCE 驗證之前，所以一次失敗的兌換也會燒掉授權碼——
+        // 持碼者沒有驗證器就不該有第二次機會；使用者重新登入即可。
+        $user = $this->makeUser();
+        [$client, $secret] = $this->makeClient();
+        [$verifier, $challenge] = $this->pkcePair();
+        $query = $this->redirectQuery($this->actingAs($user)->get($this->authorizeUrl($client, $challenge)));
+        $body = [
+            'grant_type' => 'authorization_code', 'client_id' => $client->getKey(), 'client_secret' => $secret,
+            'redirect_uri' => self::REDIRECT, 'code' => $query['code'],
+        ];
+
+        $this->post('/oauth/token', $body + ['code_verifier' => str_repeat('x', 64)])->assertStatus(400);
+        $this->post('/oauth/token', $body + ['code_verifier' => $verifier])->assertStatus(400)->assertJsonPath('error', 'invalid_grant');
+
+        $this->assertSame(0, DB::table('oauth_access_tokens')->count());
     }
 }

@@ -20,12 +20,14 @@ use OpenIDConnect\Interfaces\IdentityRepositoryInterface;
  *    RP 不可把 email 當身份鍵；
  *  - 帳號不存在或未啟用一律拒絕。
  *
- * ⚠️ 這裡的 isActive() 檢查**只在簽發 id_token 時**才會被呼叫，而套件在 token 沒有 `openid` scope 時整段跳過
- * （含這個查詢）。所以它能成為把關，靠的是兩個前提，缺一不可：
- *   1. `GET /oauth/authorize` 強制 `openid` scope（App\Http\Middleware\RequireOpenIdScope）；
- *   2. `POST /oauth/token` 只放行 authorization_code（App\Http\Middleware\RestrictOidcGrantTypes）。
- * 且 token 在這個查詢**之前**就已寫進資料庫，失敗的兌換不會把 token 交給 RP，但也**沒有被撤銷**。
- * 完整的撤銷與 refresh 把關屬計畫第 4 步，完成前總開關（config/oidc.php）不可在 prod 開啟。
+ * 這裡的 isActive() 檢查是**最後一道**（縱深防禦），不是唯一一道，而且它**只在簽發 id_token 時**才會被呼叫
+ * （套件在 token 沒有 `openid` scope 時整段跳過）。真正擋住停用帳號的是更前面的幾層：
+ *   1. EnsureOidcUserIsActive：授權請求時把已停用帳號當成未登入；
+ *   2. ActiveUserAccessTokenRepository：簽發 access token **之前**檢查，與落庫同一個交易、鎖同一列 users，
+ *      失敗時不留下任何 token 記錄，且不論 scope；
+ *   3. AccountAccessRevoker::revokeOidcTokens()：停用帳號時撤銷已簽出的 access token 與尚未兌換的授權碼；
+ *   4. 不簽發 refresh token（NoRefreshTokenRepository）。
+ * 這裡只剩「簽發 id_token 的那一刻」的最後確認，以及白名單 claims 的組裝。
  */
 final class UserIdentityRepository implements IdentityRepositoryInterface {
     public function getByIdentifier(string $identifier): IdentityEntityInterface {

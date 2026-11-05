@@ -1743,7 +1743,7 @@ v2 提案流程上線前的舊機制，仍在線但**建議一律改用 `/api/v2
 
 把本專案的後台登入提供給其他專案使用（本專案是 OpenID Connect Provider，下游是 Relying Party）。設計、決議與風險見 [docs/OIDC_PROVIDER_PLAN.md](./docs/OIDC_PROVIDER_PLAN.md)。
 
-> **預設關閉**：沒有設定環境變數 `OIDC_PROVIDER_ENABLED=true` 時，下列端點都不存在（404）。計畫第 4 步（授權碼兌換與 refresh 的停用帳號把關）完成前，**不可在 prod 開啟**。`/oauth/userinfo` 刻意不提供（id_token 已含所需 claims）。開啟前請先跑 `php artisan oidc:check`（見 15.6）。
+> **預設關閉**：沒有設定環境變數 `OIDC_PROVIDER_ENABLED=true` 時，下列端點都不存在（404）。開啟前請先完成上線前檢查（`php artisan oidc:check`，見 15.6）並讀過 15.5 的限制。`/oauth/userinfo` 刻意不提供（id_token 已含所需 claims）。
 
 | 方法 | 路徑 | 說明 |
 | ------ | ------ | ------ |
@@ -1779,12 +1779,13 @@ v2 提案流程上線前的舊機制，仍在線但**建議一律改用 `/api/v2
 
 `application/x-www-form-urlencoded`。**只接受 `grant_type=authorization_code`**，帶 `client_id`、`redirect_uri`、`code`、`code_verifier`；confidential client 另帶 `client_secret`（public client 不帶 secret，靠 PKCE）。其他 `grant_type`（`refresh_token`、`client_credentials`、`password`、裝置授權、缺漏）一律回 `400` JSON `{"error":"unsupported_grant_type"}`，**即使 client 自己的 `grant_types` 欄位允許**——`client_credentials` 不需要使用者，管理員若誤建了這種 client 也不該變成漏洞；`refresh_token` 在計畫第 4 步完成停用帳號把關前不開放。
 
-回應 `200` JSON：`token_type`（`Bearer`）、`expires_in`（秒，預設約 600）、`access_token`、`refresh_token`、`scope`、`id_token`。
+回應 `200` JSON：`token_type`（`Bearer`）、`expires_in`（秒，預設約 600）、`access_token`、`scope`、`id_token`。**沒有 `refresh_token` 欄位**（見下）。
 
-- access token 預設 **10 分鐘**（`OIDC_ACCESS_TOKEN_TTL_MINUTES`）、refresh token 預設 **7 天**（`OIDC_REFRESH_TOKEN_TTL_DAYS`）。Passport 自己的預設是一年，本專案一律明確指定。
+- access token 預設 **10 分鐘**（`OIDC_ACCESS_TOKEN_TTL_MINUTES`）。Passport 自己的預設是一年，本專案一律明確指定。
 - 授權碼有效期 10 分鐘、**id_token 有效期 1 小時**，兩者由套件寫死，無法設定。id_token 只是「登入當下的身分斷言」，RP **不可**把它當成工作階段。
-- 兌換時若帳號已被停用，回錯誤（不會把 `access_token` 交給 RP）。這個把關成立的前提是授權請求必須帶 `openid`（見 15.1）。⚠️ 目前這只是**過渡性**把關：token 在檢查之前就已寫進資料庫，失敗的兌換**沒有撤銷**它們；完整的撤銷與 refresh 把關屬計畫第 4 步。
-- **目前沒有 refresh**：`refresh_token` grant 被拒絕（見上）。回應裡仍會有 `refresh_token` 欄位，RP **不應使用也不應儲存**；第 4 步開放時會另行公告。
+- **不簽發 refresh token，也不接受 `grant_type=refresh_token`**。這是設計決議：下游只需要在登入那一刻拿到 id_token 確認身分，沒有單點登出、下游自己管工作階段；refresh token 是長壽憑證，必須在每次使用時重查帳號狀態、處理輪換與重用偵測，與其做對不如不簽發，攻擊面整個消失。下游的工作階段壽命請自行決定；使用者需要重新驗證時，重新走一次授權流程即可。
+- **授權碼只能兌換一次**，且「檢查是否已用過」與「標記為已用」是同一條條件式 `UPDATE`，並發兌換只有一個會成功。取捨：消耗發生在 PKCE 驗證**之前**，所以一次失敗的兌換（例如 `code_verifier` 不對）也會燒掉這張碼，使用者重新登入即可。
+- **兌換時若帳號已被停用，回錯誤，且不留下任何 token 記錄**：簽發 access token 之前先檢查帳號狀態，檢查與落庫在同一個交易、鎖同一列 `users`，不論 `scope`。與停用帳號的撤銷用同一把鎖，所以兩種先後順序都不會漏。
 
 ### 15.3 id_token
 
@@ -1805,15 +1806,16 @@ JWT，RS256。`iss` 為 `OIDC_ISSUER`（未設則 `APP_URL`），`aud` 為 clien
 
 驗證 `iss`、`aud`（必須等於自己的 client id）、`exp`、`nonce`、簽章，且**鎖定 RS256**（拒絕 `none`、HS256）。access token 本身也是 JWT、與 id_token 共用金鑰，**不可把 access token 當成身分證明**。沒有單點登出：使用者在本專案登出，下游不會同步登出，下游的工作階段壽命請自行控制。
 
-### 15.5 已知限制（計畫第 4 步處理；解決前不可在 prod 開啟）
+### 15.5 停用帳號、憑證撤銷與已知限制
 
-以下是已確認、尚未解決的問題，所以總開關 `OIDC_PROVIDER_ENABLED` 預設關閉：
+**管理介面停用、軟刪除帳號或變更其角色時**，以及 **`php artisan cbdb:manage-user` 把帳號改成停用時**（CLI 只在帳號變成停用時撤銷，不含角色變更；只有管理介面在角色變更時也撤銷），除了原本的 Sanctum token，現在也會撤銷該帳號所有的 OIDC 憑證：access token、尚未兌換的授權碼（以及若存在的 refresh token）。撤銷是把 `revoked` 設為 true、**保留列**供事後追溯，並寫一筆 `oidc_tokens_revoked_on_deactivation` 的審計；過期與已撤銷的列請定期以 `php artisan passport:purge` 清理。
 
-- **停用帳號後，已簽出的 token 不會被撤銷**。停用帳號只會撤銷 Sanctum token，不會動 Passport token；已簽出的 access token 會活到自己的過期時間（預設 10 分鐘），refresh token 因為目前整條路徑關閉而無法使用。
-- **兌換失敗時，token 已經寫進資料庫**。兌換授權碼時帳號若已被停用，簽發 id_token 的身分查詢會拒絕，RP 拿不到 token；但 token 記錄在那之前就已持久化，沒有被刪除或撤銷。
-- **停用與簽發之間有競態窗口**：管理員在身分查詢通過之後、回應送出之前停用帳號，仍會簽出 token。上限是 access token 壽命。
-- **授權碼的消耗不是原子的**：league/oauth2-server 先讀「是否已撤銷」再撤銷，同一張授權碼被兩個並發請求同時兌換，理論上兩者都可能成功。兌換同時需要授權碼、`code_verifier` 與（confidential client 的）`client_secret`，攻擊面很窄，但仍屬缺口。
-- **授權碼兌換仍會簽發 `refresh_token`（回應有這個欄位，也會寫進資料庫），但 `grant_type=refresh_token` 目前被拒絕**，所以它無法使用：RP 不應使用也不應儲存。這個「不會有真實 refresh token 流出」的說法**以 prod 的總開關保持關閉為前提**；第 4 步開放 refresh 時，開關前簽出的 token 不應被視為有效，上線前要清掉。
+仍存在的限制（誠實列出）：
+
+- **已簽出的 id_token 無法撤回，這不是可以修掉的缺陷，是任何身分提供方共有的性質**：id_token 是「某個時間點的身分斷言」，停用前一毫秒簽出的和窗口內簽出的本質上無法區分，也沒有人能撤回一張已簽出的 JWT。能做的是縮短它被誤用的機會：它有效期有限（最長 1 小時），且 RP 不該把它當成工作階段（見 15.4）。下面這一條說的只是這個窗口出現在哪裡：
+- **id_token 在簽發那一刻的最後確認不在鎖內**：`UserIdentityRepository` 在簽發 id_token 時再確認一次帳號狀態，但那一步沒有鎖；停用帳號發生在這一步與回應送出之間（毫秒級）時，RP 仍會收到一張 id_token。id_token 只是登入當下的身分斷言、沒有被用來呼叫任何受保護資源，這個窗口的影響只是「在帳號被停用的瞬間放行一次登入」。access token 的簽發則在鎖內，不受此限。
+- **鎖定行為只在 SQLite 上驗證了語意**：`lockForUpdate()` 在 SQLite 是 no-op，測試只能證明「檢查通過才落庫、停用後不落庫、撤銷看得到所有已落庫的 token」。真正的列鎖序列化行為需要在 MariaDB 上以兩個並發連線實測，**目前沒有做**；上線前建議補一次。
+- **`oidc:check` 只檢查本機**：多節點部署時所有節點必須使用同一對簽章金鑰（見 15.6），命令無法跨節點驗證。
 
 ### 15.6 Discovery、JWKS 與金鑰
 

@@ -27,4 +27,10 @@ return [
      * refresh token 壽命（天）。refresh 路徑必須重查 isActive()（第 4 步），這個值是縱深防禦的上限。
      */
     'refresh_token_ttl_days' => max(1, (int) env('OIDC_REFRESH_TOKEN_TTL_DAYS', 7)),
+
+    /*
+     * `POST /oauth/token` 每分鐘每 IP 的上限（具名限流器 oidc-token，見 RouteServiceProvider）。
+     * 用途是封頂 client_secret 暴力猜測。計數存在預設 cache store：多節點部署必須用共享 store。
+     */
+    'token_rate_limit_per_minute' => (int) env('OIDC_TOKEN_RATE_LIMIT_PER_MINUTE', 60),
 ];

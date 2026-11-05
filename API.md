@@ -464,7 +464,7 @@ CBDB 子資源表幾乎都是複合主鍵，且不使用 Eloquent 主鍵行為�
 | sources | **create／update 只接受 `sources`**；delete 另接受 source, biog_source_data | BIOG_SOURCE_DATA | ✔ | ✔ | ✔ |
 | merged-person | merged_person, merged_person_data, mergedperson | MERGED_PERSON_DATA | ✔ | ✘ | ✔ |
 | 可修改的代碼表（nianhao、office_codes、dynasties…） | 見〈代碼表與複合實體寫入〉 | 各代碼表 | ✘（501） | ✔ | ✘（501） |
-| 可新增的代碼表（text-codes、char-variant-map、addr-codes、addr-belongs-data、admin-cat-codes、office-type-tree） | 逐操作不同，見〈代碼表與複合實體寫入〉 | TEXT_CODES、char_variant_map、ADDR_CODES、ADDR_BELONGS_DATA、ADMIN_CAT_CODES、OFFICE_TYPE_TREE | 僅 direct | ✔ | ✘（403，已停用） |
+| 可新增的代碼表（text-codes、text-instance-data、char-variant-map、addr-codes、addr-belongs-data、admin-cat-codes、office-type-tree） | 逐操作不同，見〈代碼表與複合實體寫入〉 | TEXT_CODES、TEXT_INSTANCE_DATA、char_variant_map、ADDR_CODES、ADDR_BELONGS_DATA、ADMIN_CAT_CODES、OFFICE_TYPE_TREE | 僅 direct | ✔ | ✘（403，已停用） |
 | office、social-institution、text-entity（複合實體聚合） | 見〈代碼表與複合實體寫入〉 | 多表聚合 | ✔ | ✔ | ✔ |
 
 - 表中 `✔` 表示 `direct` 與 `proposal` 兩種模式都支援。
@@ -1402,7 +1402,7 @@ Authorization: Bearer <token>
 | choronym_codes | choronym_code, choronym | CHORONYM_CODES | c_choronym_code | c_choronym_desc |
 | ethnicity_tribe_codes | ethnicity, ethnicity_tribe | ETHNICITY_TRIBE_CODES | c_ethnicity_code | c_name, c_romanized, c_surname |
 | text_codes | — | TEXT_CODES | c_textid | c_title |
-| text_instance_data | text_instance | TEXT_INSTANCE_DATA | c_textid, c_text_edition_id, c_text_instance_id | c_instance_title, c_pub_year, c_publisher |
+| text_instance_data | text_instance, text-instance-data, textinstancedata, text-instance | TEXT_INSTANCE_DATA | c_textid, c_text_edition_id, c_text_instance_id | c_instance_title_chn, c_instance_title, c_instance_title_trans, c_part_of_instance, c_part_of_instance_notes, c_pub_country, c_pub_dy, c_pub_year, c_pub_nh_code, c_pub_nh_year, c_pub_range_code, c_pub_loc, c_publisher, c_print, c_pub_notes, c_source, c_pages, c_extant, c_url_api, c_url_homepage, c_notes, c_number, c_counter, c_title_alt_chn |
 | text_biblcat_codes | text_biblcat | TEXT_BIBLCAT_CODES | c_text_cat_code | c_text_cat_pinyin |
 | ganzhi_codes | ganzhi | GANZHI_CODES | c_ganzhi_code | c_ganzhi_py |
 | social_institution_name_codes | — | SOCIAL_INSTITUTION_NAME_CODES | c_inst_name_code | c_inst_name_py |
@@ -1416,7 +1416,7 @@ Authorization: Bearer <token>
 規則：
 
 - 預設值必須是**字串或 `null`**，且長度 ≤ 255 字元，否則 422（訊息形如 `<欄名> 必須為字串或 null`／`<欄名> 長度不可超過 255 字元`）。放寬與收緊都是**逐表逐欄**登記的（`config/code_table_mutations.php`／`config/code_table_writes.php`，判定見 `App\Support\CodeTableFieldValidator`）：
-  - **可送整數**：`TEXT_INSTANCE_DATA.c_pub_year`、`char_variant_map.c_strict_excluded`、`ADDR_CODES` 的 `c_firstyear`／`c_lastyear`／`c_admin_cat_code`／`CHGIS_PT_ID`、`ADDR_BELONGS_DATA.c_source`（訊息 `<欄名> 必須為字串、整數或 null`）。
+  - **可送整數**：`TEXT_INSTANCE_DATA` 的 `c_part_of_instance`／`c_pub_country`／`c_pub_dy`／`c_pub_year`／`c_pub_nh_code`／`c_pub_nh_year`／`c_pub_range_code`／`c_source`／`c_extant`、`char_variant_map.c_strict_excluded`、`ADDR_CODES` 的 `c_firstyear`／`c_lastyear`／`c_admin_cat_code`／`CHGIS_PT_ID`、`ADDR_BELONGS_DATA.c_source`（訊息 `<欄名> 必須為字串、整數或 null`）。
   - **可送數值（整數或小數）**：`ADDR_CODES.x_coord`／`y_coord`（訊息 `<欄名> 必須為字串、數值或 null`）。
   - 數值欄**送字串時必須真的是數字**（整數欄 `-?\d+`、浮點欄另允許小數點），否則 422 `<欄名> 必須為整數`／`必須為數值`。不擋的話 MariaDB 在本專案的非 strict sql_mode 下會把 `"not-a-year"` **靜默存成 0**，而 0 在年份／代碼欄都是合法值、事後看不出是壞資料。
   - 可為 null 的數值欄送空字串 `""` 等於**清空（寫入 null）**，不是寫 0。
@@ -1428,7 +1428,7 @@ Authorization: Bearer <token>
   - **不是所有非法座標都會被清成 `NULL`**：非空白、非數值的值（`"east"`、`"0e0"`、`"+40.5"`）仍然回 422 `<欄名> 必須為數值`，整對都不動。**但前後帶空白的數字不算在內**：所有輸入都會先經過全域的字串修剪，`" 40.5 "` 抵達時已是 `"40.5"`，所以它是個合法數值——若同一對的另一軸是零或空白，這個 `40.5` 會跟著被清成 `NULL`（回 200，`notices` 會說明）。把它們靜默清成 `NULL` 會讓一個該報錯的請求變成「存成沒有座標」。溢位成無限大的數字（JSON 的 `1e999`）回 422 `<欄名> 必須為有限數值`。
   - 整數欄另有**值域檢查**（依該欄實際型別，如 smallint 是 -32768～32767），超出回 422 `<欄名> 必須在 <min> 與 <max> 之間`。同理由：非 strict sql_mode 下 MariaDB 會把 40000 靜默截斷成 32767，回 200 但年份是錯的。
   - 超出 PHP 整數精度的數字字串回 422 `<欄名> 整數值超出可表示範圍`（`(int)` 會飽和成最大值，讓值域檢查誤判為「剛好在範圍內」）。`bigint` 欄不做值域檢查，只做這條溢位檢查。
-  - **不受 255 上限**：`ADDR_CODES.c_notes`、`ADMIN_CAT_CODES.c_notes`（實際型別是 longtext）。13.2 的 create 另有 `TEXT_CODES.c_notes`——該欄只能新增時寫，不在本節的 update 白名單內。
+  - **不受 255 上限**：`ADDR_CODES.c_notes`、`ADMIN_CAT_CODES.c_notes`、`TEXT_INSTANCE_DATA.c_notes`（實際型別是 longtext）。13.2 的 create 另有 `TEXT_CODES.c_notes`——該欄只能新增時寫，不在本節的 update 白名單內。
   - **整數欄也收「小數部分為 0 的浮點數」**（`1200.0` → `1200`）：不少 JSON 序列化器就是這樣送整數的。真的帶小數時回 422，不會靜默截斷。create 與 update 兩端一致。
   - **文字欄收到 JSON 數字時，只有 `create` 會轉成字串**（`"c_pages": 12` → `"12"`，等同資料庫原本的隱式轉型）；`update` 一律回 422。這是刻意的不對稱：create 在加上型別校驗之前完全沒有檢查，改判 422 會打斷既有客戶端；update 從第一天就要求字串。**要送 update 請自己加引號。**
   - **不可為 `null`**：資料庫 NOT NULL 的欄，訊息 `<欄名> 不可為空`。數值型的（`ADDR_CODES.c_admin_cat_code`、`char_variant_map.c_strict_excluded`）連空字串也拒絕，整個不送則吃資料庫預設值；文字型的（`TEXT_BIBLCAT_CODES.c_text_cat_pinyin`、`GANZHI_CODES.c_ganzhi_py`、`SOCIAL_INSTITUTION_NAME_CODES.c_inst_name_py`、`char_variant_map.c_variant_char`／`c_reference_char`）**允許送空字串**——那些欄是 `NOT NULL DEFAULT ''`，`''` 就是它們清空的合法寫法。
@@ -1444,7 +1444,9 @@ Authorization: Bearer <token>
 
 ### 13.2 可新增的代碼表（只支援 `create`、只支援 `direct`）
 
-目前開放新增的有六張表：
+目前開放新增的有七張表：
+
+> **`text-instance-data` 與 `text-entity` 聚合的關係**：聚合更新（13.4）會以「送來的版本集合」對賬整個文獻的 `TEXT_INSTANCE_DATA`——表單載入後才經本入口新增的版本列，會被下一次聚合更新視為「不在集合內」而刪除；反之聚合不會動本入口寫入的、聚合不認得的欄位（如 `c_print`）。同一文獻請擇一路徑維護版本列。create 回應的 `resource` 是 `text-instance-data`，update 回應是 `text_instance_data`（各表同一慣例）。
 
 > **與 13.4 的 `text-entity` 聚合並存**：`TEXT_CODES` 兩條寫入路徑都在役——本節的裸表 create 是「就這一列、就這些欄」的機器化寫入（S5 起同樣會做異體字落地替換）；聚合資源另外處理拼音派生、書名字形／標點正規化與 `TEXT_INSTANCE_DATA` 版本列。要建立一筆語義完整的文獻，用 13.4；只補一列原始資料，用本節。
 
@@ -1454,11 +1456,12 @@ Authorization: Bearer <token>
 | char-variant-map | char_variant_map, charvariantmap | char_variant_map | id（可自動配發） | c_variant_char, c_reference_char, c_strict_excluded, c_notes |
 | addr-codes | addr_codes, addrcodes | ADDR_CODES | c_addr_id（可自動配發） | c_name, c_name_chn, c_alt_names, c_firstyear, c_lastyear, c_admin_type, c_admin_cat_code, x_coord, y_coord, CHGIS_PT_ID, c_notes |
 | addr-belongs-data | addr_belongs_data, addr_belongs, addr-belongs | ADDR_BELONGS_DATA | c_addr_id, c_belongs_to, c_firstyear, c_lastyear（**四欄都必填、不配發**） | c_source, c_pages, c_notes |
+| text-instance-data | text_instance_data, textinstancedata, text-instance, text_instance | TEXT_INSTANCE_DATA | c_textid, c_text_edition_id, c_text_instance_id（**三欄都必填、不配發**） | c_instance_title_chn, c_instance_title, c_instance_title_trans, c_part_of_instance, c_part_of_instance_notes, c_pub_country, c_pub_dy, c_pub_year, c_pub_nh_code, c_pub_nh_year, c_pub_range_code, c_pub_loc, c_publisher, c_print, c_pub_notes, c_source, c_pages, c_extant, c_url_api, c_url_homepage, c_notes, c_number, c_counter, c_title_alt_chn |
 | admin-cat-codes | admin_cat_codes, admin-cat, admin_cat | ADMIN_CAT_CODES | c_admin_cat_code（可自動配發） | c_admin_cat_py, c_admin_cat_hz, c_admin_cat_trans, c_notes |
 | office-type-tree | office_type_tree, officetypetree | OFFICE_TYPE_TREE | c_office_type_node_id（**文本主鍵、必填、不配發**） | c_office_type_desc, c_office_type_desc_chn, c_parent_id |
 
 - 主鍵可放在 `target.pk` 或 `changes`；**單一主鍵的表在兩處都沒給值時，由伺服器以 `max(主鍵)+1` 自動配發**。但 `target` 這個鍵本身仍必須存在——請送 `"target": {"pk": {}}`，完全省略會被控制器層 422 擋下。
-- **複合主鍵的表（`addr-belongs-data`）沒有自動配發**：四個主鍵欄一個都不能少，缺哪一欄就回 422 `target.pk.<欄名>: ["required"]`。
+- **複合主鍵的表（`addr-belongs-data`、`text-instance-data`）沒有自動配發**：全部主鍵欄（前者四欄、後者三欄）一個都不能少，缺哪一欄就回 422 `target.pk.<欄名>: ["required"]`。
 - **`OFFICE_TYPE_TREE` 是唯一的文本主鍵表**：`c_office_type_node_id` 是零填補的階層路徑字串（`06`、`0601`、`060102`），請**原樣以字串送出**——它不會被轉成數字，前導零有意義（`'06'` 與 `'6'` 是不同的節點）。超過欄位長度回 422 `target.pk.<欄名>: ["max:255"]`；非字串／非整數回 `["string"]`。其餘表的主鍵仍是數值，適用下面兩條。
 - 主鍵值必須是整數（或可解析為整數的字串），否則 422 `target.pk.<欄名>: ["numeric"]`——不會靜默轉成 `0`；超出 PHP 整數精度的字串同樣回 `numeric`（`(int)` 會飽和成最大值而非報錯）。
 - 文本主鍵送非字串／非整數回 422 `target.pk.<欄名>: ["string"]`（`create` 與 `update` 兩端都是）。

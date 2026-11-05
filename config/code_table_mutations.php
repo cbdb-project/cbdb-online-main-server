@@ -101,15 +101,29 @@ return [
         [
             'resource' => 'text_instance_data',
             'table' => 'TEXT_INSTANCE_DATA',
-            'aliases' => ['text_instance_data', 'text_instance'],
+            'aliases' => [
+                'text_instance_data', 'text_instance', 'text-instance-data', 'textinstancedata', 'text-instance',
+            ],
             'display_name' => '文獻版本',
             'key_columns' => ['c_textid', 'c_text_edition_id', 'c_text_instance_id'],
-            'allowed_fields' => ['c_instance_title', 'c_pub_year', 'c_publisher'],
+            // 與 config/code_table_writes.php 的 create 白名單一致（CodeTableWriteConfigDriftTest 把關）。
+            'allowed_fields' => [
+                'c_instance_title_chn', 'c_instance_title', 'c_instance_title_trans',
+                'c_part_of_instance', 'c_part_of_instance_notes',
+                'c_pub_country', 'c_pub_dy', 'c_pub_year', 'c_pub_nh_code', 'c_pub_nh_year',
+                'c_pub_range_code', 'c_pub_loc', 'c_publisher', 'c_print', 'c_pub_notes',
+                'c_source', 'c_pages', 'c_extant', 'c_url_api', 'c_url_homepage',
+                'c_notes', 'c_number', 'c_counter', 'c_title_alt_chn',
+            ],
+            // 只有 c_instance_title 登記為拼音歸一欄（沿用既有行為）；c_publisher 沿用 tier2；
+            // 其餘欄位與 v→ü 無關，兩個 tier 都不列。
             'tier1_fields' => ['c_instance_title'],
-            // c_pub_year（出版年，整數）與 c_publisher（出版者，文字/可清空）非拼音欄，
-            // 放 tier2 以避開 tier1 的 v→ü 靜默正規化；c_pub_year 另登記為整數欄。
             'tier2_fields' => ['c_pub_year', 'c_publisher'],
-            'integer_fields' => ['c_pub_year'],
+            'integer_fields' => [
+                'c_part_of_instance', 'c_pub_country', 'c_pub_dy', 'c_pub_year',
+                'c_pub_nh_code', 'c_pub_nh_year', 'c_pub_range_code', 'c_source', 'c_extant',
+            ],
+            'long_text_fields' => ['c_notes'],
         ],
         [
             'resource' => 'text_biblcat_codes',

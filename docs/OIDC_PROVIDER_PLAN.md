@@ -71,6 +71,20 @@ Passport 本身**不含 OIDC**（無 id_token、discovery、JWKS），需第三�
 | ronvanderheijden/openid-connect | `league/oauth2-server ^8.2`、PHP ^7.4\|^8.0 | jeremy379 的上游，較舊 |
 | 自行在 league/oauth2-server 上實作 id_token | — | 退路。id_token 簽章與 claims 不難，但 discovery／nonce／`at_hash` 等細節容易出合規性錯誤，優先用套件 |
 
+### 5.1 套件核實結果（2026-11-05，第 1 步調研，唯讀）
+
+以 GitHub API 與 `composer require ... --dry-run`（不寫任何檔案）核實。維護度、約束、sodium 要求已由獨立 review 對照 GitHub API 複驗；「解析結果」與「副作用」兩列來自作者本機實際執行的 dry-run 輸出，**未經第二人複驗**，實際安裝時會再看到真實結果：
+
+| 項目 | 結果 |
+|---|---|
+| 維護度 | `jeremy379/laravel-openid-connect`：最後推送 2026-06-30，3.3.0（2026-06-30）、3.2.2（2026-03-31）、3.2.1（2026-03-25），0 個未決 issue，未封存。上游 `ronvanderheijden/openid-connect` 最後更新 2024-07，已停滯。`laravel/passport` v13.10.0（2026-10-13）、`league/oauth2-server` 9.4.1 皆活躍。**README 自述維護者在找接手人這點仍成立，但目前不是停滯狀態**——依賴要封在薄層（§7） |
+| 約束 | openid-connect 3.3.0：`php >=8.2`、`laravel/framework ^12\|^13`、`laravel/passport ^13`、`league/oauth2-server ^8.2\|^9.2`、`lcobucci/jwt ^4\|^5`、`ext-openssl`。Passport 13.10：`php ^8.2`、`league/oauth2-server ^9.2`、`phpseclib ^4`、`firebase/php-jwt ^6.4\|^7`、`symfony/console ^7.1\|^8`。本專案 Laravel 12／PHP 8.4，**約束相容** |
+| 解析結果 | 忽略 sodium 後可解：新增 Passport 13.10.0、openid-connect 3.3.0、league/oauth2-server 9.4.1、lcobucci/jwt 5.6.1、phpseclib 4.0.3、firebase/php-jwt 7.2.1、defuse/php-encryption 2.4.0、nyholm/psr7、php-http/discovery 等；**沒有與現有鎖定版本衝突** |
+| ⚠️ `ext-sodium` | `lcobucci/jwt` 5.4+ 要求 `ext-sodium`（PHP 8.4 只能用 5.4 以上；5.3 只支援到 PHP 8.3），而 `league/oauth2-server` 9.4 要求 `lcobucci/jwt ^5.6`——所以對 league 是**傳遞性**要求，它自己的 composer.json 沒有直接寫 sodium。**本機 PHP 8.4.15 沒有**（`php -m` 無 sodium），不處理就解析失敗。CI 用 `shivammathur/setup-php@v2`（PHP 8.4，`phpunit.yml` 的 `extensions` 清單沒列 sodium，但 setup-php 預設會啟用，**首次 CI 跑時要實測確認**）。**prod 的 PHP 是否有 sodium 未知，必須在部署前確認**（`docs/UPGRADE.md` 第 747–749 行的 apt 安裝清單沒有列 sodium 套件；多數發行版的 `php8.4-common` 已含，但要實測） |
+| 副作用 | 加 `--with-all-dependencies` 會連帶升級 `laravel/framework`（12.70.2→12.71.0）等 16 個既有套件。正式安裝請只更新必要套件，並精確列出，避免把依賴升級混進同一個 PR |
+| 本機安裝注意 | 這台 Windows 的 `composer install` 會因 `vlucas/phpdotenv` 的 `nul.env` 失敗、`^` 會被 `.bat` 吃掉、`vendor/` 跨分支共用（裝了 Passport 後，其他分支的 vendor 也會多出它）。見使用者記憶 `reference_windows_composer_vendor_quirks` |
+| 未驗證 | 套件在本專案實際行為（id_token 內容、`kid`、與 `auth` 別名／`isActive()` 的整合）尚未安裝實測，屬第 2 步之後 |
+
 **Passport 13 已知坑**：不會自動註冊授權頁面視圖，`/oauth/authorize` 會 `BindingResolutionException`，需要 `Passport::authorizationView(...)`。本專案是 React/Inertia，且 first-party client 要跳過同意頁，所以實作時要決定「自訂一個極簡授權頁」還是「全部 auto-approve」。
 
 ## 6. 設計決議與待辦
@@ -166,7 +180,7 @@ Passport 本身**不含 OIDC**（無 id_token、discovery、JWKS），需第三�
 ## 8. 建議的實作拆分（每步獨立 review、獨立 PR）
 
 0. ✅ **已完成：加固 `isSafeRedirectPath()`**（§6.8），它與 OIDC 無關、獨立先上。
-1. 核實套件（維護度、與 Passport 13／Laravel 12 的實測相容），裝上並跑通 migration（MariaDB + SQLite、全新與既有 DB），處理 cascade、`int unsigned` 型別與歷史 drop migration（§6.7）。
+1. ✅ 套件調研已完成（§5.1）；**剩下的是安裝**：先確認 `ext-sodium`（本機與 prod），再裝上並跑通 migration（MariaDB + SQLite、全新與既有 DB），處理 cascade、`int unsigned` 型別與歷史 drop migration（§6.7）。
 2. 授權端：授權頁／auto-approve、`isActive()` 把關、登入回跳、client 建立命令。
 3. id_token／claims 白名單、discovery、JWKS、`email_verified` 規則。
 4. refresh 與停用帳號、token 壽命、限流。

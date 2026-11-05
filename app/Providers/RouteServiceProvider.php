@@ -66,6 +66,21 @@ class RouteServiceProvider extends ServiceProvider {
         });
 
         /*
+         * OIDC 令牌端點 `POST /oauth/token`（docs/OIDC_PROVIDER_PLAN.md）。同 mcp：**必須是具名 limiter**，
+         * 數值型 `throttle:60,1` 的 key 是 `sha1(domain|ip)`，會與其他數值型 throttle 的路由共用同一個
+         * IP 計數器——該 IP 打無關端點會吃掉令牌端點的額度，下游合法的授權碼兌換就拿到 429。
+         *
+         * 以 IP 為鍵（不含 client_id）：這道限流的用途是封頂 client_secret 暴力猜測，若把 client_id 放進鍵，
+         * 攻擊者換個 client_id 就換一個桶。下游伺服器只有一兩個固定 IP，且只在使用者登入時才呼叫。
+         *
+         * ⚠️ 計數存在預設 cache store。**多節點部署必須用共享 store（redis／database）**，否則每個節點各算各的，
+         * 實際上限是「節點數 × 上限」。
+         */
+        RateLimiter::for('oidc-token', function (Request $request) {
+            return Limit::perMinute(self::oidcTokenRateLimit())->by($request->ip());
+        });
+
+        /*
          * 眾包舊通道的憑證簽發端點（#1264）：`GET|POST /api/operations/token` 拿 email＋密碼換
          * 長期有效的 confirmation_token。原本只有 api 群組共用的 600／分鐘，等於每分鐘 600 次
          * 密碼嘗試、每次一發 bcrypt。
@@ -146,6 +161,24 @@ class RouteServiceProvider extends ServiceProvider {
 
         if ($configured < 1) {
             $configured = self::MCP_RATE_LIMIT_DEFAULT;
+        }
+
+        return min($configured, 600);
+    }
+
+    /** OIDC 令牌端點在設定值不合理時退回的預設上限（與 config/oidc.php 的預設一致）。 */
+    public const OIDC_TOKEN_RATE_LIMIT_DEFAULT = 60;
+
+    /**
+     * OIDC 令牌端點限流的上限。夾範圍的理由同 mcpRateLimit()：`Limit::perMinute(0)` 實測是「第一個請求仍放行、
+     * 第二個才 429」，一個想關閉端點的 0／負數設定反而變成幾乎不設限，只可能是設定錯誤，退回預設。
+     * 上限夾在 600，不讓這個值把限流放寬到比 api 群組還鬆。
+     */
+    public static function oidcTokenRateLimit(): int {
+        $configured = (int) config('oidc.token_rate_limit_per_minute', self::OIDC_TOKEN_RATE_LIMIT_DEFAULT);
+
+        if ($configured < 1) {
+            $configured = self::OIDC_TOKEN_RATE_LIMIT_DEFAULT;
         }
 
         return min($configured, 600);

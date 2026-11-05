@@ -23,15 +23,16 @@ class RequirePkceS256 {
         $challenge = $request->query('code_challenge');
         $method = $request->query('code_challenge_method');
 
-        // RFC 7636 §4.2：43–128 個 [A-Za-z0-9-._~]。
+        // S256 的 challenge 是 SHA-256（32 位元組）經 base64url、去掉填充，**恆為 43 個字元**
+        // （RFC 7636 §4.2 的 43–128 是給 `plain` 用的）。放行更長的值會發出一張永遠無法兌換的授權碼。
         $valid = is_string($challenge)
-            && preg_match('/^[A-Za-z0-9\-._~]{43,128}$/', $challenge) === 1
+            && preg_match('/^[A-Za-z0-9\-_]{43}$/', $challenge) === 1
             && $method === 'S256';
 
         if (!$valid) {
             return response()->json([
                 'error' => 'invalid_request',
-                'error_description' => 'PKCE is required: send code_challenge (43-128 chars) with code_challenge_method=S256.',
+                'error_description' => 'PKCE is required: send code_challenge (the 43-character base64url SHA-256 of the verifier) with code_challenge_method=S256.',
             ], 400);
         }
 

@@ -4,6 +4,14 @@
 
 ## 2026-11
 
+### 🔐 OIDC Provider（把後台登入提供給其他專案）——已安裝、授權端與令牌端完成，**預設關閉**
+- 本專案可作為 OpenID Connect Provider，讓自家下游專案（Node.js）以後台帳號登入。設計、決議與風險見 `docs/OIDC_PROVIDER_PLAN.md`；對外說明見 `API.md` 第十五章。
+- **總開關 `OIDC_PROVIDER_ENABLED` 預設 false**，關閉時 `/oauth/*` 都不存在。**第 4 步（停用帳號的 token 撤銷、refresh 把關）完成前不可在 prod 開啟**；部署前還要確認 prod 的 PHP 有 `ext-sodium`（`lcobucci/jwt` 需要，已寫進 `composer.json`）。
+- 新增依賴 `laravel/passport` 13 與 `jeremy379/laravel-openid-connect` 3.3（`composer.json` 以 `dont-discover` 關掉 Passport 自己的自動發現）。只註冊 `GET /oauth/authorize` 與 `POST /oauth/token`；授權碼＋PKCE（S256，所有 client）、必須帶 `openid`、只放行 `authorization_code`；沒有角色權限 claim、沒有單點登出、沒有同意頁。
+- id_token 只有 `sub`（`users.id` 的字串）、`name`、`email`、`email_verified`（恆為 false）。
+- 新增 5 張 `oauth_*` 資料表（遷移改用新時戳並加保護），**已列入異體字替換排除清單與 SQLite 匯出的憑證表清單**。
+- 順帶修正：登入回跳的 `isSafeRedirectPath()` 加固（#1356）、測試不再讀 `config:cache`／`route:cache` 留下的快取（#1355，開發機專屬的假紅）。
+
 ### ⬆️ `laravel/mcp` 0.5 → 1.1（MCP 協定改說 2026-07-28，舊客戶端仍相容）
 - 取代 Dependabot #1345。`laravel/mcp` 1.0 起預設改說 MCP `2026-07-28`（`server/discover` 取代 `initialize` 握手、每個請求帶 `_meta` 協定版本、HTTP 需 `MCP-Protocol-Version`／`Mcp-Method`／`Mcp-Name` 標頭），
   且移除 session。我們的 `POST /api/mcp` 有外部客戶端在用，所以這次不能只看 CI——原本 CI 只有 schema／middleware 單元測試，**沒有任何測試走過真實協定流程**。

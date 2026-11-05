@@ -70,7 +70,7 @@ class OidcServiceProvider extends ServiceProvider {
             Route::post('/token', [AccessTokenController::class, 'issueToken'])
                 // 只放行 authorization_code（RestrictOidcGrantTypes）：refresh_token 的把關是計畫第 4 步，
                 // client_credentials 不需要使用者，兩者都不能只靠 client 的 grant_types 欄位擋。
-                ->middleware(['throttle:60,1', RestrictOidcGrantTypes::class])
+                ->middleware(['throttle:oidc-token', RestrictOidcGrantTypes::class])
                 ->name('passport.token');
         });
     }

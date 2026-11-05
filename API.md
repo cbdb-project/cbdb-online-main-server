@@ -1748,7 +1748,7 @@ v2 提案流程上線前的舊機制，仍在線但**建議一律改用 `/api/v2
 | 方法 | 路徑 | 說明 |
 | ------ | ------ | ------ |
 | GET | `/oauth/authorize` | 授權端點。瀏覽器導向；需要登入 session，未登入會被導到 `/login` 並在登入後回跳（完整 URL 含 query 保留） |
-| POST | `/oauth/token` | 令牌端點。伺服器對伺服器呼叫（不帶 session／CSRF），限流 60 次／分／IP |
+| POST | `/oauth/token` | 令牌端點。伺服器對伺服器呼叫（不帶 session／CSRF）。具名限流器 `oidc-token`，預設 60 次／分／IP（`OIDC_TOKEN_RATE_LIMIT_PER_MINUTE`，0／負數會退回 60、上限 600）；計數存在預設 cache store，**多節點部署必須用共享 store**（redis／database），否則實際上限是「節點數 × 上限」 |
 
 沒有其他 `/oauth/*` 端點：Passport 的 client 管理 JSON API、personal access token、裝置授權、核准／拒絕路由一律不存在。client 由管理員以 `php artisan passport:client` 手動建立，沒有自助註冊。
 
@@ -1762,7 +1762,7 @@ v2 提案流程上線前的舊機制，仍在線但**建議一律改用 `/api/v2
 | `scope` | **是，且必須含 `openid`** | 空白分隔，只接受 `openid`、`profile`、`email`；其他（含 `phone`、`address`、`mcp:use`）回 `invalid_scope`。缺少 `openid`（含完全不帶 scope、只帶 `profile`／`email`）回 `400` JSON `{"error":"invalid_scope"}`，**不**重導向。這是把關的一環，不只是規範：停用帳號的檢查在簽發 id_token 時，而沒有 `openid` 就不會簽發 id_token |
 | `state` | 建議 | 原樣回傳 |
 | `nonce` | 建議 | 原樣寫入 id_token |
-| `code_challenge` | **是** | 43–128 字元，`[A-Za-z0-9-._~]` |
+| `code_challenge` | **是** | **恰好 43 字元**，`[A-Za-z0-9-_]`。S256 的 challenge 是 SHA-256 經 base64url、去掉填充，長度固定 43；更長的值永遠無法兌換，所以直接拒絕 |
 | `code_challenge_method` | **是** | **只接受 `S256`**（對所有 client 一律強制，包含有 secret 的 confidential client） |
 | `prompt` | 否 | `none`、`login`；見下 |
 
@@ -1802,6 +1802,16 @@ JWT，RS256。`iss` 為 `OIDC_ISSUER`（未設則 `APP_URL`），`aud` 為 clien
 ### 15.4 RP 必須做的驗證
 
 驗證 `iss`、`aud`（必須等於自己的 client id）、`exp`、`nonce`、簽章，且**鎖定 RS256**（拒絕 `none`、HS256）。access token 本身也是 JWT、與 id_token 共用金鑰，**不可把 access token 當成身分證明**。沒有單點登出：使用者在本專案登出，下游不會同步登出，下游的工作階段壽命請自行控制。
+
+### 15.5 已知限制（計畫第 4 步處理；解決前不可在 prod 開啟）
+
+以下是已確認、尚未解決的問題，所以總開關 `OIDC_PROVIDER_ENABLED` 預設關閉：
+
+- **停用帳號後，已簽出的 token 不會被撤銷**。停用帳號只會撤銷 Sanctum token，不會動 Passport token；已簽出的 access token 會活到自己的過期時間（預設 10 分鐘），refresh token 因為目前整條路徑關閉而無法使用。
+- **兌換失敗時，token 已經寫進資料庫**。兌換授權碼時帳號若已被停用，簽發 id_token 的身分查詢會拒絕，RP 拿不到 token；但 token 記錄在那之前就已持久化，沒有被刪除或撤銷。
+- **停用與簽發之間有競態窗口**：管理員在身分查詢通過之後、回應送出之前停用帳號，仍會簽出 token。上限是 access token 壽命。
+- **授權碼的消耗不是原子的**：league/oauth2-server 先讀「是否已撤銷」再撤銷，同一張授權碼被兩個並發請求同時兌換，理論上兩者都可能成功。兌換同時需要授權碼、`code_verifier` 與（confidential client 的）`client_secret`，攻擊面很窄，但仍屬缺口。
+- **授權碼兌換仍會簽發 `refresh_token`（回應有這個欄位，也會寫進資料庫），但 `grant_type=refresh_token` 目前被拒絕**，所以它無法使用：RP 不應使用也不應儲存。這個「不會有真實 refresh token 流出」的說法**以 prod 的總開關保持關閉為前提**；第 4 步開放 refresh 時，開關前簽出的 token 不應被視為有效，上線前要清掉。
 
 ---
 

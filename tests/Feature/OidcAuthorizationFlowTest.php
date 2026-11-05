@@ -329,6 +329,9 @@ class OidcAuthorizationFlowTest extends TestCase {
             'plain method' => ['code_challenge' => $challenge, 'code_challenge_method' => 'plain'],
             'no method' => ['code_challenge' => $challenge, 'code_challenge_method' => null],
             'too short' => ['code_challenge' => 'abc', 'code_challenge_method' => 'S256'],
+            // S256 的結果恆為 43 字元；更長的值永遠無法兌換，不該發出授權碼。
+            'too long for S256' => ['code_challenge' => $challenge . 'A', 'code_challenge_method' => 'S256'],
+            'plain-only charset (dot/tilde)' => ['code_challenge' => str_repeat('a', 41) . '.~', 'code_challenge_method' => 'S256'],
             'illegal chars' => ['code_challenge' => str_repeat('!', 50), 'code_challenge_method' => 'S256'],
         ];
 
@@ -567,5 +570,32 @@ class OidcAuthorizationFlowTest extends TestCase {
             $response->assertStatus(400)->assertJsonPath('error', 'unsupported_grant_type');
             $this->assertNull($response->json('access_token'), $label);
         }
+    }
+
+    // ───────────── 令牌端點限流 ─────────────
+
+    #[Test]
+    public function the_token_endpoint_has_its_own_named_rate_limiter(): void {
+        config(['oidc.token_rate_limit_per_minute' => 3]);
+
+        // 限流在 grant_type 檢查之前：不需要真的有效的 client，用會被擋成 400 的請求就能數次數。
+        for ($i = 1; $i <= 3; $i++) {
+            $this->post('/oauth/token', ['grant_type' => 'password'])->assertStatus(400);
+        }
+        $this->post('/oauth/token', ['grant_type' => 'password'])->assertStatus(429);
+
+        $route = Route::getRoutes()->getByName('passport.token');
+        $this->assertContains('throttle:oidc-token', $route->gatherMiddleware(), '必須是具名 limiter，不是數值型 throttle:60,1。');
+    }
+
+    #[Test]
+    public function the_token_rate_limit_is_clamped_so_zero_or_huge_values_cannot_disable_it(): void {
+        foreach ([0, -5, '', 'abc'] as $bad) {
+            config(['oidc.token_rate_limit_per_minute' => $bad]);
+            $this->assertSame(60, \App\Providers\RouteServiceProvider::oidcTokenRateLimit(), json_encode($bad));
+        }
+
+        config(['oidc.token_rate_limit_per_minute' => 100000]);
+        $this->assertSame(600, \App\Providers\RouteServiceProvider::oidcTokenRateLimit());
     }
 }

@@ -34,8 +34,15 @@ class TestEnvironmentIsolationTest extends TestCase {
     public function the_phpunit_environment_wins_over_the_developer_dotenv(): void {
         // 這幾個值在 phpunit.xml 設定、而開發者本機 .env 通常是別的（mysql／file／local）。
         // 若有快取配置，它們會變回 .env 當時的值。
-        $this->assertSame('testing', $this->app->environment());
-        $this->assertSame('array', config('cache.default'));
-        $this->assertSame('array', config('session.driver'));
+        //
+        // 另一個失敗來源是宿主 shell 自己 export 了同名變數：Laravel 的 env() 先讀 $_SERVER，而 PHPUnit 的
+        // force 只更新 $_ENV／putenv，所以 phpunit.xml 擋不住。這不是誤報——測試確實正在用別的設定跑——
+        // 所以不放寬斷言，而是把原因寫進訊息，讓人知道該 unset 哪個變數。
+        $hint = ' 若不是快取造成的，請檢查 shell 是否 export 了 APP_ENV／CACHE_DRIVER／SESSION_DRIVER'
+            . '（Laravel 的 env() 先讀 $_SERVER，phpunit.xml 的設定擋不住它），unset 後再跑。';
+
+        $this->assertSame('testing', $this->app->environment(), 'APP_ENV 應為 testing。' . $hint);
+        $this->assertSame('array', config('cache.default'), 'cache.default 應為 array。' . $hint);
+        $this->assertSame('array', config('session.driver'), 'session.driver 應為 array。' . $hint);
     }
 }

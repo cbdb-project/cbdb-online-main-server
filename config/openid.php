@@ -50,9 +50,4 @@ return [
      * 優先 OIDC_ISSUER，退而用 APP_URL（兩者都沒設時回到套件的 'laravel' 推導行為）。
      */
     'issuedBy' => env('OIDC_ISSUER') ?: (env('APP_URL') ?: 'laravel'),
-
-    /*
-     * discovery 文件裡的端點網址一律用 https。prod 應保持 true；只有沒有 https 的本機開發才設 false。
-     */
-    'forceHttps' => (bool) env('OIDC_FORCE_HTTPS', true),
 ];

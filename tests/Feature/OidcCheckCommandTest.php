@@ -122,6 +122,107 @@ class OidcCheckCommandTest extends TestCase {
     }
 
     #[Test]
+    public function it_fails_for_a_malformed_or_non_hostname_issuer(): void {
+        // 不只比對 https:// 前綴：殘缺的值 RP 一樣無法使用。
+        foreach (['https://', 'op.test', 'https:///path', 'ftp://op.test', 'https://:443'] as $bad) {
+            config(['openid.issuedBy' => $bad]);
+
+            [$exit, $output] = $this->runCheck();
+
+            $this->assertSame(1, $exit, $bad);
+            $this->assertStringContainsString('issuer', $output, $bad);
+        }
+    }
+
+    #[Test]
+    public function it_fails_when_the_issuer_has_a_path_because_discovery_only_exists_at_the_host_root(): void {
+        // OIDC Discovery 規定 RP 去抓 {issuer}/.well-known/openid-configuration；帶路徑時那個網址在這裡是 404。
+        foreach (['https://op.test/idp', 'https://op.test/a/b', 'https://op.test?x=1', 'https://op.test#frag'] as $withPath) {
+            config(['openid.issuedBy' => $withPath]);
+
+            [$exit, $output] = $this->runCheck();
+
+            $this->assertSame(1, $exit, $withPath);
+            $this->assertStringContainsString('主機根路徑', $output, $withPath);
+        }
+    }
+
+    #[Test]
+    public function it_fails_for_an_rsa_key_shorter_than_2048_bits(): void {
+        // 成對、格式正確、但只有 1024 位元：可被分解，攻擊者就能偽造 RP 會接受的 id_token。
+        $weak = \phpseclib4\Crypt\RSA::createKey(1024);
+        config([
+            'passport.public_key' => (string) $weak->getPublicKey(),
+            'passport.private_key' => (string) $weak,
+        ]);
+
+        [$exit, $output] = $this->runCheck();
+
+        $this->assertSame(1, $exit, $output);
+        $this->assertStringContainsString('1024 位元', $output);
+        $this->assertStringContainsString('至少 2048', $output);
+        $this->assertStringNotContainsString('不是同一對', $output, '這把鑰是成對的，問題只在長度。');
+    }
+
+    #[Test]
+    public function it_fails_for_an_app_key_the_encrypter_would_reject(): void {
+        // 非空但格式錯誤或長度不符 cipher：授權碼加密時才丟例外，那已經是第一個下游登入的當下。
+        foreach (['base64:abc', 'base64:' . base64_encode('too-short'), 'short', 'base64:!!!not-base64!!!'] as $bad) {
+            config(['app.key' => $bad]);
+
+            [$exit, $output] = $this->runCheck();
+
+            $this->assertSame(1, $exit, $bad);
+            $this->assertStringContainsString('APP_KEY', $output, $bad);
+        }
+
+        // 長度正確的原始（非 base64:）32 位元組金鑰也是合法的。
+        config(['app.key' => str_repeat('k', 32)]);
+        [$exit] = $this->runCheck();
+        $this->assertSame(0, $exit);
+    }
+
+    #[Test]
+    public function the_shared_signing_key_reminder_is_shown_regardless_of_the_cache_store(): void {
+        // 與 cache store 無關：用 redis 的多節點部署，各節點用各自的金鑰檔一樣會讓登入時好時壞。
+        foreach (['file', 'array', 'redis', 'database'] as $store) {
+            config(['cache.default' => $store]);
+
+            [$exit, $output] = $this->runCheck();
+
+            $this->assertSame(0, $exit, $store);
+            $this->assertStringContainsString('同一對', $output, $store);
+            $this->assertStringContainsString('PASSPORT_PUBLIC_KEY', $output, $store);
+        }
+    }
+
+    #[Test]
+    public function the_node_local_cache_warning_is_only_shown_for_file_and_array(): void {
+        config(['cache.default' => 'redis']);
+        [, $redis] = $this->runCheck();
+        $this->assertStringNotContainsString('節點數 × 上限', $redis);
+
+        config(['cache.default' => 'file']);
+        [, $file] = $this->runCheck();
+        $this->assertStringContainsString('節點數 × 上限', $file);
+    }
+
+    #[Test]
+    public function it_rejects_userinfo_in_the_issuer_and_accepts_an_uppercase_scheme_and_a_port(): void {
+        config(['openid.issuedBy' => 'https://user:secret@op.test']);
+        [$exit, $output] = $this->runCheck();
+        $this->assertSame(1, $exit);
+        $this->assertStringContainsString('使用者資訊', $output);
+
+        // scheme 大小寫不拘；非預設埠、IPv6 位址都是合法的 issuer。
+        foreach (['HTTPS://op.test', 'https://op.test:8443', 'https://[::1]'] as $ok) {
+            config(['openid.issuedBy' => $ok]);
+            [$exit, $output] = $this->runCheck();
+            $this->assertSame(0, $exit, $ok . ' ' . $output);
+        }
+    }
+
+    #[Test]
     public function it_fails_without_an_app_key(): void {
         config(['app.key' => '']);
 

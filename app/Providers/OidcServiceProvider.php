@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Http\Controllers\OidcDiscoveryController;
 use App\Http\Middleware\EnsureOidcUserIsActive;
+use App\Http\Middleware\RequireExplicitIssuer;
 use App\Http\Middleware\RequireOpenIdScope;
 use App\Http\Middleware\RequirePkceS256;
 use App\Http\Middleware\RestrictOidcGrantTypes;
@@ -93,18 +94,20 @@ class OidcServiceProvider extends ServiceProvider {
         Route::prefix('oauth')->group(function () {
             // 路由名稱沿用 Passport 的，套件內部會以名稱反查。
             Route::get('/authorize', [AuthorizationController::class, 'authorize'])
-                ->middleware(['web', EnsureOidcUserIsActive::class, RequireOpenIdScope::class, RequirePkceS256::class])
+                ->middleware(['web', RequireExplicitIssuer::class, EnsureOidcUserIsActive::class, RequireOpenIdScope::class, RequirePkceS256::class])
                 ->name('passport.authorizations.authorize');
 
             // 伺服器對伺服器呼叫：不掛 web 群組（沒有 session、沒有 CSRF）。
             Route::post('/token', [AccessTokenController::class, 'issueToken'])
                 // 只放行 authorization_code（RestrictOidcGrantTypes）：refresh_token 的把關是計畫第 4 步，
                 // client_credentials 不需要使用者，兩者都不能只靠 client 的 grant_types 欄位擋。
-                ->middleware(['throttle:oidc-token', RestrictOidcGrantTypes::class])
+                ->middleware(['throttle:oidc-token', RequireExplicitIssuer::class, RestrictOidcGrantTypes::class])
                 ->name('passport.token');
         });
 
         // OpenID Connect Discovery。這是公開的靜態資料、沒有 session；下游伺服器抓取，不需要 CORS。
-        Route::get('/.well-known/openid-configuration', OidcDiscoveryController::class)->name('openid.discovery');
+        Route::get('/.well-known/openid-configuration', OidcDiscoveryController::class)
+            ->middleware(RequireExplicitIssuer::class)
+            ->name('openid.discovery');
     }
 }

@@ -71,6 +71,14 @@ final class SigningKey {
             && hash_equals($privateDetails['rsa']['e'], $publicDetails['rsa']['e']);
     }
 
+    /** 公鑰的 RSA modulus 位元數；金鑰缺漏或不是 RSA 公鑰時回 null。 */
+    public static function publicKeyBits(): ?int {
+        $resource = @openssl_pkey_get_public(self::publicKeyPem());
+        $details = $resource === false ? false : openssl_pkey_get_details($resource);
+
+        return $details !== false && isset($details['bits'], $details['rsa']) ? (int) $details['bits'] : null;
+    }
+
     /** 金鑰缺漏或不是 RSA 公鑰時回 null。 */
     public static function kid(): ?string {
         $pem = self::publicKeyPem();

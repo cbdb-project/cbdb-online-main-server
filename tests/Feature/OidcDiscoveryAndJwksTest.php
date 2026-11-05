@@ -99,12 +99,65 @@ class OidcDiscoveryAndJwksTest extends TestCase {
     }
 
     #[Test]
-    public function force_https_can_be_switched_off_for_local_development(): void {
-        config(['openid.forceHttps' => false]);
+    public function endpoints_are_built_from_the_issuer_not_from_the_request_host(): void {
+        // issuer 來自設定（可信），Host 標頭不是：偽造的 Host 不可以讓文件公布指向別的主機的端點。
+        foreach (['evil.example', 'op.test:8443', 'attacker.example'] as $host) {
+            $doc = $this->call('GET', '/.well-known/openid-configuration', [], [], [], ['HTTP_HOST' => $host, 'HTTPS' => 'off'])
+                ->assertOk()
+                ->json();
+
+            $this->assertSame('https://op.test', $doc['issuer'], $host);
+            $this->assertSame('https://op.test/oauth/authorize', $doc['authorization_endpoint'], $host);
+            $this->assertSame('https://op.test/oauth/token', $doc['token_endpoint'], $host);
+            $this->assertSame('https://op.test/oauth/jwks', $doc['jwks_uri'], $host);
+        }
+    }
+
+    #[Test]
+    public function every_oidc_endpoint_refuses_to_run_without_an_explicit_issuer(): void {
+        // issuedBy 為 'laravel'／'server' 時，套件會從請求的 Host 標頭推導 issuer——不只 discovery，連 id_token 的 iss 也是。
+        // Host 是攻擊者可控的輸入，所以「忘了設 OIDC_ISSUER」必須是 fail-closed，不能靠人記得跑 oidc:check。
+        foreach (['laravel', 'server', ''] as $derived) {
+            config(['openid.issuedBy' => $derived]);
+
+            foreach ([['GET', '/.well-known/openid-configuration'], ['GET', '/oauth/authorize'], ['POST', '/oauth/token']] as [$method, $uri]) {
+                $this->call($method, $uri, [], [], [], ['HTTP_HOST' => 'evil.example'])
+                    ->assertStatus(503)
+                    ->assertJsonPath('error', 'server_error');
+            }
+        }
+    }
+
+    #[Test]
+    public function the_explicit_issuer_requirement_is_the_first_thing_checked_on_each_endpoint(): void {
+        // 即使請求本身也不合法（沒帶 PKCE、grant 不對），也先報 503 而不是別的錯誤：不能讓任何一條路徑在
+        // 沒有 issuer 的情況下繼續往下走、甚至簽出 code。
+        config(['openid.issuedBy' => 'laravel']);
+
+        $this->get('/oauth/authorize?response_type=code')->assertStatus(503);
+        $this->post('/oauth/token', ['grant_type' => 'password'])->assertStatus(503);
+    }
+
+    #[Test]
+    public function a_trailing_slash_in_the_issuer_does_not_double_the_slash_in_endpoints(): void {
+        config(['openid.issuedBy' => 'https://op.test/']);
 
         $doc = $this->discovery();
 
-        $this->assertStringStartsWith('http://', $doc['authorization_endpoint']);
+        $this->assertSame('https://op.test/', $doc['issuer'], 'issuer 逐字回傳，RP 會逐字比對。');
+        $this->assertSame('https://op.test/oauth/token', $doc['token_endpoint']);
+    }
+
+    #[Test]
+    public function discovery_does_not_mutate_the_shared_url_generator(): void {
+        // 舊做法用 URL::forceScheme('https')，會改動共用的 URL 產生器，常駐行程裡會影響之後的請求。
+        config(['openid.issuedBy' => 'http://op.test']);
+        $before = url('/anything');
+
+        $this->discovery();
+
+        $this->assertSame($before, url('/anything'));
+        $this->assertStringStartsWith('http://', url('/anything'));
     }
 
     #[Test]
@@ -130,9 +183,10 @@ class OidcDiscoveryAndJwksTest extends TestCase {
         $this->assertSame('RSA', $key['kty']);
         $this->assertSame('RS256', $key['alg']);
         $this->assertSame('sig', $key['use']);
-        $this->assertArrayNotHasKey('d', $key, '絕不能含私鑰成員。');
-        $this->assertArrayNotHasKey('p', $key);
-        $this->assertArrayNotHasKey('q', $key);
+        // 成員集合必須**恰好**等於公鑰允許的那幾個。只排除 d／p／q 不夠：dp、dq、qi、oth 同樣是私鑰材料。
+        $members = array_keys($key);
+        sort($members);
+        $this->assertSame(['alg', 'e', 'kid', 'kty', 'n', 'use'], $members, 'JWK 出現公鑰以外的成員：' . json_encode($members));
 
         // kid ＝ 由公布的 n／e 獨立重算的 RFC 7638 指紋。
         $canonical = '{"e":"' . $key['e'] . '","kty":"RSA","n":"' . $key['n'] . '"}';

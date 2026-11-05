@@ -1808,7 +1808,7 @@ JWT，RS256。`iss` 為 `OIDC_ISSUER`（未設則 `APP_URL`），`aud` 為 clien
 
 ### 15.5 停用帳號、憑證撤銷與已知限制
 
-**管理介面停用、軟刪除帳號或變更其角色時**，以及 **`php artisan cbdb:manage-user` 把帳號改成停用時**（CLI 只在帳號變成停用時撤銷，不含角色變更；只有管理介面在角色變更時也撤銷），除了原本的 Sanctum token，現在也會撤銷該帳號所有的 OIDC 憑證：access token、尚未兌換的授權碼（以及若存在的 refresh token）。撤銷是把 `revoked` 設為 true、**保留列**供事後追溯，並寫一筆 `oidc_tokens_revoked_on_deactivation` 的審計；過期滿一天的列（含已撤銷但尚未過期者，要等過期後一天才會被清）由排程每日 04:15 以 `php artisan passport:purge --expired --hours=24` 清理（只在 `OIDC_PROVIDER_ENABLED=true` 時執行；**前提是有 `* * * * * php artisan schedule:run` 的 cron——2026-11-05 檢查時 prod 未發現這條，所以開啟 OIDC 前應先補上（見方案 §8.1 第 8 項），否則不會執行，需自行手動跑**）。
+**管理介面停用、軟刪除帳號或變更其角色時**，以及 **`php artisan cbdb:manage-user` 把帳號改成停用時**（CLI 只在帳號變成停用時撤銷，不含角色變更；只有管理介面在角色變更時也撤銷），除了原本的 Sanctum token，現在也會撤銷該帳號所有的 OIDC 憑證：access token、尚未兌換的授權碼（以及若存在的 refresh token）。撤銷是把 `revoked` 設為 true、**保留列**供事後追溯，並寫一筆 `oidc_tokens_revoked_on_deactivation` 的審計；過期滿一天的列（含已撤銷但尚未過期者，要等過期後一天才會被清）由排程每日 04:15 以 `php artisan passport:purge --expired --hours=24` 清理（只在 `OIDC_PROVIDER_ENABLED=true` 時執行；排程需要 `* * * * * php artisan schedule:run` 的 cron 才會自動跑，2026-11-05 檢查時 prod 沒有這條——這是選配：不跑只是過期列不被清理，不影響登入，可偶爾手動執行該命令）。
 
 仍存在的限制（誠實列出）：
 

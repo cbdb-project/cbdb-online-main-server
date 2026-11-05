@@ -60,6 +60,15 @@ final class VariantReplaceScope {
         'ai_fill_logs',
         'audit_log',
         'operations',
+        // OAuth／OIDC Provider 的憑證表（Passport）：存的是 token、client 密鑰、client 名稱、scope 與
+        // redirect URI——URL 與憑證必須保留原字，改寫會讓 redirect_uri 比對失敗或讓 token 失效。
+        // 目前它們不在任何 registry（D2 fail-closed 已跳過），明文列出以固定意圖：
+        // 日後哪怕有人把它們登記進已知表，也不會靜默進入替換範圍。
+        'oauth_access_tokens',
+        'oauth_auth_codes',
+        'oauth_clients',
+        'oauth_device_codes',
+        'oauth_refresh_tokens',
         // 派生表：內容由源頭重建（RegenerateAddresses），改派生物只會與源頭不一致。
         'ADDRESSES',
         // DB view（Schema::getColumns() 會回傳 view）。

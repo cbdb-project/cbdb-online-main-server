@@ -245,8 +245,9 @@ Passport 本身**不含 OIDC**（無 id_token、discovery、JWKS），需第三�
 2. **第一次部署只跑一次 `php artisan passport:keys`**（之後不要加 `--force`），私鑰不可被其他使用者讀取（0600，或擁有者與網頁伺服器不同時用 0640 並把群組改成網頁伺服器的群組，見下面的 prod 紀錄）；多節點部署所有節點必須使用**同一對**金鑰。
 3. 設定 `OIDC_ISSUER`（對外 https 網址、不帶路徑）；沒有明確 issuer 時所有端點會回 503。
 4. **`php artisan oidc:check` 通過**（`deploy.sh` 在開關開啟時自動跑，失敗只警告）。
-5. 管理員以 `php artisan passport:client --name=… --redirect_uri=…` 為下游建立 client，把 `client_id`／`client_secret` 轉交下游。
-6. 下游依 `API.md` 15.7 接入，**用 `sub` 識別使用者並自行維護白名單**。
+5. 管理員以 `php artisan passport:client --name=… --redirect_uri=…` 為下游建立 client，把 `client_id`／`client_secret` 轉交下游。**步驟、核對與日後的換 secret／改 redirect URI／撤銷見 [OIDC_PROVIDER.md](./OIDC_PROVIDER.md) §5。**
+   **第一個 client（2026-11-09，使用者明確指示）**：在 prod 為 CBDB QA Lab 建立（授權碼 client、有 secret、單一 redirect URI）。建立前 `oauth_clients` 為 0 列。核對：資料庫中 secret 為雜湊、redirect URI 只登記一個；以正確 redirect URI 打授權端得 302 到 `/login`，換成其他網址得 401 `invalid_client`。Passport 在 `grant_types` 預設寫入了 `refresh_token`，由 `RestrictOidcGrantTypes` 擋下，無須處理。`client_id`／secret 不入版控，已直接交給下游。
+6. 下游依 `API.md` 15.7 接入，**用 `sub` 識別使用者並自行維護白名單**。（CBDB QA Lab：接入程式已完成，prod 切換到 oidc 模式由該專案進行，尚未完成。）
 7. **（已做，範圍有限）MariaDB 上的 `lockForUpdate` 序列化實測**：2026-11-05 在隔離容器（mariadb:10.11.14、REPEATABLE-READ）以兩個並發連線驗證——持鎖交易擋住同列的 `FOR UPDATE` 直到提交；停用先提交時，先做過一致性讀的簽發交易其鎖定讀仍讀到最新值。範圍限制：用原生 PDO 重現等價的主鍵等值鎖定讀，不是 `ActiveUserAccessTokenRepository` 本身在 MariaDB 上並發執行（測試套件強制 SQLite，無自動化回歸）；細節見 `API.md` 15.5。
 8. **token 清理（已由週六釋出腳本順便處理，不需要新增 cron）**：`scripts/weekly-sqlite-sync-and-oidc-purge.sh`（原 `weekly-sqlite-sync.sh`，檔名改成帶上這件事）在釋出之後順便跑 `php artisan passport:purge --expired --hours=24`，**失敗只警告、不影響釋出的結束碼**（有測試鎖住，`WeeklyScriptOidcPurgeStepTest`）。prod 本來就有每週六 19:00 的 cron 在跑這支腳本，所以不必新增 `schedule:run`（2026-11-05 唯讀 SSH 檢查確認 prod 沒有 `schedule:run`，且 `/etc/cron.*`、systemd timer 都沒有）。`Kernel::schedule()` 裡的每日排程保留為「哪天有人加了 scheduler 就自動生效」的備援，沒有也無妨。
    **改檔名已收尾（2026-11-05）**：prod 的 crontab 已改指新檔名（`0 19 * * 6 …/scripts/weekly-sqlite-sync-and-oidc-purge.sh`，改前的 crontab 備份在 prod 的 `~/crontab.bak-20261105`），舊檔名的轉接檔因此移除。
@@ -260,7 +261,7 @@ Passport 本身**不含 OIDC**（無 id_token、discovery、JWKS），需第三�
    - 核對（從外部對公開網址）：登入頁 200；`/.well-known/openid-configuration` 200 且 issuer 正確；`/oauth/jwks` 200（RS256）；`/oauth/authorize` 與 POST `/oauth/token` 不帶參數回 400。
    - ⚠️ 重建快取後**立刻**請求會看到 404（opcache 的 `revalidate_freq=2` 視窗），等幾秒再驗，別誤判成沒生效。
    - ⚠️ prod 的 CLI 跑 `route:list` 會被 `PrometheusServiceProvider` 的 APC 儲存拋錯（CLI 沒有 APC），這是既有現象、與 OIDC 無關；要確認路由請看 `bootstrap/cache/routes-v7.php` 或直接 curl。
-   - **第 9 項後半（以測試帳號走一次完整登入）尚未做**：需要一個 client，而且會在 prod 留下授權碼／token 列與審計，等有第一個下游時一起做。
+   - **第 9 項後半（以測試帳號走一次完整登入）尚未做**：需要一個 client，而且會在 prod 留下授權碼／token 列與審計，等有第一個下游時一起做。（2026-11-09：第一個 client 已建立，待 CBDB QA Lab 切到 oidc 模式後做。）
 9. 設定 `OIDC_PROVIDER_ENABLED=true` 後重新部署（`route:cache`／`config:cache` 要重建才會生效），再跑一次 `scripts/oidc-e2e/run.sh` 以外的實際環境驗證（以測試帳號走一次完整登入）。
 
 ## 9. 開放問題

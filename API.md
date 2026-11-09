@@ -1744,7 +1744,7 @@ v2 提案流程上線前的舊機制，仍在線但**建議一律改用 `/api/v2
 
 ## 十五、OIDC Provider（實驗性，預設關閉）
 
-把本專案的後台登入提供給其他專案使用（本專案是 OpenID Connect Provider，下游是 Relying Party）。設計、決議與風險見 [docs/OIDC_PROVIDER_PLAN.md](./docs/OIDC_PROVIDER_PLAN.md)。
+把本專案的後台登入提供給其他專案使用（本專案是 OpenID Connect Provider，下游是 Relying Party）。設計、決議與風險見 [docs/OIDC_PROVIDER_PLAN.md](./docs/OIDC_PROVIDER_PLAN.md)；開關、建立與管理 client、疑難排解見 [docs/OIDC_PROVIDER.md](./docs/OIDC_PROVIDER.md)。
 
 > **預設關閉**：沒有設定環境變數 `OIDC_PROVIDER_ENABLED=true` 時，下列端點都不存在（404）。開啟前請先完成上線前檢查（`php artisan oidc:check`，見 15.6）並讀過 15.5 的限制。`/oauth/userinfo` 刻意不提供（id_token 已含所需 claims）。
 

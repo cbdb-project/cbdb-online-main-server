@@ -9,7 +9,8 @@
 - `update` 白名單由 3 欄（`c_instance_title`／`c_pub_year`／`c_publisher`）擴到與 create 相同的 24 個非主鍵欄（`CodeTableWriteConfigDriftTest` 機械把關兩端一致）；與 `text-entity` 聚合並存。
 
 ### 🔐 OIDC Provider（把後台登入提供給其他專案）——已安裝、授權端與令牌端完成，**預設關閉**
-- 本專案可作為 OpenID Connect Provider，讓自家下游專案（Node.js）以後台帳號登入。設計、決議與風險見 `docs/OIDC_PROVIDER_PLAN.md`；對外說明見 `API.md` 第十五章。
+- 本專案可作為 OpenID Connect Provider，讓自家下游專案（Node.js）以後台帳號登入。設計、決議與風險見 `docs/OIDC_PROVIDER_PLAN.md`；對外說明見 `API.md` 第十五章；**維運（開關、建立與管理 client、疑難排解）見 `docs/OIDC_PROVIDER.md`**。
+- prod 已於 2026-11-05 開啟；2026-11-09 為第一個下游（CBDB QA Lab）建立 client。
 - 過期 token 的清理（`passport:purge --expired --hours=24`）併進週六釋出腳本，腳本因此改名為 `scripts/weekly-sqlite-sync-and-oidc-purge.sh`（prod 的 crontab 已改指新檔名）；失敗不影響釋出結果。
 - **總開關 `OIDC_PROVIDER_ENABLED` 預設 false**，關閉時 `/oauth/*` 都不存在。開啟前先跑 `php artisan oidc:check`；部署前還要確認 prod 的 PHP 有 `ext-sodium`（`lcobucci/jwt` 需要，已寫進 `composer.json`）。
 - 新增依賴 `laravel/passport` 13 與 `jeremy379/laravel-openid-connect` 3.3（`composer.json` 以 `dont-discover` 關掉 Passport 自己的自動發現）。只註冊 `GET /oauth/authorize` 與 `POST /oauth/token`；授權碼＋PKCE（S256，所有 client）、必須帶 `openid`、只放行 `authorization_code`；沒有角色權限 claim、沒有單點登出、沒有同意頁。

@@ -35,6 +35,8 @@
 * [AdminLTE 4 升級可行性](./docs/ADMINLTE4_UPGRADE_FEASIBILITY.md)（⚠️ 已被 React/Inertia 遷移取代，歷史文件）
 * [AI 任官自動填充設計](./docs/AI_POSTING_AUTOFILL_DESIGN.md)
 * [API 認證方案](./docs/API_AUTHENTICATION.md)
+* [OIDC Provider 維運手冊](./docs/OIDC_PROVIDER.md) - 把後台登入提供給下游專案：開關、建立與管理 client、驗證、疑難排解
+* [OIDC Provider 設計與上線紀錄](./docs/OIDC_PROVIDER_PLAN.md)
 * [稽核日誌提案](./docs/AUDIT_LOG_PROPOSAL.md)
 * [人物提案流程實作狀態](./docs/BIOGMAIN_APPROVAL_FLOWS_PLAN.md)
 * [BiogMain Repository 重構計畫](./docs/BIOGMAIN_REPOSITORY_REFACTOR_PLAN.md)

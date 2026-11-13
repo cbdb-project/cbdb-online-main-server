@@ -40,6 +40,12 @@ class ChgisMapController extends Controller {
             return $this->transparentTile($request, $z, $x, $y);
         }
 
+        // ETag 納入底圖檔 mtime，底圖更新後同 z/x/y 也會失效，避免回舊磚。
+        // **先取版本、再讀磚**：若讀取期間底圖被換掉，最壞是「新磚＋舊 ETag」，下次驗證時 ETag 不符、
+        // 拿到 200 自癒；反過來（先讀磚、後取版本）會變成「舊磚＋新 ETag」，之後每次驗證都 304，
+        // 舊磚永遠不會被換掉。
+        $version = @filemtime($this->manager->path()) ?: 0;
+
         try {
             $data = (new MbtilesReader($this->manager->path()))->tile($z, $x, $y);
         } catch (\Throwable $e) {
@@ -52,9 +58,6 @@ class ChgisMapController extends Controller {
         if ($data === null) {
             return $this->transparentTile($request, $z, $x, $y);
         }
-
-        // ETag 納入底圖檔 mtime，底圖更新後同 z/x/y 也會失效，避免回舊磚
-        $version = @filemtime($this->manager->path()) ?: 0;
 
         // no-cache：瀏覽器仍快取磚體，但每次都帶 ETag 回來驗證；
         // 底圖未變回 304（省頻寬），底圖更新（mtime 變→ETag 變）即拉新磚。

@@ -174,9 +174,10 @@ php artisan cbdb:fetch-chgis-map || echo "警告: CHGIS 底圖下載失敗，地
 
 ### 5.1 新增路由（`routes/web.php`）
 ```php
-// 底圖 tile（讀 mbtiles 吐 PNG）
+// 底圖 tile（讀 mbtiles 吐 PNG）；無狀態，見 §5.1.1
 Route::get('/chgis-map/tiles/{z}/{x}/{y}', [ChgisMapController::class, 'tile'])
-    ->where(['z' => '[0-9]+', 'x' => '[0-9]+', 'y' => '[0-9]+'])
+    ->where(['z' => '[0-9]{1,2}', 'x' => '[0-9]{1,10}', 'y' => '[0-9]{1,10}'])
+    ->withoutMiddleware('web')
     ->name('chgis-map.tile');
 
 // 底圖狀態 / 觸發下載
@@ -187,6 +188,20 @@ Route::get('/basicinformation/{id}/map-points', [ChgisMapController::class, 'per
     ->name('basicinformation.map-points');
 ```
 > 路由置於 `web` middleware group，沿用既有授權上下文（與兩頁列表同等可見性）。
+> **例外：圖磚路由自 2026-11-13 起以 `->withoutMiddleware('web')` 排除整個 `web` 群組**，見 §5.1.1。
+
+#### 5.1.1 圖磚路由無狀態（下游站跨站載入）
+
+> 給下游開發者的使用說明（端點、回應、縮放範圍、Leaflet 範例、接入前檢查）：[CHGIS_TILES_FOR_EXTERNAL_SITES.md](./CHGIS_TILES_FOR_EXTERNAL_SITES.md)。本節記錄本站這一側的設計與護欄。
+
+- **誰在用**：[cbdb-qa-lab](https://github.com/cbdb-project/cbdb-qa-lab) 的對話內地圖（該 repo `docs/work-plans/TODO.md` 的 T-021、`interactive-clarification-and-visualization-workplan.md` §12.1）。設定 `QA_CHGIS_TILE_ORIGIN` 後，使用者的**瀏覽器**以 `<img>`（Leaflet `L.tileLayer`）直接載入本站的 `/chgis-map/tiles/{z}/{x}/{y}`；它的後端不連本站。
+- **為什麼要排除 `web` 群組**：跨站請求不帶本站 cookie，留在群組裡時每一塊圖磚都被當成新訪客——`StartSession` 各寫一個 session 檔（prod `SESSION_DRIVER=file`）並回 `Set-Cookie`（session 與 `VerifyCsrfToken` 的 `XSRF-TOKEN`），看一張地圖就是數十個 session 檔。圖磚是公開、無狀態的內容，群組裡沒有任何一項是它需要的（沒有授權、沒有 model binding、錯誤訊息不翻譯）。
+- **做法**：只對圖磚路由 `->withoutMiddleware('web')`（排除整個群組，日後群組新增的 cookie／session 類 middleware 也自動不會跑到這裡）。`status`／`map-points` 只有本站自己呼叫，維持在 `web` 群組。全域 middleware 不受影響：`Cors` 照樣加 `Access-Control-Allow-Origin: *`，`PrometheusMetrics` 照樣計數。`route:cache` 會把 `excluded_middleware` 序列化進快取（MCP 路由的 `withoutMiddleware` 早就依賴這一點），prod 一樣生效。
+- **連帶的行為改變**：同站（本站地圖 modal）帶著 session cookie 的圖磚請求也不再讀取、續期 session——圖磚本來就用不到它。503（底圖未就緒）照樣由例外處理器渲染，不需要 session。
+- **對下游的承諾**：回應不帶 `Set-Cookie`、不帶擋跨站的 `Cross-Origin-Resource-Policy`；路徑、無需登入、`no-cache`＋`ETag` 的快取語義維持不變。**改動這條路由（加登入、改路徑、把 session 加回來、加 CORP）會讓下游地圖沒有底圖**，要先通知下游。
+- **設定值也被下游寫死**：qa-lab 的 `src/shared/coords.ts` 抄了本站 `config/chgis_map.php` 的 `bounds`／`sane_bounds`／`display_bounds`／`epsilon`／`mercator_lat_limit`／`min_zoom`／`max_zoom`（程式預設值），以及 `CoordinateValidator` 的有效座標規則（§3）。改這些預設值、在 prod 以 `CHGIS_MAP_*` 覆寫、或改有效座標規則時，要通知 qa-lab 同步。
+- **護欄**：`tests/Feature/ChgisMapControllerTest.php` 的無狀態測試——命中、304、三條透明磚、503、帶舊 session cookie 的同站請求都斷言「沒有 cookie、請求沒有掛 session、沒有 CORP」；file driver 下連續請求不寫 session 檔；並直接檢查 `gatherRouteMiddleware()` 不含 web 群組的 middleware。cookie／掛 session、session 檔、middleware 清單這三種斷言各有留在 `web` 群組的 `status` 當對照組，證明斷言抓得到；CORP 沒有對照組（本站沒有任何地方會設它）。
+- **部署後驗證**：`curl -sI https://<主站>/chgis-map/tiles/5/25/12 | grep -i -E 'set-cookie|cross-origin-resource-policy'` 應無輸出（底圖就緒時，任一非負整數 z/x/y 都回 200，超出範圍是透明磚；底圖未就緒回 503，同樣不應帶 cookie）。⚠️ web server（nginx／Caddy）層若另外加了 `Set-Cookie` 或 CORP 標頭，應用層的測試看不到，要以這個 `curl` 為準。
 
 ### 5.2 `ChgisMapController`
 

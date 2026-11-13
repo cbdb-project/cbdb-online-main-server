@@ -278,6 +278,11 @@
   - [app/Services/PersonMapPointsService.php](./app/Services/PersonMapPointsService.php)、[app/Services/ChgisMapManager.php](./app/Services/ChgisMapManager.php)、[app/Support/CoordinateValidator.php](./app/Support/CoordinateValidator.php)
   - [resources/js/chgis-map](./resources/js/chgis-map)、[config/chgis_map.php](./config/chgis_map.php)
   - 底圖 `storage/app/chgis/chgis_map.mbtiles`（不入版控，`php artisan cbdb:fetch-chgis-map` 下載）；設計見 [docs/CHGIS_MAP_PLACE_LINK.md](./docs/CHGIS_MAP_PLACE_LINK.md)
+  - 🔴 **圖磚路由 `chgis-map/tiles/{z}/{x}/{y}` 有跨站的下游**：cbdb-qa-lab 的對話內地圖（`QA_CHGIS_TILE_ORIGIN`，該 repo TODO T-021）由使用者的瀏覽器直接載入。這條路由以 `->withoutMiddleware('web')` 排除整個 `web` 群組，回應不帶 `Set-Cookie`、不帶 CORP。**不要把 session／cookie 類 middleware 加回去，也不要對它加登入、改路徑或加 `Cross-Origin-Resource-Policy`**——下游地圖會沒有底圖（跨站時每塊圖磚還會各寫一個 session 檔）；非改不可時先通知下游。見 CHGIS_MAP_PLACE_LINK §5.1.1。
+    同一個下游還**把設定值寫死**在 cbdb-qa-lab 的 `src/shared/coords.ts`：`config/chgis_map.php` 的
+    `bounds`／`sane_bounds`／`display_bounds`／`epsilon`／`mercator_lat_limit`／`min_zoom`／`max_zoom`，
+    以及 `CoordinateValidator` 的有效座標規則。**改這些預設值、或在 prod `.env` 覆寫 `CHGIS_MAP_*`、或改有效座標規則時，要通知 qa-lab 同步。**
+    外部網站的接入說明：[docs/CHGIS_TILES_FOR_EXTERNAL_SITES.md](./docs/CHGIS_TILES_FOR_EXTERNAL_SITES.md)。
 
 ## 常用命令
 

@@ -76,8 +76,23 @@ Route::get('view/{key}', function (\Illuminate\Http\Request $request, string $ke
 })->name('view.show');
 
 // CHGIS 地圖：底圖圖磚與下載狀態（與地址/官職列表頁同等公開）
+//
+// 圖磚路由**整個排除 `web` 群組**（session、cookie 加密、queued cookie、CSRF 的 XSRF-TOKEN、
+// locale、ShareErrorsFromSession、SubstituteBindings）：圖磚是公開、無狀態的靜態內容，不需要任何一項
+//（z/x/y 是純整數參數，沒有 model binding）。
+// 下游站（cbdb-qa-lab 的對話內地圖，`QA_CHGIS_TILE_ORIGIN`）會**跨站**直接載入這裡的圖磚；
+// 跨站請求不帶本站 cookie，留在 web 群組時每一塊圖磚都被當成新訪客——各寫一個 session 檔
+// （SESSION_DRIVER=file）並回 Set-Cookie，看一張地圖就是數十個 session 檔。
+// 🔴 不要把 session／cookie 類 middleware 加回這條路由，也不要對它加登入或改路徑：
+// 下游的底圖會因此失效（見 docs/CHGIS_MAP_PLACE_LINK.md §5.1.1）。
+// 護欄：ChgisMapControllerTest 裡「圖磚路由無狀態」那一組測試（含 testTileRouteRunsNoWebGroupMiddleware）。
+// 下游也把 config/chgis_map.php 的範圍／縮放值寫死了，改那些值同樣要通知（AGENTS.md「CHGIS 地圖」）。
+// status 與 map-points 只有本站自己呼叫，維持在 web 群組。
 Route::get('chgis-map/tiles/{z}/{x}/{y}', 'ChgisMapController@tile')
-    ->where(['z' => '[0-9]+', 'x' => '[0-9]+', 'y' => '[0-9]+'])
+    // 位數上限：超出 PHP int 範圍的數字字串在轉成 int 參數時是 TypeError（500）；
+    // z ≤ 99、x／y ≤ 10 位（2^z−1 在任何實際縮放下都遠小於此）讓它們回 404。
+    ->where(['z' => '[0-9]{1,2}', 'x' => '[0-9]{1,10}', 'y' => '[0-9]{1,10}'])
+    ->withoutMiddleware('web')
     ->name('chgis-map.tile');
 Route::get('chgis-map/status', 'ChgisMapController@status')->name('chgis-map.status');
 Route::get('basicinformation/{id}/map-points', 'ChgisMapController@personPoints')

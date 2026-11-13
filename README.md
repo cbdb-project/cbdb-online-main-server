@@ -41,6 +41,7 @@
 * [人物提案流程實作狀態](./docs/BIOGMAIN_APPROVAL_FLOWS_PLAN.md)
 * [BiogMain Repository 重構計畫](./docs/BIOGMAIN_REPOSITORY_REFACTOR_PLAN.md)
 * [CHGIS 地圖 Place Name 連結與浮出地圖](./docs/CHGIS_MAP_PLACE_LINK.md)
+* [CHGIS 底圖圖磚：外部網站使用說明](./docs/CHGIS_TILES_FOR_EXTERNAL_SITES.md) - 其他網站跨站載入本站歷史底圖：端點、回應、縮放範圍、Leaflet 範例、接入前檢查
 * [複合主鍵 URL 設計](./docs/COMPOSITE_PRIMARY_KEY_URL_DESIGN.md)
 * [資料庫 Schema（MySQL/SQLite）](./docs/DATABASE_SCHEMA.md)
 * [Laravel Query 審查](./docs/LARAVEL_QUERY_REVIEW.md)

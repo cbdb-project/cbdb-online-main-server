@@ -284,6 +284,182 @@ class ChgisMapControllerTest extends TestCase {
         $this->get('/chgis-map/tiles/3/6/1')->assertStatus(503);
     }
 
+    // ---- 圖磚路由無狀態（下游站跨站載入；routes/web.php 的註解、CHGIS_MAP_PLACE_LINK §5.1.1） ----
+
+    /**
+     * 模擬下游站的瀏覽器跨站載入圖磚：帶 Origin／Referer、不帶本站 cookie、Accept 是圖片。
+     *
+     * 下游的 <img> 預設是 no-cors 請求，瀏覽器不會送 Origin；這裡加上它只是讓情境更嚴苛，
+     * 確認不論有無 Origin，回應都不帶 cookie。
+     */
+    private function getTileCrossSite(string $uri, array $headers = []): \Illuminate\Testing\TestResponse {
+        return $this->withHeaders(array_merge([
+            'Origin' => 'https://qa.example.org',
+            'Referer' => 'https://qa.example.org/',
+            'Accept' => 'image/avif,image/webp,image/png,image/*;q=0.8,*/*;q=0.5',
+            'Sec-Fetch-Site' => 'cross-site',
+        ], $headers))->get($uri);
+    }
+
+    /**
+     * 回應不帶任何 cookie，且這次請求沒有啟動 session（file driver 下就不會落 session 檔）。
+     */
+    private function assertStateless(\Illuminate\Testing\TestResponse $response): void {
+        $this->assertSame([], $response->headers->getCookies(), '圖磚回應不可帶 Set-Cookie');
+        $this->assertFalse($response->headers->has('Set-Cookie'), '圖磚回應不可帶 Set-Cookie');
+        // 不可用 session store 的 isStarted()：StartSession 在回應後 save()，save() 會把 started
+        // 設回 false，那個斷言恆真。StartSession 會把 session 掛到請求上，看請求才看得到。
+        $this->assertFalse(
+            $this->app['request']->hasSession(),
+            '圖磚請求不可啟動 session（file driver 下每次都會寫一個 session 檔）'
+        );
+        // 不可擋跨站載入：CORP 若是 same-origin／same-site，下游的 <img> 會被瀏覽器拒絕。
+        $this->assertFalse(
+            $response->headers->has('Cross-Origin-Resource-Policy'),
+            '圖磚回應不可帶擋跨站的 Cross-Origin-Resource-Policy'
+        );
+    }
+
+    public function testTileHitSetsNoCookie(): void {
+        $this->makeDirectionalFixture();
+
+        $response = $this->getTileCrossSite('/chgis-map/tiles/3/6/1');
+
+        $response->assertOk();
+        $this->assertSame($this->tileAtRow6, $response->getContent());
+        $this->assertStateless($response);
+    }
+
+    public function testTileNotModifiedSetsNoCookie(): void {
+        $this->makeDirectionalFixture();
+
+        $etag = $this->getTileCrossSite('/chgis-map/tiles/3/6/1')->headers->get('ETag');
+        $this->assertNotNull($etag);
+
+        $response = $this->getTileCrossSite('/chgis-map/tiles/3/6/1', ['If-None-Match' => $etag]);
+
+        $response->assertStatus(304);
+        $this->assertStateless($response);
+    }
+
+    public function testTransparentTileSetsNoCookie(): void {
+        $this->makeDirectionalFixture();
+
+        // miss、超出 zoom、超出座標範圍：三條透明磚路徑
+        foreach (['/chgis-map/tiles/3/0/0', '/chgis-map/tiles/2/1/1', '/chgis-map/tiles/3/8/1'] as $uri) {
+            $response = $this->getTileCrossSite($uri);
+
+            $response->assertOk();
+            $this->assertLessThan(200, strlen($response->getContent()), $uri);
+            $this->assertStateless($response);
+        }
+    }
+
+    public function testTileWhenBasemapMissingSetsNoCookie(): void {
+        // 503 走例外處理器渲染錯誤頁：沒有 session 也必須渲染得出來（不可變成 500），且不帶 cookie。
+        // 用 text/html 的 Accept 走 HTML 錯誤頁那條渲染路徑。
+        $response = $this->getTileCrossSite('/chgis-map/tiles/3/6/1', ['Accept' => 'text/html']);
+
+        $response->assertStatus(503);
+        $this->assertStateless($response);
+    }
+
+    public function testTileWithStaleSessionCookieDoesNotStartSession(): void {
+        // 同站（本站自己的地圖 modal）的請求會帶著本站的 session cookie；圖磚路由也不該讀它、
+        // 不該續期它（續期＝回 Set-Cookie）。
+        $this->makeDirectionalFixture();
+
+        $response = $this->withUnencryptedCookie(config('session.cookie'), str_repeat('a', 40))
+            ->withHeader('Accept', 'image/png')
+            ->get('/chgis-map/tiles/3/6/1');
+
+        $response->assertOk();
+        $this->assertStateless($response);
+    }
+
+    public function testWebGroupRouteStillSetsCookies(): void {
+        // 對照組：證明上面的斷言在這個測試環境裡抓得到 cookie（否則「沒有 cookie」可能只是
+        // 測試環境本來就不發 cookie）。status 刻意留在 web 群組。
+        $this->makeDirectionalFixture();
+
+        $response = $this->get('/chgis-map/status');
+
+        $response->assertOk();
+        $this->assertNotSame([], $response->headers->getCookies());
+        $this->assertTrue($this->app['request']->hasSession());
+    }
+
+    public function testTileWritesNoSessionFileUnderFileDriver(): void {
+        // prod 的實際失敗模式：SESSION_DRIVER=file 時每個跨站圖磚請求都落一個 session 檔。
+        // 這裡切到 file driver、指向空目錄，數檔案；status 是對照組（同一個設定下會寫檔）。
+        $this->makeDirectionalFixture();
+
+        $sessionDir = $this->dir . '/sessions';
+        @mkdir($sessionDir, 0775, true);
+        config(['session.driver' => 'file', 'session.files' => $sessionDir]);
+        $this->app['session']->forgetDrivers();
+
+        try {
+            for ($i = 0; $i < 3; $i++) {
+                $this->getTileCrossSite('/chgis-map/tiles/3/6/1')->assertOk();
+            }
+            $this->assertSame([], glob($sessionDir . '/*') ?: [], '圖磚請求不可寫 session 檔');
+
+            $this->get('/chgis-map/status')->assertOk();
+            $this->assertNotSame([], glob($sessionDir . '/*') ?: [], '對照組（web 群組）應寫出 session 檔');
+        } finally {
+            foreach (glob($sessionDir . '/*') ?: [] as $f) {
+                @unlink($f);
+            }
+            @rmdir($sessionDir);
+        }
+    }
+
+    public function testTileWithOversizedCoordinatesReturns404Not500(): void {
+        // 超出 PHP int 範圍的數字字串轉成 int 參數會 TypeError（500）；路由的位數上限讓它們回 404。
+        $this->makeDirectionalFixture();
+
+        foreach ([
+            '/chgis-map/tiles/3/99999999999999999999/1',
+            '/chgis-map/tiles/3/1/99999999999999999999',
+            '/chgis-map/tiles/999/1/1',
+        ] as $uri) {
+            $this->getTileCrossSite($uri)->assertNotFound();
+        }
+
+        // 位數上限之內的大數仍走控制器（超出 2^z−1 → 透明磚），不是 404。
+        $this->getTileCrossSite('/chgis-map/tiles/3/9999999999/1')->assertOk();
+        $this->getTileCrossSite('/chgis-map/tiles/99/1/1')->assertOk();
+    }
+
+    public function testTileRouteRunsNoWebGroupMiddleware(): void {
+        // 機制層的護欄：直接看路由實際會跑的 middleware，不依賴測試環境的 session driver。
+        // 在 route:cache 之下 excluded_middleware 一樣會序列化進快取，這個斷言對 prod 有效。
+        $route = app('router')->getRoutes()->getByName('chgis-map.tile');
+        $this->assertNotNull($route);
+
+        $middleware = app('router')->gatherRouteMiddleware($route);
+
+        foreach ([
+            \Illuminate\Session\Middleware\StartSession::class,
+            \App\Http\Middleware\EncryptCookies::class,
+            \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+            \App\Http\Middleware\VerifyCsrfToken::class,
+            \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+            \App\Http\Middleware\SetLocaleMiddleware::class,
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
+        ] as $class) {
+            $this->assertNotContains($class, $middleware, $class . ' 不可出現在圖磚路由上');
+        }
+
+        // 對照：同一個檔案裡的 status 路由仍有 StartSession，證明 gatherRouteMiddleware 有展開群組。
+        $status = app('router')->getRoutes()->getByName('chgis-map.status');
+        $this->assertContains(
+            \Illuminate\Session\Middleware\StartSession::class,
+            app('router')->gatherRouteMiddleware($status)
+        );
+    }
+
     // ---- status ----
 
     public function testStatusReadyWhenFilePresent(): void {

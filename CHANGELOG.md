@@ -4,6 +4,10 @@
 
 ## 2026-11
 
+### 🗺️ CHGIS 圖磚路由改為無狀態，供其他網站跨站載入
+- `chgis-map/tiles/{z}/{x}/{y}` 以 `->withoutMiddleware('web')` 排除整個 `web` 群組：不啟動 session、不寫 session 檔、回應不帶 `Set-Cookie`（原本跨站載入時每塊圖磚都各建一個 session 並回 session 與 `XSRF-TOKEN` cookie）。路徑、公開性、PNG／透明磚／503 與 `no-cache`＋`ETag` 快取語義不變；`status`／`map-points` 維持在 `web` 群組。
+- 這是 cbdb-qa-lab 對話內地圖顯示底圖的前提（該 repo TODO T-021）。部署後以 `curl -I` 確認沒有 `Set-Cookie`、沒有 `Cross-Origin-Resource-Policy`，下游再設定 `QA_CHGIS_TILE_ORIGIN`。見 `docs/CHGIS_MAP_PLACE_LINK.md` §5.1.1、`API.md` 14.9；外部網站的接入方式見 `docs/CHGIS_TILES_FOR_EXTERNAL_SITES.md`。
+
 ### 📚 v2 API 開放 `TEXT_INSTANCE_DATA`（文獻版本表）的新增與整列修改
 - 新增 `text-instance-data`（別名 `text_instance_data`／`text_instance` 等）的 `create`：三欄複合主鍵（`c_textid`、`c_text_edition_id`、`c_text_instance_id`）全由呼叫端給定、不配發；刪除仍全面停用。
 - `update` 白名單由 3 欄（`c_instance_title`／`c_pub_year`／`c_publisher`）擴到與 create 相同的 24 個非主鍵欄（`CodeTableWriteConfigDriftTest` 機械把關兩端一致）；與 `text-entity` 聚合並存。

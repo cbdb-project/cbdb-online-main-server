@@ -1733,7 +1733,7 @@ v2 提案流程上線前的舊機制，仍在線但**建議一律改用 `/api/v2
 | GET | `/app/basicinformation/{id}/summary` | 人物摘要 JSON |
 | GET | `/app/basicinformation/{id}/tabs/{tabKey}` | 人物詳情分頁資料 JSON |
 | GET | `/basicinformation/{id}/map-points` | 人物地點座標 JSON |
-| GET | `/chgis-map/status`、`/chgis-map/tiles/{z}/{x}/{y}` | CHGIS 底圖狀態與圖磚 |
+| GET | `/chgis-map/status`、`/chgis-map/tiles/{z}/{x}/{y}` | CHGIS 底圖狀態與圖磚。**圖磚端點不使用 session、回應不帶 `Set-Cookie`**，可由其他網站跨站直接載入（`<img>`／Leaflet tile layer）；回 PNG，超出範圍或未命中回 1×1 透明 PNG，底圖未就緒回 503；`Cache-Control: public, no-cache` 搭配 `ETag` 驗證。已有下游依賴這個端點的路徑與無狀態性（見 `docs/CHGIS_MAP_PLACE_LINK.md` §5.1.1）。外部網站接入方式見 [`docs/CHGIS_TILES_FOR_EXTERNAL_SITES.md`](./docs/CHGIS_TILES_FOR_EXTERNAL_SITES.md) |
 | GET | `/metrics` | Prometheus 指標 |
 | GET | `/sanctum/csrf-cookie` | 取得 CSRF cookie。**只有 cookie-based（session）客戶端需要**；用 Bearer token 呼叫 `/api/v2/*` 不需要它 |
 

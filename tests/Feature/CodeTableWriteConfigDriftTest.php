@@ -319,6 +319,35 @@ class CodeTableWriteConfigDriftTest extends TestCase {
     }
 
     /**
+     * 每張可經 v2 寫入的代碼表都會產生 operations 列，而「還原」按鈕的顯示條件
+     * （admin ＋ opType 3/4 ＋ can_compare）**不看** `OperationsController::resourceKeyColumns()`。
+     * 漏登錄的症狀是按鈕出現、按下去卻 `restore_no_pk`——而 handler 與上面那條 SCHEMAS 檢查
+     * 都不會發現（那是第三份手抄的主鍵清單）。這份 map 以實際表名字面值查鍵、不做大小寫正規化，
+     * 所以這裡也用 config 的 `table` 原字串去查。
+     */
+    #[Test]
+    public function every_code_table_is_registered_for_operations_restore(): void {
+        $controller = new \ReflectionClass(\App\Http\Controllers\OperationsController::class);
+        $method = $controller->getMethod('resourceKeyColumns');
+        $method->setAccessible(true);
+        $instance = $controller->newInstanceWithoutConstructor();
+
+        $problems = [];
+        $definitions = array_merge(
+            array_values((array) config('code_table_writes.tables', [])),
+            array_values((array) config('code_table_mutations.tables', []))
+        );
+        foreach ($definitions as $def) {
+            $table = $def['table'];
+            if ($method->invoke($instance, $table) !== (array) ($def['key_columns'] ?? [])) {
+                $problems[$table] = $table . '：OperationsController::resourceKeyColumns() 未登錄或與 key_columns 不一致';
+            }
+        }
+
+        $this->assertSame([], array_values($problems), implode("\n", $problems));
+    }
+
+    /**
      * @param array<mixed> $definitions
      * @return array<string,array<string,mixed>> 表名 => 定義
      */

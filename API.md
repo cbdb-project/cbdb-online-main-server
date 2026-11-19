@@ -464,13 +464,13 @@ CBDB 子資源表幾乎都是複合主鍵，且不使用 Eloquent 主鍵行為�
 | sources | **create／update 只接受 `sources`**；delete 另接受 source, biog_source_data | BIOG_SOURCE_DATA | ✔ | ✔ | ✔ |
 | merged-person | merged_person, merged_person_data, mergedperson | MERGED_PERSON_DATA | ✔ | ✘ | ✔ |
 | 可修改的代碼表（nianhao、office_codes、dynasties…） | 見〈代碼表與複合實體寫入〉 | 各代碼表 | ✘（501） | ✔ | ✘（501） |
-| 可新增的代碼表（text-codes、text-instance-data、char-variant-map、addr-codes、addr-belongs-data、admin-cat-codes、office-type-tree） | 逐操作不同，見〈代碼表與複合實體寫入〉 | TEXT_CODES、TEXT_INSTANCE_DATA、char_variant_map、ADDR_CODES、ADDR_BELONGS_DATA、ADMIN_CAT_CODES、OFFICE_TYPE_TREE | 僅 direct | ✔ | ✘（403，已停用） |
+| 可新增的代碼表（text-codes、text-instance-data、char-variant-map、addr-codes、addr-belongs-data、admin-cat-codes、office-type-tree、entry-codes） | 逐操作不同，見〈代碼表與複合實體寫入〉 | TEXT_CODES、TEXT_INSTANCE_DATA、char_variant_map、ADDR_CODES、ADDR_BELONGS_DATA、ADMIN_CAT_CODES、OFFICE_TYPE_TREE、ENTRY_CODES | 僅 direct | ✔ | ✘（403，已停用） |
 | office、social-institution、text-entity（複合實體聚合） | 見〈代碼表與複合實體寫入〉 | 多表聚合 | ✔ | ✔ | ✔ |
 
 - 表中 `✔` 表示 `direct` 與 `proposal` 兩種模式都支援。
 - 人物主檔（basicinformation）的 `create` 與 `delete` **不支援 proposal**，會回 501 `mode: ["proposal_not_supported"]`；`update` 則兩種模式都支援。
 - 人物主檔的 `delete` 是**軟刪除**：把 `c_name_chn` 改為 `<待删除>`（UPDATE，不是真的 DELETE，也不觸發外鍵連鎖），並記一筆 `op_type=4` 的 operation。
-- 代碼表分兩組：**只能改**的一組（`config/code_table_mutations.php`，如 nianhao、office_codes、dynasties、choronym_codes、ganzhi_codes 等）送 `create`／`delete` 會回 501；**可新增**的一組是 `TEXT_CODES`、`char_variant_map`、`ADDR_CODES`、`ADDR_BELONGS_DATA`、`ADMIN_CAT_CODES` 與 `OFFICE_TYPE_TREE`（`config/code_table_writes.php`）。代碼表的 `delete` 一律不開放——受支援的六張表回 **403**（防止級聯刪除人物資料），其餘代碼表回 501。
+- 代碼表分兩組：**只能改**的一組（`config/code_table_mutations.php`，如 nianhao、office_codes、dynasties、choronym_codes、ganzhi_codes 等）送 `create`／`delete` 會回 501；**可新增**的一組是 `TEXT_CODES`、`TEXT_INSTANCE_DATA`、`char_variant_map`、`ADDR_CODES`、`ADDR_BELONGS_DATA`、`ADMIN_CAT_CODES`、`OFFICE_TYPE_TREE` 與 `ENTRY_CODES`（`config/code_table_writes.php`）。代碼表的 `delete` 一律不開放——可新增的這八張表回 **403**（防止級聯刪除人物資料），其餘代碼表回 501。
 - 不支援的 `resource` / `mode` / `operation` 組合一律回 **501**：`{"ok":false,"message":"目前尚未支援此變更模式","errors":{"resource":"...","mode":"...","operation":"..."}}`。
 
 各資源的欄位白名單、必填規則與範例見〈各資源欄位參考〉。
@@ -1411,6 +1411,7 @@ Authorization: Bearer <token>
 | addr_codes | addr-codes, addrcodes | ADDR_CODES | c_addr_id | c_name, c_name_chn, c_alt_names, c_firstyear, c_lastyear, c_admin_type, c_admin_cat_code, x_coord, y_coord, CHGIS_PT_ID, c_notes |
 | addr_belongs_data | addr-belongs-data, addr_belongs, addr-belongs | ADDR_BELONGS_DATA | c_addr_id, c_belongs_to, c_firstyear, c_lastyear | c_source, c_pages, c_notes |
 | office_type_tree | office-type-tree, officetypetree | OFFICE_TYPE_TREE | c_office_type_node_id | c_office_type_desc, c_office_type_desc_chn, c_parent_id |
+| entry_codes | entry-codes, entrycodes | ENTRY_CODES | c_entry_code | c_entry_desc, c_entry_desc_chn |
 | char_variant_map | char-variant-map, charvariantmap | char_variant_map | id | c_variant_char, c_reference_char, c_strict_excluded, c_notes |
 
 規則：
@@ -1431,7 +1432,7 @@ Authorization: Bearer <token>
   - **不受 255 上限**：`ADDR_CODES.c_notes`、`ADMIN_CAT_CODES.c_notes`、`TEXT_INSTANCE_DATA.c_notes`（實際型別是 longtext）。13.2 的 create 另有 `TEXT_CODES.c_notes`——該欄只能新增時寫，不在本節的 update 白名單內。
   - **整數欄也收「小數部分為 0 的浮點數」**（`1200.0` → `1200`）：不少 JSON 序列化器就是這樣送整數的。真的帶小數時回 422，不會靜默截斷。create 與 update 兩端一致。
   - **文字欄收到 JSON 數字時，只有 `create` 會轉成字串**（`"c_pages": 12` → `"12"`，等同資料庫原本的隱式轉型）；`update` 一律回 422。這是刻意的不對稱：create 在加上型別校驗之前完全沒有檢查，改判 422 會打斷既有客戶端；update 從第一天就要求字串。**要送 update 請自己加引號。**
-  - **不可為 `null`**：資料庫 NOT NULL 的欄，訊息 `<欄名> 不可為空`。數值型的（`ADDR_CODES.c_admin_cat_code`、`char_variant_map.c_strict_excluded`）連空字串也拒絕，整個不送則吃資料庫預設值；文字型的（`TEXT_BIBLCAT_CODES.c_text_cat_pinyin`、`GANZHI_CODES.c_ganzhi_py`、`SOCIAL_INSTITUTION_NAME_CODES.c_inst_name_py`、`char_variant_map.c_variant_char`／`c_reference_char`）**允許送空字串**——那些欄是 `NOT NULL DEFAULT ''`，`''` 就是它們清空的合法寫法。
+  - **不可為 `null`**：資料庫 NOT NULL 的欄，訊息 `<欄名> 不可為空`。數值型的（`ADDR_CODES.c_admin_cat_code`、`char_variant_map.c_strict_excluded`）連空字串也拒絕，整個不送則吃資料庫預設值；文字型的（`TEXT_BIBLCAT_CODES.c_text_cat_pinyin`、`GANZHI_CODES.c_ganzhi_py`、`SOCIAL_INSTITUTION_NAME_CODES.c_inst_name_py`、`char_variant_map.c_variant_char`／`c_reference_char`、`ENTRY_CODES.c_entry_desc`／`c_entry_desc_chn`）**照本文件建議帶 `Content-Type: application/json` 送空字串同樣回 422**：第四章所述的全域中間件會先把 `""` 轉成 `null`（只送空白的字串也一樣，先被修剪成 `""`；與上面「可為 null 的數值欄送空字串＝清空」是同一個機制），所以這些欄實務上**無法經 API 清空**。新增 `ENTRY_CODES` 時整個不送某個名稱欄，才會吃資料庫預設值 `''`；`char_variant_map` 的兩欄**沒有預設值**，新增時兩欄都必須給值。（本文件先前寫「允許送空字串」，與實際行為不符，已更正。不帶 JSON Content-Type 時中間件不處理 JSON body，`""` 會原樣抵達並被接受——那是未定義的用法，請勿依賴。）
 - 純拼音欄位在保存時會**靜默**把 `v` 正規化為 `ü`（`create` 與 `update` 兩端一致）（只轉「`l`／`n` 之後、且後面不接 `a`／`i`／`o`／`u`」的 `v`，例如 `lv`→`lü`、`nv`→`nü`）。可能含西文的混合欄不做這個轉換——注意這是**逐表逐欄**登記的，同一個欄名在不同表可能不同：`ETHNICITY_TRIBE_CODES.c_name` 與 `TEXT_CODES.c_title` 會轉，`ADDR_CODES.c_name`、`DYNASTIES.c_dynasty`、`CHORONYM_CODES.c_choronym_desc`、`ETHNICITY_TRIBE_CODES.c_romanized` 不轉。
 - **`v→ü` 正規化發生在「有沒有變更」的判斷之前**：若庫內已是 `lü` 而你送 `lv`，兩者正規化後相同，會得到 422 `changes: no_effective_changes`。這不是 bug。
 - 改後的值與其他列的唯一鍵衝突 → 409 `changes: conflict`。
@@ -1444,7 +1445,7 @@ Authorization: Bearer <token>
 
 ### 13.2 可新增的代碼表（只支援 `create`、只支援 `direct`）
 
-目前開放新增的有七張表：
+目前開放新增的有八張表：
 
 > **`text-instance-data` 與 `text-entity` 聚合的關係**：聚合更新（13.4）會以「送來的版本集合」對賬整個文獻的 `TEXT_INSTANCE_DATA`——表單載入後才經本入口新增的版本列，會被下一次聚合更新視為「不在集合內」而刪除；反之聚合不會動本入口寫入的、聚合不認得的欄位（如 `c_print`）。同一文獻請擇一路徑維護版本列。create 回應的 `resource` 是 `text-instance-data`，update 回應是 `text_instance_data`（各表同一慣例）。
 
@@ -1459,6 +1460,7 @@ Authorization: Bearer <token>
 | text-instance-data | text_instance_data, textinstancedata, text-instance, text_instance | TEXT_INSTANCE_DATA | c_textid, c_text_edition_id, c_text_instance_id（**三欄都必填、不配發**） | c_instance_title_chn, c_instance_title, c_instance_title_trans, c_part_of_instance, c_part_of_instance_notes, c_pub_country, c_pub_dy, c_pub_year, c_pub_nh_code, c_pub_nh_year, c_pub_range_code, c_pub_loc, c_publisher, c_print, c_pub_notes, c_source, c_pages, c_extant, c_url_api, c_url_homepage, c_notes, c_number, c_counter, c_title_alt_chn |
 | admin-cat-codes | admin_cat_codes, admin-cat, admin_cat | ADMIN_CAT_CODES | c_admin_cat_code（可自動配發） | c_admin_cat_py, c_admin_cat_hz, c_admin_cat_trans, c_notes |
 | office-type-tree | office_type_tree, officetypetree | OFFICE_TYPE_TREE | c_office_type_node_id（**文本主鍵、必填、不配發**） | c_office_type_desc, c_office_type_desc_chn, c_parent_id |
+| entry-codes | entry_codes, entrycodes | ENTRY_CODES | c_entry_code（可自動配發；smallint） | c_entry_desc, c_entry_desc_chn |
 
 - 主鍵可放在 `target.pk` 或 `changes`；**單一主鍵的表在兩處都沒給值時，由伺服器以 `max(主鍵)+1` 自動配發**。但 `target` 這個鍵本身仍必須存在——請送 `"target": {"pk": {}}`，完全省略會被控制器層 422 擋下。
 - **複合主鍵的表（`addr-belongs-data`、`text-instance-data`）沒有自動配發**：全部主鍵欄（前者四欄、後者三欄）一個都不能少，缺哪一欄就回 422 `target.pk.<欄名>: ["required"]`。
@@ -1466,6 +1468,7 @@ Authorization: Bearer <token>
 - 主鍵值必須是整數（或可解析為整數的字串），否則 422 `target.pk.<欄名>: ["numeric"]`——不會靜默轉成 `0`；超出 PHP 整數精度的字串同樣回 `numeric`（`(int)` 會飽和成最大值而非報錯）。
 - 文本主鍵送非字串／非整數回 422 `target.pk.<欄名>: ["string"]`（`create` 與 `update` 兩端都是）。
 - 主鍵值也受**值域檢查**（依該欄實際型別），超出回 422 `target.pk.<欄名>: ["out_of_range:<min>..<max>"]`。非 strict sql_mode 下不擋的話，`ADDR_BELONGS_DATA.c_firstyear`（smallint）收到 40000 會被截斷成 32767——那一列就被建在**你沒有指定的主鍵**上，回應顯示 40000、實際存 32767，之後照回應的鍵去改或刪一律 404。
+- **自動配發也受同一個值域約束**：若現有最大主鍵已等於欄位型別上限（例如 smallint 的 `ENTRY_CODES.c_entry_code` 已有 32767），`max(主鍵)+1` 會超出值域，回 422 `target.pk.<欄名>: ["auto_assign_exhausted:<min>..<max>"]`、不寫入任何資料。此時請在 `target.pk` 明確指定一個未使用的代碼（區間中段可能還有空號）。
 - 顯式指定且已存在 → 409 `target.pk: conflict`；並發撞號 → 409（訊息會提示重試）。**非主鍵的唯一鍵撞值時也回 409**，而 `errors` 仍是 `target.pk: conflict`（例如 `char_variant_map.c_variant_char` 重複）。
 - 白名單外欄位 → 422，`errors.changes` 是單一字串 `"disallowed_fields: c_xxx"`（稽核欄 `c_created_by` 等也在白名單外，不可自行指定署名）。
 - 欄位型別／長度／NOT NULL 的校驗規則與 13.1 完全相同（同一份登記、同一套判定），唯一的差異是文字欄收到 JSON 數字時 create 會轉成字串、update 會 422（見 13.1 的說明）。
@@ -1477,8 +1480,9 @@ Authorization: Bearer <token>
 - 只支援 `mode=direct`；送 `mode=proposal` 會得到 **501**（找不到 handler），不是 403。注意這與 13.1 的 `update` 不對稱：**代碼表可以提案修改、但不能提案新增**，眾包帳號只能改不能增。
 - 回應：`result.pk`、`result.status: "created"`、`result.operation_id`、`result.row`；**表有稽核欄時**系統會蓋 `c_created_by`／`c_created_date`。多數代碼表（含 `ADMIN_CAT_CODES`）沒有那組欄位，此時不蓋——操作者與時間仍完整記在 `operations` 與 `audit_log`。
 - 可以放進 `batch_mutate` 一起送。
-- **本節這六張表沒有 `/api/v2/read` 定義**（代碼表中只有 `nianhao` 有）：新增後要拿到伺服器配發的主鍵，直接看回應的 `result.pk` 與 `result.row`（整列都在裡面）。
-- **新增前請自行查重**：本節的表都沒有「同名就重用」的邏輯，也沒有 read 端點可查——`ADMIN_CAT_CODES.c_admin_cat_hz` 之類的名稱欄**沒有唯一鍵**（現庫本來就有同名的類別），送兩次就是兩列。批次匯入前請先用 `/codes` 或 Query Playground 把既有代碼查出來，否則 `ADDR_CODES.c_admin_cat_code` 會分散指向兩個同義類別。
+- **本節的表都沒有 `/api/v2/read` 定義**（代碼表中只有 `nianhao` 有）：新增後要拿到伺服器配發的主鍵，直接看回應的 `result.pk` 與 `result.row`（整列都在裡面）。
+- **新增前請自行查重**：本節的表都沒有「同名就重用」的邏輯，也沒有 read 端點可查——`ADMIN_CAT_CODES.c_admin_cat_hz` 之類的名稱欄**沒有唯一鍵**（現庫本來就有同名的類別），送兩次就是兩列。批次匯入前請先用 `/codes` 或 Query Playground 把既有代碼查出來，否則 `ADDR_CODES.c_admin_cat_code` 會分散指向兩個同義類別。`ENTRY_CODES` 同理：`c_entry_desc_chn` 沒有唯一鍵，同名的入仕途徑送兩次就是兩個代碼，之後 `ENTRY_DATA.c_entry_code` 會分散指向兩者。
+- **`entry-codes`**：自動配發的代碼一律落在現有最大碼之後（`max(0, 現有最大碼)+1`）；CBDB 的入仕途徑碼習慣按類別分段，若要放進特定區段請在 `target.pk` 明確指定。別名刻意不含 `entry`／`entries`／`entry_data`——那些是人物子資源 `ENTRY_DATA`（人物的入仕記錄）。新代碼與入仕類型的關聯（`ENTRY_CODE_TYPE_REL`）**不在** API 範圍內，目前仍需經 `/codes` UI 建立。
 - **地名相關**：`ADDRESSES` 是由 `ADDR_CODES` + `ADDR_BELONGS_DATA` 派生的反正規化快取表，只由 `php artisan cbdb:regenerate-addresses-table` 重建。經本 API 新增的地名，在重建之前不會出現在依賴該快取的功能（官職地點自動填表、朝代同名地消歧、部分自然語言查詢）。批次匯入地名後請安排重建。
 - `TEXT_CODES` 的新增與修改是**兩份不同的定義**，別名清單不對稱：`create` 接受 `text-codes`／`text_codes`／`textcodes`，而 `update` **只接受 `text_codes`**（送 `text-codes` 做 update 會 501）。最保險是 create 用 `text-codes`、update 用 `text_codes`。
 
@@ -1486,7 +1490,7 @@ Authorization: Bearer <token>
 
 代碼表被大量人物資料以外鍵引用，刪一列可能影響數萬筆記錄且難以乾淨復原，因此刪除**已停用**：
 
-- 上述六張支援寫入的表、且 `mode=direct` → **403**（`代碼表刪除已停用（防止級聯刪除人物資料）`）
+- 13.2 那八張可新增的表、且 `mode=direct` → **403**（`代碼表刪除已停用（防止級聯刪除人物資料）`）
 - 其他代碼表，或 `mode=proposal` → **501**（找不到對應 handler）
 
 ### 13.4 複合實體聚合：office、social-institution 與 text-entity

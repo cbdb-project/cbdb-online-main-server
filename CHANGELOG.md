@@ -4,6 +4,14 @@
 
 ## 2026-11
 
+### 🎓 v2 API 開放 `ENTRY_CODES`（入仕途徑代碼）的新增與修改
+- **回報**：下游錄入代理要新增三個入仕途徑（經明行修、稅戶人才、懷才抱德），但沒有任何 token API 能新建 `ENTRY_CODES`——`/api/v2/create` 回 501、update 端也沒有登錄，唯一入口是 `/codes` UI（session＋CSRF）。
+- 新增 `entry-codes`（別名 `entry_codes`／`entrycodes`；刻意避開人物子資源 `ENTRY_DATA` 的 `entry`／`entries`／`entry_data`）：`create` 主鍵 `c_entry_code` 可自動配發或指定，只支援 `direct`；`update` 可 direct 或提案；白名單 `c_entry_desc`、`c_entry_desc_chn`。兩欄 `NOT NULL DEFAULT ''`，送 `null` 回 422；以 JSON Content-Type 送 `""` 也回 422（全域中間件先轉成 `null`）。刪除維持停用（403）。異體字落地替換、operations＋audit_log 由既有基底自動生效；拼音 tier 皆空（英文描述不做 v→ü）。主鍵同步登錄 `CompositePrimaryKey::SCHEMAS` 與 `OperationsController::resourceKeyColumns()`，連帶讓 `/codes` 既有編輯紀錄可以還原。
+- **代碼表自動配發補上值域檢查**：`max(主鍵)+1` 原本不經值域守衛，現有最大碼若已到欄位型別上限（smallint 32767），非 strict 的 MariaDB 會把新值截斷回 32767、撞號回「並發衝突，請重試」而重試永遠一樣。現在回 422 `target.pk.<欄名>: ["auto_assign_exhausted:<min>..<max>"]`，請呼叫端指定空號。適用所有可自動配發的代碼表。
+- **護欄**：`CodeTableWriteConfigDriftTest` 新增一條——兩份代碼表 config 的每張表都必須登錄在 `OperationsController::resourceKeyColumns()`（漏登錄的症狀是還原按鈕出現、按下去卻 `restore_no_pk`，原本沒有任何測試會發現）。
+- **API.md 更正**：原寫「文字型 NOT NULL 欄允許送空字串」與實際行為不符——帶 `Content-Type: application/json` 時全域 `ConvertEmptyStringsToNull` 會先把 `""` 轉成 `null`，所以這些欄實務上無法經 API 清空、送 `""` 回 422；同段另更正 `char_variant_map` 兩欄沒有預設值、新增時必填。
+- 計畫：`docs/ENTRY_CODES_V2_WRITE_PLAN.md`；測試 `ApiV2MutateEntryCodesTest`。
+
 ### 🗺️ CHGIS 圖磚路由改為無狀態，供其他網站跨站載入
 - `chgis-map/tiles/{z}/{x}/{y}` 以 `->withoutMiddleware('web')` 排除整個 `web` 群組：不啟動 session、不寫 session 檔、回應不帶 `Set-Cookie`（原本跨站載入時每塊圖磚都各建一個 session 並回 session 與 `XSRF-TOKEN` cookie）。路徑、公開性、PNG／透明磚／503 與 `no-cache`＋`ETag` 快取語義不變；`status`／`map-points` 維持在 `web` 群組。
 - 這是 cbdb-qa-lab 對話內地圖顯示底圖的前提（該 repo TODO T-021）。部署後以 `curl -I` 確認沒有 `Set-Cookie`、沒有 `Cross-Origin-Resource-Policy`，下游再設定 `QA_CHGIS_TILE_ORIGIN`。見 `docs/CHGIS_MAP_PLACE_LINK.md` §5.1.1、`API.md` 14.9；外部網站的接入方式見 `docs/CHGIS_TILES_FOR_EXTERNAL_SITES.md`。

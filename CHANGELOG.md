@@ -4,6 +4,15 @@
 
 ## 2026-11
 
+### 🔗 v2 API 開放 `ENTRY_CODE_TYPE_REL`（入仕途徑↔類型關聯）的新增、刪除與讀回
+- **回報**：新的入仕途徑已能經 `entry-codes` 建立，但要掛到入仕類型（`ENTRY_TYPES`，如 `"08"`）上仍只能走 `/codes` UI。
+- 新增 `entry-code-type-rel`（別名 `entry_code_type_rel`／`entrycodetyperel`）：`create` 兩欄主鍵（`c_entry_code`、文本 `c_entry_type`）都必填、不配發，`"08"` 原樣落庫；無其他欄、不開 `update`。落庫前檢查兩個參照都存在，不存在回 422 `target.pk.<欄>: ["not_found:<表>"]`；文本參照要與被參照列**完全相同**（prod 的 general_ci 不分大小寫，外鍵會放行寫法不同的值）。
+- **第一張可刪除的代碼表**：`/api/v2/delete` 對本表開放（direct），其他代碼表維持 403。理由：全庫沒有外鍵引用本表，掛錯的關聯要能撤掉。新 config 鍵 `allow_delete`（預設 false）；`CodeTableWriteConfigDriftTest` 以 migration schema 的實際外鍵鎖住「沒有人引用」這個前提。刪除路徑一併補強：主鍵格式校驗（不再 `(int) 'abc'` 變 0）、文本主鍵精確比對、交易內刪除列數不是 1 即回滾、1451／鎖衝突轉 409；回應帶被刪列 `row`；可由 operations 還原。
+- `/api/v2/get` 支援本資源（`c_entry_type` 必須是字串且精確比對：MariaDB 下 `'08' = 8` 為真，不擋的話 get 200 而 delete 404）。
+- 新 config 鍵 `key_references`（create 端通用的參照存在性檢查），drift 測試把關它只能指向可寫欄、被參照欄須存在。
+- 關聯變更不會即時重算 `BIOG_MAIN.c_index_year`，要等下次 `cbdb:rebuild-index-year`。
+- 計畫：`docs/ENTRY_CODE_TYPE_REL_V2_WRITE_PLAN.md`；API.md 13.2a／13.3、〈讀取單列〉注 4；測試 `ApiV2MutateEntryCodeTypeRelTest`。
+
 ### 🎓 v2 API 開放 `ENTRY_CODES`（入仕途徑代碼）的新增與修改
 - **回報**：下游錄入代理要新增三個入仕途徑（經明行修、稅戶人才、懷才抱德），但沒有任何 token API 能新建 `ENTRY_CODES`——`/api/v2/create` 回 501、update 端也沒有登錄，唯一入口是 `/codes` UI（session＋CSRF）。
 - 新增 `entry-codes`（別名 `entry_codes`／`entrycodes`；刻意避開人物子資源 `ENTRY_DATA` 的 `entry`／`entries`／`entry_data`）：`create` 主鍵 `c_entry_code` 可自動配發或指定，只支援 `direct`；`update` 可 direct 或提案；白名單 `c_entry_desc`、`c_entry_desc_chn`。兩欄 `NOT NULL DEFAULT ''`，送 `null` 回 422；以 JSON Content-Type 送 `""` 也回 422（全域中間件先轉成 `null`）。刪除維持停用（403）。異體字落地替換、operations＋audit_log 由既有基底自動生效；拼音 tier 皆空（英文描述不做 v→ü）。主鍵同步登錄 `CompositePrimaryKey::SCHEMAS` 與 `OperationsController::resourceKeyColumns()`，連帶讓 `/codes` 既有編輯紀錄可以還原。

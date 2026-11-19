@@ -348,6 +348,73 @@ class CodeTableWriteConfigDriftTest extends TestCase {
     }
 
     /**
+     * `key_references` 的每一項都必須指向本表的主鍵欄或白名單欄（否則 handler 不會拿到那個值、
+     * 檢查靜默不生效），而被參照的表與欄必須真的存在（否則每一筆新增都會被 422 擋下）。
+     */
+    #[Test]
+    public function key_references_point_from_writable_columns_to_existing_columns(): void {
+        $problems = [];
+        $checked = 0;
+
+        foreach (config('code_table_writes.tables', []) as $def) {
+            $table = $def['table'];
+            $writable = array_merge((array) ($def['key_columns'] ?? []), (array) ($def['allowed_fields'] ?? []));
+            foreach ((array) ($def['key_references'] ?? []) as $column => $reference) {
+                $checked++;
+                if (!in_array($column, $writable, true)) {
+                    $problems[] = "{$table}.{$column}：登記在 key_references，但不在 key_columns／allowed_fields（檢查不會生效）";
+                }
+                $refTable = (string) ($reference['table'] ?? '');
+                $refColumn = (string) ($reference['column'] ?? '');
+                if ($refTable === '' || $refColumn === '') {
+                    $problems[] = "{$table}.{$column}：key_references 缺 table 或 column";
+
+                    continue;
+                }
+                if (!Schema::hasTable($refTable) || !isset($this->columnTypes($refTable)[strtolower($refColumn)])) {
+                    $problems[] = "{$table}.{$column}：被參照的 {$refTable}.{$refColumn} 不存在於 migration schema";
+                }
+            }
+        }
+
+        $this->assertGreaterThan(0, $checked, '沒有任何 key_references 登記——掃描邏輯壞了');
+        $this->assertSame([], $problems, implode("\n", $problems));
+    }
+
+    /**
+     * 代碼表刪除預設停用，理由是「碼表被人物資料以外鍵引用」。`allow_delete: true` 只給
+     * **全庫沒有任何外鍵引用它**的表——這裡用 migration schema 的實際外鍵把那個前提鎖住：
+     * 哪天有人建了一張引用它的表，這條會紅，而不是讓刪除 API 開始撞 1451（或在沒有外鍵的
+     * 環境裡留下孤兒列）。
+     */
+    #[Test]
+    public function tables_open_for_delete_are_not_referenced_by_any_foreign_key(): void {
+        $deletable = [];
+        foreach (config('code_table_writes.tables', []) as $def) {
+            if (!empty($def['allow_delete'])) {
+                $deletable[strtoupper($def['table'])] = $def['table'];
+            }
+        }
+        $this->assertNotEmpty($deletable, '沒有任何表開放刪除——若是刻意全部關閉，請刪掉本測試');
+
+        $problems = [];
+        $foreignKeysSeen = 0;
+        foreach (Schema::getTableListing(schemaQualified: false) as $table) {
+            foreach (Schema::getForeignKeys($table) as $fk) {
+                $foreignKeysSeen++;
+                $target = strtoupper((string) ($fk['foreign_table'] ?? ''));
+                if (isset($deletable[$target]) && strtoupper($table) !== $target) {
+                    $problems[] = "{$table}（" . implode(',', (array) $fk['columns']) . "）以外鍵引用 {$deletable[$target]}，該表不可開放刪除";
+                }
+            }
+        }
+
+        // 掃描健全性：schema 裡要看得到外鍵，否則「沒有人引用」只是因為什麼都沒讀到。
+        $this->assertGreaterThan(0, $foreignKeysSeen, 'migration schema 裡讀不到任何外鍵——掃描邏輯壞了');
+        $this->assertSame([], $problems, implode("\n", $problems));
+    }
+
+    /**
      * @param array<mixed> $definitions
      * @return array<string,array<string,mixed>> 表名 => 定義
      */

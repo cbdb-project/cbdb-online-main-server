@@ -210,6 +210,13 @@ class CompositePrimaryKey {
         'ENTRY_CODES' => [
             'c_entry_code',
         ],
+        // 入仕途徑↔類型關聯。順序須與資料庫 PRIMARY KEY (c_entry_code, c_entry_type)、
+        // OperationsController::resourceKeyColumns() 及 config 的 key_columns 一致
+        // （docs/ENTRY_CODE_TYPE_REL_V2_WRITE_PLAN.md D-7）。c_entry_type 是文本（'08'）。
+        'ENTRY_CODE_TYPE_REL' => [
+            'c_entry_code',
+            'c_entry_type',
+        ],
         'CHAR_VARIANT_MAP' => [
             'id',
         ],

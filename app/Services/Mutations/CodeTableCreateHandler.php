@@ -214,6 +214,23 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
             $explicitPk = [];
         }
 
+        // 主鍵欄的參照存在性（config key_references）：排在重複檢查之前——指向不存在代碼的
+        // 請求，先告訴呼叫端輸入錯在哪一欄，而不是回一個「已存在」或不指名的外鍵違反。
+        // 主鍵欄不在落地替換範圍內（上面 fail-closed 檢查過），所以這裡驗的就是最終落庫值。
+        $references = (array) ($def['key_references'] ?? []);
+        $missingPkRefs = $this->findMissingReferences(
+            array_intersect_key($explicitPk, $references),
+            $references
+        );
+        if (!empty($missingPkRefs)) {
+            $errors = [];
+            foreach ($missingPkRefs as $col => $refTable) {
+                $errors['target.pk.' . $col] = ['not_found:' . $refTable];
+            }
+
+            return $this->errorResponse('參照的代碼不存在：' . implode('、', array_keys($missingPkRefs)), 422, $errors);
+        }
+
         // 顯式主鍵：先擋重複（TOCTOU 由交易內唯一鍵兜底）。
         if (!empty($explicitPk) && $this->whereByPk(DB::table($table), $explicitPk)->exists()) {
             return $this->errorResponse('目標主鍵已存在', 409, ['target.pk' => ['conflict']]);
@@ -314,6 +331,21 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
         // 第二個參數**必須顯式傳**：本類別沒有 tableName()，省略會 fallback 到不存在的
         // 方法而在 runtime 炸掉（不是靜態錯誤）。
         $row = $this->applyVariantReplacement($row, $table);
+
+        // 非主鍵欄的參照存在性：必須排在落地替換**之後**（AGENTS §1.3：查表鍵要用落庫值），
+        // 也因此回應要掛上替換通知。null 表示「不參照任何列」，不檢查。
+        $missingFieldRefs = $this->findMissingReferences(
+            array_filter(array_intersect_key($row, $references), static fn ($v) => $v !== null),
+            $references
+        );
+        if (!empty($missingFieldRefs)) {
+            $errors = [];
+            foreach ($missingFieldRefs as $col => $refTable) {
+                $errors['changes.' . $col] = ['not_found:' . $refTable];
+            }
+
+            return $this->withWriteNotices($this->errorResponse('參照的代碼不存在：' . implode('、', array_keys($missingFieldRefs)), 422, $errors));
+        }
 
         $operationId = (string) Str::ulid();
         $operation = null;
@@ -460,6 +492,48 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
                 'row' => $insertedArray,
             ],
         ]));
+    }
+
+    /**
+     * 逐欄確認被參照列存在（config `key_references`）。
+     *
+     * 文本欄要求與被參照列的實際值**精確相等**：prod 是 utf8mb4_general_ci（不分大小寫、
+     * PAD SPACE），SQL 比較下 `'XA'` 等於 `'xa'`、`'08 '` 等於 `'08'`，外鍵也放行，於是會建出
+     * 一列鍵值與被參照列不同形的關聯。所以取回實際值，用 PHP 嚴格比較。（經 HTTP 進來的
+     * 前後空白已先被全域 TrimStrings 修掉，實際走得到的是大小寫那一半。）
+     *
+     * @param array<string,mixed> $values 欄名 => 要落庫的值
+     * @param array<string,array{table:string,column:string}> $references
+     * @return array<string,string> 找不到參照的欄名 => 被參照表
+     */
+    protected function findMissingReferences(array $values, array $references): array {
+        $missing = [];
+        foreach ($values as $col => $value) {
+            $refTable = (string) ($references[$col]['table'] ?? '');
+            $refColumn = (string) ($references[$col]['column'] ?? '');
+            if ($refTable === '' || $refColumn === '') {
+                // 設定錯誤：寧可擋下也不要當作「參照存在」放行。
+                $missing[$col] = $refTable !== '' ? $refTable : '?';
+
+                continue;
+            }
+
+            if ($this->isTextColumn($refTable, $refColumn)) {
+                $found = DB::table($refTable)->where($refColumn, (string) $value)->pluck($refColumn)
+                    ->contains(static fn ($stored) => (string) $stored === (string) $value);
+            } else {
+                // 數值參照只收整數或純數字字串：MariaDB 會把 '1abc' 當成 1 比較，
+                // 讓一個格式錯誤的值「剛好」找到參照。
+                $found = (is_int($value) || (is_string($value) && preg_match('/\A-?\d+\z/', $value) === 1))
+                    && DB::table($refTable)->where($refColumn, $value)->exists();
+            }
+
+            if (!$found) {
+                $missing[$col] = $refTable;
+            }
+        }
+
+        return $missing;
     }
 
     /**

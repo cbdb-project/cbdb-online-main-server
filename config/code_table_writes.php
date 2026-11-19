@@ -17,6 +17,14 @@
  * - integer_fields / float_fields / long_text_fields / not_null_fields（皆可選）：欄位型別登記，
  *   語義與 config/code_table_mutations.php 相同，判定本體共用 {@see \App\Support\CodeTableFieldValidator}。
  *   未登記的欄一律要求 string|null 且長度 ≤ 255。
+ * - key_references（可選）：[欄名 => ['table' => 被參照表, 'column' => 被參照欄]]。create 落庫前
+ *   逐欄確認被參照列存在，不存在回 422（`target.pk.<欄>` 或 `changes.<欄>` = `not_found:<表>`），
+ *   比資料庫外鍵兜底（不指名欄位的 foreign_key_violation）明確。文本欄要求與被參照列的實際值
+ *   **精確相等**——general_ci 不分大小寫／PAD SPACE，`'XA'` 等於 `'xa'`、外鍵也放行。
+ *   只能指向 key_columns 或 allowed_fields（CodeTableWriteConfigDriftTest 把關）。
+ * - allow_delete（可選，預設 false）：是否開放 /api/v2/delete。**代碼表刪除預設全面停用**
+ *   （多被人物資料以外鍵引用）；只有確認「全庫沒有任何外鍵引用本表」的純關聯表才可設 true，
+ *   並要補上鎖住那個前提的護欄測試。
  *
  * 主鍵型別：handler 依**實際 schema** 逐欄判斷是數值還是文本（文本主鍵不做 `(int)`
  * 轉型，見 `HandlesCodeTableWrites::isTextColumn()`）。所以數值與文本主鍵都可登錄，
@@ -188,6 +196,28 @@ return [
             // middleware ConvertEmptyStringsToNull 轉成 null，所以送 '' 同樣 422；
             // 只有「整個不送」才會吃預設值 ''。經 API 無法把名稱清空。
             'not_null_fields' => ['c_entry_desc', 'c_entry_desc_chn'],
+        ],
+        // 入仕途徑↔入仕類型關聯（docs/ENTRY_CODE_TYPE_REL_V2_WRITE_PLAN.md）。純關聯表：
+        // 兩欄複合主鍵、沒有任何非主鍵欄，所以 allowed_fields 為空、不開 update（改鍵＝刪＋建）。
+        // c_entry_type 是**文本主鍵**（'08' 帶前導零，絕不轉 int）；它在 VariantReplaceScope
+        // 的排除清單內（跨表 join 鍵），符合本檔頭的文本主鍵前提。
+        // 別名刻意避開 entry／entries／entry_data（人物子資源）與 entry-codes 的別名。
+        'ENTRY_CODE_TYPE_REL' => [
+            'resource' => 'entry-code-type-rel',
+            'aliases' => ['entry-code-type-rel', 'entry_code_type_rel', 'entrycodetyperel'],
+            'table' => 'ENTRY_CODE_TYPE_REL',
+            'display_name' => '入仕途徑與類型關聯',
+            'key_columns' => ['c_entry_code', 'c_entry_type'],
+            'auto_assign_id' => false,
+            'allowed_fields' => [],
+            'key_references' => [
+                'c_entry_code' => ['table' => 'ENTRY_CODES', 'column' => 'c_entry_code'],
+                'c_entry_type' => ['table' => 'ENTRY_TYPES', 'column' => 'c_entry_type'],
+            ],
+            // 唯一開放刪除的代碼表：全庫沒有任何外鍵引用本表（由
+            // CodeTableWriteConfigDriftTest::tables_open_for_delete_are_not_referenced_by_any_foreign_key() 鎖住），刪一列不會牽動任何其他列，
+            // 而掛錯的關聯必須能撤掉。其他代碼表的刪除維持 403。
+            'allow_delete' => true,
         ],
     ],
 ];

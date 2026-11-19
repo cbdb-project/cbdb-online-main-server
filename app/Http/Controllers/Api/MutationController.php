@@ -287,12 +287,29 @@ class MutationController extends Controller {
             return $this->errorResponse('主鍵格式不正確', 422, ['pk' => [$e->getMessage()]]);
         }
 
+        // 文本主鍵（目前僅 entry-code-type-rel 的 c_entry_type）：字串綁定＋精確比對，
+        // 與 v2 delete 的 findExactRow 同一套語義（見 MutationReadService 該項註解）。
+        $textKeys = (array) ($definition['text_key_columns'] ?? []);
+        foreach ($textKeys as $column) {
+            if (!is_string($targetPk[$column] ?? null)) {
+                return $this->errorResponse('主鍵格式不正確', 422, ['target.pk.' . $column => ['string']]);
+            }
+        }
+
         $query = DB::table($definition['table']);
         foreach ($definition['key_columns'] as $column) {
             $query->where($column, $targetPk[$column]);
         }
 
-        $row = $query->first();
+        $row = $query->get()->first(static function ($candidate) use ($textKeys, $targetPk) {
+            foreach ($textKeys as $column) {
+                if ((string) ($candidate->{$column} ?? '') !== $targetPk[$column]) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
         if (!$row) {
             return $this->errorResponse($definition['table'] . ' 記錄不存在', 404);
         }

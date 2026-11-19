@@ -403,7 +403,8 @@ class CodeTableWriteConfigDriftTest extends TestCase {
             foreach (Schema::getForeignKeys($table) as $fk) {
                 $foreignKeysSeen++;
                 $target = strtoupper((string) ($fk['foreign_table'] ?? ''));
-                if (isset($deletable[$target]) && strtoupper($table) !== $target) {
+                // 自參照也算：ON DELETE CASCADE 的自參照外鍵會讓刪一列連帶刪掉不在快照裡的其他列。
+                if (isset($deletable[$target])) {
                     $problems[] = "{$table}（" . implode(',', (array) $fk['columns']) . "）以外鍵引用 {$deletable[$target]}，該表不可開放刪除";
                 }
             }

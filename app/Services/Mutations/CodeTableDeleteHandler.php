@@ -136,7 +136,16 @@ class CodeTableDeleteHandler extends AbstractMutationHandler {
         $operation = null;
 
         try {
-            DB::transaction(function () use (&$operation, $table, $pk, $originalArray, $personId) {
+            DB::transaction(function () use (&$operation, $table, $pk, &$originalArray, $personId) {
+                // 交易內鎖定後重做一次精確比對：上面那次在交易外，期間別人可能刪掉 'xa'、
+                // 又建了定序等價的 'XA'——不重查的話，下面的 delete 會按定序命中那一列，
+                // 而 operations／audit_log 記下的卻是舊快照。快照也改用鎖定後讀到的列。
+                $locked = $this->findExactRow($table, $pk, true);
+                if ($locked === null) {
+                    throw new CodeTableDeleteConflictException(0);
+                }
+                $originalArray = $this->auditLogService->normalizeRow($locked);
+
                 $deleted = $this->whereByPk(DB::table($table), $pk)->delete();
                 // 同一主鍵在 general_ci 下只可能對應一列（唯一鍵也按同一個 collation 判定），
                 // 而上面已精確比對過；多於一列代表 key_columns 不是真正的唯一鍵，整筆回滾。
@@ -207,8 +216,12 @@ class CodeTableDeleteHandler extends AbstractMutationHandler {
      * `'xa'` 那一列。若直接刪，被刪的是呼叫端沒有指名的列，而 operations／audit_log 記下的卻是
      * `'XA'`——稽核鏈指向一個從未存在的鍵。所以文本主鍵取回後再做 PHP 嚴格比較。
      */
-    protected function findExactRow(string $table, array $pk): ?object {
-        $candidates = $this->whereByPk(DB::table($table), $pk)->get();
+    protected function findExactRow(string $table, array $pk, bool $lockForUpdate = false): ?object {
+        $query = $this->whereByPk(DB::table($table), $pk);
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+        $candidates = $query->get();
         foreach ($candidates as $candidate) {
             $row = (array) $candidate;
             $matches = true;

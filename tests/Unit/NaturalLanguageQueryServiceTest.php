@@ -21,8 +21,8 @@ class NaturalLanguageQueryServiceTest extends TestCase {
         // Mock config - 必须在创建服务之前設定
         Config::set('services.gemini.api_key', 'test-api-key');
 
-        $this->schemaService = $this->createMock(DatabaseSchemaService::class);
-        $this->toolsService = $this->createMock(NlQueryToolsService::class);
+        $this->schemaService = $this->createStub(DatabaseSchemaService::class);
+        $this->toolsService = $this->createStub(NlQueryToolsService::class);
         $this->service = new NaturalLanguageQueryService($this->schemaService, $this->toolsService);
     }
 
@@ -31,8 +31,8 @@ class NaturalLanguageQueryServiceTest extends TestCase {
         Config::set('services.gemini.api_key', '');
 
         // 重新创建服务以使用新的配置
-        $schemaService = $this->createMock(DatabaseSchemaService::class);
-        $toolsService = $this->createMock(NlQueryToolsService::class);
+        $schemaService = $this->createStub(DatabaseSchemaService::class);
+        $toolsService = $this->createStub(NlQueryToolsService::class);
         $service = new NaturalLanguageQueryService($schemaService, $toolsService);
 
         $result = $service->generateSQL('test question');
@@ -91,9 +91,9 @@ class NaturalLanguageQueryServiceTest extends TestCase {
         Config::set('services.gemini_fallback.api_key', '');
         Config::set('nl_query_tools.enabled', true);
 
-        $schemaService = $this->createMock(DatabaseSchemaService::class);
+        $schemaService = $this->createStub(DatabaseSchemaService::class);
         $schemaService->method('generateSchemaPrompt')->willReturn('Mock schema info');
-        $toolsService = $this->createMock(NlQueryToolsService::class);
+        $toolsService = $this->createStub(NlQueryToolsService::class);
         $toolsService->method('getToolDefinitions')->willReturn([[
             'type' => 'function',
             'function' => [
@@ -161,9 +161,9 @@ class NaturalLanguageQueryServiceTest extends TestCase {
         Config::set('services.gemini_fallback.api_endpoint', $fallback);
         Config::set('services.gemini_fallback.model', 'fallback-model');
 
-        $schemaService = $this->createMock(DatabaseSchemaService::class);
+        $schemaService = $this->createStub(DatabaseSchemaService::class);
         $schemaService->method('generateSchemaPrompt')->willReturn('Mock schema info');
-        $service = new NaturalLanguageQueryService($schemaService, $this->createMock(NlQueryToolsService::class));
+        $service = new NaturalLanguageQueryService($schemaService, $this->createStub(NlQueryToolsService::class));
 
         Http::fake([
             $primary => Http::response(['status' => 'failed', 'error' => ['message' => 'upstream down'], 'output' => []], 200),
@@ -206,9 +206,9 @@ class NaturalLanguageQueryServiceTest extends TestCase {
         Config::set('services.gemini_fallback.api_endpoint', 'https://fallback.example.com/api');
         Config::set('services.gemini_fallback.model', 'fallback-model');
 
-        $schemaService = $this->createMock(DatabaseSchemaService::class);
+        $schemaService = $this->createStub(DatabaseSchemaService::class);
         $schemaService->method('generateSchemaPrompt')->willReturn('Mock schema info');
-        $toolsService = $this->createMock(NlQueryToolsService::class);
+        $toolsService = $this->createStub(NlQueryToolsService::class);
         $service = new NaturalLanguageQueryService($schemaService, $toolsService);
 
         Http::fake([

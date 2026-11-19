@@ -107,6 +107,18 @@ class MutationReadService {
             'person_id_column' => null,
             'aliases' => ['nianhao', 'nian_hao'],
         ],
+        // 入仕途徑↔類型關聯（docs/ENTRY_CODE_TYPE_REL_V2_WRITE_PLAN.md D-5）：讓 v2 create／delete
+        // 之後能直接確認關聯在不在，而不必翻 operations。別名與 config/code_table_writes.php 一致。
+        [
+            'resource' => 'entry-code-type-rel',
+            'table' => 'ENTRY_CODE_TYPE_REL',
+            'key_columns' => ['c_entry_code', 'c_entry_type'],
+            'person_id_column' => null,
+            'aliases' => ['entry-code-type-rel', 'entry_code_type_rel', 'entrycodetyperel'],
+            // 文本主鍵：以字串綁定並與實際值精確比對。MariaDB 下 `'08' = 8` 為真（數值比較）、
+            // general_ci 下 `'XA' = 'xa'` 為真——不擋的話 get 回 200、delete 卻回 404。
+            'text_key_columns' => ['c_entry_type'],
+        ],
     ];
 
     /**

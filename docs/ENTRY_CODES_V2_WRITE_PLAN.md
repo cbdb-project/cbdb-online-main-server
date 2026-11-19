@@ -43,6 +43,7 @@ token API 能新建 `ENTRY_CODES` 記錄：
   兩份 config 的 `key_columns`。連帶讓 `/codes` UI 既有寫入產生的 operations 列可解析與還原。
 - **D-8 不在範圍**：`ENTRY_CODE_TYPE_REL`（入仕途徑↔入仕類型的關聯）。新代碼若要掛上類型，
   目前仍需走 `/codes` UI；若下游之後需要，另開環節。
+  **後續（2026-11）**：已另開環節實作，見 [ENTRY_CODE_TYPE_REL_V2_WRITE_PLAN.md](./ENTRY_CODE_TYPE_REL_V2_WRITE_PLAN.md)。
 - **D-9 異體字落地替換／稽核蓋章／外鍵 422**：繼承 `AbstractCodeTableMutationHandler`／
   `CodeTableCreateHandler` 自動生效，不需額外掛鉤。本表沒有 `c_created_*`／`c_modified_*`
   稽核欄，比照 ADMIN_CAT_CODES 刻意不補（operations＋audit_log 已記錄操作者與時間）。

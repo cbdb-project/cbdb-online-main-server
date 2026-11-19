@@ -75,7 +75,7 @@ class VariantReplaceHookCoverageTest extends TestCase {
         // 常數（固定字面值、非使用者輸入，所以沒有替換的必要）。哪天它開始寫任何輸入衍生的
         // 文本，就必須從這裡移出並掛上替換。
         'BiogMainDeleteHandler' => '軟刪除以 UPDATE 寫入固定的 DELETE_MARKER 常數，非使用者輸入 ⇒ 無需替換',
-        'CodeTableDeleteHandler' => '同上（刪除）；且碼表刪除目前全域停用（回 403）',
+        'CodeTableDeleteHandler' => '同上（刪除，不寫任何文本）；碼表刪除預設停用（403），僅 config 標 allow_delete 的表開放',
         'EntityAggregateDeleteHandler' => '同上（刪除）',
         'EntryDeleteHandler' => '同上（刪除）',
         'EventDeleteHandler' => '同上（刪除）',

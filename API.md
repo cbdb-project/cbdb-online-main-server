@@ -465,12 +465,13 @@ CBDB 子資源表幾乎都是複合主鍵，且不使用 Eloquent 主鍵行為�
 | merged-person | merged_person, merged_person_data, mergedperson | MERGED_PERSON_DATA | ✔ | ✘ | ✔ |
 | 可修改的代碼表（nianhao、office_codes、dynasties…） | 見〈代碼表與複合實體寫入〉 | 各代碼表 | ✘（501） | ✔ | ✘（501） |
 | 可新增的代碼表（text-codes、text-instance-data、char-variant-map、addr-codes、addr-belongs-data、admin-cat-codes、office-type-tree、entry-codes） | 逐操作不同，見〈代碼表與複合實體寫入〉 | TEXT_CODES、TEXT_INSTANCE_DATA、char_variant_map、ADDR_CODES、ADDR_BELONGS_DATA、ADMIN_CAT_CODES、OFFICE_TYPE_TREE、ENTRY_CODES | 僅 direct | ✔ | ✘（403，已停用） |
+| entry-code-type-rel（入仕途徑↔類型關聯） | entry_code_type_rel, entrycodetyperel | ENTRY_CODE_TYPE_REL | 僅 direct | ✘（501） | **僅 direct**（唯一可刪除的代碼表） |
 | office、social-institution、text-entity（複合實體聚合） | 見〈代碼表與複合實體寫入〉 | 多表聚合 | ✔ | ✔ | ✔ |
 
 - 表中 `✔` 表示 `direct` 與 `proposal` 兩種模式都支援。
 - 人物主檔（basicinformation）的 `create` 與 `delete` **不支援 proposal**，會回 501 `mode: ["proposal_not_supported"]`；`update` 則兩種模式都支援。
 - 人物主檔的 `delete` 是**軟刪除**：把 `c_name_chn` 改為 `<待删除>`（UPDATE，不是真的 DELETE，也不觸發外鍵連鎖），並記一筆 `op_type=4` 的 operation。
-- 代碼表分兩組：**只能改**的一組（`config/code_table_mutations.php`，如 nianhao、office_codes、dynasties、choronym_codes、ganzhi_codes 等）送 `create`／`delete` 會回 501；**可新增**的一組是 `TEXT_CODES`、`TEXT_INSTANCE_DATA`、`char_variant_map`、`ADDR_CODES`、`ADDR_BELONGS_DATA`、`ADMIN_CAT_CODES`、`OFFICE_TYPE_TREE` 與 `ENTRY_CODES`（`config/code_table_writes.php`）。代碼表的 `delete` 一律不開放——可新增的這八張表回 **403**（防止級聯刪除人物資料），其餘代碼表回 501。
+- 代碼表分兩組：**只能改**的一組（`config/code_table_mutations.php`，如 nianhao、office_codes、dynasties、choronym_codes、ganzhi_codes 等）送 `create`／`delete` 會回 501；**可新增**的一組是 `TEXT_CODES`、`TEXT_INSTANCE_DATA`、`char_variant_map`、`ADDR_CODES`、`ADDR_BELONGS_DATA`、`ADMIN_CAT_CODES`、`OFFICE_TYPE_TREE` 與 `ENTRY_CODES`（`config/code_table_writes.php`）。代碼表的 `delete` 原則上不開放——可新增的這八張表回 **403**（防止級聯刪除人物資料），其餘代碼表回 501。**唯一例外是純關聯表 `entry-code-type-rel`**：它可以 `create` 與 `delete`（都只支援 direct），不能 `update`（見 13.2a）。
 - 不支援的 `resource` / `mode` / `operation` 組合一律回 **501**：`{"ok":false,"message":"目前尚未支援此變更模式","errors":{"resource":"...","mode":"...","operation":"..."}}`。
 
 各資源的欄位白名單、必填規則與範例見〈各資源欄位參考〉。
@@ -581,12 +582,15 @@ CBDB 子資源表幾乎都是複合主鍵，且不使用 Eloquent 主鍵行為�
 | social_institutions | socialinstitution, social_institution, biog_inst_data | BIOG_INST_DATA | c_personid, c_inst_code, c_inst_name_code, c_bi_role_code |
 | sources | source, biog_source_data | BIOG_SOURCE_DATA | c_personid, c_textid, c_pages |
 | nianhao | nian_hao | NIAN_HAO | c_nianhao_id |
+| entry-code-type-rel | entry_code_type_rel, entrycodetyperel | ENTRY_CODE_TYPE_REL | c_entry_code, c_entry_type |
 
 **注 1：`possessions` 與 `postings` 的主鍵不含 `c_personid`，但 `person_id` 仍為必填，且後端會比對該列的 `c_personid` 是否相符。`nianhao` 不是人物資料（無人物欄），`person_id` 只需給任一非空值即可。**
 
 **注 2（`sources` 的空頁碼讀不回來）：`BIOG_SOURCE_DATA.c_pages` 在寫入端可為空，但本端點**不**套用該例外——空字串會先被中間件轉成 `null`，主鍵驗證即回 422 `缺少必要的複合主鍵參數：c_pages`。也就是「頁碼為空的出處列」可以用 `create`／`delete` 操作，卻無法用 `/api/v2/get` 讀回；這類列請改由人物詳情頁或 `GET /api/v2/operations` 取得內容。**
 
 **注 3：`merged-person` 可以寫入（create／delete），但本端點不支援讀取。**
+
+**注 4（`entry-code-type-rel`）：不是人物資料，`person_id` 給任一非空值即可（同 `nianhao`）。`c_entry_type` 必須以**字串**送出且與資料庫的值**完全相同**（`"08"`，不是 `8`、不是 `"8"`）：本端點送數字回 422 `target.pk.c_entry_type: ["string"]`（寫入端 create／delete 會把整數轉成字串再比對，見 13.2a）；大小寫或寫法不同回 404。兩欄給齊時回 200＋`result.row`（關聯存在）或 404（不存在），用來在新增／刪除後確認關聯狀態。要列出某類型之下的所有途徑，見舊版 `/api/entry_list?id=<類型代碼>`（以類型代碼**前綴**比對，`id=04` 會含 `0403` 等子類型）。**
 
 ### 輸入示例
 
@@ -885,7 +889,7 @@ Authorization: Bearer <token>
 
 - 目標列不存在 → 404。
 - **人物主檔（`basicinformation`）的刪除是軟刪除**：改名為 `<待删除>`，資料列仍在（見 4.5）。
-- 資料庫層外鍵一律 `RESTRICT`（沒有 `ON DELETE CASCADE`），**不會由資料庫連鎖刪除**。若該列仍被其他資料引用，資料庫會擋下來（此時可能收到 500，請視為「不可刪除」而不是重試）。
+- 資料庫層外鍵一律 `RESTRICT`（沒有 `ON DELETE CASCADE`），**不會由資料庫連鎖刪除**。若該列仍被其他資料引用，資料庫會擋下來（此時可能收到 500，請視為「不可刪除」而不是重試；`entry-code-type-rel` 另轉為 409 `referenced`，見 13.2a）。
 - 但**應用層會顯式刪除該列自己的附屬子表**，且會逐列寫 operations／audit：
   - `possessions` → 一併刪 `POSSESSION_ADDR`
   - `postings` → 一併刪 `POSTED_TO_ADDR_DATA` 與 `POSTING_DATA`
@@ -1445,7 +1449,7 @@ Authorization: Bearer <token>
 
 ### 13.2 可新增的代碼表（只支援 `create`、只支援 `direct`）
 
-目前開放新增的有八張表：
+目前開放新增的有八張表（另有 13.2a 的關聯表 `entry-code-type-rel`，可新增也可刪除）：
 
 > **`text-instance-data` 與 `text-entity` 聚合的關係**：聚合更新（13.4）會以「送來的版本集合」對賬整個文獻的 `TEXT_INSTANCE_DATA`——表單載入後才經本入口新增的版本列，會被下一次聚合更新視為「不在集合內」而刪除；反之聚合不會動本入口寫入的、聚合不認得的欄位（如 `c_print`）。同一文獻請擇一路徑維護版本列。create 回應的 `resource` 是 `text-instance-data`，update 回應是 `text_instance_data`（各表同一慣例）。
 
@@ -1464,7 +1468,7 @@ Authorization: Bearer <token>
 
 - 主鍵可放在 `target.pk` 或 `changes`；**單一主鍵的表在兩處都沒給值時，由伺服器以 `max(主鍵)+1` 自動配發**。但 `target` 這個鍵本身仍必須存在——請送 `"target": {"pk": {}}`，完全省略會被控制器層 422 擋下。
 - **複合主鍵的表（`addr-belongs-data`、`text-instance-data`）沒有自動配發**：全部主鍵欄（前者四欄、後者三欄）一個都不能少，缺哪一欄就回 422 `target.pk.<欄名>: ["required"]`。
-- **`OFFICE_TYPE_TREE` 是唯一的文本主鍵表**：`c_office_type_node_id` 是零填補的階層路徑字串（`06`、`0601`、`060102`），請**原樣以字串送出**——它不會被轉成數字，前導零有意義（`'06'` 與 `'6'` 是不同的節點）。超過欄位長度回 422 `target.pk.<欄名>: ["max:255"]`；非字串／非整數回 `["string"]`。其餘表的主鍵仍是數值，適用下面兩條。
+- **`OFFICE_TYPE_TREE` 是本節八張表中唯一的文本主鍵表**（13.2a 的 `entry-code-type-rel` 另有文本主鍵欄 `c_entry_type`）：`c_office_type_node_id` 是零填補的階層路徑字串（`06`、`0601`、`060102`），請**原樣以字串送出**——它不會被轉成數字，前導零有意義（`'06'` 與 `'6'` 是不同的節點）。超過欄位長度回 422 `target.pk.<欄名>: ["max:255"]`；非字串／非整數回 `["string"]`。其餘表的主鍵仍是數值，適用下面兩條。
 - 主鍵值必須是整數（或可解析為整數的字串），否則 422 `target.pk.<欄名>: ["numeric"]`——不會靜默轉成 `0`；超出 PHP 整數精度的字串同樣回 `numeric`（`(int)` 會飽和成最大值而非報錯）。
 - 文本主鍵送非字串／非整數回 422 `target.pk.<欄名>: ["string"]`（`create` 與 `update` 兩端都是）。
 - 主鍵值也受**值域檢查**（依該欄實際型別），超出回 422 `target.pk.<欄名>: ["out_of_range:<min>..<max>"]`。非 strict sql_mode 下不擋的話，`ADDR_BELONGS_DATA.c_firstyear`（smallint）收到 40000 會被截斷成 32767——那一列就被建在**你沒有指定的主鍵**上，回應顯示 40000、實際存 32767，之後照回應的鍵去改或刪一律 404。
@@ -1480,18 +1484,39 @@ Authorization: Bearer <token>
 - 只支援 `mode=direct`；送 `mode=proposal` 會得到 **501**（找不到 handler），不是 403。注意這與 13.1 的 `update` 不對稱：**代碼表可以提案修改、但不能提案新增**，眾包帳號只能改不能增。
 - 回應：`result.pk`、`result.status: "created"`、`result.operation_id`、`result.row`；**表有稽核欄時**系統會蓋 `c_created_by`／`c_created_date`。多數代碼表（含 `ADMIN_CAT_CODES`）沒有那組欄位，此時不蓋——操作者與時間仍完整記在 `operations` 與 `audit_log`。
 - 可以放進 `batch_mutate` 一起送。
-- **本節的表都沒有 `/api/v2/read` 定義**（代碼表中只有 `nianhao` 有）：新增後要拿到伺服器配發的主鍵，直接看回應的 `result.pk` 與 `result.row`（整列都在裡面）。
+- **本節八張表都沒有 `/api/v2/get` 定義**（目前可讀取的非人物資源只有 `nianhao` 與 13.2a 的關聯資源 `entry-code-type-rel`）：新增後要拿到伺服器配發的主鍵，直接看回應的 `result.pk` 與 `result.row`（整列都在裡面）。
 - **新增前請自行查重**：本節的表都沒有「同名就重用」的邏輯，也沒有 read 端點可查——`ADMIN_CAT_CODES.c_admin_cat_hz` 之類的名稱欄**沒有唯一鍵**（現庫本來就有同名的類別），送兩次就是兩列。批次匯入前請先用 `/codes` 或 Query Playground 把既有代碼查出來，否則 `ADDR_CODES.c_admin_cat_code` 會分散指向兩個同義類別。`ENTRY_CODES` 同理：`c_entry_desc_chn` 沒有唯一鍵，同名的入仕途徑送兩次就是兩個代碼，之後 `ENTRY_DATA.c_entry_code` 會分散指向兩者。
-- **`entry-codes`**：自動配發的代碼一律落在現有最大碼之後（`max(0, 現有最大碼)+1`）；CBDB 的入仕途徑碼習慣按類別分段，若要放進特定區段請在 `target.pk` 明確指定。別名刻意不含 `entry`／`entries`／`entry_data`——那些是人物子資源 `ENTRY_DATA`（人物的入仕記錄）。新代碼與入仕類型的關聯（`ENTRY_CODE_TYPE_REL`）**不在** API 範圍內，目前仍需經 `/codes` UI 建立。
+- **`entry-codes`**：自動配發的代碼一律落在現有最大碼之後（`max(0, 現有最大碼)+1`）；CBDB 的入仕途徑碼習慣按類別分段，若要放進特定區段請在 `target.pk` 明確指定。別名刻意不含 `entry`／`entries`／`entry_data`——那些是人物子資源 `ENTRY_DATA`（人物的入仕記錄）。新代碼要掛到入仕類型上，接著用 13.2a 的 `entry-code-type-rel` 建立關聯。
 - **地名相關**：`ADDRESSES` 是由 `ADDR_CODES` + `ADDR_BELONGS_DATA` 派生的反正規化快取表，只由 `php artisan cbdb:regenerate-addresses-table` 重建。經本 API 新增的地名，在重建之前不會出現在依賴該快取的功能（官職地點自動填表、朝代同名地消歧、部分自然語言查詢）。批次匯入地名後請安排重建。
 - `TEXT_CODES` 的新增與修改是**兩份不同的定義**，別名清單不對稱：`create` 接受 `text-codes`／`text_codes`／`textcodes`，而 `update` **只接受 `text_codes`**（送 `text-codes` 做 update 會 501）。最保險是 create 用 `text-codes`、update 用 `text_codes`。
 
-### 13.3 代碼表刪除：一律不開放
+### 13.2a 入仕途徑↔類型關聯（`entry-code-type-rel`）：create／delete
 
-代碼表被大量人物資料以外鍵引用，刪一列可能影響數萬筆記錄且難以乾淨復原，因此刪除**已停用**：
+`ENTRY_CODE_TYPE_REL` 把入仕途徑（`ENTRY_CODES`）掛到入仕類型（`ENTRY_TYPES`，如 `"08"`）上。它是純關聯表：只有兩欄複合主鍵、沒有其他欄。
+
+| resource | 別名 | 資料表 | 主鍵 | 可寫欄位 | 支援端點 |
+| ------ | ------ | ------ | ------ | ------ | ------ |
+| entry-code-type-rel | entry_code_type_rel, entrycodetyperel | ENTRY_CODE_TYPE_REL | c_entry_code（smallint）, c_entry_type（**文本**）——**兩欄都必填、不配發** | （無） | 寫入：`/api/v2/create`、`/api/v2/delete`（皆僅 direct）；唯讀：`/api/v2/get` |
+
+- 別名刻意不含 `entry`／`entries`／`entry_data`（人物子資源 `ENTRY_DATA`），也不與 `entry-codes` 重疊。
+- **`c_entry_type` 是帶前導零的字串**，請原樣以字串送出：`"08"` 與 `8`／`"8"` 是不同的值。create 收到數字 `8` 會轉成 `"8"`（不是 422 `string`），接著因不存在於 `ENTRY_TYPES` 而回 422 `target.pk.c_entry_type: ["not_found:ENTRY_TYPES"]`。前後空白會先被全域中間件修掉（`" 08 "` → `"08"`）。
+- **兩欄的參照存在性都會檢查**（落庫前、排在重複檢查之前）：`c_entry_code` 不在 `ENTRY_CODES` → 422 `target.pk.c_entry_code: ["not_found:ENTRY_CODES"]`；`c_entry_type` 不在 `ENTRY_TYPES` → 422 `target.pk.c_entry_type: ["not_found:ENTRY_TYPES"]`（兩欄都錯時兩個鍵都會出現）。`c_entry_type` 經全域中間件移除前後空白後，仍須與 `ENTRY_TYPES` 的實際值**完全相同**——資料庫定序雖不分大小寫，API 不接受大小寫或寫法不同的值。新的入仕途徑請先以 `entry-codes`（13.2）建立，再建關聯。
+- 缺任一主鍵欄 → 422 `target.pk.<欄名>: ["required"]`；`c_entry_code` 非整數 → `["numeric"]`、超出 smallint → `["out_of_range:-32768..32767"]`。
+- 關聯已存在 → 409 `target.pk: ["conflict"]`。`changes` 帶主鍵以外的欄位 → 422 `disallowed_fields`（本表沒有非主鍵欄；主鍵也可以放在 `changes`，同 13.2）。單筆 `/api/v2/create` 可省略 `changes`；**放進 `batch_mutate` 時 create 那筆須帶 `"changes": {}`**，否則 422 `changes: required`。
+- **不支援 `update`**（`/api/v2/mutate` 回 501）：改掛到另一個類型＝刪掉舊關聯、建立新關聯，兩筆可以放進同一個 `batch_mutate`（`atomic: true` 時任一筆失敗整批回滾）。
+- **`delete`（`/api/v2/delete`，只支援 `mode=direct`）**：權限與 create 相同（已啟用、非眾包帳號）。兩欄主鍵都必填（缺 → 422 `required`）；`c_entry_code` 非整數 → 422 `numeric`；`c_entry_type` **請一律以字串送出**：既不是字串也不是整數的值（小數、布林、陣列）→ 422 `string`；整數會先轉成字串（`8` → `"8"`）再精確比對，因此不會命中 `"08"`，回 404。成功回 `result.pk`、`result.status: "deleted"`、`result.operation_id` 與 `result.row`（被刪那一列）。會寫一筆 `op_type=4` 的 operation（快照為被刪列）與 audit_log，管理員可在 operations 頁以「還原」重建。極少數情形：關聯在你刪除前已被別人刪掉 → 404；若資料庫回報該列仍被引用（現行 schema 沒有任何表引用本表，正常不會發生）→ 409 `target.pk: ["referenced"]`；鎖衝突 → 409 `target.pk: ["lock_contention"]`，可直接重試。
+- **讀回**：`/api/v2/get` 支援本資源（見〈讀取單列〉注 4）。
+- 寫入 `operations` 時 `c_personid` 記錄你送的 `person_id`（轉為整數；建議送 `0`）；`resource_id` 形如 `c_entry_code=400&c_entry_type=08`。
+- **對人物指數年（`BIOG_MAIN.c_index_year`）的影響**：指數年的入仕規則以本表判斷「哪些途徑屬於某類型」。關聯的新增或刪除**不會立即**重算指數年，要等下一次 `php artisan cbdb:rebuild-index-year`（全量重算）才生效。
+- `/codes` UI 的刪除仍然停用；本節只開放 token API。
+
+### 13.3 代碼表刪除：原則上不開放
+
+一般代碼表被大量人物資料以外鍵引用，刪一列可能影響數萬筆記錄且難以乾淨復原，因此刪除**已停用**（唯一例外見本節最後一點）：
 
 - 13.2 那八張可新增的表、且 `mode=direct` → **403**（`代碼表刪除已停用（防止級聯刪除人物資料）`）
 - 其他代碼表，或 `mode=proposal` → **501**（找不到對應 handler）
+- **唯一例外：`entry-code-type-rel`（13.2a）**。全庫沒有任何外鍵引用這張關聯表，刪一列不會影響其他資料，而掛錯的關聯必須能撤掉。這個前提有自動化護欄：日後若有 migration 宣告引用它的外鍵，測試會先擋下；不經 migration 的外鍵則由資料庫擋下，執行期回 409 `referenced`（不會靜默刪除）；其他資料庫錯誤依一般錯誤處理。
 
 ### 13.4 複合實體聚合：office、social-institution 與 text-entity
 
@@ -1968,7 +1993,7 @@ const claims = tokens.claims();
 ### 輸入參數:
 | 參數名| 參數類型 | 說明 |
 | ------ | ------ | ------ |
-| id | 數字 | 入仕途徑代碼 |
+| id | 字串 | 入仕類型代碼（`ENTRY_TYPES.c_entry_type`，**前綴比對**，須保留前導零如 `04`）；一個途徑掛在多個子類型下時會出現多次；省略時列出全部關聯 |
 | start | 數字 | 開始筆數 |
 | list | 數字 | 列表長度 |
 ### 輸入示例: 

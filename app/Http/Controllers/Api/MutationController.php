@@ -295,10 +295,25 @@ class MutationController extends Controller {
                 return $this->errorResponse('主鍵格式不正確', 422, ['target.pk.' . $column => ['string']]);
             }
         }
+        // 登記了 text_key_columns 的定義採嚴格主鍵：其餘主鍵欄必須是整數或純數字字串。
+        // 否則 MariaDB 會把 '400junk' 當 400、'abc' 當 0 比較，回一列呼叫端沒指名的記錄。
+        // （只對登記了的定義生效，不改變其他資源既有的寬鬆行為。）
+        if ($textKeys !== []) {
+            foreach (array_diff($definition['key_columns'], $textKeys) as $column) {
+                $value = $targetPk[$column] ?? null;
+                if (!is_int($value) && !(is_string($value) && preg_match('/\A-?\d{1,18}\z/', $value) === 1)) {
+                    return $this->errorResponse('主鍵格式不正確', 422, ['target.pk.' . $column => ['numeric']]);
+                }
+            }
+        }
 
         $query = DB::table($definition['table']);
         foreach ($definition['key_columns'] as $column) {
-            $query->where($column, $targetPk[$column]);
+            // 嚴格主鍵的數值欄以 int 綁定，與 v2 delete 的 (int) 轉型一致。
+            $value = ($textKeys !== [] && !in_array($column, $textKeys, true))
+                ? (int) $targetPk[$column]
+                : $targetPk[$column];
+            $query->where($column, $value);
         }
 
         $row = $query->get()->first(static function ($candidate) use ($textKeys, $targetPk) {

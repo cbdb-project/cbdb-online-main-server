@@ -590,7 +590,7 @@ CBDB 子資源表幾乎都是複合主鍵，且不使用 Eloquent 主鍵行為�
 
 **注 3：`merged-person` 可以寫入（create／delete），但本端點不支援讀取。**
 
-**注 4（`entry-code-type-rel`）：不是人物資料，`person_id` 給任一非空值即可（同 `nianhao`）。`c_entry_type` 必須以**字串**送出且與資料庫的值**完全相同**（`"08"`，不是 `8`、不是 `"8"`）：本端點送數字回 422 `target.pk.c_entry_type: ["string"]`（寫入端 create／delete 會把整數轉成字串再比對，見 13.2a）；大小寫或寫法不同回 404。兩欄給齊時回 200＋`result.row`（關聯存在）或 404（不存在），用來在新增／刪除後確認關聯狀態。要列出某類型之下的所有途徑，見舊版 `/api/entry_list?id=<類型代碼>`（以類型代碼**前綴**比對，`id=04` 會含 `0403` 等子類型）。**
+**注 4（`entry-code-type-rel`）：不是人物資料，`person_id` 給任一非空值即可（同 `nianhao`）。`c_entry_type` 必須以**字串**送出且與資料庫的值**完全相同**（`"08"`，不是 `8`、不是 `"8"`）：本端點送數字回 422 `target.pk.c_entry_type: ["string"]`（寫入端 create／delete 會把整數轉成字串再比對，見 13.2a）；`c_entry_code` 必須是整數或純數字字串，否則 422 `target.pk.c_entry_code: ["numeric"]`；大小寫或寫法不同回 404。兩欄給齊時回 200＋`result.row`（關聯存在）或 404（不存在），用來在新增／刪除後確認關聯狀態。要列出某類型之下的所有途徑，見舊版 `/api/entry_list?id=<類型代碼>`（以類型代碼**前綴**比對，`id=04` 會含 `0403` 等子類型）。**
 
 ### 輸入示例
 

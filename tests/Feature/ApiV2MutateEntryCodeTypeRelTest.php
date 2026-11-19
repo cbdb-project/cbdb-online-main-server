@@ -550,6 +550,59 @@ class ApiV2MutateEntryCodeTypeRelTest extends TestCase {
         // 定序不分大小寫時 SQL 命中 'xa'，但指名的是 'XA'。
         $this->getRel(['c_entry_code' => 400, 'c_entry_type' => 'XA'])->assertStatus(404);
         $this->getRel(['c_entry_code' => 400, 'c_entry_type' => 'xa'])->assertOk();
+
+        // 數值主鍵也要嚴格：MariaDB 會把 '400junk' 當 400 比較。
+        $this->getRel(['c_entry_code' => '400junk', 'c_entry_type' => '08'])
+            ->assertStatus(422)
+            ->assertJsonPath('errors', ['target.pk.c_entry_code' => ['numeric']]);
+        $this->getRel(['c_entry_code' => '400', 'c_entry_type' => '08'])->assertOk();
+    }
+
+    #[Test]
+    public function testDeleteDoesNotRemoveCollationEquivalentRowRecreatedAfterPrecheck(): void {
+        // 重現競態：交易外的預檢看到 'xa' 之後，別人刪掉 'xa'、建了定序等價的 'XA'。
+        // 不在交易內重查的話，delete 會按定序（NOCASE）命中 'XA' 並回 200。
+        $this->actingAs($this->makeUser());
+        DB::table('ENTRY_CODE_TYPE_REL')->insert(['c_entry_code' => 400, 'c_entry_type' => 'xa']);
+
+        $swapped = false;
+        DB::listen(function ($query) use (&$swapped) {
+            if ($swapped || DB::transactionLevel() !== 0) {
+                return;
+            }
+            // 只認讀資料列的那一句（schema 內省的 pragma_table_info 查詢也含表名，要排除）。
+            if (str_contains($query->sql, 'from "ENTRY_CODE_TYPE_REL" where')) {
+                $swapped = true;
+                DB::table('ENTRY_CODE_TYPE_REL')->where('c_entry_code', 400)->delete();
+                DB::table('ENTRY_CODE_TYPE_REL')->insert(['c_entry_code' => 400, 'c_entry_type' => 'XA']);
+            }
+        });
+
+        $this->deleteRel(['c_entry_code' => 400, 'c_entry_type' => 'xa'])->assertStatus(404);
+
+        $this->assertTrue($swapped, '沒有觸發競態模擬');
+        $this->assertSame([[400, 'XA']], $this->relRows());
+        $this->assertSame(0, Operation::query()->count());
+        $this->assertSame(0, DB::table('audit_log')->count());
+    }
+
+    #[Test]
+    public function testDeleteRechecksExactKeyUnderLockAndUsesLockedSnapshot(): void {
+        $this->actingAs($this->makeUser());
+        DB::table('ENTRY_CODE_TYPE_REL')->insert(['c_entry_code' => 400, 'c_entry_type' => '08']);
+
+        $locked = [];
+        DB::listen(function ($query) use (&$locked) {
+            if (str_contains($query->sql, 'ENTRY_CODE_TYPE_REL') && str_starts_with(strtolower(ltrim($query->sql)), 'select')) {
+                $locked[] = DB::transactionLevel();
+            }
+        });
+
+        $this->deleteRel(['c_entry_code' => 400, 'c_entry_type' => '08'])->assertOk();
+
+        // 一次在交易外（快速 404），一次在交易內（鎖定後重查）。
+        $this->assertContains(0, $locked);
+        $this->assertTrue(collect($locked)->contains(fn ($level) => $level >= 1), '交易內沒有重查目標列');
     }
 
     #[Test]

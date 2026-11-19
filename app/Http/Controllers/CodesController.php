@@ -2493,7 +2493,7 @@ class CodesController extends Controller {
      *    （`ADDR_CODES.c_admin_cat_code` 是 NOT NULL DEFAULT 0，現在留白是吃預設值）；
      *  - `integer_ranges` 不在 config 裡（由 handler 的 trait 依實際 schema 推導），
      *    controller 要複製一份才能用，而複製一份型別推導正是最容易漂移的東西；
-     *  - 兩份 config 只覆蓋 16 張表，而 `config/codes.php` 有 82 張。
+     *  - 兩份 config 只覆蓋 17 張表，而 `config/codes.php` 有 82 張。
      * 窄範圍的座標檢查沒有那個爆炸半徑，而且判定共用 `CoordinatePairNormalizer` 自己的
      * 謂詞，所以與 v2 那條路「什麼算合法座標」由構造保證一致。
      *

@@ -205,6 +205,11 @@ class CompositePrimaryKey {
             'c_firstyear',
             'c_lastyear',
         ],
+        // 入仕途徑代碼。與 OperationsController::resourceKeyColumns() 及兩份 config 的
+        // key_columns 一致（docs/ENTRY_CODES_V2_WRITE_PLAN.md D-7）。
+        'ENTRY_CODES' => [
+            'c_entry_code',
+        ],
         'CHAR_VARIANT_MAP' => [
             'id',
         ],

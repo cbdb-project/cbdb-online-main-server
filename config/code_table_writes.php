@@ -172,5 +172,22 @@ return [
             'allowed_fields' => ['c_source', 'c_pages', 'c_notes'],
             'integer_fields' => ['c_source'],
         ],
+        // 入仕途徑代碼（docs/ENTRY_CODES_V2_WRITE_PLAN.md）。原本只能走 /codes UI 新增，
+        // 機器化錄入新的入仕途徑時無 token 入口。被 ENTRY_DATA 與 ENTRY_CODE_TYPE_REL
+        // 以外鍵引用，刪除仍停用。別名刻意避開 entry／entries／entry_data（人物子資源 ENTRY_DATA）。
+        // 與 ADMIN_CAT_CODES 一樣沒有稽核欄、刻意不補。
+        'ENTRY_CODES' => [
+            'resource' => 'entry-codes',
+            'aliases' => ['entry-codes', 'entry_codes', 'entrycodes'],
+            'table' => 'ENTRY_CODES',
+            'display_name' => '入仕途徑代碼',
+            'key_columns' => ['c_entry_code'],
+            'auto_assign_id' => true,
+            'allowed_fields' => ['c_entry_desc', 'c_entry_desc_chn'],
+            // 兩欄皆 NOT NULL DEFAULT ''：送 null 擋在 422。注意 JSON 請求的 '' 會先被全域
+            // middleware ConvertEmptyStringsToNull 轉成 null，所以送 '' 同樣 422；
+            // 只有「整個不送」才會吃預設值 ''。經 API 無法把名稱清空。
+            'not_null_fields' => ['c_entry_desc', 'c_entry_desc_chn'],
+        ],
     ],
 ];

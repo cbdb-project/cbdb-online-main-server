@@ -246,6 +246,24 @@ return [
             'integer_fields' => ['c_source'],
         ],
         [
+            // 入仕途徑代碼（docs/ENTRY_CODES_V2_WRITE_PLAN.md）。可經 /api/v2/create 新增，
+            // update 端收同一組欄位。主鍵 c_entry_code 不在白名單內。
+            'resource' => 'entry_codes',
+            'table' => 'ENTRY_CODES',
+            'aliases' => ['entry_codes', 'entry-codes', 'entrycodes'],
+            'display_name' => '入仕途徑代碼',
+            'key_columns' => ['c_entry_code'],
+            'allowed_fields' => ['c_entry_desc', 'c_entry_desc_chn'],
+            // c_entry_desc 是英文描述、不是漢語拼音，本表從未列入 §D-6 Tier 登錄表；
+            // 兩個 tier 皆空（列進 tier2 會讓 /codes 編輯器對它彈 ü 轉換視窗）。
+            'tier1_fields' => [],
+            'tier2_fields' => [],
+            // NOT NULL DEFAULT ''：送 null 在欄位校驗就回 422（不登記的話會落到資料庫層，
+            // 由 handler 兜底轉成 not_null_violation）。JSON 請求的 '' 會先被全域 middleware
+            // ConvertEmptyStringsToNull 轉成 null，所以經 API 無法把名稱清空。
+            'not_null_fields' => ['c_entry_desc', 'c_entry_desc_chn'],
+        ],
+        [
             'resource' => 'char_variant_map',
             'table' => 'char_variant_map',
             'aliases' => ['char_variant_map', 'char-variant-map', 'charvariantmap'],

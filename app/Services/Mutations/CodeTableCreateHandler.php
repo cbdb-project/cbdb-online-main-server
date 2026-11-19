@@ -333,7 +333,13 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
                     $pk = $explicitPk;
                 } else {
                     $keyColumn = $keyColumns[0];
-                    $pk = [$keyColumn => max(0, (int) DB::table($table)->max($keyColumn)) + 1];
+                    $next = max(0, (int) DB::table($table)->max($keyColumn)) + 1;
+                    // 顯式主鍵在上面驗過值域，自動配發的值不經那一道（見例外類註解）。
+                    $range = $this->integerRanges($table)[strtolower($keyColumn)] ?? null;
+                    if ($range !== null && $next > $range[1]) {
+                        throw new AutoAssignedKeyOutOfRangeException($keyColumn, $range);
+                    }
+                    $pk = [$keyColumn => $next];
                 }
 
                 // 自參照樹：交易內鎖定複查（理由同 update 端——handle() 裡那次是「檢查後
@@ -390,6 +396,13 @@ class CodeTableCreateHandler extends AbstractMutationHandler {
         } catch (TreeCycleException $e) {
             // 交易內的鎖定複查擋下的競態；與上面那次同樣回 422 tree_cycle。
             return $this->withWriteNotices($this->errorResponse($e->getMessage(), 422, ['changes' => ['tree_cycle']]));
+        } catch (AutoAssignedKeyOutOfRangeException $e) {
+            // 現有最大碼已到值域上限，但中間可能還有空號：請呼叫端在 target.pk 明確指定。
+            return $this->withWriteNotices($this->errorResponse(
+                $e->getMessage() . '，請在 target.pk 明確指定主鍵',
+                422,
+                ['target.pk.' . $e->column => ['auto_assign_exhausted:' . $e->range[0] . '..' . $e->range[1]]]
+            ));
         } catch (\Illuminate\Database\QueryException $e) {
             // 這幾個回應都在落地替換之後，所以**必須**帶 notices（AGENTS §1.3：成功、409、
             // 422 都要掛）——被擋下來時使用者更需要知道自己輸入的字被正規化了，否則交易

@@ -177,7 +177,7 @@ class HistoricalQaTest extends TestCase {
         // 向後相容：不帶 conversation_history（或帶空陣列）與現行單輪行為完全一致。
         $this->be($this->adminUser);
 
-        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService = $this->createStub(NaturalLanguageQueryService::class);
         $mockService->method('answerQuestion')->willReturn([
             'success' => true,
             'answer_markdown' => '李白是唐代詩人。',
@@ -225,7 +225,7 @@ class HistoricalQaTest extends TestCase {
         // 剛好 4 筆歷史（qa_max_turns - 1）應通過驗證，不被 max 規則擋下。
         $history = array_map(fn ($i) => ['question' => "問題 {$i}", 'summary' => "摘要 {$i}"], range(1, 4));
 
-        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService = $this->createStub(NaturalLanguageQueryService::class);
         $mockService->method('answerQuestion')->willReturn([
             'success' => true,
             'answer_markdown' => 'ok',
@@ -284,7 +284,7 @@ class HistoricalQaTest extends TestCase {
         Config::set('query_playground.qa_history_char_limit', 100);
         $this->be($this->adminUser);
 
-        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService = $this->createStub(NaturalLanguageQueryService::class);
         $mockService->method('answerQuestion')->willReturn([
             'success' => true,
             'answer_markdown' => 'ok',
@@ -324,7 +324,7 @@ class HistoricalQaTest extends TestCase {
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['conversation_history']);
 
-        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService = $this->createStub(NaturalLanguageQueryService::class);
         $mockService->method('answerQuestion')->willReturn([
             'success' => true,
             'answer_markdown' => 'ok',
@@ -395,7 +395,7 @@ class HistoricalQaTest extends TestCase {
     public function answer_from_nl_returns_answer_markdown_on_success() {
         $this->be($this->adminUser);
 
-        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService = $this->createStub(NaturalLanguageQueryService::class);
         $mockService->method('answerQuestion')
             ->willReturn([
                 'success' => true,
@@ -435,7 +435,7 @@ class HistoricalQaTest extends TestCase {
     public function answer_from_nl_returns_error_on_failure() {
         $this->be($this->adminUser);
 
-        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService = $this->createStub(NaturalLanguageQueryService::class);
         $mockService->method('answerQuestion')
             ->willReturn([
                 'success' => false,
@@ -496,7 +496,7 @@ class HistoricalQaTest extends TestCase {
     public function answer_from_nl_stream_returns_200_with_sse_headers() {
         $this->be($this->adminUser);
 
-        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService = $this->createStub(NaturalLanguageQueryService::class);
         $mockService->method('answerQuestion')
             ->willReturn([
                 'success' => true,
@@ -587,7 +587,7 @@ class HistoricalQaTest extends TestCase {
 
         $this->be($this->adminUser);
 
-        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService = $this->createStub(NaturalLanguageQueryService::class);
         $mockService->method('answerQuestion')
             ->willReturnCallback(function (
                 string $question,
@@ -637,7 +637,7 @@ class HistoricalQaTest extends TestCase {
     public function old_generate_from_nl_endpoint_still_works() {
         $this->be($this->adminUser);
 
-        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService = $this->createStub(NaturalLanguageQueryService::class);
         $mockService->method('generateSQL')
             ->willReturn([
                 'success' => true,
@@ -664,7 +664,7 @@ class HistoricalQaTest extends TestCase {
     public function old_generate_from_nl_stream_endpoint_still_works() {
         $this->be($this->adminUser);
 
-        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService = $this->createStub(NaturalLanguageQueryService::class);
         $mockService->method('generateSQL')
             ->willReturn([
                 'success' => true,
@@ -715,11 +715,13 @@ class HistoricalQaTest extends TestCase {
             ->onlyMethods($methods)
             ->getMock();
 
+        // 刻意保留為 mock 並斷言 LLM 請求至少發生一次：所有呼叫端的情境都依賴這個回應，
+        // 這是真實的期望（PHPUnit 13 對沒有期望的 mock 會發 notice；不需要斷言時可改用 getStubBuilder()）。
         if (is_callable($responses)) {
-            $service->method('performLlmHttpRequest')
+            $service->expects($this->atLeastOnce())->method('performLlmHttpRequest')
                 ->willReturnCallback($responses);
         } else {
-            $service->method('performLlmHttpRequest')
+            $service->expects($this->atLeastOnce())->method('performLlmHttpRequest')
                 ->willReturn($responses);
         }
 
@@ -1168,7 +1170,7 @@ class HistoricalQaTest extends TestCase {
     public function answer_from_nl_response_includes_suggested_follow_ups() {
         $this->be($this->adminUser);
 
-        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService = $this->createStub(NaturalLanguageQueryService::class);
         $mockService->method('answerQuestion')->willReturn([
             'success' => true,
             'answer_markdown' => '李白是唐代詩人。',
@@ -1194,7 +1196,7 @@ class HistoricalQaTest extends TestCase {
     public function answer_from_nl_stream_complete_event_includes_suggested_follow_ups() {
         $this->be($this->adminUser);
 
-        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService = $this->createStub(NaturalLanguageQueryService::class);
         $mockService->method('answerQuestion')->willReturn([
             'success' => true,
             'answer_markdown' => '李白是唐代詩人。',
@@ -1224,7 +1226,7 @@ class HistoricalQaTest extends TestCase {
         Config::set('query_playground.qa_rate_limit_per_minute', 2);
         $this->be($this->adminUser);
 
-        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService = $this->createStub(NaturalLanguageQueryService::class);
         $mockService->method('answerQuestion')->willReturn([
             'success' => true,
             'answer_markdown' => 'ok',
@@ -1250,7 +1252,7 @@ class HistoricalQaTest extends TestCase {
     public function answer_from_nl_rate_limit_is_keyed_per_user() {
         Config::set('query_playground.qa_rate_limit_per_minute', 1);
 
-        $mockService = $this->createMock(NaturalLanguageQueryService::class);
+        $mockService = $this->createStub(NaturalLanguageQueryService::class);
         $mockService->method('answerQuestion')->willReturn([
             'success' => true,
             'answer_markdown' => 'ok',

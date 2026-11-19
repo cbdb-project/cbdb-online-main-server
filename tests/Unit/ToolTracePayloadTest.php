@@ -16,7 +16,7 @@ use Tests\TestCase;
  */
 class ToolTracePayloadTest extends TestCase {
     private function makeService(NlQueryToolsService $toolsService): NaturalLanguageQueryService {
-        $schemaService = $this->createMock(DatabaseSchemaService::class);
+        $schemaService = $this->createStub(DatabaseSchemaService::class);
         $schemaService->method('generateSchemaPrompt')->willReturn('');
         $schemaService->method('getSchemaInfo')->willReturn([]);
 
@@ -56,7 +56,7 @@ class ToolTracePayloadTest extends TestCase {
 
     #[Test]
     public function tool_trace_payload_contains_arguments(): void {
-        $toolsService = $this->createMock(NlQueryToolsService::class);
+        $toolsService = $this->createStub(NlQueryToolsService::class);
         $toolsService->method('executeTool')->willReturn([
             'success' => true,
             'data' => [],
@@ -73,7 +73,7 @@ class ToolTracePayloadTest extends TestCase {
 
     #[Test]
     public function tool_trace_payload_contains_status(): void {
-        $toolsService = $this->createMock(NlQueryToolsService::class);
+        $toolsService = $this->createStub(NlQueryToolsService::class);
         $toolsService->method('executeTool')->willReturn([
             'success' => true,
             'data' => [],
@@ -91,7 +91,7 @@ class ToolTracePayloadTest extends TestCase {
 
     #[Test]
     public function tool_trace_payload_contains_result_summary(): void {
-        $toolsService = $this->createMock(NlQueryToolsService::class);
+        $toolsService = $this->createStub(NlQueryToolsService::class);
         $toolsService->method('executeTool')->willReturn([
             'success' => true,
             'data' => ['table_a', 'table_b'],
@@ -109,7 +109,7 @@ class ToolTracePayloadTest extends TestCase {
 
     #[Test]
     public function error_tool_trace_has_status_error(): void {
-        $toolsService = $this->createMock(NlQueryToolsService::class);
+        $toolsService = $this->createStub(NlQueryToolsService::class);
         $toolsService->method('executeTool')->willReturn([
             'success' => false,
             'data' => null,
@@ -130,7 +130,7 @@ class ToolTracePayloadTest extends TestCase {
 
     #[Test]
     public function tool_execution_complete_event_contains_result_summary(): void {
-        $toolsService = $this->createMock(NlQueryToolsService::class);
+        $toolsService = $this->createStub(NlQueryToolsService::class);
         $toolsService->method('executeTool')->willReturn([
             'success' => true,
             'data' => [],
@@ -158,7 +158,7 @@ class ToolTracePayloadTest extends TestCase {
 
     #[Test]
     public function tool_execution_start_event_contains_arguments(): void {
-        $toolsService = $this->createMock(NlQueryToolsService::class);
+        $toolsService = $this->createStub(NlQueryToolsService::class);
         $toolsService->method('executeTool')->willReturn([
             'success' => true,
             'data' => null,
@@ -187,7 +187,7 @@ class ToolTracePayloadTest extends TestCase {
 
     #[Test]
     public function summarize_query_read_only_sql_includes_sql_and_row_count(): void {
-        $service = $this->makeService($this->createMock(NlQueryToolsService::class));
+        $service = $this->makeService($this->createStub(NlQueryToolsService::class));
         $sql = 'SELECT c_personid, c_name_chn FROM BIOG_MAIN WHERE c_personid = 1';
         $result = [
             'success' => true,
@@ -215,7 +215,7 @@ class ToolTracePayloadTest extends TestCase {
 
     #[Test]
     public function summarize_get_person_ids_includes_count_and_names(): void {
-        $service = $this->makeService($this->createMock(NlQueryToolsService::class));
+        $service = $this->makeService($this->createStub(NlQueryToolsService::class));
         $result = [
             'success' => true,
             'data' => [
@@ -240,7 +240,7 @@ class ToolTracePayloadTest extends TestCase {
 
     #[Test]
     public function summarize_error_result_returns_error_status(): void {
-        $service = $this->makeService($this->createMock(NlQueryToolsService::class));
+        $service = $this->makeService($this->createStub(NlQueryToolsService::class));
         $result = [
             'success' => false,
             'data' => null,
@@ -259,7 +259,7 @@ class ToolTracePayloadTest extends TestCase {
 
     #[Test]
     public function summarize_query_table_includes_row_count_and_columns(): void {
-        $service = $this->makeService($this->createMock(NlQueryToolsService::class));
+        $service = $this->makeService($this->createStub(NlQueryToolsService::class));
         $result = [
             'success' => true,
             'data' => [
@@ -294,7 +294,7 @@ class ToolTracePayloadTest extends TestCase {
 
     #[Test]
     public function summarize_get_table_row_by_id_reports_found_status(): void {
-        $service = $this->makeService($this->createMock(NlQueryToolsService::class));
+        $service = $this->makeService($this->createStub(NlQueryToolsService::class));
         $result = [
             'success' => true,
             'data' => [
@@ -322,7 +322,7 @@ class ToolTracePayloadTest extends TestCase {
     public function summarize_query_read_only_sql_sql_is_accessible_in_arguments(): void {
         // This test verifies that SQL is preserved in the arguments field
         // (which is always passed through to the frontend)
-        $toolsService = $this->createMock(NlQueryToolsService::class);
+        $toolsService = $this->createStub(NlQueryToolsService::class);
         $expectedSql = 'SELECT * FROM DYNASTIES';
         $toolsService->method('executeTool')->willReturn([
             'success' => true,

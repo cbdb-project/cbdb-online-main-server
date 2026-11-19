@@ -20,7 +20,7 @@ use Tests\TestCase;
  *   - 沒有任何人物 ID 欄位的表（代碼表等）不受影響。
  */
 class ExportMysqlToSqliteExcludesDeletedBiogMainTest extends TestCase {
-    private function invokeExcludeSoftDeletedPersons(string $tableName, $query, array $personIdColumnsOverride = null) {
+    private function invokeExcludeSoftDeletedPersons(string $tableName, $query, ?array $personIdColumnsOverride = null) {
         $command = new class ($personIdColumnsOverride) extends ExportMysqlToSqlite {
             private $personIdColumnsOverride;
 

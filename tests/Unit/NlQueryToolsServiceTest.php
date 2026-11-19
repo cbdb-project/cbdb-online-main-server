@@ -163,7 +163,7 @@ class NlQueryToolsServiceTest extends TestCase {
 
     #[Test]
     public function it_can_execute_list_allowed_tables_tool(): void {
-        $readOnlyService = $this->createMock(ReadOnlyTableQueryService::class);
+        $readOnlyService = $this->createStub(ReadOnlyTableQueryService::class);
         $readOnlyService->method('listAllowedTables')
             ->willReturn(['DYNASTIES', 'BIOG_MAIN']);
 
@@ -177,7 +177,7 @@ class NlQueryToolsServiceTest extends TestCase {
     #[Test]
     public function it_can_execute_query_table_schema_tool(): void {
         $readOnlyService = $this->createMock(ReadOnlyTableQueryService::class);
-        $readOnlyService->method('queryTableSchema')
+        $readOnlyService->expects($this->once())->method('queryTableSchema')
             ->with('DYNASTIES')
             ->willReturn([
                 'table_name' => 'DYNASTIES',
@@ -199,7 +199,7 @@ class NlQueryToolsServiceTest extends TestCase {
     #[Test]
     public function it_can_execute_query_read_only_sql_tool(): void {
         $readOnlyService = $this->createMock(ReadOnlyTableQueryService::class);
-        $readOnlyService->method('queryReadOnlySql')
+        $readOnlyService->expects($this->once())->method('queryReadOnlySql')
             ->with('SELECT * FROM DYNASTIES', 5, 0)
             ->willReturn([
                 'sql' => 'SELECT * FROM DYNASTIES',

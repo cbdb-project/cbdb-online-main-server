@@ -18,7 +18,7 @@
     "tailwindcss": "^4.3.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.8",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.1"
   },
   "dependencies": {
     "@inertiajs/react": "^3.11.0",
@@ -29,14 +29,14 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cn-era": "^0.4.1",
-    "dompurify": "^3.4.17",
+    "dompurify": "^3.4.18",
     "leaflet": "^1.9.4",
-    "lucide-react": "^1.72.0",
-    "marked": "^18.2.0",
+    "lucide-react": "^1.76.0",
+    "marked": "^18.2.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "sql-formatter": "^15.9.0",
-    "tailwind-merge": "^3.7.0",
+    "sql-formatter": "^15.9.1",
+    "tailwind-merge": "^3.7.1",
     "tailwindcss-animate": "^1.0.7"
   },
   "engines": {
